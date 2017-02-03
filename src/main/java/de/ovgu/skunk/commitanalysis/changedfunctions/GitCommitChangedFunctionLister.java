@@ -39,6 +39,7 @@ public class GitCommitChangedFunctionLister implements Runnable {
 
     @Override
     public void run() {
+        /*
         if (true) {
             throw new RuntimeException("This is wrong: (is_absolute_uri should not be listed!)\n" +
                     "20:03:00  INFO Analyzing commit 0ce6568af0d6dffbefb78a787d108e1d95c366fe\n" +
@@ -46,6 +47,7 @@ public class GitCommitChangedFunctionLister implements Runnable {
                     "1\tmodules/mappers/mod_rewrite.c\tstatic unsigned is_absolute_uri(char *uri)\n" +
                     "2\tmodules/mappers/mod_rewrite.c\tstatic char *do_expand(char *input, rewrite_ctx *ctx, rewriterule_entry *entry)");
         }
+        */
 
         errors = 0;
         try {
@@ -185,6 +187,7 @@ public class GitCommitChangedFunctionLister implements Runnable {
             }
         }
 
+        @Override
         public void accept(Edit edit) {
             // NOTE, 2016-12-09, wf: To know which *existing* functions have been modified, we
             // only need to look at the "A"-side of the edit and can ignore the "B" side.
