@@ -135,6 +135,12 @@ public class GitCommitChangedFunctionLister implements Runnable {
                     if (edits > 0) {
                         Method func = e.getKey();
                         System.out.println(edits + "\t" + oldPath + "\t" + func.functionSignatureXml);
+                        /*
+                        if ("0ce6568af0d6dffbefb78a787d108e1d95c366fe".equals(commitId) && func.functionSignatureXml.contains("is_absolute_uri")) {
+                            throw new RuntimeException("This is wrong: is_absolute_uri should not be listed for commitId " +
+                                    "0ce6568af0d6dffbefb78a787d108e1d95c366fe!");
+                        }
+                        */
                     }
                 }
             }
@@ -162,7 +168,7 @@ public class GitCommitChangedFunctionLister implements Runnable {
         for (Map.Entry<String, List<Method>> e : changedFunctions.entrySet()) {
             LOG.debug(prefix + "\t" + e.getKey());
             for (Method f : e.getValue()) {
-                LOG.debug(prefix + "\t" + f.start + ":" + f.end + "\t" + f.functionSignatureXml);
+                LOG.debug(prefix + "\t" + f.start1 + ":" + f.end1 + "\t" + f.functionSignatureXml);
             }
         }
     }
@@ -199,11 +205,14 @@ public class GitCommitChangedFunctionLister implements Runnable {
                 Method f = fIter.next();
                 if (editOverlaps(f, remBegin, remEnd)) {
                     markFunctionEdit(edit, f);
-                } else if (f.end < remBegin) {
+                } else if (f.end1 < remBegin) {
                     if (LOG.isDebugEnabled()) {
-                        LOG.debug("Removing " + f + ": no future edits to be expected.");
+                        LOG.debug("No future edits possible for " + f);
                     }
                     fIter.remove();
+                } else if (f.start1 > remEnd) {
+                    LOG.debug("Suspending search for modified functions at " + f);
+                    break;
                 }
             }
         }
@@ -216,14 +225,27 @@ public class GitCommitChangedFunctionLister implements Runnable {
 
         private void logEdit(Method f, Edit edit) {
             if (LOG.isDebugEnabled()) {
-                LOG.debug("Detected edit to " + f + ": " + edit.getBeginA() + "," + edit.getEndA());
+                int editBegin = edit.getBeginA();
+                int editEnd = edit.getEndA();
+                LOG.debug("Detected edit to " + f + ": " + editBegin + "," + editEnd);
+                String[] lines = f.getSourceCode().split("\n");
+                int fBegin = (f.start1 - 1);
+                int adjustedBegin = Math.max(editBegin - fBegin, 0);
+                int adjustedEnd = Math.min(editEnd - fBegin, lines.length);
+                for (int iLine = adjustedBegin; iLine < adjustedEnd; iLine++) {
+                    LOG.debug("- " + lines[iLine]);
+                }
+                LOG.trace(f.sourceCodeWithLineNumbers());
             }
         }
 
         private boolean editOverlaps(Method func, final int editBegin, final int editEnd) {
-            int fBegin = func.start;
-            int fEnd = func.end;
-            return ((editBegin <= fEnd) && (editEnd >= fBegin));
+            // NOTE, 2017-02-04, wf: We subtract 1 from the function's line
+            // numbers because function line numbers are 1-based, whereas edit
+            // line numbers are 0-based.
+            int fBegin = func.start1 - 1;
+            int fEnd = func.end1 - 1;
+            return ((editBegin < fEnd) && (editEnd >= fBegin));
         }
 
         public SortedMap<Method, Integer> getEditedFunctions() {

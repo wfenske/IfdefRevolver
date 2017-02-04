@@ -1,0 +1,87 @@
+commit 0ce6568af0d6dffbefb78a787d108e1d95c366fe
+Author: Nick Kew <niq@apache.org>
+Date:   Thu Jan 8 01:13:36 2009 +0000
+
+    Backport r730274
+    Fix mod_rewrite "B" flag breakage
+    PR 45529
+    
+    
+    git-svn-id: https://svn.apache.org/repos/asf/httpd/httpd/branches/2.2.x@732578 13f79535-47bb-0310-9956-ffa450edef68
+
+diff --git a/CHANGES b/CHANGES
+index 85da92c..9e2bf58 100644
+--- a/CHANGES
++++ b/CHANGES
+@@ -3,0 +4,3 @@ Changes with Apache 2.2.12
++  *) mod_rewrite: fix "B" flag breakage by reverting r589343
++     PR 45529 [Bob Ionescu <bobsiegen googlemail.com>]
++
+diff --git a/STATUS b/STATUS
+index e985cb9..6529e0a 100644
+--- a/STATUS
++++ b/STATUS
+@@ -105,5 +104,0 @@ PATCHES ACCEPTED TO BACKPORT FROM TRUNK:
+-  * mod_rewrite: fix "B" flag breakage by reverting r5589343
+-    PR 45529
+-    http://svn.apache.org/viewvc?view=rev&revision=730274
+-    +1: niq, rpluem, covener
+-
+diff --git a/modules/mappers/mod_rewrite.c b/modules/mappers/mod_rewrite.c
+index 863d69e..ec631bc 100644
+--- a/modules/mappers/mod_rewrite.c
++++ b/modules/mappers/mod_rewrite.c
+@@ -382,0 +383 @@ static APR_OPTIONAL_FN_TYPE(ssl_is_https) *rewrite_is_https = NULL;
++static char *escape_uri(apr_pool_t *p, const char *path);
+@@ -630,0 +632,40 @@ static unsigned is_absolute_uri(char *uri)
++static const char c2x_table[] = "0123456789abcdef";
++
++static APR_INLINE unsigned char *c2x(unsigned what, unsigned char prefix,
++                                     unsigned char *where)
++{
++#if APR_CHARSET_EBCDIC
++    what = apr_xlate_conv_byte(ap_hdrs_to_ascii, (unsigned char)what);
++#endif /*APR_CHARSET_EBCDIC*/
++    *where++ = prefix;
++    *where++ = c2x_table[what >> 4];
++    *where++ = c2x_table[what & 0xf];
++    return where;
++}
++
++/*
++ * Escapes a uri in a similar way as php's urlencode does.
++ * Based on ap_os_escape_path in server/util.c
++ */
++static char *escape_uri(apr_pool_t *p, const char *path) {
++    char *copy = apr_palloc(p, 3 * strlen(path) + 3);
++    const unsigned char *s = (const unsigned char *)path;
++    unsigned char *d = (unsigned char *)copy;
++    unsigned c;
++
++    while ((c = *s)) {
++        if (apr_isalnum(c) || c == '_') {
++            *d++ = c;
++        }
++        else if (c == ' ') {
++            *d++ = '+';
++        }
++        else {
++            d = c2x(c, '%', d);
++        }
++        ++s;
++    }
++    *d = '\0';
++    return copy;
++}
++
+@@ -2243,2 +2284,4 @@ static char *do_expand(char *input, rewrite_ctx *ctx, rewriterule_entry *entry)
+-                    tmp = apr_pstrndup(pool, bri->source + bri->regmatch[n].rm_so, span);
+-                    tmp2 = ap_escape_path_segment(pool, tmp);
++                    tmp = apr_palloc(pool, span + 1);
++                    strncpy(tmp, bri->source + bri->regmatch[n].rm_so, span);
++                    tmp[span] = '\0';
++                    tmp2 = escape_uri(pool, tmp);
+@@ -2250,2 +2293 @@ static char *do_expand(char *input, rewrite_ctx *ctx, rewriterule_entry *entry)
+-                }
+-                else {
++                } else {
