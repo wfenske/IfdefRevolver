@@ -10,7 +10,7 @@ add_to_cp()
     fi
 }
 
-skunk_dir=$(dirname "$0")/..
+skunk_dir=$(dirname "$0")/../../..
 maven_repo=$HOME/.m2/repository
 
 add_to_cp "${maven_repo}"/log4j/log4j/1.2.14/log4j-1.2.14.jar
@@ -23,8 +23,8 @@ add_to_cp "${maven_repo}"/com/google/collections/google-collections/1.0/google-c
 
 add_to_cp "${maven_repo}"/commons-cli/commons-cli/1.3/commons-cli-1.3.jar
 
-add_to_cp "${maven_repo}"/br/usp/metricminer/2.4.2-SNAPSHOT-no-git-branches/metricminer-2.4.2-SNAPSHOT-no-git-branches.jar
+add_to_cp "${maven_repo}"/org/repodriller/repodriller/1.2.2-SNAPSHOT-no-git-branches/repodriller-1.2.2-SNAPSHOT-no-git-branches.jar
 
-add_to_cp "${skunk_dir}"/MAMiner/target/classes 
+add_to_cp "${skunk_dir}"/target/classes 
 
 exec java -cp $SKUNK_CP de.ovgu.skunk.bugs.miner.main.FindBugfixCommits "$@"
