@@ -1,19 +1,11 @@
 package de.ovgu.skunk.bugs.miner.main;
 
-import java.io.PrintWriter;
-
-import org.apache.commons.cli.CommandLine;
-import org.apache.commons.cli.CommandLineParser;
-import org.apache.commons.cli.DefaultParser;
-import org.apache.commons.cli.HelpFormatter;
-import org.apache.commons.cli.Option;
-import org.apache.commons.cli.Options;
-import org.apache.commons.cli.ParseException;
-import org.apache.commons.cli.PatternOptionBuilder;
-
 import de.ovgu.skunk.bugs.miner.BugfixCommitStudy;
 import de.ovgu.skunk.bugs.miner.Config;
+import org.apache.commons.cli.*;
 import org.repodriller.RepoDriller;
+
+import java.io.PrintWriter;
 
 public class FindBugfixCommits {
 
@@ -44,7 +36,9 @@ public class FindBugfixCommits {
             if (dummyLine.hasOption('h')) {
                 HelpFormatter formatter = new HelpFormatter();
                 System.err.flush();
-                formatter.printHelp(progName() + " [OPTIONS]", actualOptions);
+                formatter.printHelp(progName() + " [OPTIONS]",
+                        "Identify bug-fix commits in a GIT repository based on keywords in the commit message.\n\nOptions:\n",
+                        actualOptions, null, false);
                 System.out.flush();
                 System.exit(0);
                 // We will never get here.

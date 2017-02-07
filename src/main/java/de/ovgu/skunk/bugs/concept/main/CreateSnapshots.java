@@ -1,36 +1,20 @@
 package de.ovgu.skunk.bugs.concept.main;
 
-import java.io.BufferedWriter;
-import java.io.File;
-import java.io.FileWriter;
-import java.io.IOException;
-import java.io.InputStream;
-import java.io.PrintWriter;
+import de.ovgu.skunk.bugs.concept.data.Commit;
+import de.ovgu.skunk.bugs.concept.data.ISnapshot;
+import de.ovgu.skunk.bugs.concept.data.NullSnapshot;
+import de.ovgu.skunk.bugs.concept.data.ProperSnapshot;
+import de.ovgu.skunk.bugs.concept.input.FileFinder;
+import de.ovgu.skunk.bugs.concept.input.RevisionsCsvReader;
+import de.ovgu.skunk.bugs.miner.main.FindBugfixCommits;
+import org.apache.commons.cli.*;
+import org.apache.log4j.Logger;
+
+import java.io.*;
 import java.nio.file.Files;
 import java.nio.file.StandardCopyOption;
 import java.text.SimpleDateFormat;
-import java.util.ArrayList;
-import java.util.Collection;
-import java.util.Date;
-import java.util.List;
-import java.util.Scanner;
-
-import de.ovgu.skunk.bugs.concept.data.ISnapshot;
-import de.ovgu.skunk.bugs.concept.data.NullSnapshot;
-import de.ovgu.skunk.bugs.concept.input.FileFinder;
-import de.ovgu.skunk.bugs.concept.input.RevisionsCsvReader;
-import org.apache.commons.cli.CommandLine;
-import org.apache.commons.cli.CommandLineParser;
-import org.apache.commons.cli.DefaultParser;
-import org.apache.commons.cli.HelpFormatter;
-import org.apache.commons.cli.Option;
-import org.apache.commons.cli.OptionGroup;
-import org.apache.commons.cli.Options;
-import org.apache.commons.cli.ParseException;
-import org.apache.log4j.Logger;
-
-import de.ovgu.skunk.bugs.concept.data.Commit;
-import de.ovgu.skunk.bugs.concept.data.ProperSnapshot;
+import java.util.*;
 
 public class CreateSnapshots {
     private static final String GIT_PROG = "git";
@@ -103,15 +87,15 @@ public class CreateSnapshots {
     /**
      * Enumerates possible smells, such as {@link #AB} (for Annotation Bundle),
      * or {@link #LF} (for Large File).
-     * 
+     *
      * @author wfenske
      */
     public enum Smell {
         // @formatter:off
-		AB("methods", "AnnotationBundle.csm"),
-		AF("files", "AnnotationFile.csm"),
-		LF("features", "LargeFeature.csm");
-		// @formatter:on
+        AB("methods", "AnnotationBundle.csm"),
+        AF("files", "AnnotationFile.csm"),
+        LF("features", "LargeFeature.csm");
+        // @formatter:on
         public final String fileName;
         public final String configFileName;
 
@@ -128,8 +112,7 @@ public class CreateSnapshots {
     /**
      * The main method.
      *
-     * @param args
-     *            the arguments
+     * @param args the arguments
      */
     public static void main(String[] args) {
         try {
@@ -157,22 +140,17 @@ public class CreateSnapshots {
          * stored on disk in the folder {@link Config#projectSnapshotsDir()}
          * /&lt;date&gt;, where &lt;date&gt; hsa the format
          * &quot;YYYY-MM-DD&quot;.
-         * 
-         * @param previousSnapshot
-         *            The previous snapshot
-         * @param curSnapshot
-         *            Start date of the current snapshot
+         *
+         * @param previousSnapshot The previous snapshot
+         * @param curSnapshot      Start date of the current snapshot
          */
         void ensureSnapshot(ISnapshot previousSnapshot, ProperSnapshot curSnapshot);
 
         /**
          * Run cppstats (if necessary) and Skunk
-         * 
-         * @param previousSnapshot
-         *            The previous snapshot
-         * 
-         * @param snapshot
-         *            The current snapshot
+         *
+         * @param previousSnapshot The previous snapshot
+         * @param snapshot         The current snapshot
          */
         void processSnapshot(ISnapshot previousSnapshot, ProperSnapshot snapshot);
     }
@@ -216,7 +194,7 @@ public class CreateSnapshots {
 
         /**
          * Git Checkout Script Aufruf
-         * 
+         *
          * @param snapshot
          */
         private void gitCheckout(ProperSnapshot snapshot) {
@@ -280,7 +258,7 @@ public class CreateSnapshots {
         }
 
         private void copyCheckoutToTmpSnapshotDir(List<File> filesInCurrentCheckout, ISnapshot previousSnapShot,
-                ProperSnapshot curSnapshot) {
+                                                  ProperSnapshot curSnapshot) {
             final File cppstatsDir = new File(conf.tmpSnapshotDir(curSnapshot.revisionDate()), "source");
             // Copy Files
             if (conf.optimized && (previousSnapShot instanceof ProperSnapshot)) {
@@ -294,7 +272,7 @@ public class CreateSnapshots {
 
         /**
          * Copies all files for the current Snapshot
-         * 
+         *
          * @param filesInCurrentCheckout
          * @param destDir
          */
@@ -319,9 +297,8 @@ public class CreateSnapshots {
 
         /**
          * Create the cppstats_input.txt in the given directory
-         * 
-         * @param snapshotDir
-         *            Directory where the files of the snapshot will be put
+         *
+         * @param snapshotDir Directory where the files of the snapshot will be put
          */
         private void writeCppstatsConfigFile(final File snapshotDir) {
             File cppstatsConfigFile = new File(snapshotDir, CPPSTATS_INPUT_TXT);
@@ -531,7 +508,7 @@ public class CreateSnapshots {
             StreamReader readErr = new StreamReader(streamErr, progBasename, " err");
             Thread threadOut = new Thread(readOut, "Stream reader for stdout of " + progBasename);
             Thread threadErr = new Thread(readErr, "Stream reader for stderr of " + progBasename);
-            Thread[] threads = new Thread[] { threadOut, threadErr };
+            Thread[] threads = new Thread[]{threadOut, threadErr};
             for (Thread t : threads) {
                 t.start();
             }
@@ -696,21 +673,35 @@ public class CreateSnapshots {
     // mutex groupof options controlling how Skunk is called
     private static final String OPT_SOURCE_L = "source";
     private static final String OPT_PROCESSED_L = "processed";
-    /** --smell=AB|AF|LF */
+    /**
+     * --smell=AB|AF|LF
+     */
     private static final String OPT_SMELL = "s";
-    /** Optional flag for optimizing some unknown magical stuff */
+    /**
+     * Optional flag for optimizing some unknown magical stuff
+     */
     private static final String OPT_OPTIMIZED = "O";
-    /** --reposdir=, e.g. /home/hnes/Masterarbeit/Repositories/ */
+    /**
+     * --reposdir=, e.g. /home/hnes/Masterarbeit/Repositories/
+     */
     private static final String OPT_REPOS_DIR_L = "reposdir";
-    /** e.g., /home/hnes/Masterarbeit/SmellConfigs/ */
+    /**
+     * e.g., /home/hnes/Masterarbeit/SmellConfigs/
+     */
     private static final String OPT_SMELL_CONFIGS_DIR_L = "smellconfigsdir";
     // private static final String OPT_CPPSTATS_PATH =
     // "/home/hnes/Masterarbeit/Tools/cppstats/";
-    /** e.g., /home/hnes/Masterarbeit/Results/ */
+    /**
+     * e.g., /home/hnes/Masterarbeit/Results/
+     */
     private static final String OPT_RESULTS_DIR_L = "resultsdir";
-    /** /home/hnes/Masterarbeit/Temp/ */
+    /**
+     * /home/hnes/Masterarbeit/Temp/
+     */
     private static final String OPT_SNAPSHOTS_DIR_L = "snapshotsdir";
-    /** Specifies project name, e.g., openvpn */
+    /**
+     * Specifies project name, e.g., openvpn
+     */
     private static final char OPT_PROJECT = 'p';
     /**
      * Long name of the {@link #OPT_PROJECT} option.
@@ -719,11 +710,11 @@ public class CreateSnapshots {
     private RevisionsCsvReader revisionsReader = null;
 
     // private static final String OPT_;
+
     /**
      * Analyze input to decide what to do during runtime
      *
-     * @param args
-     *            the command line arguments
+     * @param args the command line arguments
      */
     private Config parseCommandLineArgs(String[] args) {
         Config res = new Config();
@@ -736,7 +727,14 @@ public class CreateSnapshots {
             if (dummyLine.hasOption('h')) {
                 HelpFormatter formatter = new HelpFormatter();
                 System.err.flush();
-                formatter.printHelp(progName() + " [OPTIONS]", actualOptions);
+                formatter.printHelp(progName() + " [OPTIONS]",
+                        "Create snapshots of a VCS repository and detect variability-aware smells in those snapshots using Skunk and cppstats.\n\t" +
+                                "Snapshot creation requires information about the commits to this repository, which can be obtained by running " +
+                                FindBugfixCommits.class.getSimpleName() + " on the repository.\n\t" +
+                                "The snapshots will be created and an extensive Skunk analysis performed when this program is run with the `--" + OPT_SOURCE_L
+                                + "' option. Subsequent runs with the `" +
+                                OPT_PROCESSED_L + "' option will reuse the snapshots and Skunk analysis data and proceed much faster.\n\nOptions:\n",
+                        actualOptions, null, false);
                 System.out.flush();
                 System.exit(0);
                 // We never actually get here due to the preceding
@@ -842,62 +840,62 @@ public class CreateSnapshots {
         boolean required = !forHelp;
         Options options = new Options();
         // @formatter:off
-		// --help= option
-		options.addOption(Option.builder(String.valueOf(OPT_HELP)).longOpt("help")
-				.desc("print this help sceen and exit").build());
+        // --help= option
+        options.addOption(Option.builder(String.valueOf(OPT_HELP)).longOpt("help")
+                .desc("print this help sceen and exit").build());
 
-		options.addOption(
-				Option.builder().longOpt(OPT_SMELL_CONFIGS_DIR_L)
-						.desc("Name of the directory holding the smell detection configuration files for "
-								+ "Skunk. [Default=" + Config.DEFAULT_SMELL_CONFIGS_DIR_NAME + "]")
-						.hasArg().argName("DIR").build());
+        options.addOption(
+                Option.builder().longOpt(OPT_SMELL_CONFIGS_DIR_L)
+                        .desc("Name of the directory holding the smell detection configuration files for "
+                                + "Skunk. [Default=" + Config.DEFAULT_SMELL_CONFIGS_DIR_NAME + "]")
+                        .hasArg().argName("DIR").build());
 
-		StringBuilder validSmellArgs = new StringBuilder();
-		for (Smell m : Smell.values()) {
-			if (validSmellArgs.length() > 0) {
-				validSmellArgs.append("|");
-			}
-			validSmellArgs.append(m.name());
-		}
+        StringBuilder validSmellArgs = new StringBuilder();
+        for (Smell m : Smell.values()) {
+            if (validSmellArgs.length() > 0) {
+                validSmellArgs.append("|");
+            }
+            validSmellArgs.append(m.name());
+        }
 
-		options.addOption(Option.builder(OPT_SMELL).longOpt("smell").desc("Name of smell for which to check").hasArg()
-				.argName(validSmellArgs.toString()).required(required).build());
+        options.addOption(Option.builder(OPT_SMELL).longOpt("smell").desc("Name of smell for which to check").hasArg()
+                .argName(validSmellArgs.toString()).required(required).build());
 
-		options.addOption(Option.builder().longOpt(OPT_REPOS_DIR_L)
-				.desc("Directory below which the repository of the project (specified via `--" + OPT_PROJECT_L
-						+ "') can be found." + " [Default=" + Config.DEFAULT_REPOS_DIR_NAME + "]")
-				.hasArg().argName("DIR").build());
+        options.addOption(Option.builder().longOpt(OPT_REPOS_DIR_L)
+                .desc("Directory below which the repository of the project (specified via `--" + OPT_PROJECT_L
+                        + "') can be found." + " [Default=" + Config.DEFAULT_REPOS_DIR_NAME + "]")
+                .hasArg().argName("DIR").build());
 
-		options.addOption(Option.builder(String.valueOf(OPT_PROJECT)).longOpt(OPT_PROJECT_L)
-				.desc("Name of the project to be analyzed; must specify an existing git folder below the folder given via `--"
-						+ OPT_REPOS_DIR_L + "'.")
-				.hasArg().argName("DIR").required(required).build());
+        options.addOption(Option.builder(String.valueOf(OPT_PROJECT)).longOpt(OPT_PROJECT_L)
+                .desc("Name of the project to be analyzed; must specify an existing git folder below the folder given via `--"
+                        + OPT_REPOS_DIR_L + "'.")
+                .hasArg().argName("DIR").required(required).build());
 
-		options.addOption(Option.builder().longOpt(OPT_SNAPSHOTS_DIR_L).desc(
-				"Snapshots will be created in this directory." + " [Default=" + Config.DEFAULT_SNAPSHOTS_DIR_NAME + "]")
-				.hasArg().argName("DIR").build());
+        options.addOption(Option.builder().longOpt(OPT_SNAPSHOTS_DIR_L).desc(
+                "Snapshots will be created in this directory." + " [Default=" + Config.DEFAULT_SNAPSHOTS_DIR_NAME + "]")
+                .hasArg().argName("DIR").build());
 
-		options.addOption(Option.builder().longOpt(OPT_RESULTS_DIR_L)
-				.desc("Directory where to put results." + " [Default=" + Config.DEFAULT_RESULTS_DIR_NAME + "]").hasArg()
-				.argName("DIR").build());
+        options.addOption(Option.builder().longOpt(OPT_RESULTS_DIR_L)
+                .desc("Directory where to put results." + " [Default=" + Config.DEFAULT_RESULTS_DIR_NAME + "]").hasArg()
+                .argName("DIR").build());
 
-		// --source= and --processed= options
-		OptionGroup skunkModeOptions = new OptionGroup();
-		skunkModeOptions.setRequired(required);
+        // --source= and --processed= options
+        OptionGroup skunkModeOptions = new OptionGroup();
+        skunkModeOptions.setRequired(required);
 
-		skunkModeOptions.addOption(Option.builder().longOpt(OPT_SOURCE_L)
-				.desc("Run Skunk on fresh set of sources, for which no analysis has been" + " performed, yet.")
-				.build());
-		skunkModeOptions.addOption(Option.builder().longOpt(OPT_PROCESSED_L)
-				.desc("Run Skunk on already preprocessed data saved during a previous run of this"
-						+ " tool with the `--" + OPT_SOURCE_L + "' option on.")
-				.build());
+        skunkModeOptions.addOption(Option.builder().longOpt(OPT_SOURCE_L)
+                .desc("Run Skunk on fresh set of sources, for which no analysis has been" + " performed, yet.")
+                .build());
+        skunkModeOptions.addOption(Option.builder().longOpt(OPT_PROCESSED_L)
+                .desc("Run Skunk on already preprocessed data saved during a previous run of this"
+                        + " tool with the `--" + OPT_SOURCE_L + "' option on.")
+                .build());
 
-		options.addOptionGroup(skunkModeOptions);
+        options.addOptionGroup(skunkModeOptions);
 
-		options.addOption(Option.builder(OPT_OPTIMIZED).longOpt("optimized")
-				.desc("Magic optimization option. I don't know what it does.").build());
-		// @formatter:on
+        options.addOption(Option.builder(OPT_OPTIMIZED).longOpt("optimized")
+                .desc("Magic optimization option. I don't know what it does.").build());
+        // @formatter:on
         return options;
     }
 
