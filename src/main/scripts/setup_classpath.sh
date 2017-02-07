@@ -18,10 +18,9 @@ ifdefrevolver_dir=$(dirname "$0")/../../..
 skunk_dir=${ifdefrevolver_dir}/../Skunk/Skunk
 reprodriller_dir=${ifdefrevolver_dir}/../repodriller
 maven_repo=$HOME/.m2/repository
-log4j_dir="${reprodriller_dir}"/lib/apache-log4j-2.6-bin
 
 # Skunk class files
-add_to_cp "${skunk_dir}"/bin
+add_to_cp "${skunk_dir}"/target/classes
 
 # IfdefRevolver class files
 add_to_cp "${ifdefrevolver_dir}"/target/classes 
@@ -35,11 +34,18 @@ add_to_cp "${maven_repo}"/com/opencsv/opencsv/3.8/opencsv-3.8.jar
 # repodriller classes
 add_to_cp "${maven_repo}"/org/repodriller/repodriller/1.2.2-SNAPSHOT-no-git-branches/repodriller-1.2.2-SNAPSHOT-no-git-branches.jar
 
+# egit (required by repodriller)
+add_to_cp "${maven_repo}"/org/eclipse/jgit/org.eclipse.jgit/3.4.1.201406201815-r/org.eclipse.jgit-3.4.1.201406201815-r.jar
+
 # log4j-api
-add_to_cp ${log4j_dir}/log4j-api-2.6.jar
+#add_to_cp ${log4j_dir}/log4j-api-2.6.jar
 
 # log4j-core
-add_to_cp ${log4j_dir}/log4j-core-2.6.jar
+#add_to_cp ${log4j_dir}/log4j-core-2.6.jar
 
 # log4j-1.2-api
-add_to_cp ${log4j_dir}/log4j-1.2-api-2.6.jar
+#add_to_cp ${log4j_dir}/log4j-1.2-api-2.6.jar
+
+# Log4j
+add_to_cp "${maven_repo}"/log4j/log4j/1.2.14/log4j-1.2.14.jar
+add_to_cp "${maven_repo}"/org/apache/logging/log4j/log4j-api/2.1/log4j-api-2.1.jar
