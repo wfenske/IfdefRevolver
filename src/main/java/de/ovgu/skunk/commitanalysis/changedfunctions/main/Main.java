@@ -1,21 +1,14 @@
 package de.ovgu.skunk.commitanalysis.changedfunctions.main;
 
+import de.ovgu.skunk.commitanalysis.changedfunctions.GitCommitChangedFunctionLister;
+import org.apache.commons.cli.*;
+import org.apache.log4j.Logger;
+
 import java.io.IOException;
 import java.io.InputStream;
 import java.io.PrintWriter;
 import java.util.ArrayList;
 import java.util.List;
-
-import org.apache.commons.cli.CommandLine;
-import org.apache.commons.cli.CommandLineParser;
-import org.apache.commons.cli.DefaultParser;
-import org.apache.commons.cli.HelpFormatter;
-import org.apache.commons.cli.Option;
-import org.apache.commons.cli.Options;
-import org.apache.commons.cli.ParseException;
-import org.apache.log4j.Logger;
-
-import de.ovgu.skunk.commitanalysis.changedfunctions.GitCommitChangedFunctionLister;
 
 public class Main {
     private static final Logger LOG = Logger.getLogger(Main.class);
@@ -37,10 +30,10 @@ public class Main {
 
     private void execute() {
         LOG.debug("Analyzing repo " + config.repoDir);
-        LOG.debug("Listing functions changed by commits " + config.commitIds);
         if (config.commitIds.isEmpty()) {
             config.commitIds = readCommitIdsFromStdin();
         }
+        LOG.debug("Listing functions changed by commits " + config.commitIds);
         GitCommitChangedFunctionLister lister = new GitCommitChangedFunctionLister(config);
         lister.run();
     }
@@ -82,8 +75,7 @@ public class Main {
     /**
      * Analyze input to decide what to do during runtime
      *
-     * @param args
-     *            the command line arguments
+     * @param args the command line arguments
      */
     private void parseCommandLineArgs(String[] args) {
         CommandLineParser parser = new DefaultParser();
@@ -98,13 +90,13 @@ public class Main {
                 HelpFormatter formatter = new HelpFormatter();
                 //@formatter:off
                 formatter.printHelp(progName()
-                        + " [-" + Config.OPT_HELP + "]"
-                        + " -" + Config.OPT_REPO + " DIR"
-                        + " [COMMIT_ID ...]"
-                        , "List the signatures of the functions changed by a GIT commit." /* header */
+                                + " [-" + Config.OPT_HELP + "]"
+                                + " -" + Config.OPT_REPO + " DIR"
+                                + " [COMMIT_ID ...]"
+                        , "List the signatures of the functions changed by GIT commits. The commit-ids can either be specified on the command line. Or, if no non-option arguments are specified, they will be read from stdin." /* header */
                         , actualOptions
                         , null /* footer */
-                        );
+                );
                 //@formatter:on
                 System.out.flush();
                 System.err.flush();

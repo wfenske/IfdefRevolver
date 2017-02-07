@@ -35,7 +35,7 @@ public class FunctionLocationProvider {
         this.folderReader = new SrcMlFolderReader(ctx);
     }
 
-    public Map<String, List<Method>> listFunctionsInChangedFiles(RevCommit commit, Set<String> paths) throws IOException {
+    public Map<String, List<Method>> listFunctionsInFiles(RevCommit commit, Set<String> paths) throws IOException {
         final Map<String, List<Method>> changedFunctions = new HashMap<>();
         Consumer<Method> changedFunctionHandler = new Consumer<Method>() {
             @Override
@@ -49,11 +49,11 @@ public class FunctionLocationProvider {
                 functions.add(method);
             }
         };
-        listFunctionsInChangedFiles(commit, paths, changedFunctionHandler);
+        listFunctionsInFiles(commit, paths, changedFunctionHandler);
         return changedFunctions;
     }
 
-    private void listFunctionsInChangedFiles(RevCommit commit, Set<String> paths, Consumer<Method> functionHandler) throws IOException {
+    private void listFunctionsInFiles(RevCommit commit, Set<String> paths, Consumer<Method> functionHandler) throws IOException {
         // a RevWalk allows to walk over commits based on some filtering that is defined
         // and using commit's tree find the path
         RevTree tree = commit.getTree();

@@ -4,21 +4,14 @@ import de.ovgu.skunk.commitanalysis.changedfunctions.main.Config;
 import de.ovgu.skunk.detection.data.Method;
 import org.apache.log4j.Logger;
 import org.eclipse.jgit.api.Git;
-import org.eclipse.jgit.api.errors.GitAPIException;
 import org.eclipse.jgit.diff.DiffEntry;
-import org.eclipse.jgit.diff.DiffEntry.ChangeType;
 import org.eclipse.jgit.diff.DiffFormatter;
 import org.eclipse.jgit.diff.Edit;
 import org.eclipse.jgit.diff.RawTextComparator;
-import org.eclipse.jgit.errors.AmbiguousObjectException;
-import org.eclipse.jgit.errors.IncorrectObjectTypeException;
-import org.eclipse.jgit.errors.LargeObjectException;
-import org.eclipse.jgit.errors.RevisionSyntaxException;
-import org.eclipse.jgit.lib.*;
+import org.eclipse.jgit.lib.ObjectId;
+import org.eclipse.jgit.lib.Repository;
 import org.eclipse.jgit.revwalk.RevCommit;
 import org.eclipse.jgit.revwalk.RevWalk;
-import org.eclipse.jgit.treewalk.CanonicalTreeParser;
-import org.eclipse.jgit.treewalk.EmptyTreeIterator;
 import org.eclipse.jgit.util.MutableInteger;
 import org.eclipse.jgit.util.io.DisabledOutputStream;
 
@@ -39,16 +32,6 @@ public class GitCommitChangedFunctionLister implements Runnable {
 
     @Override
     public void run() {
-        /*
-        if (true) {
-            throw new RuntimeException("This is wrong: (is_absolute_uri should not be listed!)\n" +
-                    "20:03:00  INFO Analyzing commit 0ce6568af0d6dffbefb78a787d108e1d95c366fe\n" +
-                    "20:03:00  INFO 94be9638cfebeb6d049c85d7bd515d40a0d62b48 ... 0ce6568af0d6dffbefb78a787d108e1d95c366fe\n" +
-                    "1\tmodules/mappers/mod_rewrite.c\tstatic unsigned is_absolute_uri(char *uri)\n" +
-                    "2\tmodules/mappers/mod_rewrite.c\tstatic char *do_expand(char *input, rewrite_ctx *ctx, rewriterule_entry *entry)");
-        }
-        */
-
         errors = 0;
         try {
             openRepo(config.repoDir);
@@ -124,23 +107,17 @@ public class GitCommitChangedFunctionLister implements Runnable {
             }
 
             LOG.debug("Parsing A-side functions");
-            final Map<String, List<Method>> allASideFunctions = listFunctionsInChangedFiles(parent, aSideCFilePaths);
+            final Map<String, List<Method>> allASideFunctions = listFunctionsInFiles(parent, aSideCFilePaths);
 
             LOG.debug("Mappings edits to A-side function locations");
             for (DiffEntry diff : diffs) {
                 String oldPath = diff.getOldPath();
                 SortedMap<Method, Integer> changedFunctions = listChangedFunctions(formatter, diff, allASideFunctions);
                 for (Map.Entry<Method, Integer> e : changedFunctions.entrySet()) {
-                    int edits = e.getValue();
-                    if (edits > 0) {
+                    int numEdits = e.getValue();
+                    if (numEdits > 0) {
                         Method func = e.getKey();
-                        System.out.println(edits + "\t" + oldPath + "\t" + func.functionSignatureXml);
-                        /*
-                        if ("0ce6568af0d6dffbefb78a787d108e1d95c366fe".equals(commitId) && func.functionSignatureXml.contains("is_absolute_uri")) {
-                            throw new RuntimeException("This is wrong: is_absolute_uri should not be listed for commitId " +
-                                    "0ce6568af0d6dffbefb78a787d108e1d95c366fe!");
-                        }
-                        */
+                        System.out.println(commitId + "\t" + parentCommitId.name() + "\t" + numEdits + "\t" + oldPath + "\t" + func.functionSignatureXml);
                     }
                 }
             }
@@ -173,12 +150,12 @@ public class GitCommitChangedFunctionLister implements Runnable {
         }
     }
 
-    private Map<String, List<Method>> listFunctionsInChangedFiles(RevCommit commit, Set<String> changedFilesPaths) throws IOException {
-        if (changedFilesPaths.isEmpty()) {
+    private Map<String, List<Method>> listFunctionsInFiles(RevCommit commit, Set<String> filesPaths) throws IOException {
+        if (filesPaths.isEmpty()) {
             return Collections.emptyMap();
         }
         FunctionLocationProvider functionLocationProvider = new FunctionLocationProvider(repo);
-        return functionLocationProvider.listFunctionsInChangedFiles(commit, changedFilesPaths);
+        return functionLocationProvider.listFunctionsInFiles(commit, filesPaths);
     }
 
     static class EditToFunctionLocMapper implements Consumer<Edit> {
@@ -224,7 +201,7 @@ public class GitCommitChangedFunctionLister implements Runnable {
         }
 
         private void logEdit(Method f, Edit edit) {
-            if (LOG.isDebugEnabled()) {
+            if (LOG.isDebugEnabled() || LOG.isTraceEnabled()) {
                 int editBegin = edit.getBeginA();
                 int editEnd = edit.getEndA();
                 LOG.debug("Detected edit to " + f + ": " + editBegin + "," + editEnd);
@@ -279,83 +256,6 @@ public class GitCommitChangedFunctionLister implements Runnable {
         }
 
         return editLocMapper.getEditedFunctions();
-    }
-
-    private void xlistChangedFunctions(String commitId) {
-        Iterable<RevCommit> commits;
-        try {
-            commits = git.log().add(repo.resolve(commitId)).call();
-        } catch (IOException | GitAPIException e) {
-            throw new RuntimeException("Failed to resolve commit " + commitId, e);
-        }
-        for (RevCommit jgitCommit : commits) {
-            // String msg = jgitCommit.getFullMessage().trim();
-            // String hash = jgitCommit.getName().toString();
-            long epoch = jgitCommit.getCommitTime();
-            final int parentCount = jgitCommit.getParentCount();
-            // String parent = (parentCount > 0) ?
-            // jgitCommit.getParent(0).getName().toString() : "";
-            GregorianCalendar date = new GregorianCalendar();
-            date.setTime(new Date(epoch * 1000L));
-            boolean merge = false;
-            if (parentCount > 1) merge = true;
-            if (merge) {
-                LOG.info("Ignoring merge commit " + commitId);
-                continue;
-            }
-            List<DiffEntry> diffsForTheCommit;
-            try {
-                diffsForTheCommit = diffsForTheCommit(jgitCommit);
-            } catch (RevisionSyntaxException | IOException e) {
-                throw new RuntimeException("Exception gettings diffs for commit " + commitId, e);
-            }
-            if (diffsForTheCommit.size() > config.maxNumberOfFilesPerCommit) {
-                LOG.warn("commit " + commitId + " has more than files than the limit");
-                throw new RuntimeException("commit " + commitId + " too big, sorry");
-            }
-            System.out.print(commitId);
-            System.out.println(":");
-            analyzeDiffsForCommit(diffsForTheCommit);
-            break;
-        }
-    }
-
-    void analyzeDiffsForCommit(List<DiffEntry> diffsForTheCommit) {
-        for (DiffEntry diff : diffsForTheCommit) {
-            final ChangeType changeType = diff.getChangeType();
-            String oldPath = diff.getOldPath();
-            String newPath = diff.getNewPath();
-            String diffText = "";
-            String sc = "";
-            if (changeType != ChangeType.DELETE) {
-                diffText = getDiffText(diff);
-                sc = getSourceCode(diff);
-            }
-            System.out.print("---\t");
-            System.out.println(oldPath);
-            System.out.print("+++\t");
-            System.out.println(newPath);
-            // System.out.println(":");
-            System.out.println(diffText);
-        }
-    }
-
-    private String getSourceCode(DiffEntry diff) {
-        try {
-            ObjectReader reader = repo.newObjectReader();
-            final ObjectLoader loader = reader.open(diff.getNewId().toObjectId());
-            byte[] bytes;
-            try {
-                bytes = loader.getCachedBytes(config.maxSizeOfDiffSource);
-            } catch (LargeObjectException loe) {
-                LOG.warn("diff source for " + diff.getNewPath() + " too big.", loe);
-                return "-- TOO BIG --";
-            }
-            return new String(bytes, "utf-8");
-        } catch (Throwable e) {
-            LOG.warn("Failed to obtain source code for diff of " + diff.getNewPath(), e);
-            return "-- ERROR GETTING SOURCE OF NEW OBJECT --";
-        }
     }
 
     class BoundedByteArrayOutputStream extends OutputStream {
@@ -413,67 +313,6 @@ public class GitCommitChangedFunctionLister implements Runnable {
         public String toString(String charsetName) throws UnsupportedEncodingException {
             return delegate.toString(charsetName);
         }
-    }
-
-    private String getDiffText(DiffEntry diff) {
-        DiffFormatter df2 = null;
-        BoundedByteArrayOutputStream out = null;
-        try {
-            out = new BoundedByteArrayOutputStream(config.maxSizeOfADiff);
-            df2 = new DiffFormatter(out);
-            df2.setRepository(repo);
-            df2.format(diff);
-            String diffText = out.toString("UTF-8");
-            return diffText;
-        } catch (IOException ioe) {
-            LOG.warn("diff for " + diff.getNewPath() + " too big.", ioe);
-            return "-- TOO BIG --";
-        } catch (Throwable e) {
-            LOG.warn("Failed to obtain diff for " + diff.getNewPath(), e);
-            return "-- ERROR GETTING DIFF TEXT --";
-        } finally {
-            try {
-                if (df2 != null) df2.release();
-            } finally {
-                if (out != null) {
-                    try {
-                        out.close();
-                    } catch (IOException ioe) {
-                        // Don't care.
-                    }
-                }
-            }
-        }
-    }
-
-    private List<DiffEntry> diffsForTheCommit(RevCommit commit)
-            throws RevisionSyntaxException, AmbiguousObjectException, IncorrectObjectTypeException, IOException {
-        AnyObjectId currentCommit = repo.resolve(commit.getName());
-        AnyObjectId parentCommit = commit.getParentCount() > 0 ? repo.resolve(commit.getParent(0).getName()) : null;
-        DiffFormatter df = new DiffFormatter(DisabledOutputStream.INSTANCE);
-        df.setBinaryFileThreshold(config.binaryFileSizeThresholdInKb);
-        df.setRepository(repo);
-        df.setDiffComparator(RawTextComparator.DEFAULT);
-        df.setDetectRenames(true);
-        List<DiffEntry> diffs = null;
-        if (parentCommit == null) {
-            RevWalk rw = new RevWalk(repo);
-            diffs = df.scan(new EmptyTreeIterator(),
-                    new CanonicalTreeParser(null, rw.getObjectReader(), commit.getTree()));
-            rw.release();
-        } else {
-            diffs = df.scan(parentCommit, currentCommit);
-        }
-        df.release();
-        return diffs;
-    }
-
-    /**
-     * @return Number of errors that have occurred during {@link #run()}. If
-     * everything went fine, this returns <code>0</code>.
-     */
-    public int errors() {
-        return errors;
     }
 
     private void openRepo(String repoDir) throws IOException {
