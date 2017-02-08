@@ -1,27 +1,17 @@
 package de.ovgu.skunk.bugs.concept.input;
 
+import de.ovgu.skunk.bugs.concept.data.Commit;
+import de.ovgu.skunk.bugs.concept.data.FileChange;
+import de.ovgu.skunk.bugs.concept.data.ProperSnapshot;
+import org.apache.log4j.Logger;
+
 import java.io.BufferedReader;
 import java.io.File;
 import java.io.FileReader;
 import java.io.IOException;
 import java.text.ParseException;
 import java.text.SimpleDateFormat;
-import java.util.ArrayList;
-import java.util.Date;
-import java.util.HashMap;
-import java.util.HashSet;
-import java.util.Iterator;
-import java.util.List;
-import java.util.Map;
-import java.util.Set;
-import java.util.SortedMap;
-import java.util.TreeMap;
-
-import org.apache.log4j.Logger;
-
-import de.ovgu.skunk.bugs.concept.data.Commit;
-import de.ovgu.skunk.bugs.concept.data.FileChange;
-import de.ovgu.skunk.bugs.concept.data.ProperSnapshot;
+import java.util.*;
 
 public class RevisionsCsvReader {
     private static Logger log = Logger.getLogger(RevisionsCsvReader.class);
@@ -43,8 +33,7 @@ public class RevisionsCsvReader {
     /**
      * Instantiates a new CSVReader
      *
-     * @param detPath
-     *            the path of the revisionsFull.csv
+     * @param revisionsCsv the path of the revisionsFull.csv
      */
     public RevisionsCsvReader(File revisionsCsv, int commitWindowSize) {
         this.revisionsCsv = revisionsCsv;
@@ -190,9 +179,8 @@ public class RevisionsCsvReader {
     /**
      * Validate the snapshots in {@link #snapshots}. If something is wrong,
      * throw an {@link AssertionError}
-     * 
-     * @throws AssertionError
-     *             if the contents of {@link #snapshots} are invalid
+     *
+     * @throws AssertionError if the contents of {@link #snapshots} are invalid
      */
     private void validateSnapshots() {
         for (ProperSnapshot snapshot : snapshots) {
@@ -210,16 +198,14 @@ public class RevisionsCsvReader {
     /**
      * Call {@link Iterator#next()} until n-many bug fix-commits have been seen,
      * or until the iterator does not provide any more elements.
-     * 
-     * @param iter
-     *            an Iterator
-     * @param n
-     *            A non-negative number indicating the number of bug-fixes which
-     *            should be skipped. If 0, the iterator will be advanced to the
-     *            next bug-fix commit, if such a commit exists.
+     *
+     * @param iter an Iterator
+     * @param n    A non-negative number indicating the number of bug-fixes which
+     *             should be skipped. If 0, the iterator will be advanced to the
+     *             next bug-fix commit, if such a commit exists.
      * @return The n-th bug-fix commit. If no such bug-fix commit exists
-     *         (because the iterator stops returning elements before that),
-     *         <code>null</code> is returned.
+     * (because the iterator stops returning elements before that),
+     * <code>null</code> is returned.
      */
     private Commit skipNBugfixes(Iterator<Commit> iter, final int n) {
         if (n < 0) {
@@ -243,10 +229,10 @@ public class RevisionsCsvReader {
     /**
      * The list of snapshots, created by calling {@link #processFile()}. Each
      * snapshot contains exactly {@link #commitWindowSize} bug-fix commits.
-     * 
+     *
      * @return The list of snapshots, in ascending order by date. Each snapshot
-     *         contains at least one commit, i.e., the maps are guaranteed to be
-     *         non-empty.
+     * contains at least one commit, i.e., the maps are guaranteed to be
+     * non-empty.
      */
     public List<ProperSnapshot> getSnapshots() {
         return snapshots;

@@ -1,6 +1,7 @@
 #!/usr/bin/env sh
 
-me_dir=$(dirname "$0")
+real_me=$(realpath -- "$0")
+me_dir=$(dirname -- "${real_me}")
 . "${me_dir}"/setup_classpath.sh || exit $?
 
 o_smellconfigs_dir="--smellconfigsdir=${me_dir}/../resources/smellconfigs"

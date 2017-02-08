@@ -4,7 +4,7 @@ config=${1:?"Smell detection configuration file (first positional argument) is m
 
 #echo "$0 $@ in $PWD" >&2; exit 1
 
-SKUNK_COMMAND=$(dirname "$0")/../../Skunk/VARISCAN/skunk.sh
+SKUNK_COMMAND=skunk.sh
 
 # (2.5) skunk
 echo "Starting SKUNK --processed ..." >&2

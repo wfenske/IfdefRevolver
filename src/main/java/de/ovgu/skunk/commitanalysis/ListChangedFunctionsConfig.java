@@ -1,17 +1,17 @@
 /**
- * 
+ *
  */
-package de.ovgu.skunk.commitanalysis.changedfunctions.main;
+package de.ovgu.skunk.commitanalysis;
 
 import java.io.File;
 import java.util.List;
 
 /**
  * Runtime configuration options of this program
- * 
+ *
  * @author wfenske
  */
-public class Config {
+public class ListChangedFunctionsConfig {
     public static final char OPT_HELP = 'h';
     public static final String OPT_HELP_L = "help";
     public static final char OPT_REPO = 'r';

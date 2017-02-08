@@ -14,7 +14,10 @@ add_to_cp()
     fi
 }
 
-ifdefrevolver_dir=$(dirname "$0")/../../..
+real_me=$(realpath -- "$0")
+me_dir=$(dirname -- "${real_me}")
+
+ifdefrevolver_dir=${me_dir}/../../..
 skunk_dir=${ifdefrevolver_dir}/../Skunk/Skunk
 reprodriller_dir=${ifdefrevolver_dir}/../repodriller
 maven_repo=$HOME/.m2/repository
@@ -48,4 +51,4 @@ add_to_cp "${maven_repo}"/org/eclipse/jgit/org.eclipse.jgit/3.4.1.201406201815-r
 
 # Log4j
 add_to_cp "${maven_repo}"/log4j/log4j/1.2.14/log4j-1.2.14.jar
-add_to_cp "${maven_repo}"/org/apache/logging/log4j/log4j-api/2.1/log4j-api-2.1.jar
+#add_to_cp "${maven_repo}"/org/apache/logging/log4j/log4j-api/2.1/log4j-api-2.1.jar

@@ -4,7 +4,7 @@
 <log4j:configuration xmlns:log4j="http://jakarta.apache.org/log4j/">
 
     <appender name="stderr" class="org.apache.log4j.ConsoleAppender">
-        <param name="threshold" value="INFO"/>
+        <param name="threshold" value="trace"/>
         <param name="target" value="System.err"/>
         <layout class="org.apache.log4j.PatternLayout">
             <param name="ConversionPattern" value="%d{HH:mm:ss} %5p %m%n"/>
@@ -12,19 +12,19 @@
         </layout>
     </appender>
 
-    <category name="org.repodriller">
-        <priority value="INFO"/>
+    <logger name="org.repodriller" additivity="false">
+        <level value="info"/>
         <appender-ref ref="stderr"/>
-    </category>
+    </logger>
 
-    <category name="de.ovgu.skunk">
-        <priority value="INFO"/>
+    <logger name="de.ovgu.skunk" additivity="false">
+        <level value="info"/>
         <appender-ref ref="stderr"/>
-    </category>
+    </logger>
 
-    <category name="/">
-        <priority value="INFO"/>
+    <logger name="de.ovgu.skunk.commitanalysis.ListAllFunctions" additivity="false">
+        <level value="trace"/>
         <appender-ref ref="stderr"/>
-    </category>
+    </logger>
 
 </log4j:configuration>

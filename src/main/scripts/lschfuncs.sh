@@ -1,6 +1,7 @@
 #!/usr/bin/env sh
 
-me_dir=$(dirname "$0")
+real_me=$(realpath -- "$0")
+me_dir=$(dirname -- "${real_me}")
 . "${me_dir}"/setup_classpath.sh || exit $?
 
-exec java -cp "${CP:?}" de.ovgu.skunk.commitanalysis.changedfunctions.main.Main "$@"
+exec java -cp "${CP:?}" de.ovgu.skunk.commitanalysis.ListChangedFunctions "$@"

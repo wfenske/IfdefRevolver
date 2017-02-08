@@ -1,4 +1,4 @@
-package de.ovgu.skunk.commitanalysis.changedfunctions;
+package de.ovgu.skunk.commitanalysis;
 
 import de.ovgu.skunk.detection.data.Context;
 import de.ovgu.skunk.detection.data.Method;

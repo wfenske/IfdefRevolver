@@ -1,6 +1,5 @@
-package de.ovgu.skunk.commitanalysis.changedfunctions;
+package de.ovgu.skunk.commitanalysis;
 
-import de.ovgu.skunk.commitanalysis.changedfunctions.main.Config;
 import de.ovgu.skunk.detection.data.Method;
 import org.apache.log4j.Logger;
 import org.eclipse.jgit.api.Git;
@@ -21,12 +20,12 @@ import java.util.function.Consumer;
 
 public class GitCommitChangedFunctionLister implements Runnable {
     private static final Logger LOG = Logger.getLogger(GitCommitChangedFunctionLister.class);
-    private Config config;
+    private ListChangedFunctionsConfig config;
     private int errors = 0;
     private Git git = null;
     private Repository repo = null;
 
-    public GitCommitChangedFunctionLister(Config config) {
+    public GitCommitChangedFunctionLister(ListChangedFunctionsConfig config) {
         this.config = config;
     }
 

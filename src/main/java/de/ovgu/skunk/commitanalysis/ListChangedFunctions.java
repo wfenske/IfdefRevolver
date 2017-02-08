@@ -1,6 +1,5 @@
-package de.ovgu.skunk.commitanalysis.changedfunctions.main;
+package de.ovgu.skunk.commitanalysis;
 
-import de.ovgu.skunk.commitanalysis.changedfunctions.GitCommitChangedFunctionLister;
 import org.apache.commons.cli.*;
 import org.apache.log4j.Logger;
 
@@ -10,12 +9,12 @@ import java.io.PrintWriter;
 import java.util.ArrayList;
 import java.util.List;
 
-public class Main {
-    private static final Logger LOG = Logger.getLogger(Main.class);
-    private Config config;
+public class ListChangedFunctions {
+    private static final Logger LOG = Logger.getLogger(ListChangedFunctions.class);
+    private ListChangedFunctionsConfig config;
 
     public static void main(String[] args) {
-        Main main = new Main();
+        ListChangedFunctions main = new ListChangedFunctions();
         try {
             main.parseCommandLineArgs(args);
         } catch (Exception e) {
@@ -84,14 +83,14 @@ public class Main {
         CommandLine line;
         try {
             CommandLine dummyLine = parser.parse(fakeOptionsForHelp, args);
-            if (dummyLine.hasOption(Config.OPT_HELP)) {
+            if (dummyLine.hasOption(ListChangedFunctionsConfig.OPT_HELP)) {
                 System.out.flush();
                 System.err.flush();
                 HelpFormatter formatter = new HelpFormatter();
                 //@formatter:off
                 formatter.printHelp(progName()
-                                + " [-" + Config.OPT_HELP + "]"
-                                + " -" + Config.OPT_REPO + " DIR"
+                                + " [-" + ListChangedFunctionsConfig.OPT_HELP + "]"
+                                + " -" + ListChangedFunctionsConfig.OPT_REPO + " DIR"
                                 + " [COMMIT_ID ...]"
                         , "List the signatures of the functions changed by GIT commits. The commit-ids can either be specified on the command line. Or, if no non-option arguments are specified, they will be read from stdin." /* header */
                         , actualOptions
@@ -119,8 +118,8 @@ public class Main {
             // call.
             return;
         }
-        this.config = new Config();
-        config.repoDir = line.getOptionValue(Config.OPT_REPO);
+        this.config = new ListChangedFunctionsConfig();
+        config.repoDir = line.getOptionValue(ListChangedFunctionsConfig.OPT_REPO);
         config.validateRepoDir();
         config.commitIds = line.getArgList();
     }
@@ -131,13 +130,13 @@ public class Main {
         // @formatter:off
 
         // --help= option
-        options.addOption(Option.builder(String.valueOf(Config.OPT_HELP))
-                .longOpt(Config.OPT_HELP_L)
+        options.addOption(Option.builder(String.valueOf(ListChangedFunctionsConfig.OPT_HELP))
+                .longOpt(ListChangedFunctionsConfig.OPT_HELP_L)
                 .desc("print this help sceen and exit")
                 .build());
 
-        options.addOption(Option.builder(String.valueOf(Config.OPT_REPO))
-                .longOpt(Config.OPT_REPO_L)
+        options.addOption(Option.builder(String.valueOf(ListChangedFunctionsConfig.OPT_REPO))
+                .longOpt(ListChangedFunctionsConfig.OPT_REPO_L)
                 .desc("directory containing the git repository to analyze")
                 .hasArg().argName("DIR")
                 .required(required)
