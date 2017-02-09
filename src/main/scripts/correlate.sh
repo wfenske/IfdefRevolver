@@ -4,4 +4,4 @@ real_me=$(realpath -- "$0")
 me_dir=$(dirname -- "${real_me}")
 . "${me_dir}"/setup_classpath.sh || exit $?
 
-exec java -cp "$CP" de.ovgu.skunk.bugs.eval.main.Correlate "$@"
+exec java -cp "$CP" de.ovgu.skunk.bugs.correlate.main.Correlate "$@"

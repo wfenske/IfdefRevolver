@@ -1,6 +1,6 @@
 package de.ovgu.skunk.commitanalysis;
 
-import de.ovgu.skunk.bugs.concept.main.CreateSnapshots;
+import de.ovgu.skunk.bugs.createsnapshots.main.CreateSnapshots;
 
 import java.io.File;
 import java.text.SimpleDateFormat;

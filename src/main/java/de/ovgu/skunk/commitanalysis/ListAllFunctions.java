@@ -1,7 +1,7 @@
 package de.ovgu.skunk.commitanalysis;
 
-import de.ovgu.skunk.bugs.concept.main.CreateSnapshots;
-import de.ovgu.skunk.bugs.eval.main.Config;
+import de.ovgu.skunk.bugs.correlate.main.Config;
+import de.ovgu.skunk.bugs.createsnapshots.main.CreateSnapshots;
 import de.ovgu.skunk.detection.data.Context;
 import de.ovgu.skunk.detection.data.Method;
 import de.ovgu.skunk.detection.input.SrcMlFolderReader;
