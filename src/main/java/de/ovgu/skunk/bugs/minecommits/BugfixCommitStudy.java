@@ -1,15 +1,15 @@
 package de.ovgu.skunk.bugs.minecommits;
 
-import java.io.File;
-import java.io.IOException;
-
 import de.ovgu.skunk.bugs.minecommits.main.FindBugfixCommits;
 import org.repodriller.RepositoryMining;
 import org.repodriller.Study;
+import org.repodriller.filter.range.Commits;
 import org.repodriller.persistence.csv.CSVFile;
 import org.repodriller.scm.GitRepository;
 import org.repodriller.scm.SCMRepository;
-import org.repodriller.filter.range.Commits;
+
+import java.io.File;
+import java.io.IOException;
 
 public class BugfixCommitStudy implements Study {
 
@@ -82,12 +82,12 @@ public class BugfixCommitStudy implements Study {
         // @formatter:off
         SCMRepository repo = GitRepository.singleProject(conf.repoPathName);
         new RepositoryMining()
-            .in(repo)
-            .through(Commits.all())
-            .withThreads(2)
-            .process(new DevelopersVisitor(conf.bugfixTerms),
-                     new CSVFile(conf.outputFileName))
-            .mine();
+                .in(repo)
+                .through(Commits.all())
+                .withThreads(2)
+                .process(new DevelopersVisitor(conf.bugfixTerms),
+                        new CSVFile(conf.outputFileName))
+                .mine();
         // @formatter:on
     }
 }

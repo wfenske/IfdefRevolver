@@ -1,14 +1,15 @@
 package de.ovgu.skunk.bugs.minecommits;
-import java.text.SimpleDateFormat;
-import java.util.Calendar;
-import java.util.regex.Matcher;
-import java.util.regex.Pattern;
 
 import org.repodriller.domain.Commit;
 import org.repodriller.domain.Modification;
 import org.repodriller.persistence.PersistenceMechanism;
 import org.repodriller.scm.CommitVisitor;
 import org.repodriller.scm.SCMRepository;
+
+import java.text.SimpleDateFormat;
+import java.util.Calendar;
+import java.util.regex.Matcher;
+import java.util.regex.Pattern;
 
 public class DevelopersVisitor implements CommitVisitor {
 

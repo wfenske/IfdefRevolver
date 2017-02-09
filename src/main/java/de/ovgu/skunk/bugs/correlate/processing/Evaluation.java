@@ -585,8 +585,8 @@ public class Evaluation {
         StringBuilder r = new StringBuilder();
 
         r.append("Snapshot"); // Holds snapshot dates
-		/*
-		 * for (String prefix : COR_OVERVIEW_GROUP_PREFIXES) { for
+        /*
+         * for (String prefix : COR_OVERVIEW_GROUP_PREFIXES) { for
 		 * (CorOverviewGroupColumn c : CorOverviewGroupColumn.values()) {
 		 * r.append(','); r.append(prefix).append('_').append(c.name()); } }
 		 */
@@ -606,8 +606,8 @@ public class Evaluation {
                                 File corOverviewCsvOut) {
 
         // @formatter:off
-		/*
-		double smellFixed = 0;
+        /*
+        double smellFixed = 0;
 		double smellChanged = 0;
 		double smellNotFixed = 0;
 		double smellNotChanged = 0;
@@ -635,7 +635,7 @@ public class Evaluation {
         }
 
         // @formatter:off
-		/*
+        /*
         int smFixCount = 0;
         int smChangeCount = 0;
         int nsFixCount = 0;
@@ -715,7 +715,7 @@ public class Evaluation {
         }
 
 		/*
-		 * Collection<CorOverviewTab> allTabs = new ArrayList<>();
+         * Collection<CorOverviewTab> allTabs = new ArrayList<>();
 		 * allTabs.add(anySmellTab); for (Smell smell : Smell.values()) {
 		 * CorOverviewTab singleSmellTab = singleSmellTabs.get(smell);
 		 * allTabs.add(singleSmellTab); } allTabs.add(abOrAfTab);
@@ -731,7 +731,7 @@ public class Evaluation {
             buff.write(dateFormatter.format(snapshotDate));
 
 			/*
-			 * for (CorOverviewTab tab : allTabs) { for (CorOverviewGroupColumn
+             * for (CorOverviewTab tab : allTabs) { for (CorOverviewGroupColumn
 			 * c : CorOverviewGroupColumn.values()) { buff.write(','); String v
 			 * = c.getColumnValue(tab); buff.write(v); } }
 			 */

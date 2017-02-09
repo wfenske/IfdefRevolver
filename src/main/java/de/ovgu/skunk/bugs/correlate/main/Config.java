@@ -10,7 +10,7 @@ import java.io.File;
 /**
  * @author wfenske
  */
-public class Config {
+public class Config implements IHasProjectSnapshotsDir, IHasProjectResultsDir, IHasRevisionCsvFile {
 
     @SuppressWarnings("unused")
     private static Logger log = Logger.getLogger(Config.class);
@@ -21,7 +21,7 @@ public class Config {
     String project;
 
     /**
-     * Name of the snapshots directory of this project, e.g. "results/openvpn"
+     * Name of the results directory. Below this directory we expect a folder with the name of the project (see {@link #project}), e.g. "results/openvpn".
      */
     String resultsDir = null;
     public static final String DEFAULT_RESULTS_DIR_NAME = "results";
@@ -30,7 +30,7 @@ public class Config {
      * Name of the revisionsFull.csv of this project, e.g.
      * "results/openvpn/revisionsFull.csv"
      */
-    String revisionCsvFile = null;
+    String revisionCsvFilename = null;
     public static final String REVISIONS_FILE_BASENAME = "revisionsFull.csv";
 
     /**
@@ -76,28 +76,19 @@ public class Config {
         // Just for traceability
     }
 
-    public String getResultsDir() {
-        return resultsDir;
+    @Override
+    public File projectResultsDir() {
+        return new File(resultsDir, project);
     }
 
-    public String getSnapshotsDir() {
-        return this.snapshotsDir;
+    @Override
+    public File projectSnapshotsDir() {
+        return new File(snapshotsDir, project);
     }
 
-	/*
-     * private static Path createNewTempDir() { Path result; String tmpDirStr =
-	 * System.getProperty(TMP_DIR_PROP_NAME); if (tmpDirStr == null ||
-	 * tmpDirStr.isEmpty()) { throw new RuntimeException("Java property " +
-	 * TMP_DIR_PROP_NAME + " is not set."); } try { result =
-	 * Files.createTempDirectory(TMP_DIR_PROP_NAME); } catch (IOException e) {
-	 * throw new RuntimeException(
-	 * "Failed to create temporary directory in system temp dir " +
-	 * TMP_DIR_PROP_NAME, e); } log.debug("Created temporary directory " +
-	 * result.toString()); return result; }
-	 */
-
-    public String getRevisionCsvFile() {
-        return revisionCsvFile;
+    @Override
+    public File revisionCsvFile() {
+        return new File(revisionCsvFilename);
     }
 
     // public String getSmellDir() {
@@ -125,26 +116,26 @@ public class Config {
     }
 
     public File smellOverviewFile(Smell smell) {
-        return new File(getResultsDir(), "smellOverview" + smell.name() + ".csv");
+        return new File(projectResultsDir(), "smellOverview" + smell.name() + ".csv");
     }
 
     public File corOverviewFile() {
-        return new File(getResultsDir(), "corOverview.csv");
+        return new File(projectResultsDir(), "corOverview.csv");
     }
 
     public File corOverviewSizeFile() {
-        return new File(getResultsDir(), "corOverviewSize.csv");
+        return new File(projectResultsDir(), "corOverviewSize.csv");
     }
 
     public File correlatedResultsDir() {
-        return new File(getResultsDir(), "Correlated");
+        return new File(projectResultsDir(), "Correlated");
     }
 
     public File projectInfoFile() {
-        return new File(getResultsDir(), "projectInfo.csv");
+        return new File(projectResultsDir(), "projectInfo.csv");
     }
 
     public File projectAnalysisFile() {
-        return new File(getResultsDir(), "projectAnalysis.csv");
+        return new File(projectResultsDir(), "projectAnalysis.csv");
     }
 }

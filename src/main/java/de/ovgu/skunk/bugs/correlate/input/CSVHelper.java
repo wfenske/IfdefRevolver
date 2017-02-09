@@ -8,7 +8,6 @@ import de.ovgu.skunk.bugs.correlate.main.Config;
 import de.ovgu.skunk.bugs.correlate.main.Smell;
 import org.apache.log4j.Logger;
 
-import java.io.BufferedReader;
 import java.io.File;
 import java.io.FileReader;
 import java.io.IOException;
@@ -21,59 +20,34 @@ import java.text.SimpleDateFormat;
 import java.util.*;
 import java.util.Map.Entry;
 
-public class CSVHelper {
+public class CSVHelper extends ProjectInformationReader<Config> {
     private static Logger log = Logger.getLogger(CSVHelper.class);
 
 	/* Indices into Skunk's feature location CSV file */
     /**
      * Column LGSmell (smell score assigned by Skunk)
      */
-    private static final int SFL_IX_LGSMELL = 1;
+    private static final int SFL_COLUMN_IX_LGSMELL = 1;
     /**
      * Column NOFC (number of feature constants)
      */
-    private static final int SFL_IX_NOFC = 6;
+    private static final int SFL_COLUMN_IX_NOFC = 6;
     /**
      * Column LOFC (lines of feature code)
      */
-    private static final int SFL_IX_LOFC = 8;
+    private static final int SFL_COLUMN_IX_LOFC = 8;
     /**
      * Column NOCU (number of compilation units)
      */
-    private static final int SFL_IX_NOCU = 10;
+    private static final int SFL_COLUMN_IX_NOCU = 10;
 
-    // Liste für geänderte Dateien
-    // private SortedMap<ChangedFile, String> changedFiles = new
-    // TreeMap<ChangedFile, String>();
-    // Liste für jeden x-ten Bugfix Commit
-    // private SortedMap<ChangedFile, String> bugFiles = new
-    // TreeMap<ChangedFile, String>();
-
-    // Liste für geänderte Dateien
-    // private SortedMap<ChangedFile, String> changedFilesSingle = new
-    // TreeMap<ChangedFile, String>();
-    // Liste für jeden x-ten Bugfix Commit
-    // private SortedMap<ChangedFile, String> bugFilesSingle = new
-    // TreeMap<ChangedFile, String>();
-    private final Config conf;
-
-    private SortedMap<Date, Snapshot> snapshots;
-
-    private SortedMap<Snapshot, SortedMap<FileChangeHunk, String>> changedFilesBySnapshot = new TreeMap<>();
-    private SortedMap<Snapshot, SortedMap<FileChangeHunk, String>> fixedFilesBySnapshot = new TreeMap<>();
-
-    /**
-     * Instantiates a new CSVReader
-     *
-     * @param detPath the path of the bugdetection csv
-     */
     public CSVHelper(Config conf) {
-        this.conf = conf;
+        super(conf);
     }
 
     /**
-     * @param smell
-     * @param snapshotSmellFile
+     * @param smell             The smell in question.  (Depending on the smell, the snapshotsSmellFile has to be processed a little differently.)
+     * @param snapshotSmellFile A CSV file containing Skunk's smelliness information
      * @return Names of files that exhibit the smells listed in
      * <code>snapshotSmellFile</code>
      */
@@ -107,7 +81,7 @@ public class CSVHelper {
                     scoreList.add(smellScore);
                     // @formatter:off
                     /*
-					if (!scoresByFilename.containsKey(fileName)) {
+                    if (!scoresByFilename.containsKey(fileName)) {
 						scoresByFilename.put(fileName, smellScore);
 						scoreList.add(smellScore);
 					}
@@ -183,8 +157,8 @@ public class CSVHelper {
         }
 
         // @formatter:off
-		/*
-		 * int totalSum = 0; log.
+        /*
+         * int totalSum = 0; log.
 		 * warn("This code is inefficient and should be removed. Just return minVal instead."
 		 * ); Collections.reverse(scoreList);
 		 * 
@@ -257,83 +231,6 @@ public class CSVHelper {
         return basenameWithoutSuffix;
     }
 
-    /**
-     * Main entry point of this class, reads all the necessary project
-     * information
-     */
-    public void processFiles() {
-        snapshots = readSnapshots();
-        processRevisionsFile();
-        // processFileSingle();
-    }
-
-    /**
-     * Nimmt die ursprüngliche CSV-Datei von MetricMiner2 und erstellt die
-     * Listen der Bugfixes und geänderten Dateien mit ihren Änderungsdaten
-     */
-    private void processRevisionsFile() {
-        log.info("Reading revisions file " + conf.getRevisionCsvFile());
-
-        final String cvsSplitBy = ",";
-        final DateFormat formatter = new SimpleDateFormat("yyyy-MM-dd");
-
-        final Map<String, Snapshot> snapshotsByCommit = mapSnapshotsToCommits();
-
-        BufferedReader br = null;
-        String line = "";
-
-        try {
-
-            br = new BufferedReader(new FileReader(conf.getRevisionCsvFile()));
-            while ((line = br.readLine()) != null) {
-
-                // use comma as separator
-                String[] modification = line.split(cvsSplitBy);
-                String curHash = modification[0];
-
-                Snapshot snapshot = snapshotsByCommit.get(curHash);
-
-                if (snapshot == null) {
-                    log.debug("Skipping commit " + curHash + ": not part of any snapshot");
-                    continue;
-                }
-
-                boolean bugfixCommit = Boolean.parseBoolean(modification[1]);
-                // int bugfixCount = Integer.parseInt(commit[8]);
-                String strDate = modification[7];
-                String fileName = modification[3];
-
-                Date comDate;
-                try {
-                    comDate = formatter.parse(strDate);
-                } catch (ParseException e) {
-                    throw new RuntimeException("Could not parse date " + strDate + " in file "
-                            + conf.getRevisionCsvFile(), e);
-                }
-
-                FileChangeHunk chFile = new FileChangeHunk(fileName, curHash, comDate);
-
-                putChangedFile(this.changedFilesBySnapshot, snapshot, chFile, fileName);
-
-                if (bugfixCommit) {
-                    putChangedFile(this.fixedFilesBySnapshot, snapshot, chFile, fileName);
-                }
-            }
-
-        } catch (IOException e) {
-            throw new RuntimeException(
-                    "Error reading revisions CSV file " + conf.getRevisionCsvFile(), e);
-        } finally {
-            if (br != null) {
-                try {
-                    br.close();
-                } catch (IOException e) {
-                    // Don't care
-                }
-            }
-        }
-    }
-
     private void putChangedFile(SortedMap<Snapshot, SortedMap<FileChangeHunk, String>> map,
                                 Snapshot snapshot, FileChangeHunk chFile, String fileName) {
         SortedMap<FileChangeHunk, String> changedFiles = ensureValueForKey(map, snapshot);
@@ -372,7 +269,7 @@ public class CSVHelper {
 
         final DateFormat formatter = new SimpleDateFormat("yyyy-MM-dd");
 
-        File projSnapshotMetadataDir = new File(conf.getResultsDir(), "snapshots");
+        File projSnapshotMetadataDir = new File(conf.projectResultsDir(), "snapshots");
         for (Date snapshotDate : snapshotDates) {
             File snapshotFile = new File(projSnapshotMetadataDir,
                     formatter.format(snapshotDate) + ".csv");
@@ -409,7 +306,7 @@ public class CSVHelper {
             }
         } catch (IOException e1) {
             throw new RuntimeException(
-                    "Error reading file " + conf.projectAnalysisFile().getAbsolutePath(), e1);
+                    "Error reading file " + snapshotFile.getAbsolutePath(), e1);
         } finally {
             if (reader != null) {
                 try {
@@ -436,15 +333,15 @@ public class CSVHelper {
      *
      * @param csvFileName
      */
-	/*
-	 * private void processFileSingle() { BufferedReader br = null; String line
+    /*
+     * private void processFileSingle() { BufferedReader br = null; String line
 	 * = ""; String cvsSplitBy = ",";
 	 * 
 	 * SimpleDateFormat formatter = new SimpleDateFormat("yyyy-MM-dd");
 	 * 
 	 * try {
 	 * 
-	 * br = new BufferedReader(new FileReader(conf.getRevisionCsvFile())); while
+	 * br = new BufferedReader(new FileReader(conf.revisionCsvFile())); while
 	 * ((line = br.readLine()) != null) { // use comma as separator String[]
 	 * commit = line.split(cvsSplitBy); String curHash = commit[0]; boolean
 	 * bugfixCommit = Boolean.parseBoolean(commit[1]); int bugfixCount =
@@ -457,7 +354,7 @@ public class CSVHelper {
 	 * formatter.format(dateStr); comDate = formatter.parse(formattedDate); }
 	 * catch (ParseException e) { throw new RuntimeException(
 	 * "Could not parse date " + strDate + " in file " +
-	 * conf.getRevisionCsvFile(), e); }
+	 * conf.revisionCsvFile(), e); }
 	 * 
 	 * ChangedFile chFile = new ChangedFile(fileName, curHash, comDate);
 	 * 
@@ -467,14 +364,14 @@ public class CSVHelper {
 	 * }
 	 * 
 	 * } catch (IOException e) { throw new
-	 * RuntimeException("Error reading file " + conf.getRevisionCsvFile(), e); }
+	 * RuntimeException("Error reading file " + conf.revisionCsvFile(), e); }
 	 * finally { if (br != null) { try { br.close(); } catch (IOException e) {
 	 * // We don't care. } } } }
 	 */
     // @formatter:on
 
     /**
-     * @param skunkFeatureLocationsCsv
+     * @param skunkFeatureLocationsCsv Skunk-produced CSV file containing information about where feature code resides withing a snapshot
      * @return Map from feature name to {@link Feature} data structure
      */
     public SortedMap<String, Feature> getFeaturesByName(File skunkFeatureLocationsCsv) {
@@ -487,10 +384,10 @@ public class CSVHelper {
             reader.readNext(); // erste Zeile überspringen
             while ((nextLine = reader.readNext()) != null) {
                 String featName = nextLine[0];
-                double smellScore = Double.parseDouble(nextLine[SFL_IX_LGSMELL]);
-                int nofc = Integer.parseInt(nextLine[SFL_IX_NOFC]);
-                int lofc = Integer.parseInt(nextLine[SFL_IX_LOFC]);
-                int nocu = Integer.parseInt(nextLine[SFL_IX_NOCU]);
+                double smellScore = Double.parseDouble(nextLine[SFL_COLUMN_IX_LGSMELL]);
+                int nofc = Integer.parseInt(nextLine[SFL_COLUMN_IX_NOFC]);
+                int lofc = Integer.parseInt(nextLine[SFL_COLUMN_IX_LOFC]);
+                int nocu = Integer.parseInt(nextLine[SFL_COLUMN_IX_NOCU]);
 
                 Feature feature = new Feature(featName, lofc, nofc, nocu, smellScore);
 
@@ -500,7 +397,7 @@ public class CSVHelper {
                 featMap.put(featName, feature);
             }
         } catch (IOException e1) {
-            throw new RuntimeException("Fehler beim Lesen der Datei " + skunkFeatureLocationsCsv,
+            throw new RuntimeException("Error reading file " + skunkFeatureLocationsCsv,
                     e1);
         } finally {
             if (reader != null) {
@@ -515,10 +412,6 @@ public class CSVHelper {
         return featMap;
     }
 
-    /**
-     * @param date
-     * @return
-     */
     public Set<String> getFilesInSnapshot(Snapshot snapshot) {
         Set<String> resultSet = new HashSet<>();
         Date snapshotDate = snapshot.getSnapshotDate();
@@ -633,10 +526,6 @@ public class CSVHelper {
         return scoresByFilename;
     }
 
-    /**
-     * @param projectInfo
-     * @return
-     */
     private List<Date> getProjectDates() {
         List<Date> resultList = new ArrayList<>();
         final SimpleDateFormat formatter = new SimpleDateFormat("yyyy-MM-dd");

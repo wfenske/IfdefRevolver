@@ -32,7 +32,7 @@ public class Preprocessing {
         SmellCSV smellProcessor = new SmellCSV(conf);
 
         // Anzahl der .csv Dateien checken
-        final File pathFind = new File(conf.getResultsDir(), smell.name() + "Res");
+        final File pathFind = new File(conf.projectResultsDir(), smell.name() + "Res");
         log.info("Preprocessing smell data in " + pathFind.getAbsolutePath());
         List<File> smellsPerSnapshotFiles = FileFinder.find(pathFind, "(.*\\.csv$)");
 

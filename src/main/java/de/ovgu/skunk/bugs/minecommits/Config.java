@@ -2,7 +2,7 @@ package de.ovgu.skunk.bugs.minecommits;
 
 /**
  * Configuration options
- * 
+ *
  * @author wfenske
  */
 public class Config {

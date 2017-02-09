@@ -63,7 +63,7 @@ public class ListAllFunctions {
     }
 
     private void execute() {
-        //LOG.debug("Analyzing snapshots in " + config.projectSnapshotsDir());
+        LOG.debug("Analyzing snapshots in " + config.projectSnapshotsDir());
         this.errors = 0;
         listFunctionsInFiles(config.filenames);
     }
@@ -147,8 +147,6 @@ public class ListAllFunctions {
             // call.
             return;
         }
-
-        LOG.trace("line=" + line.getArgList());
 
         this.config = new ListAllFunctionsConfig();
 

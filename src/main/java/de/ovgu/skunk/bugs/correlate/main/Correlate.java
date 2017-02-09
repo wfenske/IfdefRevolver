@@ -52,7 +52,7 @@ public class Correlate {
         deleteOutputFiles();
 
         final CSVHelper csvHelper = new CSVHelper(conf);
-        csvHelper.processFiles();
+        csvHelper.readSnapshotsAndRevisionsFile();
 
 		/* PREPROCESSING of the Smell Data */
 
@@ -113,7 +113,7 @@ public class Correlate {
                 MergedFileInfo fileInfo = new MergedFileInfo(sourceFileName,
                         snapshot.getSnapshotDate());
 
-                Path snapshotsPath = Paths.get(conf.getSnapshotsDir());
+                Path snapshotsPath = conf.projectSnapshotsDir().toPath();
                 Path filePath = snapshotsPath
                         .resolve(Paths.get(snapshotDateString, "_cppstats", sourceFileName));
                 File file = filePath.toFile();
@@ -185,7 +185,7 @@ public class Correlate {
      * Stackoverflow</a>
      * </p>
      *
-     * @param filename
+     * @param file
      * @return
      * @throws IOException If something goes wrong while reading the file
      */
@@ -296,7 +296,7 @@ public class Correlate {
 
         // nur für die einzelnen Ratios pro Commit nötig...
         // wahrscheinlich wieder zu entfernen
-        File corrRatioDir = new File(conf.getResultsDir(), "CorrelatedRatio");
+        File corrRatioDir = new File(conf.projectResultsDir(), "CorrelatedRatio");
         corrRatioDir.mkdirs();
         File corrRatioCsvOut = new File(corrRatioDir, dateStr + "_ratio.csv");
 
@@ -612,7 +612,7 @@ public class Correlate {
             throw new RuntimeException("The revisions CSV file does not exist or is a directory: "
                     + revisionsCsvFile.getAbsolutePath());
         }
-        result.revisionCsvFile = revisionsCsvFile.getAbsolutePath();
+        result.revisionCsvFilename = revisionsCsvFile.getAbsolutePath();
 
         final String snapshotsDirName;
         if (line.hasOption(OPT_SNAPSHOTS_DIR_L)) {
@@ -620,11 +620,12 @@ public class Correlate {
         } else {
             snapshotsDirName = Config.DEFAULT_SNAPSHOTS_DIR_NAME;
         }
-        final File snapshotsDir = new File(snapshotsDirName, project);
-        if (!snapshotsDir.exists() || !snapshotsDir.isDirectory()) {
+        final File snapshotsDir = new File(snapshotsDirName);
+        final File projectSnapshotsDir = new File(snapshotsDir, project);
+        if (!projectSnapshotsDir.exists() || !projectSnapshotsDir.isDirectory()) {
             throw new RuntimeException(
-                    "The snapshots directory does not exist or is not a directory: "
-                            + snapshotsDir.getAbsolutePath());
+                    "The project's snapshots directory does not exist or is not a directory: "
+                            + projectSnapshotsDir.getAbsolutePath());
         }
         result.snapshotsDir = snapshotsDir.getAbsolutePath();
 
