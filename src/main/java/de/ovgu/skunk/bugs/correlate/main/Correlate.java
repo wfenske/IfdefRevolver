@@ -491,29 +491,6 @@ public class Correlate {
         return randomNum;
     }
 
-    private static final char OPT_HELP = 'h';
-    /**
-     * Path to revisionsFull.csv file
-     */
-    // private static final char OPT_REVISIONS = 'r';
-
-    /**
-     * Name of the project to analyze
-     */
-    private static final char OPT_PROJECT = 'p';
-
-    /**
-     * Long name of the {@link #OPT_PROJECT} option.
-     */
-    private static final String OPT_PROJECT_L = "project";
-
-    /**
-     * Directory containing the &lt;project&gt;ABRes/*.csv,
-     * &lt;project&gt;AFRes/*.csv, &lt;project&gt;LFRes/*.csv files
-     */
-    private static final String OPT_RESULTS_DIR_L = "resultsdir";
-    private static final String OPT_SNAPSHOTS_DIR_L = "snapshotsdir";
-
     /**
      * Large file evaluation: percentage of files (LOC-wise) to be considered
      * large
@@ -590,44 +567,11 @@ public class Correlate {
 
         Config result = new Config();
 
-        final String project = line.getOptionValue(OPT_PROJECT);
-        result.project = project;
+        ProjectInformationConfig.parseProjectNameFromCommandLine(line, result);
 
-        final String resultsDirName;
-        if (line.hasOption(OPT_RESULTS_DIR_L)) {
-            resultsDirName = line.getOptionValue(OPT_RESULTS_DIR_L);
-        } else {
-            resultsDirName = Config.DEFAULT_RESULTS_DIR_NAME;
-        }
-        final File resultsDir = new File(resultsDirName, project);
-        if (!resultsDir.exists() || !resultsDir.isDirectory()) {
-            throw new RuntimeException(
-                    "The results directory does not exist or is not a directory: "
-                            + resultsDir.getAbsolutePath());
-        }
-        result.resultsDir = resultsDir.getAbsolutePath();
+        ProjectInformationConfig.parseProjectResultsDirFromCommandLine(line, result);
 
-        File revisionsCsvFile = new File(resultsDir, Config.REVISIONS_FILE_BASENAME);
-        if (!revisionsCsvFile.exists() || revisionsCsvFile.isDirectory()) {
-            throw new RuntimeException("The revisions CSV file does not exist or is a directory: "
-                    + revisionsCsvFile.getAbsolutePath());
-        }
-        result.revisionCsvFilename = revisionsCsvFile.getAbsolutePath();
-
-        final String snapshotsDirName;
-        if (line.hasOption(OPT_SNAPSHOTS_DIR_L)) {
-            snapshotsDirName = line.getOptionValue(OPT_SNAPSHOTS_DIR_L);
-        } else {
-            snapshotsDirName = Config.DEFAULT_SNAPSHOTS_DIR_NAME;
-        }
-        final File snapshotsDir = new File(snapshotsDirName);
-        final File projectSnapshotsDir = new File(snapshotsDir, project);
-        if (!projectSnapshotsDir.exists() || !projectSnapshotsDir.isDirectory()) {
-            throw new RuntimeException(
-                    "The project's snapshots directory does not exist or is not a directory: "
-                            + projectSnapshotsDir.getAbsolutePath());
-        }
-        result.snapshotsDir = snapshotsDir.getAbsolutePath();
+        ProjectInformationConfig.parseSnapshotsDirFromCommandLine(line, result);
 
         // Large file percentage
         Optional<Double> largeFileSizePercentage = getPercentOptionValue(line,
@@ -684,31 +628,12 @@ public class Correlate {
         // @formatter:off
 
         // --help= option
-        options.addOption(Option.builder(String.valueOf(OPT_HELP)).longOpt("help")
-                .desc("print this help sceen and exit").build());
+        options.addOption(ProjectInformationConfig.helpCommandLineOption());
 
         // Options for describing project locations
-        options.addOption(Option.builder(String.valueOf(OPT_PROJECT)).longOpt(OPT_PROJECT_L)
-                .desc("Name of the project to analyze. The project's data must be located in subdirectories of"
-                        + " the results and snapshot directories.")
-                .hasArg().argName("NAME").required(required).build());
-
-        options.addOption(Option.builder().longOpt(OPT_RESULTS_DIR_L)
-                .desc("Directory where to put results. The revisions CSV file, `" + Config.REVISIONS_FILE_BASENAME
-                        + "' must be located in the <project> subdirectory within this directory, where <project>"
-                        + " is the project name specified via the `--" + OPT_PROJECT_L + "' option." + " [Default="
-                        + Config.DEFAULT_RESULTS_DIR_NAME + "]")
-                .hasArg().argName("DIR").type(PatternOptionBuilder.EXISTING_FILE_VALUE)
-                // .required(required)
-                .build());
-        options.addOption(Option.builder().longOpt(OPT_SNAPSHOTS_DIR_L)
-                .desc("Directory where snapshots are located. The project's snapshots must be located in the "
-                        + "<project> subdirectory within this directory, where <project>"
-                        + " is the project name specified via the `--" + OPT_PROJECT_L + "' option." + " [Default="
-                        + Config.DEFAULT_SNAPSHOTS_DIR_NAME + "]")
-                .hasArg().argName("DIR").type(PatternOptionBuilder.EXISTING_FILE_VALUE)
-                // .required(required)
-                .build());
+        options.addOption(ProjectInformationConfig.projectNameCommandLineOption(required));
+        options.addOption(ProjectInformationConfig.resultsDirCommandLineOption());
+        options.addOption(ProjectInformationConfig.snapshotsDirCommandLineOption());
 
         // Option for large file evaluation
         options.addOption(Option.builder().longOpt(OPT_LARGE_FILE_PERCENT_PERCENT_L)

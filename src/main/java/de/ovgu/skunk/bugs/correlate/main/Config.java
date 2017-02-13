@@ -10,34 +10,10 @@ import java.io.File;
 /**
  * @author wfenske
  */
-public class Config implements IHasProjectSnapshotsDir, IHasProjectResultsDir, IHasRevisionCsvFile {
+public class Config extends ProjectInformationConfig {
 
     @SuppressWarnings("unused")
     private static Logger log = Logger.getLogger(Config.class);
-
-    /**
-     * Name of the project to be analyzed, e.g., "openvpn"
-     */
-    String project;
-
-    /**
-     * Name of the results directory. Below this directory we expect a folder with the name of the project (see {@link #project}), e.g. "results/openvpn".
-     */
-    String resultsDir = null;
-    public static final String DEFAULT_RESULTS_DIR_NAME = "results";
-
-    /**
-     * Name of the revisionsFull.csv of this project, e.g.
-     * "results/openvpn/revisionsFull.csv"
-     */
-    String revisionCsvFilename = null;
-    public static final String REVISIONS_FILE_BASENAME = "revisionsFull.csv";
-
-    /**
-     * Name of the snapshots directory of this project, e.g. "snapshots/openvpn"
-     */
-    String snapshotsDir = null;
-    public static final String DEFAULT_SNAPSHOTS_DIR_NAME = "snapshots";
 
     private double smellScoreThreshold = 0;
     private double smellyFilesFraction = 0.5; // used to be 0.7
@@ -74,21 +50,6 @@ public class Config implements IHasProjectSnapshotsDir, IHasProjectResultsDir, I
 
     public Config() {
         // Just for traceability
-    }
-
-    @Override
-    public File projectResultsDir() {
-        return new File(resultsDir, project);
-    }
-
-    @Override
-    public File projectSnapshotsDir() {
-        return new File(snapshotsDir, project);
-    }
-
-    @Override
-    public File revisionCsvFile() {
-        return new File(revisionCsvFilename);
     }
 
     // public String getSmellDir() {
@@ -129,10 +90,6 @@ public class Config implements IHasProjectSnapshotsDir, IHasProjectResultsDir, I
 
     public File correlatedResultsDir() {
         return new File(projectResultsDir(), "Correlated");
-    }
-
-    public File projectInfoFile() {
-        return new File(projectResultsDir(), "projectInfo.csv");
     }
 
     public File projectAnalysisFile() {

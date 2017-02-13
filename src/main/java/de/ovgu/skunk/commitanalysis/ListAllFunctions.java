@@ -1,6 +1,6 @@
 package de.ovgu.skunk.commitanalysis;
 
-import de.ovgu.skunk.bugs.correlate.main.Config;
+import de.ovgu.skunk.bugs.correlate.main.ProjectInformationConfig;
 import de.ovgu.skunk.bugs.createsnapshots.main.CreateSnapshots;
 import de.ovgu.skunk.detection.data.Context;
 import de.ovgu.skunk.detection.data.Method;
@@ -11,7 +11,6 @@ import org.w3c.dom.Document;
 import org.w3c.dom.Node;
 import org.w3c.dom.NodeList;
 
-import java.io.File;
 import java.io.PrintWriter;
 import java.util.ArrayList;
 import java.util.List;
@@ -150,23 +149,11 @@ public class ListAllFunctions {
 
         this.config = new ListAllFunctionsConfig();
 
-        final String project = line.getOptionValue(OPT_PROJECT);
-        this.config.project = project;
+        ProjectInformationConfig.parseProjectNameFromCommandLine(line, this.config);
 
-        final String snapshotsDirName;
-        if (line.hasOption(OPT_SNAPSHOTS_DIR_L)) {
-            snapshotsDirName = line.getOptionValue(OPT_SNAPSHOTS_DIR_L);
-        } else {
-            snapshotsDirName = Config.DEFAULT_SNAPSHOTS_DIR_NAME;
-        }
-        final File snapshotsDir = new File(snapshotsDirName);
-        final File projectSnapshotsDir = new File(snapshotsDir, project);
-        if (!projectSnapshotsDir.exists() || !projectSnapshotsDir.isDirectory()) {
-            throw new RuntimeException(
-                    "The project's snapshots directory does not exist or is not a directory: "
-                            + projectSnapshotsDir.getAbsolutePath());
-        }
-        this.config.snapshotsDir = snapshotsDir.getAbsolutePath();
+        ProjectInformationConfig.parseProjectResultsDirFromCommandLine(line, this.config);
+
+        ProjectInformationConfig.parseSnapshotsDirFromCommandLine(line, this.config);
 
         this.config.filenames = line.getArgList();
     }
@@ -177,23 +164,12 @@ public class ListAllFunctions {
         // @formatter:off
 
         // --help= option
-        options.addOption(Option.builder(String.valueOf(ListChangedFunctionsConfig.OPT_HELP))
-                .longOpt(ListChangedFunctionsConfig.OPT_HELP_L)
-                .desc("print this help sceen and exit")
-                .build());
+        options.addOption(ProjectInformationConfig.helpCommandLineOption());
 
-        options.addOption(Option.builder(String.valueOf(OPT_PROJECT)).longOpt(OPT_PROJECT_L)
-                .desc("Name of the project to analyze. The project's data must be located in subdirectories of"
-                        + " the results and snapshot directories.")
-                .hasArg().argName("NAME").required(required).build());
-
-        options.addOption(Option.builder().longOpt(OPT_SNAPSHOTS_DIR_L)
-                .desc("Directory where snapshots are located. The project's snapshots must be located in the "
-                        + "<project> subdirectory within this directory, where <project>"
-                        + " is the project name specified via the `--" + OPT_PROJECT_L + "' option." + " [Default="
-                        + Config.DEFAULT_SNAPSHOTS_DIR_NAME + "]")
-                .hasArg().argName("DIR").type(PatternOptionBuilder.EXISTING_FILE_VALUE)
-                .build());
+        // Options for describing project locations
+        options.addOption(ProjectInformationConfig.projectNameCommandLineOption(required));
+        options.addOption(ProjectInformationConfig.resultsDirCommandLineOption());
+        options.addOption(ProjectInformationConfig.snapshotsDirCommandLineOption());
 
         // @formatter:on
         return options;

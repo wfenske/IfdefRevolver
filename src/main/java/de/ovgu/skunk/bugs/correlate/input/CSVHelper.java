@@ -2,7 +2,6 @@ package de.ovgu.skunk.bugs.correlate.input;
 
 import com.opencsv.CSVReader;
 import de.ovgu.skunk.bugs.correlate.data.Feature;
-import de.ovgu.skunk.bugs.correlate.data.FileChangeHunk;
 import de.ovgu.skunk.bugs.correlate.data.Snapshot;
 import de.ovgu.skunk.bugs.correlate.main.Config;
 import de.ovgu.skunk.bugs.correlate.main.Smell;
@@ -231,101 +230,6 @@ public class CSVHelper extends ProjectInformationReader<Config> {
         return basenameWithoutSuffix;
     }
 
-    private void putChangedFile(SortedMap<Snapshot, SortedMap<FileChangeHunk, String>> map,
-                                Snapshot snapshot, FileChangeHunk chFile, String fileName) {
-        SortedMap<FileChangeHunk, String> changedFiles = ensureValueForKey(map, snapshot);
-        changedFiles.put(chFile, fileName);
-    }
-
-    private static SortedMap<FileChangeHunk, String> ensureValueForKey(
-            SortedMap<Snapshot, SortedMap<FileChangeHunk, String>> filesBySnapshot,
-            Snapshot snapshot) {
-        SortedMap<FileChangeHunk, String> value = filesBySnapshot.get(snapshot);
-        if (value != null) {
-            return value;
-        }
-        value = new TreeMap<>();
-        filesBySnapshot.put(snapshot, value);
-        return value;
-    }
-
-    private Map<String, Snapshot> mapSnapshotsToCommits() {
-        Map<String, Snapshot> snapshotsByCommit = new HashMap<>();
-        for (Snapshot s : snapshots.values()) {
-            for (String commitHash : s.getCommitHashes()) {
-                Snapshot previousSnapshot = snapshotsByCommit.put(commitHash, s);
-                if (previousSnapshot != null) {
-                    throw new RuntimeException("Commit " + commitHash + " occurs in two snapshots "
-                            + previousSnapshot + " and " + s);
-                }
-            }
-        }
-        return snapshotsByCommit;
-    }
-
-    private SortedMap<Date, Snapshot> readSnapshots() {
-        SortedMap<Date, Snapshot> result = new TreeMap<>();
-        List<Date> snapshotDates = getProjectDates();
-
-        final DateFormat formatter = new SimpleDateFormat("yyyy-MM-dd");
-
-        File projSnapshotMetadataDir = new File(conf.projectResultsDir(), "snapshots");
-        for (Date snapshotDate : snapshotDates) {
-            File snapshotFile = new File(projSnapshotMetadataDir,
-                    formatter.format(snapshotDate) + ".csv");
-            Snapshot snapshot = readSnapshot(snapshotFile);
-            result.put(snapshotDate, snapshot);
-        }
-
-        return result;
-    }
-
-    private Snapshot readSnapshot(File snapshotFile) {
-        Set<String> commitHashes = new LinkedHashSet<>();
-        int snapshotIndex = -1;
-        Date snapshotDate = null;
-        final SimpleDateFormat dateFormatter = new SimpleDateFormat("yyyy-MM-dd");
-
-        CSVReader reader = null;
-        FileReader fileReader = null;
-        try {
-            fileReader = new FileReader(snapshotFile);
-            reader = new CSVReader(fileReader);
-            String[] header = reader.readNext();
-            try {
-                snapshotIndex = Integer.parseInt(header[0]);
-                snapshotDate = dateFormatter.parse(header[1]);
-            } catch (ParseException pe) {
-                throw new RuntimeException(
-                        "Error parsing header of snapshot file " + snapshotFile.getAbsolutePath());
-            }
-            String[] nextLine;
-            while ((nextLine = reader.readNext()) != null) {
-                String commitHash = nextLine[0];
-                commitHashes.add(commitHash);
-            }
-        } catch (IOException e1) {
-            throw new RuntimeException(
-                    "Error reading file " + snapshotFile.getAbsolutePath(), e1);
-        } finally {
-            if (reader != null) {
-                try {
-                    reader.close();
-                } catch (IOException e) {
-                    // We don't care if closing the reader fails.
-                }
-            } else if (fileReader != null) {
-                try {
-                    fileReader.close();
-                } catch (IOException e) {
-                    // We don't care if closing the reader fails.
-                }
-            }
-        }
-
-        return new Snapshot(snapshotIndex, snapshotDate, commitHashes);
-    }
-
     // @formatter:off
     /**
      * Nimmt die ursprüngliche CSV-Datei von MetricMiner2 und erstellt die
@@ -526,68 +430,4 @@ public class CSVHelper extends ProjectInformationReader<Config> {
         return scoresByFilename;
     }
 
-    private List<Date> getProjectDates() {
-        List<Date> resultList = new ArrayList<>();
-        final SimpleDateFormat formatter = new SimpleDateFormat("yyyy-MM-dd");
-
-        CSVReader reader = null;
-        FileReader fileReader = null;
-        try {
-            fileReader = new FileReader(conf.projectInfoFile());
-            reader = new CSVReader(fileReader);
-            String[] nextLine;
-            while ((nextLine = reader.readNext()) != null) {
-                String dateStr = nextLine[1];
-                Date verDate = null;
-                try {
-                    verDate = formatter.parse(dateStr);
-                } catch (ParseException e) {
-                    throw new RuntimeException("Error parsing date in  file "
-                            + conf.projectInfoFile().getAbsolutePath(), e);
-                }
-
-                resultList.add(verDate);
-            }
-        } catch (IOException e1) {
-            throw new RuntimeException(
-                    "Error reading file " + conf.projectInfoFile().getAbsolutePath(), e1);
-        } finally {
-            if (reader != null) {
-                try {
-                    reader.close();
-                } catch (IOException e) {
-                    // We don't care if closing the reader fails.
-                }
-            } else if (fileReader != null) {
-                try {
-                    fileReader.close();
-                } catch (IOException e) {
-                    // We don't care if closing the reader fails.
-                }
-            }
-        }
-
-        return resultList;
-    }
-
-    /**
-     * @return Changed files for the given snapshot
-     */
-    public SortedMap<FileChangeHunk, String> getChangedFiles(Snapshot s) {
-        return changedFilesBySnapshot.get(s);
-    }
-
-    /**
-     * @return Fixed files for the given snapshot
-     */
-    public SortedMap<FileChangeHunk, String> getFixedFiles(Snapshot s) {
-        return fixedFilesBySnapshot.get(s);
-    }
-
-    /**
-     * @return Snapshots, ordered by date
-     */
-    public SortedMap<Date, Snapshot> getSnapshots() {
-        return snapshots;
-    }
 }

@@ -7,4 +7,6 @@ import java.io.File;
  */
 public interface IHasProjectResultsDir {
     File projectResultsDir();
+
+    void setResultsDir(String resultsDir);
 }

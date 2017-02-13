@@ -7,4 +7,6 @@ import java.io.File;
  */
 public interface IHasProjectSnapshotsDir {
     File projectSnapshotsDir();
+
+    void setSnapshotsDir(String snapshotsDir);
 }
