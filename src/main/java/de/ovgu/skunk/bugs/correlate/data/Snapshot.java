@@ -1,7 +1,11 @@
 package de.ovgu.skunk.bugs.correlate.data;
 
+import de.ovgu.skunk.bugs.createsnapshots.input.FileFinder;
+
+import java.io.File;
 import java.text.SimpleDateFormat;
 import java.util.Date;
+import java.util.List;
 import java.util.Set;
 
 /**
@@ -16,12 +20,14 @@ public class Snapshot implements Comparable<Snapshot> {
     private final Date snapshotDate;
     private final Set<String> commitHashes;
     private final String startHash;
+    private final File snapshotDir;
 
-    public Snapshot(int snapshotIndex, Date snapshotDate, Set<String> commitHashes) {
+    public Snapshot(int snapshotIndex, Date snapshotDate, Set<String> commitHashes, File snapshotDir) {
         this.snapshotIndex = snapshotIndex;
         this.snapshotDate = snapshotDate;
         this.commitHashes = commitHashes;
         this.startHash = commitHashes.iterator().next();
+        this.snapshotDir = snapshotDir;
     }
 
     /**
@@ -101,4 +107,11 @@ public class Snapshot implements Comparable<Snapshot> {
         return this.getSnapshotIndex() - other.getSnapshotIndex();
     }
 
+    /**
+     * @return All SrcML files of the C files within the snapshot
+     */
+    public List<File> listSrcmlCFiles() {
+        File srcmlFolder = new File(snapshotDir, "_cppstats");
+        return FileFinder.find(srcmlFolder, ".*\\.c\\.xml$");
+    }
 }

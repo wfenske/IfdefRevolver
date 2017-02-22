@@ -2,10 +2,10 @@ package de.ovgu.skunk.bugs.correlate.processing;
 
 import de.ovgu.skunk.bugs.correlate.data.FileChangeHunk;
 import de.ovgu.skunk.bugs.correlate.input.CSVHelper;
-import de.ovgu.skunk.bugs.correlate.input.FileFinder;
 import de.ovgu.skunk.bugs.correlate.main.Config;
 import de.ovgu.skunk.bugs.correlate.main.Smell;
 import de.ovgu.skunk.bugs.correlate.output.SmellCSV;
+import de.ovgu.skunk.bugs.createsnapshots.input.FileFinder;
 import org.apache.log4j.Logger;
 
 import java.io.File;

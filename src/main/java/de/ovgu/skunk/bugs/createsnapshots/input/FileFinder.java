@@ -7,15 +7,20 @@ import java.util.Stack;
 import java.util.regex.Pattern;
 
 public class FileFinder {
-    public static List<File> find(String startDirName, String extensionPattern) {
-        File startDir = new File(startDirName);
-        return find(startDir, extensionPattern);
-    }
-
-    public static List<File> find(File startDir, String extensionPattern) {
+    /**
+     * Return all the files (no directories) below a starting directory whose name matches a pattern.
+     *
+     * @param startDir        The directory within which to search
+     * @param filenamePattern A regular expression patten that the names of files must match.
+     *                        Note, the entire filename must match, not just the extension or so.
+     *                        For instance, to find all the .c files, use the pattern
+     *                        <code>&quot;.*\\.c&quot;</code>.  Patterns are case-insensitive.
+     * @return A list of file objects representing the matching files.
+     */
+    public static List<File> find(File startDir, String filenamePattern) {
         List<File> files = new ArrayList<>(1024);
         Stack<File> dirs = new Stack<>();
-        Pattern p = Pattern.compile(extensionPattern, Pattern.CASE_INSENSITIVE);
+        Pattern p = Pattern.compile(filenamePattern, Pattern.CASE_INSENSITIVE);
 
         if (!startDir.isDirectory())
             throw new IllegalArgumentException("Not a directory: " + startDir.getAbsolutePath());

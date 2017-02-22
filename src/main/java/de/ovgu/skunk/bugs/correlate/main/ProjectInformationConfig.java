@@ -5,11 +5,15 @@ import org.apache.commons.cli.Option;
 import org.apache.commons.cli.PatternOptionBuilder;
 
 import java.io.File;
+import java.text.SimpleDateFormat;
+import java.util.Date;
 
 /**
  * Created by wfenske on 13.02.17.
  */
 public class ProjectInformationConfig implements IHasProjectSnapshotsDir, IHasProjectResultsDir, IHasRevisionCsvFile, IHasProjectInfoFile, IHasProjectName {
+    private final SimpleDateFormat dateFormatter = new SimpleDateFormat("yyyy-MM-dd");
+
     public static final char OPT_HELP = 'h';
     public static final String OPT_HELP_L = "help";
 
@@ -63,8 +67,9 @@ public class ProjectInformationConfig implements IHasProjectSnapshotsDir, IHasPr
         } else {
             resultsDirName = DEFAULT_RESULTS_DIR_NAME;
         }
-        final File resultsDir = new File(resultsDirName, config.getProject());
-        if (!resultsDir.exists() || !resultsDir.isDirectory()) {
+        final File resultsDir = new File(resultsDirName);
+        final File projectResultsDir = new File(resultsDir, config.getProject());
+        if (!projectResultsDir.exists() || !projectResultsDir.isDirectory()) {
             throw new RuntimeException(
                     "The results directory does not exist or is not a directory: "
                             + resultsDir.getAbsolutePath());
@@ -155,7 +160,7 @@ public class ProjectInformationConfig implements IHasProjectSnapshotsDir, IHasPr
     }
 
     private void initializeRevisionsCsvFileOrDie(String resultsDir) {
-        File revisionsCsvFile = new File(resultsDir, Config.REVISIONS_FILE_BASENAME);
+        File revisionsCsvFile = new File(projectResultsDir(), Config.REVISIONS_FILE_BASENAME);
         if (!revisionsCsvFile.exists() || revisionsCsvFile.isDirectory()) {
             throw new RuntimeException("The revisions CSV file does not exist or is a directory: "
                     + revisionsCsvFile.getAbsolutePath());
@@ -179,5 +184,10 @@ public class ProjectInformationConfig implements IHasProjectSnapshotsDir, IHasPr
     @Override
     public void setSnapshotsDir(String snapshotsDir) {
         this.snapshotsDir = snapshotsDir;
+    }
+
+    @Override
+    public File projectSnapshotDirForDate(Date date) {
+        return new File(projectSnapshotsDir(), dateFormatter.format(date));
     }
 }

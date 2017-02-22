@@ -175,7 +175,8 @@ public class ProjectInformationReader<TConfig extends IHasProjectInfoFile & IHas
             }
         }
 
-        return new Snapshot(snapshotIndex, snapshotDate, commitHashes);
+        File snapshotDir = conf.projectSnapshotDirForDate(snapshotDate);
+        return new Snapshot(snapshotIndex, snapshotDate, commitHashes, snapshotDir);
     }
 
     private List<Date> getProjectDates() {
