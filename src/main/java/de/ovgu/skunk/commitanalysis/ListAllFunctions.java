@@ -98,17 +98,49 @@ public class ListAllFunctions {
     }
 
     private void listFunctionsInFilesByFilename(Collection<String> filenames, Consumer<Method> functionDefinitionsConsumer) {
-        int ixFile = 1;
-        final int numFiles = filenames.size();
-        for (String filename : filenames) {
+        final Iterator<String> filenameIter = filenames.iterator();
+
+        final int NUM_FUNCTION_LISTING_WORKER_THREADS = 4;
+        Thread[] workers = new Thread[NUM_FUNCTION_LISTING_WORKER_THREADS];
+
+        for (int iWorker = 0; iWorker < workers.length; iWorker++) {
+            workers[iWorker] = new Thread() {
+                public void run() {
+                    while (true) {
+                        final String nextFilename;
+                        synchronized (filenameIter) {
+                            if (!filenameIter.hasNext()) {
+                                break;
+                            }
+                            nextFilename = filenameIter.next();
+                        }
+                        try {
+                            //LOG.info("Processing file " + (ixFile++) + "/" + numFiles);
+                            listFunctions(nextFilename, functionDefinitionsConsumer);
+                        } catch (RuntimeException t) {
+                            LOG.warn("Error processing file " + nextFilename, t);
+                            increaseErrorCount();
+                        }
+                    }
+                }
+            };
+        }
+
+        for (int iWorker = 0; iWorker < workers.length; iWorker++) {
+            workers[iWorker].start();
+        }
+
+        for (int iWorker = 0; iWorker < workers.length; iWorker++) {
             try {
-                LOG.info("Processing file " + (ixFile++) + "/" + numFiles);
-                listFunctions(filename, functionDefinitionsConsumer);
-            } catch (RuntimeException t) {
-                LOG.warn("Error processing file " + filename, t);
-                errors++;
+                workers[iWorker].join();
+            } catch (InterruptedException e) {
+                LOG.warn("Interrupted while waiting for function lister thread to finish.", e);
             }
         }
+    }
+
+    private synchronized void increaseErrorCount() {
+        errors++;
     }
 
     private static final Consumer<Method> SIMPLE_FUNCTION_DEFINITION_LISTER = new Consumer<Method>() {
