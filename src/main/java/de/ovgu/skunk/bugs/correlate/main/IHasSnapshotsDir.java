@@ -6,7 +6,7 @@ import java.util.Date;
 /**
  * Created by wfenske on 09.02.17.
  */
-public interface IHasProjectSnapshotsDir {
+public interface IHasSnapshotsDir {
     File projectSnapshotsDir();
 
     void setSnapshotsDir(String snapshotsDir);

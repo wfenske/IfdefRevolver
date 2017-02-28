@@ -7,13 +7,17 @@ import de.ovgu.skunk.bugs.createsnapshots.main.CreateSnapshots;
 import de.ovgu.skunk.detection.data.Context;
 import de.ovgu.skunk.detection.data.Method;
 import de.ovgu.skunk.detection.input.SrcMlFolderReader;
+import de.ovgu.skunk.detection.output.CsvFileWriterHelper;
+import de.ovgu.skunk.detection.output.CsvRowProvider;
 import org.apache.commons.cli.*;
+import org.apache.commons.csv.CSVPrinter;
 import org.apache.log4j.Logger;
 import org.w3c.dom.Document;
 import org.w3c.dom.Node;
 import org.w3c.dom.NodeList;
 
 import java.io.File;
+import java.io.IOException;
 import java.io.PrintWriter;
 import java.util.*;
 import java.util.function.Consumer;
@@ -77,9 +81,42 @@ public class ListAllFunctions {
     }
 
     private void listFunctionsInSnapshots(Collection<Snapshot> snapshots) {
-        for (Snapshot s : snapshots) {
-            listFunctionsInSnapshot(s, SIMPLE_FUNCTION_DEFINITION_LISTER);
+        for (final Snapshot s : snapshots) {
+            CsvFileWriterHelper helper = newCsvFileWriterForSnapshot(s);
+            File outputFileDir = config.snapshotResultsDirForDate(s.getSnapshotDate());
+            File outputFile = new File(outputFileDir, AllSnapshotFunctionsColumns.FILE_BASENAME);
+            helper.write(outputFile);
         }
+    }
+
+    private CsvFileWriterHelper newCsvFileWriterForSnapshot(final Snapshot s) {
+        return new CsvFileWriterHelper() {
+            CsvRowProvider<Method, Snapshot, AllSnapshotFunctionsColumns> csvRowProvider = AllSnapshotFunctionsColumns.newCsvRowProviderForSnapshot(s);
+
+            @Override
+            protected void actuallyDoStuff(CSVPrinter csv) throws IOException {
+                csv.printRecord(csvRowProvider.headerRow());
+                Consumer<Method> csvRowFromFunction = newThreadSafeFunctionToCsvWriter(csv, csvRowProvider);
+                listFunctionsInSnapshot(s, csvRowFromFunction);
+            }
+        };
+    }
+
+    private Consumer<Method> newThreadSafeFunctionToCsvWriter(final CSVPrinter csv, final CsvRowProvider<Method, Snapshot, AllSnapshotFunctionsColumns> csvRowProvider) {
+        return new Consumer<Method>() {
+            @Override
+            public void accept(Method function) {
+                Object[] rowForFunc = csvRowProvider.dataRow(function);
+                try {
+                    synchronized (csv) {
+                        csv.printRecord(rowForFunc);
+                    }
+                } catch (IOException ioe) {
+                    throw new RuntimeException("IOException while writing row for function " +
+                            function, ioe);
+                }
+            }
+        };
     }
 
     private void listFunctionsInSnapshot(Snapshot snapshot, Consumer<Method> functionDefinitionsConsumer) {
@@ -105,6 +142,7 @@ public class ListAllFunctions {
 
         for (int iWorker = 0; iWorker < workers.length; iWorker++) {
             workers[iWorker] = new Thread() {
+                @Override
                 public void run() {
                     while (true) {
                         final String nextFilename;

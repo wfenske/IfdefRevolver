@@ -4,8 +4,8 @@ import com.opencsv.CSVReader;
 import de.ovgu.skunk.bugs.correlate.data.FileChangeHunk;
 import de.ovgu.skunk.bugs.correlate.data.Snapshot;
 import de.ovgu.skunk.bugs.correlate.main.IHasProjectInfoFile;
-import de.ovgu.skunk.bugs.correlate.main.IHasProjectResultsDir;
-import de.ovgu.skunk.bugs.correlate.main.IHasProjectSnapshotsDir;
+import de.ovgu.skunk.bugs.correlate.main.IHasResultsDir;
+import de.ovgu.skunk.bugs.correlate.main.IHasSnapshotsDir;
 import de.ovgu.skunk.bugs.correlate.main.IHasRevisionCsvFile;
 import org.apache.log4j.Logger;
 
@@ -21,7 +21,7 @@ import java.util.*;
 /**
  * Created by wfenske on 09.02.17.
  */
-public class ProjectInformationReader<TConfig extends IHasProjectInfoFile & IHasProjectResultsDir & IHasProjectSnapshotsDir & IHasRevisionCsvFile> {
+public class ProjectInformationReader<TConfig extends IHasProjectInfoFile & IHasResultsDir & IHasSnapshotsDir & IHasRevisionCsvFile> {
     private static Logger log = Logger.getLogger(ProjectInformationReader.class);
 
     protected TConfig conf;

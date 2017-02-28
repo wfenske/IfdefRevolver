@@ -11,7 +11,7 @@ import java.util.Date;
 /**
  * Created by wfenske on 13.02.17.
  */
-public class ProjectInformationConfig implements IHasProjectSnapshotsDir, IHasProjectResultsDir, IHasRevisionCsvFile, IHasProjectInfoFile, IHasProjectName {
+public class ProjectInformationConfig implements IHasSnapshotsDir, IHasResultsDir, IHasRevisionCsvFile, IHasProjectInfoFile, IHasProjectName {
     private final SimpleDateFormat dateFormatter = new SimpleDateFormat("yyyy-MM-dd");
 
     public static final char OPT_HELP = 'h';
@@ -60,7 +60,7 @@ public class ProjectInformationConfig implements IHasProjectSnapshotsDir, IHasPr
     private String snapshotsDir = null;
     public static final String DEFAULT_SNAPSHOTS_DIR_NAME = "snapshots";
 
-    public static <TConfig extends IHasProjectResultsDir & IHasProjectName> void parseProjectResultsDirFromCommandLine(CommandLine line, TConfig config) {
+    public static <TConfig extends IHasResultsDir & IHasProjectName> void parseProjectResultsDirFromCommandLine(CommandLine line, TConfig config) {
         final String resultsDirName;
         if (line.hasOption(OPT_RESULTS_DIR_L)) {
             resultsDirName = line.getOptionValue(OPT_RESULTS_DIR_L);
@@ -77,7 +77,7 @@ public class ProjectInformationConfig implements IHasProjectSnapshotsDir, IHasPr
         config.setResultsDir(resultsDir.getAbsolutePath());
     }
 
-    public static <TConfig extends IHasProjectSnapshotsDir & IHasProjectName> void parseSnapshotsDirFromCommandLine(CommandLine line, TConfig config) {
+    public static <TConfig extends IHasSnapshotsDir & IHasProjectName> void parseSnapshotsDirFromCommandLine(CommandLine line, TConfig config) {
         final String snapshotsDirName;
         if (line.hasOption(OPT_SNAPSHOTS_DIR_L)) {
             snapshotsDirName = line.getOptionValue(OPT_SNAPSHOTS_DIR_L);
@@ -189,5 +189,10 @@ public class ProjectInformationConfig implements IHasProjectSnapshotsDir, IHasPr
     @Override
     public File projectSnapshotDirForDate(Date date) {
         return new File(projectSnapshotsDir(), dateFormatter.format(date));
+    }
+
+    @Override
+    public File snapshotResultsDirForDate(Date date) {
+        return new File(projectResultsDir(), dateFormatter.format(date));
     }
 }
