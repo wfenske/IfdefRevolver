@@ -81,12 +81,16 @@ public class ListAllFunctions {
     }
 
     private void listFunctionsInSnapshots(Collection<Snapshot> snapshots) {
+        final int totalSnapshots = snapshots.size();
+        int numSnapshot = 1;
         for (final Snapshot s : snapshots) {
+            LOG.info("Listing functions in snapshot " + (numSnapshot++) + "/" + totalSnapshots + ".");
             CsvFileWriterHelper helper = newCsvFileWriterForSnapshot(s);
             File outputFileDir = config.snapshotResultsDirForDate(s.getSnapshotDate());
             File outputFile = new File(outputFileDir, AllSnapshotFunctionsColumns.FILE_BASENAME);
             helper.write(outputFile);
         }
+        LOG.info("Done listing functions in " + totalSnapshots + " snapshots.");
     }
 
     private CsvFileWriterHelper newCsvFileWriterForSnapshot(final Snapshot s) {
