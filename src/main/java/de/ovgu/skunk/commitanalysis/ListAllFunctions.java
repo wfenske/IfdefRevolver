@@ -69,9 +69,8 @@ public class ListAllFunctions {
     }
 
     private void execute() {
-        LOG.debug("Analyzing snapshots in " + config.projectSnapshotsDir());
+        LOG.debug("Listing all function definitions in snapshots in " + config.projectSnapshotsDir());
         this.errors = 0;
-        //listFunctionsInFiles(config.filenames);
         ProjectInformationReader<ListAllFunctionsConfig> projectInfo = new ProjectInformationReader<>(config);
         LOG.debug("Reading project information");
         projectInfo.readSnapshotsAndRevisionsFile();
@@ -168,6 +167,10 @@ public class ListAllFunctions {
             };
         }
 
+        executeWorkers(workers);
+    }
+
+    private void executeWorkers(Thread[] workers) {
         for (int iWorker = 0; iWorker < workers.length; iWorker++) {
             workers[iWorker].start();
         }
@@ -184,13 +187,6 @@ public class ListAllFunctions {
     private synchronized void increaseErrorCount() {
         errors++;
     }
-
-    private static final Consumer<Method> SIMPLE_FUNCTION_DEFINITION_LISTER = new Consumer<Method>() {
-        @Override
-        public void accept(Method func) {
-            System.out.println(func.FilePathForDisplay() + "\t" + func.functionSignatureXml);
-        }
-    };
 
     private void listFunctions(String filename, Consumer<Method> functionDefinitionsConsumer) {
         Context ctx = new Context(null);

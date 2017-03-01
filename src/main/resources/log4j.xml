@@ -27,4 +27,9 @@
         <appender-ref ref="stderr"/>
     </logger>
 
+    <logger name="de.ovgu.skunk.commitanalysis.GitCommitChangedFunctionLister" additivity="false">
+        <level value="warn"/>
+        <appender-ref ref="stderr"/>
+    </logger>
+
 </log4j:configuration>

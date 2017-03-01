@@ -1,6 +1,10 @@
 package de.ovgu.skunk.commitanalysis;
 
+import de.ovgu.skunk.bugs.correlate.data.Snapshot;
 import de.ovgu.skunk.detection.data.Method;
+import de.ovgu.skunk.detection.output.CsvFileWriterHelper;
+import de.ovgu.skunk.detection.output.CsvRowProvider;
+import org.apache.commons.csv.CSVPrinter;
 import org.apache.log4j.Logger;
 import org.eclipse.jgit.api.Git;
 import org.eclipse.jgit.diff.DiffEntry;
@@ -21,12 +25,14 @@ import java.util.function.Consumer;
 public class GitCommitChangedFunctionLister implements Runnable {
     private static final Logger LOG = Logger.getLogger(GitCommitChangedFunctionLister.class);
     private ListChangedFunctionsConfig config;
+    private Snapshot snapshot;
     private int errors = 0;
     private Git git = null;
     private Repository repo = null;
 
-    public GitCommitChangedFunctionLister(ListChangedFunctionsConfig config) {
+    public GitCommitChangedFunctionLister(ListChangedFunctionsConfig config, Snapshot snapshot) {
         this.config = config;
+        this.snapshot = snapshot;
     }
 
     @Override
@@ -36,36 +42,140 @@ public class GitCommitChangedFunctionLister implements Runnable {
             openRepo(config.repoDir);
         } catch (Exception e) {
             LOG.error("Error opening repository " + config.repoDir + ".", e);
-            errors++;
+            increaseErrorCount();
             throw new RuntimeException("Error opening repository " + config.repoDir, e);
         }
         try {
-            listChangedFunctions(config.commitIds);
+            listChangedFunctionsInSnapshot();
         } catch (RuntimeException t) {
-            errors++;
+            increaseErrorCount();
             throw t;
         } finally {
             try {
                 closeRepo();
             } catch (RuntimeException t) {
                 LOG.warn("Error closing repository " + config.repoDir + " (error will be ignored.)", t);
-                errors++;
+                increaseErrorCount();
             }
         }
     }
 
-    private void listChangedFunctions(Collection<String> commitIds) {
-        int ixCommit = 1;
-        final int numCommits = commitIds.size();
-        for (String commitId : commitIds) {
-            try {
-                LOG.info("Processing commit " + (ixCommit++) + "/" + numCommits);
-                listChangedFunctions(commitId);
-            } catch (RuntimeException t) {
-                LOG.warn("Error processing commit ID " + commitId, t);
-                errors++;
+    public boolean errorsOccurred() {
+        return errors > 0;
+    }
+
+    private void listChangedFunctionsInSnapshot() {
+        CsvFileWriterHelper helper = newCsvFileWriterForSnapshot(snapshot);
+        File outputFileDir = config.snapshotResultsDirForDate(snapshot.getSnapshotDate());
+        File outputFile = new File(outputFileDir, ChangedSnapshotFunctionsColumns.FILE_BASENAME);
+        helper.write(outputFile);
+    }
+
+    private CsvFileWriterHelper newCsvFileWriterForSnapshot(final Snapshot snapshot) {
+        return new CsvFileWriterHelper() {
+            CsvRowProvider<Map.Entry<Method, Integer>, Snapshot, ChangedSnapshotFunctionsColumns> csvRowProvider = ChangedSnapshotFunctionsColumns.newCsvRowProviderForSnapshot(snapshot);
+
+            @Override
+            protected void actuallyDoStuff(CSVPrinter csv) throws IOException {
+                csv.printRecord(csvRowProvider.headerRow());
+                Consumer<Map.Entry<Method, Integer>> csvRowFromFunction = newThreadSafeFunctionToCsvWriter(csv, csvRowProvider);
+                listChangedFunctions(snapshot.getCommitHashes(), csvRowFromFunction);
+            }
+        };
+    }
+
+    private Consumer<Map.Entry<Method, Integer>> newThreadSafeFunctionToCsvWriter(final CSVPrinter csv, final CsvRowProvider<Map.Entry<Method, Integer>, Snapshot, ChangedSnapshotFunctionsColumns> csvRowProvider) {
+        return new Consumer<Map.Entry<Method, Integer>>() {
+            @Override
+            public void accept(Map.Entry<Method, Integer> functionChange) {
+                Object[] rowForFunc = csvRowProvider.dataRow(functionChange);
+                try {
+                    synchronized (csv) {
+                        csv.printRecord(rowForFunc);
+                    }
+                } catch (IOException ioe) {
+                    throw new RuntimeException("IOException while writing row for changed function " +
+                            functionChange.getKey(), ioe);
+                }
+            }
+        };
+    }
+
+    private static class ThreadSafeFunctionChangeAggregator implements Consumer<Map.Entry<Method, Integer>> {
+        private final Map<Method, Integer> aggregatedChanges = new HashMap<>();
+
+        @Override
+        public void accept(Map.Entry<Method, Integer> functionChangeEntry) {
+            Method func = functionChangeEntry.getKey();
+            Integer newChanges = functionChangeEntry.getValue();
+            synchronized (aggregatedChanges) {
+                Integer oldChanges = aggregatedChanges.get(func);
+                if (oldChanges == null) {
+                    aggregatedChanges.put(func, newChanges);
+                } else {
+                    aggregatedChanges.put(func, oldChanges + newChanges);
+                }
             }
         }
+
+        public Map<Method, Integer> getAggregatedFunctionChanges() {
+            return aggregatedChanges;
+        }
+    }
+
+    private void listChangedFunctions(Collection<String> commitIds, Consumer<Map.Entry<Method, Integer>> changedFunctionConsumer) {
+        ThreadSafeFunctionChangeAggregator aggregatingConsumer = new ThreadSafeFunctionChangeAggregator();
+
+        Iterator<String> commitIdIter = commitIds.iterator();
+        Thread[] workers = new Thread[config.getNumThreads()];
+
+        for (int iWorker = 0; iWorker < workers.length; iWorker++) {
+            workers[iWorker] = new Thread() {
+                @Override
+                public void run() {
+                    while (true) {
+                        final String nextCommitId;
+                        synchronized (commitIdIter) {
+                            if (!commitIdIter.hasNext()) {
+                                break;
+                            }
+                            nextCommitId = commitIdIter.next();
+                        }
+                        try {
+                            //LOG.info("Processing file " + (ixFile++) + "/" + numFiles);
+                            listChangedFunctions(nextCommitId, aggregatingConsumer);
+                        } catch (RuntimeException t) {
+                            LOG.warn("Error processing commit ID " + nextCommitId, t);
+                            increaseErrorCount();
+                        }
+                    }
+                }
+            };
+        }
+
+        executeWorkers(workers);
+
+        for (Map.Entry<Method, Integer> e : aggregatingConsumer.getAggregatedFunctionChanges().entrySet()) {
+            changedFunctionConsumer.accept(e);
+        }
+    }
+
+    private void executeWorkers(Thread[] workers) {
+        for (int iWorker = 0; iWorker < workers.length; iWorker++) {
+            workers[iWorker].start();
+        }
+
+        for (int iWorker = 0; iWorker < workers.length; iWorker++) {
+            try {
+                workers[iWorker].join();
+            } catch (InterruptedException e) {
+                LOG.warn("Interrupted while waiting for changed function lister thread to finish.", e);
+            }
+        }
+    }
+
+    private synchronized int increaseErrorCount() {
+        return errors++;
     }
 
 
@@ -78,7 +188,7 @@ public class GitCommitChangedFunctionLister implements Runnable {
      *
      * @param commitId
      */
-    private void listChangedFunctions(String commitId) {
+    private void listChangedFunctions(String commitId, Consumer<Map.Entry<Method, Integer>> changedFunctionConsumer) {
         LOG.info("Analyzing commit " + commitId);
         int linesAdded = 0;
         int linesDeleted = 0;
@@ -115,8 +225,9 @@ public class GitCommitChangedFunctionLister implements Runnable {
                 for (Map.Entry<Method, Integer> e : changedFunctions.entrySet()) {
                     int numEdits = e.getValue();
                     if (numEdits > 0) {
-                        Method func = e.getKey();
-                        System.out.println(commitId + "\t" + parentCommitId.name() + "\t" + numEdits + "\t" + oldPath + "\t" + func.functionSignatureXml);
+                        //Method func = e.getKey();
+                        //System.out.println(commitId + "\t" + parentCommitId.name() + "\t" + numEdits + "\t" + oldPath + "\t" + func.functionSignatureXml);
+                        changedFunctionConsumer.accept(e);
                     }
                 }
             }
@@ -140,14 +251,14 @@ public class GitCommitChangedFunctionLister implements Runnable {
         }
     }
 
-    private void listFunctions(Map<String, List<Method>> changedFunctions, String prefix) {
-        for (Map.Entry<String, List<Method>> e : changedFunctions.entrySet()) {
-            LOG.debug(prefix + "\t" + e.getKey());
-            for (Method f : e.getValue()) {
-                LOG.debug(prefix + "\t" + f.start1 + ":" + f.end1 + "\t" + f.functionSignatureXml);
-            }
-        }
-    }
+//    private void listFunctions(Map<String, List<Method>> changedFunctions, String prefix) {
+//        for (Map.Entry<String, List<Method>> e : changedFunctions.entrySet()) {
+//            LOG.debug(prefix + "\t" + e.getKey());
+//            for (Method f : e.getValue()) {
+//                LOG.debug(prefix + "\t" + f.start1 + ":" + f.end1 + "\t" + f.functionSignatureXml);
+//            }
+//        }
+//    }
 
     private Map<String, List<Method>> listFunctionsInFiles(RevCommit commit, Set<String> filesPaths) throws IOException {
         if (filesPaths.isEmpty()) {

@@ -1,17 +1,21 @@
 package de.ovgu.skunk.commitanalysis;
 
+import de.ovgu.skunk.bugs.correlate.data.Snapshot;
+import de.ovgu.skunk.bugs.correlate.input.ProjectInformationReader;
+import de.ovgu.skunk.bugs.correlate.main.ProjectInformationConfig;
 import org.apache.commons.cli.*;
 import org.apache.log4j.Logger;
 
-import java.io.IOException;
-import java.io.InputStream;
 import java.io.PrintWriter;
-import java.util.ArrayList;
-import java.util.List;
+import java.nio.file.Paths;
+import java.util.Collection;
+import java.util.Date;
+import java.util.SortedMap;
 
 public class ListChangedFunctions {
     private static final Logger LOG = Logger.getLogger(ListChangedFunctions.class);
     private ListChangedFunctionsConfig config;
+    private int errors;
 
     public static void main(String[] args) {
         ListChangedFunctions main = new ListChangedFunctions();
@@ -25,18 +29,40 @@ public class ListChangedFunctions {
             System.exit(1);
         }
         main.execute();
+        System.exit(main.errors);
     }
 
     private void execute() {
-        LOG.debug("Analyzing repo " + config.repoDir);
-        if (config.commitIds.isEmpty()) {
-            config.commitIds = readCommitIdsFromStdin();
-        }
-        LOG.debug("Listing functions changed by commits " + config.commitIds);
-        GitCommitChangedFunctionLister lister = new GitCommitChangedFunctionLister(config);
-        lister.run();
+        LOG.debug("Listing changed functions in snapshots in " + config.projectSnapshotsDir() + " and repo " + config.repoDir);
+        this.errors = 0;
+        ProjectInformationReader<ListChangedFunctionsConfig> projectInfo = new ProjectInformationReader<>(config);
+        LOG.debug("Reading project information");
+        projectInfo.readSnapshotsAndRevisionsFile();
+        LOG.debug("Done reading project information");
+        SortedMap<Date, Snapshot> snapshots = projectInfo.getSnapshots();
+        listFunctionsInSnapshots(snapshots.values());
     }
 
+    private void listFunctionsInSnapshots(Collection<Snapshot> snapshots) {
+        final int totalSnapshots = snapshots.size();
+        int numSnapshot = 1;
+        for (final Snapshot s : snapshots) {
+            LOG.info("Listing changed functions in snapshot " + (numSnapshot++) + "/" + totalSnapshots + ".");
+            listChangedFunctionsInSnapshot(s);
+        }
+        LOG.info("Done listing changed functions in " + totalSnapshots + " snapshots.");
+    }
+
+    private void listChangedFunctionsInSnapshot(Snapshot snapshot) {
+        LOG.debug("Listing functions changed by " + snapshot);
+        GitCommitChangedFunctionLister lister = new GitCommitChangedFunctionLister(config, snapshot);
+        lister.run();
+        if (lister.errorsOccurred()) {
+            errors++;
+        }
+    }
+
+    /*
     List<String> readCommitIdsFromStdin() {
         return readCommitIdsFromStream(System.in);
     }
@@ -70,6 +96,7 @@ public class ListChangedFunctions {
         }
         return commitIds;
     }
+    */
 
     /**
      * Analyze input to decide what to do during runtime
@@ -89,10 +116,8 @@ public class ListChangedFunctions {
                 HelpFormatter formatter = new HelpFormatter();
                 //@formatter:off
                 formatter.printHelp(progName()
-                                + " [-" + ListChangedFunctionsConfig.OPT_HELP + "]"
-                                + " -" + ListChangedFunctionsConfig.OPT_REPO + " DIR"
-                                + " [COMMIT_ID ...]"
-                        , "List the signatures of the functions changed by GIT commits. The commit-ids can either be specified on the command line. Or, if no non-option arguments are specified, they will be read from stdin." /* header */
+                                + " [OPTIONS]"
+                        , "List the signatures of the functions changed by the GIT commits in the snapshots of an IfdefRevolver project." /* header */
                         , actualOptions
                         , null /* footer */
                 );
@@ -119,9 +144,33 @@ public class ListChangedFunctions {
             return;
         }
         this.config = new ListChangedFunctionsConfig();
-        config.repoDir = line.getOptionValue(ListChangedFunctionsConfig.OPT_REPO);
+
+        ProjectInformationConfig.parseProjectNameFromCommandLine(line, this.config);
+        ProjectInformationConfig.parseProjectResultsDirFromCommandLine(line, this.config);
+        ProjectInformationConfig.parseSnapshotsDirFromCommandLine(line, this.config);
+
+        if (line.hasOption(ListChangedFunctionsConfig.OPT_REPO)) {
+            config.repoDir = line.getOptionValue(ListChangedFunctionsConfig.OPT_REPO);
+        } else {
+            config.repoDir = Paths.get(ListChangedFunctionsConfig.DEFAULT_REPOS_DIR_NAME, this.config.getProject(), ".git").toString();
+        }
         config.validateRepoDir();
-        config.commitIds = line.getArgList();
+
+        if (line.hasOption(ListChangedFunctionsConfig.OPT_THREADS)) {
+            String threadsString = line.getOptionValue(ListChangedFunctionsConfig.OPT_THREADS);
+            int numThreads;
+            try {
+                numThreads = Integer.valueOf(threadsString);
+            } catch (NumberFormatException e) {
+                throw new RuntimeException("Invalid value for option `-" + ListChangedFunctionsConfig.OPT_THREADS
+                        + "': Not a valid integer: " + threadsString);
+            }
+            if (numThreads < 1) {
+                throw new RuntimeException("Invalid value for option `-" + ListChangedFunctionsConfig.OPT_THREADS
+                        + "': Number of threads must be an integer >= 1.");
+            }
+            config.setNumThreads(numThreads);
+        }
     }
 
     private Options makeOptions(boolean forHelp) {
@@ -130,16 +179,29 @@ public class ListChangedFunctions {
         // @formatter:off
 
         // --help= option
-        options.addOption(Option.builder(String.valueOf(ListChangedFunctionsConfig.OPT_HELP))
-                .longOpt(ListChangedFunctionsConfig.OPT_HELP_L)
-                .desc("print this help sceen and exit")
-                .build());
+        options.addOption(ProjectInformationConfig.helpCommandLineOption());
 
+        // Options for describing project locations
+        options.addOption(ProjectInformationConfig.projectNameCommandLineOption(required));
+        options.addOption(ProjectInformationConfig.resultsDirCommandLineOption());
+        options.addOption(ProjectInformationConfig.snapshotsDirCommandLineOption());
+
+        // --repo=foo/bar/.git GIT repository location
         options.addOption(Option.builder(String.valueOf(ListChangedFunctionsConfig.OPT_REPO))
                 .longOpt(ListChangedFunctionsConfig.OPT_REPO_L)
-                .desc("directory containing the git repository to analyze")
+                .desc("Directory containing the git repository to analyze."  + " [Default="
+                        + ListChangedFunctionsConfig.DEFAULT_REPOS_DIR_NAME + "/<project>/.git]")
                 .hasArg().argName("DIR")
-                .required(required)
+                //.required(required)
+                .build());
+
+        // --threads=1 options
+        options.addOption(Option.builder(String.valueOf(ListChangedFunctionsConfig.OPT_THREADS))
+                .longOpt(ListChangedFunctionsConfig.OPT_THREADS_L)
+                .desc("Number of parallel analysis threads. Must be at least 1."  + " [Default="
+                        + ListChangedFunctionsConfig.DEFAULT_NUM_THREADS + "]")
+                .hasArg().argName("NUM")
+                .type(Integer.class)
                 .build());
 
         // @formatter:on
