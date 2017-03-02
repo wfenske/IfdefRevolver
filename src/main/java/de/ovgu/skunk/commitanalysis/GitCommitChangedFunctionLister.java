@@ -200,55 +200,71 @@ public class GitCommitChangedFunctionLister implements Runnable {
             RevCommit commit = rw.parseCommit(repo.resolve(commitId));
             ObjectId parentCommitId = commit.getParent(0).getId();
             RevCommit parent = rw.parseCommit(parentCommitId);
-            formatter = new DiffFormatter(DisabledOutputStream.INSTANCE);
-            formatter.setRepository(repo);
-            formatter.setDiffComparator(RawTextComparator.WS_IGNORE_ALL);
-            formatter.setDetectRenames(true);
+            formatter = getDiffFormatterInstance();
             List<DiffEntry> diffs = formatter.scan(parent.getTree(), commit.getTree());
-            LOG.info(parentCommitId.name() + " ... " + commitId);
+            LOG.debug(parentCommitId.name() + " ... " + commitId);
 
-            Set<String> aSideCFilePaths = new HashSet<>();
-            for (DiffEntry diff : diffs) {
-                String oldPath = diff.getOldPath();
-                if (oldPath.endsWith(".c")) {
-                    aSideCFilePaths.add(oldPath);
-                }
-            }
+            Set<String> aSideCFilePaths = getFilenamesOfCFilesModifiedByDiffsASides(diffs);
+            Map<String, List<Method>> allASideFunctions = listAllFunctionsInModifiedFiles(parent, aSideCFilePaths);
 
-            LOG.debug("Parsing A-side functions");
-            final Map<String, List<Method>> allASideFunctions = listFunctionsInFiles(parent, aSideCFilePaths);
-
-            LOG.debug("Mappings edits to A-side function locations");
-            for (DiffEntry diff : diffs) {
-                String oldPath = diff.getOldPath();
-                SortedMap<Method, Integer> changedFunctions = listChangedFunctions(formatter, diff, allASideFunctions);
-                for (Map.Entry<Method, Integer> e : changedFunctions.entrySet()) {
-                    int numEdits = e.getValue();
-                    if (numEdits > 0) {
-                        //Method func = e.getKey();
-                        //System.out.println(commitId + "\t" + parentCommitId.name() + "\t" + numEdits + "\t" + oldPath + "\t" + func.functionSignatureXml);
-                        changedFunctionConsumer.accept(e);
-                    }
-                }
-            }
-        } catch (IOException e1) {
-            throw new RuntimeException(e1);
+            mapEditsToASideFunctionLocations(diffs, allASideFunctions, formatter, changedFunctionConsumer);
+        } catch (IOException ioe) {
+            throw new RuntimeException("I/O exception parsing files changed by commit " + commitId, ioe);
         } finally {
-            try {
-                if (formatter != null) formatter.release();
-            } catch (RuntimeException e) {
-                LOG.warn("Problem releasing diff formatter for commit " + commitId, e);
-            } finally {
-                formatter = null;
-            }
-            try {
-                if (rw != null) rw.release();
-            } catch (RuntimeException e) {
-                LOG.warn("Problem releasing revision walker for commit " + commitId, e);
-            } finally {
-                rw = null;
+            releaseFormatter(commitId, formatter);
+            releaseRevisionWalker(commitId, rw);
+        }
+    }
+
+    private void releaseRevisionWalker(String commitId, RevWalk rw) {
+        try {
+            if (rw != null) rw.release();
+        } catch (RuntimeException e) {
+            LOG.warn("Problem releasing revision walker for commit " + commitId, e);
+        }
+    }
+
+    private void releaseFormatter(String commitId, DiffFormatter formatter) {
+        try {
+            if (formatter != null) formatter.release();
+        } catch (RuntimeException e) {
+            LOG.warn("Problem releasing diff formatter for commit " + commitId, e);
+        }
+    }
+
+    private void mapEditsToASideFunctionLocations(List<DiffEntry> diffs, Map<String, List<Method>> allASideFunctions, DiffFormatter formatter, Consumer<Map.Entry<Method, Integer>> changedFunctionConsumer) throws IOException {
+        LOG.debug("Mappings edits to A-side function locations");
+        for (DiffEntry diff : diffs) {
+            SortedMap<Method, Integer> changedFunctions = listChangedFunctions(formatter, diff, allASideFunctions);
+            for (Map.Entry<Method, Integer> e : changedFunctions.entrySet()) {
+                int numEdits = e.getValue();
+                if (numEdits > 0) {
+                    //Method func = e.getKey();
+                    //System.out.println(commitId + "\t" + parentCommitId.name() + "\t" + numEdits + "\t" + oldPath + "\t" + func.functionSignatureXml);
+                    changedFunctionConsumer.accept(e);
+                }
             }
         }
+    }
+
+    private Set<String> getFilenamesOfCFilesModifiedByDiffsASides(List<DiffEntry> diffs) {
+        Set<String> aSideCFilePaths = new HashSet<>();
+        for (DiffEntry diff : diffs) {
+            String oldPath = diff.getOldPath();
+            if (oldPath.endsWith(".c")) {
+                aSideCFilePaths.add(oldPath);
+            }
+        }
+        return aSideCFilePaths;
+    }
+
+    private DiffFormatter getDiffFormatterInstance() {
+        DiffFormatter formatter;
+        formatter = new DiffFormatter(DisabledOutputStream.INSTANCE);
+        formatter.setRepository(repo);
+        formatter.setDiffComparator(RawTextComparator.WS_IGNORE_ALL);
+        formatter.setDetectRenames(true);
+        return formatter;
     }
 
 //    private void listFunctions(Map<String, List<Method>> changedFunctions, String prefix) {
@@ -260,12 +276,14 @@ public class GitCommitChangedFunctionLister implements Runnable {
 //        }
 //    }
 
-    private Map<String, List<Method>> listFunctionsInFiles(RevCommit commit, Set<String> filesPaths) throws IOException {
-        if (filesPaths.isEmpty()) {
+    private Map<String, List<Method>> listAllFunctionsInModifiedFiles(RevCommit commit, Set<String> modifiedFiles) throws IOException {
+        LOG.debug("Parsing all A-side functions");
+        if (modifiedFiles.isEmpty()) {
             return Collections.emptyMap();
         }
+
         FunctionLocationProvider functionLocationProvider = new FunctionLocationProvider(repo);
-        return functionLocationProvider.listFunctionsInFiles(commit, filesPaths);
+        return functionLocationProvider.listFunctionsInFiles(commit, modifiedFiles);
     }
 
     static class EditToFunctionLocMapper implements Consumer<Edit> {
