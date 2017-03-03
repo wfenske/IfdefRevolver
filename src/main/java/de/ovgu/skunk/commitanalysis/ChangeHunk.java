@@ -9,21 +9,68 @@ public class ChangeHunk {
     /**
      * ID of the commit to which this hunk belongs
      */
-    String commitId;
+    private String commitId;
     /**
      * File being changed (old file name, in contrast to the new file name in cases where a file is renamed or newly created)
      */
-    String aSidePath;
+    private String oldPath;
     /**
-     * Number of the change hunk within the file {@link #aSidePath}, counted from 0
+     * Number of the change hunk within the file {@link #oldPath}, counted from 0
      */
-    int hunkNo;
+    private int hunkNo;
     /**
      * Lines deleted by this hunk
      */
-    int linesDeleted;
+    private int linesDeleted;
     /**
      * Lines added by this hunk
      */
-    int linesAdded;
+    private int linesAdded;
+
+    public ChangeHunk(String commitId, String oldPath, int hunkNo, int linesDeleted, int linesAdded) {
+        this.commitId = commitId;
+        this.oldPath = oldPath;
+        this.hunkNo = hunkNo;
+        this.linesDeleted = linesDeleted;
+        this.linesAdded = linesAdded;
+    }
+
+    public String getCommitId() {
+        return commitId;
+    }
+
+    public String getOldPath() {
+        return oldPath;
+    }
+
+    public int getHunkNo() {
+        return hunkNo;
+    }
+
+    public int getLinesDeleted() {
+        return linesDeleted;
+    }
+
+    public int getLinesAdded() {
+        return linesAdded;
+    }
+
+    /**
+     * @return Tally of lines deleted and added by the hunk.  Will be positive if more lines were added than deleted
+     */
+    public int getDelta() {
+        return linesAdded - linesDeleted;
+    }
+
+    @Override
+    public String toString() {
+        return this.getClass().getSimpleName() + '{' +
+                "" + commitId +
+                ", " + oldPath +
+                ", hunkNo=" + hunkNo +
+                ", -" + linesDeleted +
+                ", +" + linesAdded +
+                ", -/+" + getDelta() +
+                '}';
+    }
 }

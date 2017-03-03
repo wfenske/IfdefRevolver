@@ -149,7 +149,7 @@ public class FunctionLocationProvider {
         builder.inheritIO()
                 .redirectOutput(ProcessBuilder.Redirect.PIPE)
                 .redirectInput(ProcessBuilder.Redirect.PIPE);
-        Process process = null;
+        Process process;
 
         try {
             process = builder.start();

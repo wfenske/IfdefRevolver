@@ -8,6 +8,33 @@ import de.ovgu.skunk.detection.data.Method;
  * Created by wfenske on 02.03.17.
  */
 public class FunctionChangeHunk {
-    ChangeHunk hunk;
-    Method function;
+    /**
+     * The function being changed
+     */
+    private Method function;
+    /**
+     * The change applied to the function
+     */
+    private ChangeHunk hunk;
+
+    public FunctionChangeHunk(Method function, ChangeHunk hunk) {
+        this.function = function;
+        this.hunk = hunk;
+    }
+
+    public Method getFunction() {
+        return function;
+    }
+
+    public ChangeHunk getHunk() {
+        return hunk;
+    }
+
+    @Override
+    public String toString() {
+        return this.getClass().getSimpleName() + "{" +
+                "f=" + function +
+                ", hunk=" + hunk +
+                '}';
+    }
 }
