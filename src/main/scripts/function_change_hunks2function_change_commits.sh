@@ -45,7 +45,7 @@ main()
 		fi
 		err=$(( $err + 1 ))
 	    fi
-	    i_file=$(( ++i_file ))
+	    i_file=$(( $i_file + 1 ))
 	done
 	if [ $err -ne 0 ]
 	then

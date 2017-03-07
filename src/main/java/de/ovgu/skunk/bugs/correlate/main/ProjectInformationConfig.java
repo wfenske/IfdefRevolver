@@ -68,11 +68,16 @@ public class ProjectInformationConfig implements IHasSnapshotsDir, IHasResultsDi
             resultsDirName = DEFAULT_RESULTS_DIR_NAME;
         }
         final File resultsDir = new File(resultsDirName);
-        final File projectResultsDir = new File(resultsDir, config.getProject());
-        if (!projectResultsDir.exists() || !projectResultsDir.isDirectory()) {
+        if (!resultsDir.exists() || !resultsDir.isDirectory()) {
             throw new RuntimeException(
                     "The results directory does not exist or is not a directory: "
                             + resultsDir.getAbsolutePath());
+        }
+        final File projectResultsDir = new File(resultsDir, config.getProject());
+        if (!projectResultsDir.exists() || !projectResultsDir.isDirectory()) {
+            throw new RuntimeException(
+                    "The project's results directory does not exist or is not a directory: "
+                            + projectResultsDir.getAbsolutePath());
         }
         config.setResultsDir(resultsDir.getAbsolutePath());
     }
@@ -171,13 +176,20 @@ public class ProjectInformationConfig implements IHasSnapshotsDir, IHasResultsDi
     @Override
     public String getProject() {
         if (project == null) {
-            throw new NullPointerException("Attempt to read field `project' before initialization");
+            throw new IllegalStateException("Attempt to read field `project' before initialization");
         }
         return project;
     }
 
     @Override
     public void setProject(String project) {
+        if (project == null) {
+            throw new IllegalArgumentException("`project' must not be null");
+        }
+        if ("".equals(project)) {
+            throw new IllegalArgumentException("`project' must not be an empty string");
+        }
+
         this.project = project;
     }
 

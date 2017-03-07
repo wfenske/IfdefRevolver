@@ -22,7 +22,7 @@ import java.io.IOException;
 import java.util.*;
 import java.util.function.Consumer;
 
-public class GitCommitChangedFunctionLister implements Runnable {
+public class GitCommitChangedFunctionLister {
     private static final Logger LOG = Logger.getLogger(GitCommitChangedFunctionLister.class);
     private ListChangedFunctionsConfig config;
     private Snapshot snapshot;
@@ -35,18 +35,20 @@ public class GitCommitChangedFunctionLister implements Runnable {
         this.snapshot = snapshot;
     }
 
-    @Override
-    public void run() {
+    /**
+     * @return Name of the CSV file in which the results will be saved
+     */
+    public File listChangedFunctions() {
         errors = 0;
         try {
-            openRepo(config.repoDir);
+            openRepo(config.getRepoDir());
         } catch (Exception e) {
-            LOG.error("Error opening repository " + config.repoDir + ".", e);
+            LOG.error("Error opening repository " + config.getRepoDir() + ".", e);
             increaseErrorCount();
-            throw new RuntimeException("Error opening repository " + config.repoDir, e);
+            throw new RuntimeException("Error opening repository " + config.getRepoDir(), e);
         }
         try {
-            listChangedFunctionsInSnapshot();
+            return listChangedFunctionsInSnapshot();
         } catch (RuntimeException t) {
             increaseErrorCount();
             throw t;
@@ -54,7 +56,7 @@ public class GitCommitChangedFunctionLister implements Runnable {
             try {
                 closeRepo();
             } catch (RuntimeException t) {
-                LOG.warn("Error closing repository " + config.repoDir + " (error will be ignored.)", t);
+                LOG.warn("Error closing repository " + config.getRepoDir() + " (error will be ignored.)", t);
                 increaseErrorCount();
             }
         }
@@ -64,11 +66,12 @@ public class GitCommitChangedFunctionLister implements Runnable {
         return errors > 0;
     }
 
-    private void listChangedFunctionsInSnapshot() {
+    private File listChangedFunctionsInSnapshot() {
         CsvFileWriterHelper helper = newCsvFileWriterForSnapshot(snapshot);
         File outputFileDir = config.snapshotResultsDirForDate(snapshot.getSnapshotDate());
         File outputFile = new File(outputFileDir, FunctionChangeHunksColumns.FILE_BASENAME);
         helper.write(outputFile);
+        return outputFile;
     }
 
     private CsvFileWriterHelper newCsvFileWriterForSnapshot(final Snapshot snapshot) {
@@ -357,7 +360,7 @@ public class GitCommitChangedFunctionLister implements Runnable {
     }
 
     private void openRepo(String repoDir) throws IOException {
-        git = Git.open(new File(config.repoDir));
+        git = Git.open(new File(config.getRepoDir()));
         repo = git.getRepository();
     }
 

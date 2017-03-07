@@ -15,7 +15,7 @@ for o in "$@"; do
     esac
 done
 
-main_class=de.ovgu.skunk.bugs.concept.main.CreateSnapshots
+main_class=de.ovgu.skunk.bugs.createsnapshots.main.CreateSnapshots
 if [ -n "$o_smellconfigs_dir" ]
 then
     exec java -cp "$CP" ${main_class} $o_smellconfigs_dir "$@"

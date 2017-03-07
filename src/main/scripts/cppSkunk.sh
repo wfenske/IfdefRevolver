@@ -1,8 +1,5 @@
 #!/usr/bin/env bash
 
-# Pfad zu CPPSTATS
-#statspath="/home/hnes/Masterarbeit/Tools/cppstats/"
-
 #source=${2:?Temporary snapshot directory (second positional argument) is missing.}
 source=${PWD:?PWD (current working directory) unset or empty.}
 config=${1:?"Smell detection configuration file (first positional argument) is missing."}

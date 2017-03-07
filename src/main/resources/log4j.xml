@@ -12,6 +12,7 @@
         </layout>
     </appender>
 
+    <!--
     <logger name="org.repodriller" additivity="false">
         <level value="info"/>
         <appender-ref ref="stderr"/>
@@ -22,14 +23,28 @@
         <appender-ref ref="stderr"/>
     </logger>
 
-    <logger name="de.ovgu.skunk.commitanalysis.ListAllFunctions" additivity="false">
-        <level value="trace"/>
-        <appender-ref ref="stderr"/>
-    </logger>
-
     <logger name="de.ovgu.skunk.commitanalysis.GitCommitChangedFunctionLister" additivity="false">
         <level value="warn"/>
         <appender-ref ref="stderr"/>
     </logger>
+    -->
+
+    <logger name="de.ovgu.skunk">
+        <level value="info"/>
+    </logger>
+
+    <logger name="de.ovgu.skunk.detection.input.SrcMlFolderReader">
+        <level value="warn"/>
+    </logger>
+
+
+    <logger name="de.ovgu.skunk.commitanalysis.GitCommitChangedFunctionLister">
+        <level value="warn"/>
+    </logger>
+
+    <root>
+        <priority value="info"/>
+        <appender-ref ref="stderr"/>
+    </root>
 
 </log4j:configuration>

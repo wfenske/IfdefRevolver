@@ -6,11 +6,12 @@ add_to_cp()
 {
     if [ -n "$1" ]
     then
-	if [ ! -e "$1" ]
+	add_cp=$(realpath -- "$1") || exit $?
+	if [ ! -e "${add_cp}" ]
 	then
-	    echo "Warn: file not found: \`$1'" >&2
+	    echo "Warn: file not found: \`${add_cp}'" >&2
 	fi
-	CP="$CP${CP:+:}${1}"
+	CP="$CP${CP:+:}${add_cp}"
     fi
 }
 
@@ -22,11 +23,11 @@ skunk_dir=${ifdefrevolver_dir}/../Skunk/Skunk
 reprodriller_dir=${ifdefrevolver_dir}/../repodriller
 maven_repo=$HOME/.m2/repository
 
-# Skunk class files
-add_to_cp "${skunk_dir}"/target/classes
-
 # IfdefRevolver class files
 add_to_cp "${ifdefrevolver_dir}"/target/classes 
+
+# Skunk class files
+add_to_cp "${skunk_dir}"/target/classes
 
 # commons-cli
 add_to_cp "${maven_repo}"/commons-cli/commons-cli/1.3/commons-cli-1.3.jar

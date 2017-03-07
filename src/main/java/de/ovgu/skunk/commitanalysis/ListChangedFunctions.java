@@ -6,11 +6,11 @@ import de.ovgu.skunk.bugs.correlate.main.ProjectInformationConfig;
 import org.apache.commons.cli.*;
 import org.apache.log4j.Logger;
 
+import java.io.File;
 import java.io.PrintWriter;
 import java.nio.file.Paths;
-import java.util.Collection;
-import java.util.Date;
-import java.util.SortedMap;
+import java.text.SimpleDateFormat;
+import java.util.*;
 
 public class ListChangedFunctions {
     private static final Logger LOG = Logger.getLogger(ListChangedFunctions.class);
@@ -33,33 +33,67 @@ public class ListChangedFunctions {
     }
 
     private void execute() {
-        LOG.debug("Listing changed functions in snapshots in " + config.projectSnapshotsDir() + " and repo " + config.repoDir);
+        LOG.debug("Listing changed functions in snapshots in " + config.projectSnapshotsDir() + " and repo " + config.getRepoDir());
         this.errors = 0;
         ProjectInformationReader<ListChangedFunctionsConfig> projectInfo = new ProjectInformationReader<>(config);
         LOG.debug("Reading project information");
         projectInfo.readSnapshotsAndRevisionsFile();
         LOG.debug("Done reading project information");
         SortedMap<Date, Snapshot> snapshots = projectInfo.getSnapshots();
-        listFunctionsInSnapshots(snapshots.values());
+        Collection<Snapshot> snapshotsToProcess = filterSnapshotsToProcess(snapshots);
+        listFunctionsInSnapshots(snapshotsToProcess);
+    }
+
+    private Collection<Snapshot> filterSnapshotsToProcess(SortedMap<Date, Snapshot> snapshots) {
+        Optional<List<Date>> explicitSnapshotDates = config.getSnapshots();
+        final Collection<Snapshot> snapshotsToProcess;
+        if (explicitSnapshotDates.isPresent()) {
+            Collection<Date> explicitSnapshotDatesValue = explicitSnapshotDates.get();
+            snapshotsToProcess = new ArrayList<>(explicitSnapshotDatesValue.size());
+            for (Date snapshotDate : explicitSnapshotDatesValue) {
+                Snapshot snapshot = snapshots.get(snapshotDate);
+                if (snapshot == null) {
+                    LOG.warn("No such snapshot: " + snapshotDate);
+                } else {
+                    snapshotsToProcess.add(snapshot);
+                }
+            }
+        } else {
+            snapshotsToProcess = snapshots.values();
+        }
+        return snapshotsToProcess;
     }
 
     private void listFunctionsInSnapshots(Collection<Snapshot> snapshots) {
+        logSnapshotsToProcess(snapshots);
+
         final int totalSnapshots = snapshots.size();
         int numSnapshot = 1;
         for (final Snapshot s : snapshots) {
             LOG.info("Listing changed functions in snapshot " + (numSnapshot++) + "/" + totalSnapshots + ".");
-            listChangedFunctionsInSnapshot(s);
+            File resultCsv = listChangedFunctionsInSnapshot(s);
+            LOG.info("Function changes saved in " + resultCsv.getAbsolutePath());
         }
         LOG.info("Done listing changed functions in " + totalSnapshots + " snapshots.");
     }
 
-    private void listChangedFunctionsInSnapshot(Snapshot snapshot) {
+    private void logSnapshotsToProcess(Collection<Snapshot> snapshotsToProcess) {
+        if (LOG.isDebugEnabled()) {
+            LOG.debug("The following snapshots will be processed:");
+            for (Snapshot s : snapshotsToProcess) {
+                LOG.debug("" + s);
+            }
+        }
+    }
+
+    private File listChangedFunctionsInSnapshot(Snapshot snapshot) {
         LOG.debug("Listing functions changed by " + snapshot);
         GitCommitChangedFunctionLister lister = new GitCommitChangedFunctionLister(config, snapshot);
-        lister.run();
+        File resultCsv = lister.listChangedFunctions();
         if (lister.errorsOccurred()) {
             errors++;
         }
+        return resultCsv;
     }
 
     /*
@@ -116,8 +150,11 @@ public class ListChangedFunctions {
                 HelpFormatter formatter = new HelpFormatter();
                 //@formatter:off
                 formatter.printHelp(progName()
-                                + " [OPTIONS]"
-                        , "List the signatures of the functions changed by the GIT commits in the snapshots of an IfdefRevolver project." /* header */
+                                + " [OPTION]... [SNAPSHOT]..."
+                        , "List the signatures of the functions changed by the GIT commits in the snapshots of" +
+                                " an IfdefRevolver project.  By default, all snapshots of the project will be" +
+                                " analyzed.  If you wish to analyze only specific snapshots, you can list their dates" +
+                                " in YYYY-MM-DD format after the last named command line option." /* header */
                         , actualOptions
                         , null /* footer */
                 );
@@ -150,9 +187,9 @@ public class ListChangedFunctions {
         ProjectInformationConfig.parseSnapshotsDirFromCommandLine(line, this.config);
 
         if (line.hasOption(ListChangedFunctionsConfig.OPT_REPO)) {
-            config.repoDir = line.getOptionValue(ListChangedFunctionsConfig.OPT_REPO);
+            config.setRepoDir(line.getOptionValue(ListChangedFunctionsConfig.OPT_REPO));
         } else {
-            config.repoDir = Paths.get(ListChangedFunctionsConfig.DEFAULT_REPOS_DIR_NAME, this.config.getProject(), ".git").toString();
+            config.setRepoDir(Paths.get(ListChangedFunctionsConfig.DEFAULT_REPOS_DIR_NAME, this.config.getProject(), ".git").toString());
         }
         config.validateRepoDir();
 
@@ -171,6 +208,28 @@ public class ListChangedFunctions {
             }
             config.setNumThreads(numThreads);
         }
+
+        List<String> snapshotDateNames = line.getArgList();
+        if (!snapshotDateNames.isEmpty()) {
+            parseSnapshotDates(snapshotDateNames);
+        }
+    }
+
+    private void parseSnapshotDates(List<String> snapshotDateNames) {
+        List<Date> snapshotDates = new ArrayList<>(snapshotDateNames.size());
+        final SimpleDateFormat dateFormatter = new SimpleDateFormat("yyyy-MM-dd");
+
+        for (String snapshotDateString : snapshotDateNames) {
+            Date snapshotDate;
+            try {
+                snapshotDate = dateFormatter.parse(snapshotDateString);
+            } catch (java.text.ParseException e) {
+                throw new RuntimeException("Invalid snapshot (not in YYYY-MM-DD format): " + snapshotDateString, e);
+            }
+            snapshotDates.add(snapshotDate);
+        }
+        config.setSnapshots(snapshotDates);
+        config.validateSnapshots();
     }
 
     private Options makeOptions(boolean forHelp) {
@@ -189,7 +248,7 @@ public class ListChangedFunctions {
         // --repo=foo/bar/.git GIT repository location
         options.addOption(Option.builder(String.valueOf(ListChangedFunctionsConfig.OPT_REPO))
                 .longOpt(ListChangedFunctionsConfig.OPT_REPO_L)
-                .desc("Directory containing the git repository to analyze."  + " [Default="
+                .desc("Directory containing the git repository to analyze." + " [Default="
                         + ListChangedFunctionsConfig.DEFAULT_REPOS_DIR_NAME + "/<project>/.git]")
                 .hasArg().argName("DIR")
                 //.required(required)
@@ -198,7 +257,7 @@ public class ListChangedFunctions {
         // --threads=1 options
         options.addOption(Option.builder(String.valueOf(ListChangedFunctionsConfig.OPT_THREADS))
                 .longOpt(ListChangedFunctionsConfig.OPT_THREADS_L)
-                .desc("Number of parallel analysis threads. Must be at least 1."  + " [Default="
+                .desc("Number of parallel analysis threads. Must be at least 1." + " [Default="
                         + ListChangedFunctionsConfig.DEFAULT_NUM_THREADS + "]")
                 .hasArg().argName("NUM")
                 .type(Integer.class)
