@@ -22,23 +22,22 @@ public class CreateSnapshots {
     private static final String SKUNK_PROG = "skunk.sh";
     private static final String CPPSTATS_INPUT_TXT = "cppstats_input.txt";
     public static final String REVISIONS_FILE_BASENAME = "revisionsFull.csv";
-    private static Logger log = Logger.getLogger(CreateSnapshots.class);
+    private static Logger LOG = Logger.getLogger(CreateSnapshots.class);
 
     public static class Config {
         public static final int DEFAULT_COMMIT_WINDOW_SIZE = 100;
         private final SimpleDateFormat dateFormatter = new SimpleDateFormat("yyyy-MM-dd");
         private String reposDir = null; // "/home/hnes/Masterarbeit/Repositories/";
         public static final String DEFAULT_REPOS_DIR_NAME = "repos";
-        private String smellConfig = null; // "/home/hnes/Masterarbeit/SmellConfigs/annotationBundle.csm";
+        private String smellConfig = null;
         public static final String DEFAULT_SMELL_CONFIGS_DIR_NAME = "smellconfigs";
-        private String resultsDir = null; // "/home/hnes/Masterarbeit/Results/";
+        private String resultsDir = null;
         public static final String DEFAULT_RESULTS_DIR_NAME = "results";
-        private String snapshotsDir = null; // "/home/hnes/Masterarbeit/Temp/";
+        private String snapshotsDir = null;
         public static final String DEFAULT_SNAPSHOTS_DIR_NAME = "snapshots";
-        private String project = null; // "emacs";
+        private String project = null;
         public SkunkMode skunkMode = null;
         public Smell smell = null;
-        // public String configStr = "";
         public boolean optimized = false;
 
         public String smellModeFile() {
@@ -106,7 +105,28 @@ public class CreateSnapshots {
     }
 
     public enum SkunkMode {
-        SOURCE, PROCESSED;
+        SOURCE {
+            @Override
+            public ISkunkModeStrategy getNewStrategyInstance(Config conf) {
+                return new SourceStrategy(conf);
+            }
+        },
+
+        PREPROCESS {
+            @Override
+            public ISkunkModeStrategy getNewStrategyInstance(Config conf) {
+                return new PreprocessStrategy(conf);
+            }
+        },
+
+        PROCESSED {
+            @Override
+            public ISkunkModeStrategy getNewStrategyInstance(Config conf) {
+                return new ProcessedStrategy(conf);
+            }
+        };
+
+        public abstract ISkunkModeStrategy getNewStrategyInstance(Config conf);
     }
 
     /**
@@ -155,18 +175,24 @@ public class CreateSnapshots {
         void processSnapshot(ISnapshot previousSnapshot, ProperSnapshot snapshot);
     }
 
-    class SourceStrategy implements ISkunkModeStrategy {
+    static class SourceStrategy implements ISkunkModeStrategy {
+        private final Config conf;
+
+        public SourceStrategy(Config conf) {
+            this.conf = conf;
+        }
+
         @Override
         public void removeOutputFiles() {
             File projInfoCsv = conf.projectInfoCsv();
             if (projInfoCsv.exists()) {
-                log.warn("Running in SOURCE mode, but project info CSV already exists. It will be overwritten: "
+                LOG.warn("Running in SOURCE mode, but project info CSV already exists. It will be overwritten: "
                         + projInfoCsv.getAbsolutePath());
                 projInfoCsv.delete();
             }
             File projAnalysisCsv = conf.projectAnalysisCsv();
             if (projAnalysisCsv.exists()) {
-                log.warn("Running in SOURCE mode, but project analysis CSV already exists. It will be overwritten: "
+                LOG.warn("Running in SOURCE mode, but project analysis CSV already exists. It will be overwritten: "
                         + projAnalysisCsv.getAbsolutePath());
                 projAnalysisCsv.delete();
             }
@@ -177,10 +203,10 @@ public class CreateSnapshots {
             // GIT CHECKOUT
             gitCheckout(curSnapshot);
             // Anzahl der .c Dateien checken
-            log.debug("Looking for checkout .c files in directory " + conf.projectRepoDir().getAbsolutePath());
+            LOG.debug("Looking for checkout .c files in directory " + conf.projectRepoDir().getAbsolutePath());
             List<File> filesFound = FileFinder.find(conf.projectRepoDir(), "(.*\\.c$)");
             final int filesCount = filesFound.size();
-            log.info(String.format("Found %d .c file%s in %s", filesCount, filesCount == 1 ? "" : "s",
+            LOG.info(String.format("Found %d .c file%s in %s", filesCount, filesCount == 1 ? "" : "s",
                     conf.projectRepoDir().getAbsolutePath()));
             // In CSV Datei schreiben
             conf.projectResultsDir().mkdirs();
@@ -229,7 +255,7 @@ public class CreateSnapshots {
                 buff = new BufferedWriter(fileWriter);
                 buff.write(snapshot.revisionHash() + "," + snapshot.revisionDateString() + "," + filesFound.size());
                 buff.newLine();
-                log.debug("Added snapshot " + snapshot.revisionDateString() + " to "
+                LOG.debug("Added snapshot " + snapshot.revisionDateString() + " to "
                         + conf.projectInfoCsv().getAbsolutePath());
             } catch (IOException e1) {
                 throw new RuntimeException("Error appending snapshot " + snapshot.revisionDateString() + " to "
@@ -313,7 +339,7 @@ public class CreateSnapshots {
             } finally {
                 if (writer != null) writer.close();
             }
-            log.info("Wrote " + cppstatsConfigFile.getAbsolutePath());
+            LOG.info("Wrote " + cppstatsConfigFile.getAbsolutePath());
         }
 
         @Override
@@ -354,7 +380,7 @@ public class CreateSnapshots {
                     buff.write(commit.getHash());
                     buff.newLine();
                 }
-                log.info("Stored commit hashes of snapshot " + snapshot + " to " + out.getAbsolutePath());
+                LOG.info("Stored commit hashes of snapshot " + snapshot + " to " + out.getAbsolutePath());
             } catch (IOException e1) {
                 throw new RuntimeException("Error appending snapshot " + snapshot.revisionDateString() + " to "
                         + conf.projectInfoCsv().getAbsolutePath(), e1);
@@ -364,7 +390,43 @@ public class CreateSnapshots {
         }
     }
 
-    class ProcessedStrategy implements ISkunkModeStrategy {
+    /**
+     * Only call Skunk to create its intermediate files, without doing anything else.  Requires cppstats to already have run.
+     */
+    static class PreprocessStrategy implements ISkunkModeStrategy {
+        private final Config conf;
+
+        public PreprocessStrategy(Config conf) {
+            this.conf = conf;
+        }
+
+        @Override
+        public void removeOutputFiles() {
+            // Nothing to do.
+        }
+
+        @Override
+        public void ensureSnapshot(ISnapshot previousSnapShot, ProperSnapshot curSnapshot) {
+            // The snapshot has already been created in a previous run in SOURCE
+            // mode --> Nothing to do.
+        }
+
+        @Override
+        public void processSnapshot(ISnapshot previousSnapshot, ProperSnapshot snapshot) {
+            Date snapshotDate = snapshot.revisionDate();
+            File workingDir = conf.resultsSnapshotDir(snapshotDate);
+            File snapshotDir = conf.tmpSnapshotDir(snapshotDate);
+            runExternalCommand(SKUNK_PROG, workingDir, "--source=" + snapshotDir.getAbsolutePath());
+        }
+    }
+
+    static class ProcessedStrategy implements ISkunkModeStrategy {
+        private final Config conf;
+
+        public ProcessedStrategy(Config conf) {
+            this.conf = conf;
+        }
+
         @Override
         public void removeOutputFiles() {
             // Nothing to do.
@@ -386,17 +448,8 @@ public class CreateSnapshots {
 
     private void run(String[] args) {
         this.conf = this.parseCommandLineArgs(args);
-        final ISkunkModeStrategy skunkStrategy;
-        switch (conf.skunkMode) {
-            case PROCESSED:
-                skunkStrategy = new ProcessedStrategy();
-                break;
-            case SOURCE:
-                skunkStrategy = new SourceStrategy();
-                break;
-            default:
-                throw new RuntimeException("Invalid mode to run Skunk: " + conf.skunkMode);
-        }
+        final ISkunkModeStrategy skunkStrategy = conf.skunkMode.getNewStrategyInstance(conf);
+
         revisionsReader = new RevisionsCsvReader(conf.projectRevisionsCsvFile(), conf.commitWindowSize());
         revisionsReader.processFile();
         skunkStrategy.removeOutputFiles();
@@ -404,16 +457,18 @@ public class CreateSnapshots {
         // for (Date curDate : revisionsReader.bugHashes.keySet()) {
         ISnapshot previousSnapshot = NullSnapshot.getInstance();
         for (ProperSnapshot curSnapshot : revisionsReader.getSnapshots()) {
-            log.info("Processing snapshot " + curSnapshot);
-            // log.debug("Key: " + curDateForm + " - " + "Value: " +
+            LOG.info("Processing snapshot " + curSnapshot);
+            // LOG.debug("Key: " + curDateForm + " - " + "Value: " +
             // revisionsReader.bugHashes.get(curDate));
             skunkStrategy.ensureSnapshot(previousSnapshot, curSnapshot);
             skunkStrategy.processSnapshot(previousSnapshot, curSnapshot);
             // Ergebnis kopieren in eigenen Results Ordner
-            File sourcePath = conf.resultsSnapshotDir(curSnapshot.startDate());
-            File smellResultsDir = new File(conf.projectResultsDir(), conf.smell.name() + "Res");
-            smellResultsDir.mkdirs(); // Directories erstellen
-            moveSnapshotSmellDetectionResults(curSnapshot, sourcePath, smellResultsDir);
+            if (conf.smell != null) {
+                File sourcePath = conf.resultsSnapshotDir(curSnapshot.startDate());
+                File smellResultsDir = new File(conf.projectResultsDir(), conf.smell.name() + "Res");
+                smellResultsDir.mkdirs(); // Directories erstellen
+                moveSnapshotSmellDetectionResults(curSnapshot, sourcePath, smellResultsDir);
+            }
             previousSnapshot = curSnapshot;
         }
     }
@@ -474,7 +529,7 @@ public class CreateSnapshots {
             try {
                 while (true) {
                     if (scanner.hasNextLine()) {
-                        log.debug("[" + progBasename + suffix + "] " + scanner.nextLine());
+                        LOG.debug("[" + progBasename + suffix + "] " + scanner.nextLine());
                     } else {
                         break;
                     }
@@ -535,7 +590,7 @@ public class CreateSnapshots {
                         t.interrupt();
                     } catch (Exception e) {
                         // Don't care.
-                        log.debug("Exception interrupting scanner thread " + t, e);
+                        LOG.debug("Exception interrupting scanner thread " + t, e);
                     }
                 }
             }
@@ -561,7 +616,7 @@ public class CreateSnapshots {
         }
         commandSb.append("' in directory ").append(wd.getAbsolutePath());
         final String command = commandSb.toString();
-        log.debug("Executing " + command + " ...");
+        LOG.debug("Executing " + command + " ...");
         ProcessBuilder pb = new ProcessBuilder(processBuilderArgs);
         pb.directory(wd);
         // Scanner scanStdout = null;
@@ -584,11 +639,11 @@ public class CreateSnapshots {
             // hadMoreOutput = false;
             // if (scanStdout.hasNextLine()) {
             // hadMoreOutput = true;
-            // log.info("[" + progBasename + " out] " + scanStdout.nextLine());
+            // LOG.info("[" + progBasename + " out] " + scanStdout.nextLine());
             // }
             // if (scanStderr.hasNextLine()) {
             // hadMoreOutput = true;
-            // log.info("[" + progBasename + " err] " + scanStderr.nextLine());
+            // LOG.info("[" + progBasename + " err] " + scanStderr.nextLine());
             // }
             // } while (hadMoreOutput);
             try {
@@ -613,7 +668,7 @@ public class CreateSnapshots {
                         readerCoordinator.interrupt();
                         readerCoordinator.join();
                     } catch (Exception e) {
-                        log.debug("Exception interrupting process reader coordinator", e);
+                        LOG.debug("Exception interrupting process reader coordinator", e);
                         // Don't care.
                     }
                 }
@@ -648,7 +703,7 @@ public class CreateSnapshots {
             throw new RuntimeException("Command " + command + " exited with non-zero exit code " + exitCode);
         }
         long timeForProg = System.currentTimeMillis() - startTime;
-        log.debug("Executing " + command + " took " + timeForProg + " ms");
+        LOG.debug("Executing " + command + " took " + timeForProg + " ms");
     }
 
     static String pathRelativeTo(File file, File dir) {
@@ -672,6 +727,7 @@ public class CreateSnapshots {
     private static final char OPT_HELP = 'h';
     // mutex groupof options controlling how Skunk is called
     private static final String OPT_SOURCE_L = "source";
+    private static final String OPT_PREPROCESS_L = "preprocess";
     private static final String OPT_PROCESSED_L = "processed";
     /**
      * --smell=AB|AF|LF
@@ -751,46 +807,59 @@ public class CreateSnapshots {
             // call.
             return null;
         }
-        String smellShortName = line.getOptionValue(OPT_SMELL);
-        try {
-            res.smell = Smell.valueOf(smellShortName);
-        } catch (IllegalArgumentException e) {
-            StringBuilder sb = new StringBuilder();
-            for (Smell m : Smell.values()) {
-                if (sb.length() > 0) {
-                    sb.append(", ");
-                }
-                sb.append(m.name());
-            }
-            throw new RuntimeException("Illegal value for option -" + OPT_SMELL + ": " + smellShortName
-                    + ". Valid values are " + sb.toString());
-        }
-        final String smellConfigsDirName;
-        if (line.hasOption(OPT_SMELL_CONFIGS_DIR_L)) {
-            smellConfigsDirName = line.getOptionValue(OPT_SMELL_CONFIGS_DIR_L);
-        } else {
-            smellConfigsDirName = Config.DEFAULT_SMELL_CONFIGS_DIR_NAME;
-        }
-        File smellConfigsDir = new File(smellConfigsDirName);
-        if (!smellConfigsDir.isDirectory()) {
-            throw new RuntimeException("Smell configurations directory does not exist or is not a directory: "
-                    + smellConfigsDir.getAbsolutePath());
-        }
-        File smellConfigFile = new File(smellConfigsDir, res.smell.configFileName);
-        if (smellConfigFile.exists() && !smellConfigFile.isDirectory()) {
-            res.smellConfig = smellConfigFile.getAbsolutePath();
-        } else {
-            throw new RuntimeException("The smell detection configuration file does not exist or is a directory: "
-                    + smellConfigFile.getAbsolutePath());
-        }
+
+        boolean needSmell = true;
+
         if (line.hasOption(OPT_SOURCE_L)) {
             res.skunkMode = SkunkMode.SOURCE;
+        } else if (line.hasOption(OPT_PREPROCESS_L)) {
+            res.skunkMode = SkunkMode.PREPROCESS;
+            needSmell = false;
         } else if (line.hasOption(OPT_PROCESSED_L)) {
             res.skunkMode = SkunkMode.PROCESSED;
         } else {
             throw new RuntimeException(
-                    "Either `--" + OPT_SOURCE_L + "' or `--" + OPT_PROCESSED_L + "' must be specified!");
+                    "Either `--" + OPT_SOURCE_L + "', `--" + OPT_PREPROCESS_L + "' or `--" + OPT_PROCESSED_L + "' must be specified!");
         }
+
+        if (needSmell) {
+            String smellShortName = line.getOptionValue(OPT_SMELL);
+            try {
+                res.smell = Smell.valueOf(smellShortName);
+            } catch (IllegalArgumentException e) {
+                StringBuilder sb = new StringBuilder();
+                for (Smell m : Smell.values()) {
+                    if (sb.length() > 0) {
+                        sb.append(", ");
+                    }
+                    sb.append(m.name());
+                }
+                throw new RuntimeException("Illegal value for option -" + OPT_SMELL + ": " + smellShortName
+                        + ". Valid values are " + sb.toString());
+            }
+
+            final String smellConfigsDirName;
+            if (line.hasOption(OPT_SMELL_CONFIGS_DIR_L)) {
+                smellConfigsDirName = line.getOptionValue(OPT_SMELL_CONFIGS_DIR_L);
+            } else {
+                smellConfigsDirName = Config.DEFAULT_SMELL_CONFIGS_DIR_NAME;
+            }
+
+            File smellConfigsDir = new File(smellConfigsDirName);
+            if (!smellConfigsDir.isDirectory()) {
+                throw new RuntimeException("Smell configurations directory does not exist or is not a directory: "
+                        + smellConfigsDir.getAbsolutePath());
+            }
+
+            File smellConfigFile = new File(smellConfigsDir, res.smell.configFileName);
+            if (smellConfigFile.exists() && !smellConfigFile.isDirectory()) {
+                res.smellConfig = smellConfigFile.getAbsolutePath();
+            } else {
+                throw new RuntimeException("The smell detection configuration file does not exist or is a directory: "
+                        + smellConfigFile.getAbsolutePath());
+            }
+        }
+
         res.optimized = line.hasOption(OPT_OPTIMIZED);
         final String reposDirName;
         if (line.hasOption(OPT_REPOS_DIR_L)) {
@@ -798,6 +867,7 @@ public class CreateSnapshots {
         } else {
             reposDirName = Config.DEFAULT_REPOS_DIR_NAME;
         }
+
         File reposDir = new File(reposDirName);
         if (!reposDir.exists() || !reposDir.isDirectory()) {
             throw new RuntimeException(
@@ -842,7 +912,7 @@ public class CreateSnapshots {
         // @formatter:off
         // --help= option
         options.addOption(Option.builder(String.valueOf(OPT_HELP)).longOpt("help")
-                .desc("print this help sceen and exit").build());
+                .desc("print this help screen and exit").build());
 
         options.addOption(
                 Option.builder().longOpt(OPT_SMELL_CONFIGS_DIR_L)
@@ -858,8 +928,9 @@ public class CreateSnapshots {
             validSmellArgs.append(m.name());
         }
 
-        options.addOption(Option.builder(OPT_SMELL).longOpt("smell").desc("Name of smell for which to check").hasArg()
-                .argName(validSmellArgs.toString()).required(required).build());
+        options.addOption(Option.builder(OPT_SMELL).longOpt("smell").desc("Name of smell for which to check." +
+                " Required if running in modes `--" + OPT_SOURCE_L + "' or `--" + OPT_PROCESSED_L + "'").hasArg()
+                .argName(validSmellArgs.toString()).build());
 
         options.addOption(Option.builder().longOpt(OPT_REPOS_DIR_L)
                 .desc("Directory below which the repository of the project (specified via `--" + OPT_PROJECT_L
@@ -879,12 +950,16 @@ public class CreateSnapshots {
                 .desc("Directory where to put results." + " [Default=" + Config.DEFAULT_RESULTS_DIR_NAME + "]").hasArg()
                 .argName("DIR").build());
 
-        // --source= and --processed= options
+        // --source, --preprocess and --processed options
         OptionGroup skunkModeOptions = new OptionGroup();
         skunkModeOptions.setRequired(required);
 
         skunkModeOptions.addOption(Option.builder().longOpt(OPT_SOURCE_L)
-                .desc("Run Skunk on fresh set of sources, for which no analysis has been" + " performed, yet.")
+                .desc("Run Skunk on fresh set of sources, for which no analysis has been performed, yet.")
+                .build());
+        skunkModeOptions.addOption(Option.builder().longOpt(OPT_PREPROCESS_L)
+                .desc("Recompute Skunk's on preprocessed on the cppstats files saved during a previous run of this"
+                        + " tool with the `--" + OPT_SOURCE_L + "' option on.")
                 .build());
         skunkModeOptions.addOption(Option.builder().longOpt(OPT_PROCESSED_L)
                 .desc("Run Skunk on already preprocessed data saved during a previous run of this"
