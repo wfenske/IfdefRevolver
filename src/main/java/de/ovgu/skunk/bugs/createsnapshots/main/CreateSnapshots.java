@@ -416,7 +416,7 @@ public class CreateSnapshots {
             Date snapshotDate = snapshot.revisionDate();
             File workingDir = conf.resultsSnapshotDir(snapshotDate);
             File snapshotDir = conf.tmpSnapshotDir(snapshotDate);
-            runExternalCommand(SKUNK_PROG, workingDir, "--source=" + snapshotDir.getAbsolutePath());
+            runExternalCommand(SKUNK_PROG, workingDir, "--source=" + snapshotDir.getAbsolutePath(), "--save-intermediate");
         }
     }
 
