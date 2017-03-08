@@ -35,30 +35,26 @@ public class FunctionLocationProvider {
         this.folderReader = new SrcMlFolderReader(ctx);
     }
 
-    public Map<String, List<Method>> listFunctionsInFiles(RevCommit commit, Set<String> paths) throws IOException {
+    public Map<String, List<Method>> listFunctionsInFiles(String commitId, RevCommit stateBeforeCommit, Set<String> paths) throws IOException {
         final Map<String, List<Method>> changedFunctions = new HashMap<>();
-        Consumer<Method> changedFunctionHandler = new Consumer<Method>() {
-            @Override
-            public void accept(Method method) {
-                String filePath = method.filePath;
-                List<Method> functions = changedFunctions.get(filePath);
-                if (functions == null) {
-                    functions = new ArrayList<>();
-                    changedFunctions.put(filePath, functions);
-                }
-                functions.add(method);
+        Consumer<Method> changedFunctionHandler = method -> {
+            String filePath = method.filePath;
+            List<Method> functions = changedFunctions.get(filePath);
+            if (functions == null) {
+                functions = new ArrayList<>();
+                changedFunctions.put(filePath, functions);
             }
+            functions.add(method);
         };
-        listFunctionsInFiles(commit, paths, changedFunctionHandler);
+        listFunctionsInFiles(commitId, stateBeforeCommit, paths, changedFunctionHandler);
         return changedFunctions;
     }
 
-    private void listFunctionsInFiles(RevCommit commit, Set<String> paths, Consumer<Method> functionHandler) throws IOException {
+    private void listFunctionsInFiles(String commitId, RevCommit stateBeforeCommit, Set<String> paths, Consumer<Method> functionHandler) throws IOException {
         // a RevWalk allows to walk over commits based on some filtering that is defined
         // and using commit's tree find the path
-        RevTree tree = commit.getTree();
-        final String commitHash = commit.getId().name();
-        LOG.debug("Analyzing commit/state " + commitHash + ". Looking at tree: " + tree);
+        RevTree tree = stateBeforeCommit.getTree();
+        LOG.debug("Analyzing state " + stateBeforeCommit.getId().name() + ". Looking at tree: " + tree);
         LOG.debug("Paths to analyze: " + paths);
 
         // now try to find a specific file
@@ -75,9 +71,8 @@ public class FunctionLocationProvider {
                 ObjectId objectId = treeWalk.getObjectId(0);
                 String path = treeWalk.getPathString();
                 if (!filesToGo.remove(path)) {
-                    throw new IllegalStateException("Unexpected file in commit " + commitHash + ". Expected one of " +
+                    throw new IllegalStateException("Unexpected file in commit " + commitId + ". Expected one of " +
                             filesToGo + ", got: " + path);
-                    //LOG.warn("Unexpected file in commit " + commitHash + " : " + path + ". Expected one of " + filesToGo + ".");
                 }
                 ObjectLoader loader = repository.open(objectId);
                 //System.out.print(getSrcMl(loader));
@@ -85,7 +80,7 @@ public class FunctionLocationProvider {
             }
 
             if (!filesToGo.isEmpty()) {
-                throw new IllegalStateException("Did not find the following files in commit " + commitHash + ": " + filesToGo);
+                throw new IllegalStateException("Did not find the following files in commit " + commitId + ": " + filesToGo);
             }
         } finally {
             treeWalk.release();

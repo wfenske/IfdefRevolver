@@ -5,8 +5,8 @@ import de.ovgu.skunk.bugs.correlate.data.FileChangeHunk;
 import de.ovgu.skunk.bugs.correlate.data.Snapshot;
 import de.ovgu.skunk.bugs.correlate.main.IHasProjectInfoFile;
 import de.ovgu.skunk.bugs.correlate.main.IHasResultsDir;
-import de.ovgu.skunk.bugs.correlate.main.IHasSnapshotsDir;
 import de.ovgu.skunk.bugs.correlate.main.IHasRevisionCsvFile;
+import de.ovgu.skunk.bugs.correlate.main.IHasSnapshotsDir;
 import org.apache.log4j.Logger;
 
 import java.io.BufferedReader;
@@ -61,11 +61,11 @@ public class ProjectInformationReader<TConfig extends IHasProjectInfoFile & IHas
         final Map<String, Snapshot> snapshotsByCommit = mapSnapshotsToCommits();
 
         BufferedReader br = null;
-        String line = "";
 
         try {
 
             br = new BufferedReader(new FileReader(conf.revisionCsvFile()));
+            String line;
             while ((line = br.readLine()) != null) {
 
                 // use comma as separator
@@ -80,7 +80,6 @@ public class ProjectInformationReader<TConfig extends IHasProjectInfoFile & IHas
                 }
 
                 boolean bugfixCommit = Boolean.parseBoolean(modification[1]);
-                // int bugfixCount = Integer.parseInt(commit[8]);
                 String strDate = modification[7];
                 String fileName = modification[3];
 
@@ -98,6 +97,7 @@ public class ProjectInformationReader<TConfig extends IHasProjectInfoFile & IHas
 
                 if (bugfixCommit) {
                     putChangedFile(this.fixedFilesBySnapshot, snapshot, chFile, fileName);
+                    snapshot.addBugfixCommit(curHash);
                 }
             }
 

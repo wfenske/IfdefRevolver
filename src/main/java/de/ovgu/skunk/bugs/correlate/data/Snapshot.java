@@ -5,6 +5,7 @@ import de.ovgu.skunk.bugs.createsnapshots.input.FileFinder;
 import java.io.File;
 import java.text.SimpleDateFormat;
 import java.util.Date;
+import java.util.HashSet;
 import java.util.List;
 import java.util.Set;
 
@@ -21,6 +22,7 @@ public class Snapshot implements Comparable<Snapshot> {
     private final Set<String> commitHashes;
     private final String startHash;
     private final File snapshotDir;
+    private Set<String> bugfixCommits = new HashSet<>();
 
     public Snapshot(int snapshotIndex, Date snapshotDate, Set<String> commitHashes, File snapshotDir) {
         this.snapshotIndex = snapshotIndex;
@@ -113,5 +115,13 @@ public class Snapshot implements Comparable<Snapshot> {
     public List<File> listSrcmlCFiles() {
         File srcmlFolder = new File(snapshotDir, "_cppstats");
         return FileFinder.find(srcmlFolder, ".*\\.c\\.xml$");
+    }
+
+    public void addBugfixCommit(String commitId) {
+        this.bugfixCommits.add(commitId);
+    }
+
+    public boolean isBugfixCommit(String commitId) {
+        return this.bugfixCommits.contains(commitId);
     }
 }

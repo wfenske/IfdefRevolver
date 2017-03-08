@@ -88,18 +88,15 @@ public class GitCommitChangedFunctionLister {
     }
 
     private Consumer<FunctionChangeHunk> newThreadSafeFunctionToCsvWriter(final CSVPrinter csv, final CsvRowProvider<FunctionChangeHunk, Snapshot, FunctionChangeHunksColumns> csvRowProvider) {
-        return new Consumer<FunctionChangeHunk>() {
-            @Override
-            public void accept(FunctionChangeHunk functionChange) {
-                Object[] rowForFunc = csvRowProvider.dataRow(functionChange);
-                try {
-                    synchronized (csv) {
-                        csv.printRecord(rowForFunc);
-                    }
-                } catch (IOException ioe) {
-                    throw new RuntimeException("IOException while writing row for changed function " +
-                            functionChange, ioe);
+        return functionChange -> {
+            Object[] rowForFunc = csvRowProvider.dataRow(functionChange);
+            try {
+                synchronized (csv) {
+                    csv.printRecord(rowForFunc);
                 }
+            } catch (IOException ioe) {
+                throw new RuntimeException("IOException while writing row for changed function " +
+                        functionChange, ioe);
             }
         };
     }
@@ -244,14 +241,14 @@ public class GitCommitChangedFunctionLister {
             return formatter;
         }
 
-        private Map<String, List<Method>> listAllFunctionsInModifiedFiles(RevCommit commit, Set<String> modifiedFiles) throws IOException {
+        private Map<String, List<Method>> listAllFunctionsInModifiedFiles(RevCommit stateBeforeCommit, Set<String> modifiedFiles) throws IOException {
             LOG.debug("Parsing all A-side functions");
             if (modifiedFiles.isEmpty()) {
                 return Collections.emptyMap();
             }
 
             FunctionLocationProvider functionLocationProvider = new FunctionLocationProvider(repo);
-            return functionLocationProvider.listFunctionsInFiles(commit, modifiedFiles);
+            return functionLocationProvider.listFunctionsInFiles(commitId, stateBeforeCommit, modifiedFiles);
         }
 
         private void listChangedFunctions(final DiffEntry diff) throws IOException {

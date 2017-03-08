@@ -60,6 +60,20 @@ public enum FunctionChangeHunksColumns implements CsvColumnValueProvider<Functio
         }
     },
     /**
+     * Contains <code>1</code> if the commit is a bug-fix commit, else <code>0</code>
+     */
+    BUGFIX {
+        @Override
+        public Integer csvColumnValue(FunctionChangeHunk changedFunc, Snapshot snapshot) {
+            String commitId = changedFunc.getHunk().getCommitId();
+            if (snapshot.isBugfixCommit(commitId)) {
+                return 1;
+            } else {
+                return 0;
+            }
+        }
+    },
+    /**
      * Tally of lines deleted and lines added to the function (will be positive if more lines were added than deleted)
      */
     LINE_DELTA {
