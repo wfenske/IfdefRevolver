@@ -36,19 +36,20 @@ public enum AllSnapshotFunctionsColumns implements CsvColumnValueProvider<Method
         }
     },
     /**
-     * File containing the definition (usually a <code>.c</code> file)
+     * File containing the definition (usually a <code>.c</code> file).  The path is relative to the project's
+     * repository root, i.e., the snapshot directory is <em>not</em> part of the returned name.
      */
     FILE {
         @Override
         public String csvColumnValue(Method func, Snapshot snapshot) {
-            return func.FilePathForDisplay();
+            return func.ProjectRelativeFilePath();
         }
 
     },
     /**
      * cppstats-normalized LOC
      */
-    LOC {
+    FUNCTION_LOC {
         @Override
         public Integer csvColumnValue(Method func, Snapshot snapshot) {
             return func.loc;

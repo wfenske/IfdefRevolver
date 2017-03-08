@@ -172,6 +172,7 @@ public class CSVHelper extends ProjectInformationReader<Config> {
         // @formatter:on
     }
 
+    // TODO, 2017-03-08, wf: The same (very similar?) logic is implemented in FileUtils#projectRelativeSourceFilePathFromCppstatsSrcMlPath
     private String parseFilename(String fileName) {
         // filename muss noch beschnitten werden
         final String suffix = ".xml";

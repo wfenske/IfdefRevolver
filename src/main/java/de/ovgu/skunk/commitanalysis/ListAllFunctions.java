@@ -23,27 +23,6 @@ import java.util.*;
 import java.util.function.Consumer;
 
 public class ListAllFunctions {
-    private static final char OPT_HELP = 'h';
-    private static final String OPT_HELP_L = "help";
-
-    /**
-     * Name of the project to analyze
-     */
-    private static final char OPT_PROJECT = 'p';
-
-    /**
-     * Long name of the {@link #OPT_PROJECT} option.
-     */
-    private static final String OPT_PROJECT_L = "project";
-
-    /**
-     * Directory containing the &lt;project&gt;ABRes/*.csv,
-     * &lt;project&gt;AFRes/*.csv, &lt;project&gt;LFRes/*.csv files
-     */
-    //private static final String OPT_RESULTS_DIR_L = "resultsdir";
-    private static final String OPT_SNAPSHOTS_DIR_L = "snapshotsdir";
-
-
     private static final Logger LOG = Logger.getLogger(ListAllFunctions.class);
     private ListAllFunctionsConfig config;
     private int errors;
@@ -214,7 +193,7 @@ public class ListAllFunctions {
         CommandLine line;
         try {
             CommandLine dummyLine = parser.parse(fakeOptionsForHelp, args);
-            if (dummyLine.hasOption(OPT_HELP)) {
+            if (dummyLine.hasOption(ProjectInformationConfig.OPT_HELP)) {
                 System.out.flush();
                 System.err.flush();
                 HelpFormatter formatter = new HelpFormatter();
