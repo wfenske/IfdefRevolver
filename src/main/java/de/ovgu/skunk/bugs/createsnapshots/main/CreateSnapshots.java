@@ -91,9 +91,9 @@ public class CreateSnapshots {
      */
     public enum Smell {
         // @formatter:off
-        AB("methods", "AnnotationBundle.csm"),
-        AF("files", "AnnotationFile.csm"),
-        LF("features", "LargeFeature.csm");
+        AB("functions.csv", "AnnotationBundle.csm"),
+        AF("files.csv", "AnnotationFile.csm"),
+        LF("features.csv", "LargeFeature.csm");
         // @formatter:on
         public final String fileName;
         public final String configFileName;
@@ -479,9 +479,9 @@ public class CreateSnapshots {
         // umbennen und verschieben von CSV Dateien (Smell Severity)
         for (File f : filesFindCSV) {
             String fileName = f.getName();
-            if (fileName.contains(conf.smellModeFile())) {
+            if (fileName.equals("skunk_metrics_" + conf.smellModeFile())) {
                 final File copyFrom = new File(f.getParentFile(),
-                        conf.smell.name() + "Res-" + snapshotDateString + ".csv");
+                        conf.smell.name() + "Res" + ".csv");
                 f.renameTo(copyFrom);
                 File copyTo = new File(smellResultsDir, snapshotDateString + ".csv");
                 try {
@@ -491,7 +491,7 @@ public class CreateSnapshots {
                             + copyTo.getAbsolutePath(), e);
                 }
             } else {
-                f.delete();
+                //f.delete();
             }
         }
         // Rename and move XML files (Smell Location)
