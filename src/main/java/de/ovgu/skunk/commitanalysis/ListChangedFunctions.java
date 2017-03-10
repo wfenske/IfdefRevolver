@@ -75,6 +75,9 @@ public class ListChangedFunctions {
             LOG.info("Function changes saved in " + resultCsv.getAbsolutePath());
         }
         LOG.info("Done listing changed functions in " + totalSnapshots + " snapshots.");
+        if (errors > 0) {
+            LOG.warn("" + errors + " error(s) occurred.  See previous messages for details.");
+        }
     }
 
     private void logSnapshotsToProcess(Collection<Snapshot> snapshotsToProcess) {

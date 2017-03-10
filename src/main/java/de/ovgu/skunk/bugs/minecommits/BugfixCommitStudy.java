@@ -79,14 +79,16 @@ public class BugfixCommitStudy implements Study {
             throw new RuntimeException("Repository " + canonicalRepoFile.getAbsolutePath() + " is not a directory");
         }
 
-        // @formatter:off
+        KeywordBasedBugfixIndentificator visitor = new KeywordBasedBugfixIndentificator(conf.bugfixTerms);
+        CSVFile writer = new CSVFile(conf.outputFileName, visitor.getOutputFileHeader());
         SCMRepository repo = GitRepository.singleProject(conf.repoPathName);
+
+        // @formatter:off
         new RepositoryMining()
                 .in(repo)
                 .through(Commits.all())
                 .withThreads(2)
-                .process(new DevelopersVisitor(conf.bugfixTerms),
-                        new CSVFile(conf.outputFileName))
+                .process(visitor, writer)
                 .mine();
         // @formatter:on
     }

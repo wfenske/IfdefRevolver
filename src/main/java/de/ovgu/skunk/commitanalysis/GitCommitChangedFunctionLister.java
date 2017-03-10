@@ -122,7 +122,7 @@ public class GitCommitChangedFunctionLister {
                             SingleGitCommitChangedFunctionLister lister = new SingleGitCommitChangedFunctionLister(repo, nextCommitId, changedFunctionConsumer);
                             lister.listChangedFunctions();
                         } catch (RuntimeException t) {
-                            LOG.warn("Error processing commit ID " + nextCommitId, t);
+                            LOG.warn("Error processing commit ID " + nextCommitId + ". Processing will continue with the remaining IDs.", t);
                             increaseErrorCount();
                         }
                     }

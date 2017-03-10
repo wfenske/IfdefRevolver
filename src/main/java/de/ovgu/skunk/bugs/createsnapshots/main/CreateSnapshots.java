@@ -1,5 +1,6 @@
 package de.ovgu.skunk.bugs.createsnapshots.main;
 
+import de.ovgu.skunk.bugs.correlate.main.ProjectInformationConfig;
 import de.ovgu.skunk.bugs.createsnapshots.data.Commit;
 import de.ovgu.skunk.bugs.createsnapshots.data.ISnapshot;
 import de.ovgu.skunk.bugs.createsnapshots.data.NullSnapshot;
@@ -21,13 +22,15 @@ public class CreateSnapshots {
     private static final String CPP_SKUNK_PROG = "cppSkunk.sh";
     private static final String SKUNK_PROG = "skunk.sh";
     private static final String CPPSTATS_INPUT_TXT = "cppstats_input.txt";
-    public static final String REVISIONS_FILE_BASENAME = "revisionsFull.csv";
     private static Logger LOG = Logger.getLogger(CreateSnapshots.class);
 
     public static class Config {
-        public static final int DEFAULT_COMMIT_WINDOW_SIZE = 100;
+        /**
+         * Number of bug-fixes that a commit window should contain
+         */
+        public static final int DEFAULT_COMMIT_WINDOW_SIZE_IN_NUMBER_OF_BUGFIXES = 100;
         private final SimpleDateFormat dateFormatter = new SimpleDateFormat("yyyy-MM-dd");
-        private String reposDir = null; // "/home/hnes/Masterarbeit/Repositories/";
+        private String reposDir = null;
         public static final String DEFAULT_REPOS_DIR_NAME = "repos";
         private String smellConfig = null;
         public static final String DEFAULT_SMELL_CONFIGS_DIR_NAME = "smellconfigs";
@@ -56,8 +59,8 @@ public class CreateSnapshots {
             return new File(snapshotsDir, project);
         }
 
-        public int commitWindowSize() {
-            return DEFAULT_COMMIT_WINDOW_SIZE;
+        public int commitWindowSizeInNumberOfBugfixes() {
+            return DEFAULT_COMMIT_WINDOW_SIZE_IN_NUMBER_OF_BUGFIXES;
         }
 
         public synchronized File tmpSnapshotDir(Date snapshotDate) {
@@ -69,7 +72,7 @@ public class CreateSnapshots {
         }
 
         public File projectRevisionsCsvFile() {
-            return new File(projectResultsDir(), REVISIONS_FILE_BASENAME);
+            return new File(projectResultsDir(), ProjectInformationConfig.REVISIONS_FILE_BASENAME);
         }
 
         public File projectInfoCsv() {
@@ -105,10 +108,10 @@ public class CreateSnapshots {
     }
 
     public enum SkunkMode {
-        SOURCE {
+        CHECKOUT {
             @Override
             public ISkunkModeStrategy getNewStrategyInstance(Config conf) {
-                return new SourceStrategy(conf);
+                return new CheckoutStrategy(conf);
             }
         },
 
@@ -119,10 +122,10 @@ public class CreateSnapshots {
             }
         },
 
-        PROCESSED {
+        DETECTSMELLS {
             @Override
             public ISkunkModeStrategy getNewStrategyInstance(Config conf) {
-                return new ProcessedStrategy(conf);
+                return new DetectSmellsStrategy(conf);
             }
         };
 
@@ -173,12 +176,17 @@ public class CreateSnapshots {
          * @param snapshot         The current snapshot
          */
         void processSnapshot(ISnapshot previousSnapshot, ProperSnapshot snapshot);
+
+        /**
+         * @return String describing in human-readable form what this strategy is about to do.
+         */
+        String activityDisplayName();
     }
 
-    static class SourceStrategy implements ISkunkModeStrategy {
+    static class CheckoutStrategy implements ISkunkModeStrategy {
         private final Config conf;
 
-        public SourceStrategy(Config conf) {
+        public CheckoutStrategy(Config conf) {
             this.conf = conf;
         }
 
@@ -186,13 +194,13 @@ public class CreateSnapshots {
         public void removeOutputFiles() {
             File projInfoCsv = conf.projectInfoCsv();
             if (projInfoCsv.exists()) {
-                LOG.warn("Running in SOURCE mode, but project info CSV already exists. It will be overwritten: "
+                LOG.warn("Running in CHECKOUT mode, but project info CSV already exists. It will be overwritten: "
                         + projInfoCsv.getAbsolutePath());
                 projInfoCsv.delete();
             }
             File projAnalysisCsv = conf.projectAnalysisCsv();
             if (projAnalysisCsv.exists()) {
-                LOG.warn("Running in SOURCE mode, but project analysis CSV already exists. It will be overwritten: "
+                LOG.warn("Running in CHECKOUT mode, but project analysis CSV already exists. It will be overwritten: "
                         + projAnalysisCsv.getAbsolutePath());
                 projAnalysisCsv.delete();
             }
@@ -208,7 +216,6 @@ public class CreateSnapshots {
             final int filesCount = filesFound.size();
             LOG.info(String.format("Found %d .c file%s in %s", filesCount, filesCount == 1 ? "" : "s",
                     conf.projectRepoDir().getAbsolutePath()));
-            // In CSV Datei schreiben
             conf.projectResultsDir().mkdirs();
             writeProjectCsv(curSnapshot, filesFound);
             writeProjectAnalysisCsv(curSnapshot, filesFound);
@@ -349,8 +356,8 @@ public class CreateSnapshots {
             final File tmpSnapshotDir = conf.tmpSnapshotDir(snapshotDate);
             resultsSnapshotDir.mkdirs();
             List<String> args = new ArrayList<>();
-            args.add(conf.smellConfig /* ARG1 */);
-            args.add(resultsSnapshotDir.getAbsolutePath() /* ARG2 */);
+            //args.add(conf.smellConfig /* ARG1 */);
+            //args.add(resultsSnapshotDir.getAbsolutePath() /* ARG2 */);
             final Date prevSnapshotDate = previousSnapshot.revisionDate();
             if (prevSnapshotDate != null) {
                 final File prevSnapshotDir = conf.tmpSnapshotDir(prevSnapshotDate);
@@ -361,6 +368,11 @@ public class CreateSnapshots {
             }
             runExternalCommand(CPP_SKUNK_PROG, tmpSnapshotDir /* WD */, args.toArray(new String[args.size()]));
             saveSnapshotCommitsHashes(snapshot);
+        }
+
+        @Override
+        public String activityDisplayName() {
+            return "Checking out sources and running cppstats";
         }
 
         private void saveSnapshotCommitsHashes(ProperSnapshot snapshot) {
@@ -388,6 +400,7 @@ public class CreateSnapshots {
                 closeBufferedWriter(buff, fileWriter);
             }
         }
+
     }
 
     /**
@@ -407,7 +420,7 @@ public class CreateSnapshots {
 
         @Override
         public void ensureSnapshot(ISnapshot previousSnapShot, ProperSnapshot curSnapshot) {
-            // The snapshot has already been created in a previous run in SOURCE
+            // The snapshot has already been created in a previous run in CHECKOUT
             // mode --> Nothing to do.
         }
 
@@ -416,14 +429,25 @@ public class CreateSnapshots {
             Date snapshotDate = snapshot.revisionDate();
             File workingDir = conf.resultsSnapshotDir(snapshotDate);
             File snapshotDir = conf.tmpSnapshotDir(snapshotDate);
+            if (!workingDir.isDirectory()) {
+                boolean success = workingDir.mkdirs();
+                if (!success) {
+                    throw new RuntimeException("Error creating directory or one of its parents: " + workingDir);
+                }
+            }
             runExternalCommand(SKUNK_PROG, workingDir, "--source=" + snapshotDir.getAbsolutePath(), "--save-intermediate");
+        }
+
+        @Override
+        public String activityDisplayName() {
+            return "Preprocessing cppstats sources with Skunk";
         }
     }
 
-    static class ProcessedStrategy implements ISkunkModeStrategy {
+    static class DetectSmellsStrategy implements ISkunkModeStrategy {
         private final Config conf;
 
-        public ProcessedStrategy(Config conf) {
+        public DetectSmellsStrategy(Config conf) {
             this.conf = conf;
         }
 
@@ -434,7 +458,7 @@ public class CreateSnapshots {
 
         @Override
         public void ensureSnapshot(ISnapshot previousSnapShot, ProperSnapshot curSnapshot) {
-            // The snapshot has already been created in a previous run in SOURCE
+            // The snapshot has already been created in a previous run in CHECKOUT
             // mode --> Nothing to do.
         }
 
@@ -443,6 +467,58 @@ public class CreateSnapshots {
             Date snapshotDate = snapshot.revisionDate();
             File resultsDir = conf.resultsSnapshotDir(snapshotDate);
             runExternalCommand(SKUNK_PROG, resultsDir, "--processed=.", "--config=" + conf.smellConfig);
+            moveSnapshotSmellDetectionResults(snapshot);
+        }
+
+        @Override
+        public String activityDisplayName() {
+            return "Detecting smell " + conf.smell;
+        }
+
+        private void moveSnapshotSmellDetectionResults(ProperSnapshot curSnapshot) {
+            File sourcePath = conf.resultsSnapshotDir(curSnapshot.startDate());
+            File smellResultsDir = new File(conf.projectResultsDir(), conf.smell.name() + "Res");
+            smellResultsDir.mkdirs(); // Create target directory
+            moveSnapshotSmellDetectionResults(curSnapshot, sourcePath, smellResultsDir);
+        }
+
+        private void moveSnapshotSmellDetectionResults(ProperSnapshot snapshot, File sourcePath, File smellResultsDir) {
+            final String snapshotDateString = snapshot.revisionDateString();
+            List<File> filesFindCSV = FileFinder.find(sourcePath, "(.*\\.csv$)");
+            // Rename and move CSV files (smell severity)
+            for (File f : filesFindCSV) {
+                String fileName = f.getName();
+                if (fileName.equals("skunk_metrics_" + conf.smellModeFile())) {
+                    final File copyFrom = new File(f.getParentFile(),
+                            conf.smell.name() + "Res" + ".csv");
+                    f.renameTo(copyFrom);
+                    File copyTo = new File(smellResultsDir, snapshotDateString + ".csv");
+                    try {
+                        Files.copy(copyFrom.toPath(), copyTo.toPath(), StandardCopyOption.REPLACE_EXISTING);
+                    } catch (IOException e) {
+                        throw new RuntimeException("Error copying files from " + copyFrom.getAbsolutePath() + " to "
+                                + copyTo.getAbsolutePath(), e);
+                    }
+                } else {
+                    //f.delete();
+                }
+            }
+
+            // Rename and move XML files (smell location)
+            if (conf.smell == Smell.LF) {
+                List<File> filesFindXML = FileFinder.find(sourcePath, "(.*\\.xml$)");
+                for (File f : filesFindXML) {
+                    if (f.getName().contains(conf.smellModeFile())) {
+                        File copyTo = new File(smellResultsDir, snapshotDateString + ".xml");
+                        try {
+                            Files.copy(f.toPath(), copyTo.toPath(), StandardCopyOption.REPLACE_EXISTING);
+                        } catch (IOException e) {
+                            throw new RuntimeException(
+                                    "Error copying file " + f.getAbsolutePath() + " to " + copyTo.getAbsolutePath(), e);
+                        }
+                    }
+                }
+            }
         }
     }
 
@@ -450,64 +526,20 @@ public class CreateSnapshots {
         this.conf = this.parseCommandLineArgs(args);
         final ISkunkModeStrategy skunkStrategy = conf.skunkMode.getNewStrategyInstance(conf);
 
-        revisionsReader = new RevisionsCsvReader(conf.projectRevisionsCsvFile(), conf.commitWindowSize());
+        revisionsReader = new RevisionsCsvReader(conf.projectRevisionsCsvFile(), conf.commitWindowSizeInNumberOfBugfixes());
         revisionsReader.processFile();
         skunkStrategy.removeOutputFiles();
+        final String activityDisplayName = skunkStrategy.activityDisplayName();
         // Date prevDate = revisionsReader.bugHashes.firstKey();
         // for (Date curDate : revisionsReader.bugHashes.keySet()) {
         ISnapshot previousSnapshot = NullSnapshot.getInstance();
         for (ProperSnapshot curSnapshot : revisionsReader.getSnapshots()) {
-            LOG.info("Processing snapshot " + curSnapshot);
+            LOG.info(activityDisplayName + " " + curSnapshot);
             // LOG.debug("Key: " + curDateForm + " - " + "Value: " +
             // revisionsReader.bugHashes.get(curDate));
             skunkStrategy.ensureSnapshot(previousSnapshot, curSnapshot);
             skunkStrategy.processSnapshot(previousSnapshot, curSnapshot);
-            // Ergebnis kopieren in eigenen Results Ordner
-            if (conf.smell != null) {
-                File sourcePath = conf.resultsSnapshotDir(curSnapshot.startDate());
-                File smellResultsDir = new File(conf.projectResultsDir(), conf.smell.name() + "Res");
-                smellResultsDir.mkdirs(); // Directories erstellen
-                moveSnapshotSmellDetectionResults(curSnapshot, sourcePath, smellResultsDir);
-            }
             previousSnapshot = curSnapshot;
-        }
-    }
-
-    private void moveSnapshotSmellDetectionResults(ProperSnapshot snapshot, File sourcePath, File smellResultsDir) {
-        final String snapshotDateString = snapshot.revisionDateString();
-        List<File> filesFindCSV = FileFinder.find(sourcePath, "(.*\\.csv$)");
-        // umbennen und verschieben von CSV Dateien (Smell Severity)
-        for (File f : filesFindCSV) {
-            String fileName = f.getName();
-            if (fileName.equals("skunk_metrics_" + conf.smellModeFile())) {
-                final File copyFrom = new File(f.getParentFile(),
-                        conf.smell.name() + "Res" + ".csv");
-                f.renameTo(copyFrom);
-                File copyTo = new File(smellResultsDir, snapshotDateString + ".csv");
-                try {
-                    Files.copy(copyFrom.toPath(), copyTo.toPath(), StandardCopyOption.REPLACE_EXISTING);
-                } catch (IOException e) {
-                    throw new RuntimeException("Error copying files from " + copyFrom.getAbsolutePath() + " to "
-                            + copyTo.getAbsolutePath(), e);
-                }
-            } else {
-                //f.delete();
-            }
-        }
-        // Rename and move XML files (Smell Location)
-        if (conf.smell == Smell.LF) {
-            List<File> filesFindXML = FileFinder.find(sourcePath, "(.*\\.xml$)");
-            for (File f : filesFindXML) {
-                if (f.getName().contains(conf.smellModeFile())) {
-                    File copyTo = new File(smellResultsDir, snapshotDateString + ".xml");
-                    try {
-                        Files.copy(f.toPath(), copyTo.toPath(), StandardCopyOption.REPLACE_EXISTING);
-                    } catch (IOException e) {
-                        throw new RuntimeException(
-                                "Error copying file " + f.getAbsolutePath() + " to " + copyTo.getAbsolutePath(), e);
-                    }
-                }
-            }
         }
     }
 
@@ -726,9 +758,9 @@ public class CreateSnapshots {
 
     private static final char OPT_HELP = 'h';
     // mutex groupof options controlling how Skunk is called
-    private static final String OPT_SOURCE_L = "source";
+    private static final String OPT_CHECKOUT_L = "checkout";
     private static final String OPT_PREPROCESS_L = "preprocess";
-    private static final String OPT_PROCESSED_L = "processed";
+    private static final String OPT_DETECT_L = "detect";
     /**
      * --smell=AB|AF|LF
      */
@@ -787,9 +819,9 @@ public class CreateSnapshots {
                         "Create snapshots of a VCS repository and detect variability-aware smells in those snapshots using Skunk and cppstats.\n\t" +
                                 "Snapshot creation requires information about the commits to this repository, which can be obtained by running " +
                                 FindBugfixCommits.class.getSimpleName() + " on the repository.\n\t" +
-                                "The snapshots will be created and an extensive Skunk analysis performed when this program is run with the `--" + OPT_SOURCE_L
+                                "The snapshots will be created and an extensive Skunk analysis performed when this program is run with the `--" + OPT_CHECKOUT_L
                                 + "' option. Subsequent runs with the `" +
-                                OPT_PROCESSED_L + "' option will reuse the snapshots and Skunk analysis data and proceed much faster.\n\nOptions:\n",
+                                OPT_DETECT_L + "' option will reuse the snapshots and Skunk analysis data and proceed much faster.\n\nOptions:\n",
                         actualOptions, null, false);
                 System.out.flush();
                 System.exit(0);
@@ -808,56 +840,16 @@ public class CreateSnapshots {
             return null;
         }
 
-        boolean needSmell = true;
-
-        if (line.hasOption(OPT_SOURCE_L)) {
-            res.skunkMode = SkunkMode.SOURCE;
+        if (line.hasOption(OPT_CHECKOUT_L)) {
+            res.skunkMode = SkunkMode.CHECKOUT;
         } else if (line.hasOption(OPT_PREPROCESS_L)) {
             res.skunkMode = SkunkMode.PREPROCESS;
-            needSmell = false;
-        } else if (line.hasOption(OPT_PROCESSED_L)) {
-            res.skunkMode = SkunkMode.PROCESSED;
+        } else if (line.hasOption(OPT_DETECT_L)) {
+            res.skunkMode = SkunkMode.DETECTSMELLS;
+            parseSmellDetectionArgs(res, line);
         } else {
             throw new RuntimeException(
-                    "Either `--" + OPT_SOURCE_L + "', `--" + OPT_PREPROCESS_L + "' or `--" + OPT_PROCESSED_L + "' must be specified!");
-        }
-
-        if (needSmell) {
-            String smellShortName = line.getOptionValue(OPT_SMELL);
-            try {
-                res.smell = Smell.valueOf(smellShortName);
-            } catch (IllegalArgumentException e) {
-                StringBuilder sb = new StringBuilder();
-                for (Smell m : Smell.values()) {
-                    if (sb.length() > 0) {
-                        sb.append(", ");
-                    }
-                    sb.append(m.name());
-                }
-                throw new RuntimeException("Illegal value for option -" + OPT_SMELL + ": " + smellShortName
-                        + ". Valid values are " + sb.toString());
-            }
-
-            final String smellConfigsDirName;
-            if (line.hasOption(OPT_SMELL_CONFIGS_DIR_L)) {
-                smellConfigsDirName = line.getOptionValue(OPT_SMELL_CONFIGS_DIR_L);
-            } else {
-                smellConfigsDirName = Config.DEFAULT_SMELL_CONFIGS_DIR_NAME;
-            }
-
-            File smellConfigsDir = new File(smellConfigsDirName);
-            if (!smellConfigsDir.isDirectory()) {
-                throw new RuntimeException("Smell configurations directory does not exist or is not a directory: "
-                        + smellConfigsDir.getAbsolutePath());
-            }
-
-            File smellConfigFile = new File(smellConfigsDir, res.smell.configFileName);
-            if (smellConfigFile.exists() && !smellConfigFile.isDirectory()) {
-                res.smellConfig = smellConfigFile.getAbsolutePath();
-            } else {
-                throw new RuntimeException("The smell detection configuration file does not exist or is a directory: "
-                        + smellConfigFile.getAbsolutePath());
-            }
+                    "Either `--" + OPT_CHECKOUT_L + "', `--" + OPT_PREPROCESS_L + "' or `--" + OPT_DETECT_L + "' must be specified!");
         }
 
         res.optimized = line.hasOption(OPT_OPTIMIZED);
@@ -906,6 +898,44 @@ public class CreateSnapshots {
         return res;
     }
 
+    private void parseSmellDetectionArgs(Config res, CommandLine line) {
+        String smellShortName = line.getOptionValue(OPT_DETECT_L);
+        try {
+            res.smell = Smell.valueOf(smellShortName);
+        } catch (IllegalArgumentException e) {
+            StringBuilder sb = new StringBuilder();
+            for (Smell m : Smell.values()) {
+                if (sb.length() > 0) {
+                    sb.append(", ");
+                }
+                sb.append(m.name());
+            }
+            throw new RuntimeException("Illegal value for option --" + OPT_DETECT_L + ": " + smellShortName
+                    + ". Valid values are " + sb.toString());
+        }
+
+        final String smellConfigsDirName;
+        if (line.hasOption(OPT_SMELL_CONFIGS_DIR_L)) {
+            smellConfigsDirName = line.getOptionValue(OPT_SMELL_CONFIGS_DIR_L);
+        } else {
+            smellConfigsDirName = Config.DEFAULT_SMELL_CONFIGS_DIR_NAME;
+        }
+
+        File smellConfigsDir = new File(smellConfigsDirName);
+        if (!smellConfigsDir.isDirectory()) {
+            throw new RuntimeException("Smell configurations directory does not exist or is not a directory: "
+                    + smellConfigsDir.getAbsolutePath());
+        }
+
+        File smellConfigFile = new File(smellConfigsDir, res.smell.configFileName);
+        if (smellConfigFile.exists() && !smellConfigFile.isDirectory()) {
+            res.smellConfig = smellConfigFile.getAbsolutePath();
+        } else {
+            throw new RuntimeException("The smell detection configuration file does not exist or is a directory: "
+                    + smellConfigFile.getAbsolutePath());
+        }
+    }
+
     private Options makeOptions(boolean forHelp) {
         boolean required = !forHelp;
         Options options = new Options();
@@ -920,17 +950,7 @@ public class CreateSnapshots {
                                 + "Skunk. [Default=" + Config.DEFAULT_SMELL_CONFIGS_DIR_NAME + "]")
                         .hasArg().argName("DIR").build());
 
-        StringBuilder validSmellArgs = new StringBuilder();
-        for (Smell m : Smell.values()) {
-            if (validSmellArgs.length() > 0) {
-                validSmellArgs.append("|");
-            }
-            validSmellArgs.append(m.name());
-        }
-
-        options.addOption(Option.builder(OPT_SMELL).longOpt("smell").desc("Name of smell for which to check." +
-                " Required if running in modes `--" + OPT_SOURCE_L + "' or `--" + OPT_PROCESSED_L + "'").hasArg()
-                .argName(validSmellArgs.toString()).build());
+        String validSmellArgs = getValidSmellArgs();
 
         options.addOption(Option.builder().longOpt(OPT_REPOS_DIR_L)
                 .desc("Directory below which the repository of the project (specified via `--" + OPT_PROJECT_L
@@ -950,20 +970,22 @@ public class CreateSnapshots {
                 .desc("Directory where to put results." + " [Default=" + Config.DEFAULT_RESULTS_DIR_NAME + "]").hasArg()
                 .argName("DIR").build());
 
-        // --source, --preprocess and --processed options
+        // --checkout, --preprocess and --detect options
         OptionGroup skunkModeOptions = new OptionGroup();
         skunkModeOptions.setRequired(required);
 
-        skunkModeOptions.addOption(Option.builder().longOpt(OPT_SOURCE_L)
+        skunkModeOptions.addOption(Option.builder().longOpt(OPT_CHECKOUT_L)
                 .desc("Run Skunk on fresh set of sources, for which no analysis has been performed, yet.")
                 .build());
         skunkModeOptions.addOption(Option.builder().longOpt(OPT_PREPROCESS_L)
-                .desc("Recompute Skunk's on preprocessed on the cppstats files saved during a previous run of this"
-                        + " tool with the `--" + OPT_SOURCE_L + "' option on.")
+                .desc("Preprocess cppstats files using Skunk.  Requires a previous run of this"
+                        + " tool with the `--" + OPT_CHECKOUT_L + "' option on.")
                 .build());
-        skunkModeOptions.addOption(Option.builder().longOpt(OPT_PROCESSED_L)
-                .desc("Run Skunk on already preprocessed data saved during a previous run of this"
-                        + " tool with the `--" + OPT_SOURCE_L + "' option on.")
+        skunkModeOptions.addOption(Option.builder().longOpt(OPT_DETECT_L)
+                .desc("Detect smells using on already preprocessed data saved during a previous run of this"
+                        + " tool with the `--" + OPT_PREPROCESS_L + "' option on.")
+                .hasArg()
+                .argName(validSmellArgs)
                 .build());
 
         options.addOptionGroup(skunkModeOptions);
@@ -972,6 +994,17 @@ public class CreateSnapshots {
                 .desc("Magic optimization option. I don't know what it does.").build());
         // @formatter:on
         return options;
+    }
+
+    private static String getValidSmellArgs() {
+        StringBuilder validSmellArgs = new StringBuilder();
+        for (Smell m : Smell.values()) {
+            if (validSmellArgs.length() > 0) {
+                validSmellArgs.append("|");
+            }
+            validSmellArgs.append(m.name());
+        }
+        return validSmellArgs.toString();
     }
 
     private String progName() {

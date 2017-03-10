@@ -1,5 +1,6 @@
 package de.ovgu.skunk.bugs.minecommits;
 
+import de.ovgu.skunk.detection.output.CsvEnumUtils;
 import org.repodriller.domain.Commit;
 import org.repodriller.domain.Modification;
 import org.repodriller.persistence.PersistenceMechanism;
@@ -11,18 +12,16 @@ import java.util.Calendar;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
-public class DevelopersVisitor implements CommitVisitor {
+public class KeywordBasedBugfixIndentificator implements CommitVisitor {
 
     private String[] bugFixTerms;
-    private int fixCount = 0;
 
-    public DevelopersVisitor(String[] bugFixTerms) {
+    public KeywordBasedBugfixIndentificator(String[] bugFixTerms) {
         this.bugFixTerms = bugFixTerms;
     }
 
     @Override
     public void process(SCMRepository repo, Commit commit, PersistenceMechanism writer) {
-        boolean counted = false;
         Calendar cal = commit.getDate();
         SimpleDateFormat format1 = new SimpleDateFormat("yyyy-MM-dd");
         String dateForm = format1.format(cal.getTime());
@@ -69,12 +68,6 @@ public class DevelopersVisitor implements CommitVisitor {
             /* Wenn Kein Bugfix Commit entfernen */
             // if(!containsABug) continue;
 
-            // nur hochzählen wenn der Bugfix noch nicht gezählt wurde
-            if (!counted && containsABug) {
-                counted = true;
-                fixCount++;
-            }
-
             /* RegEx für die geänderten Lines */
             Matcher newMatch = Pattern.compile("@@ .* @@").matcher(diff);
             while (newMatch.find()) {
@@ -87,7 +80,7 @@ public class DevelopersVisitor implements CommitVisitor {
 
                 /* schreibt aktuellen Datensatz in die CSV */
                 writer.write(commit.getHash(), containsABug, foundWords.toString(), m.getFileName(), m.getType(),
-                        delLine, addLine, dateForm, this.fixCount);
+                        delLine, addLine, dateForm);
             }
 
             // writer.write(
@@ -101,7 +94,10 @@ public class DevelopersVisitor implements CommitVisitor {
 
     @Override
     public String name() {
-        return "developers";
+        return "keyword-based bugfix identificator";
     }
 
+    public String[] getOutputFileHeader() {
+        return CsvEnumUtils.headerRowStrings(RevisionsFullColumns.class);
+    }
 }

@@ -7,6 +7,7 @@ import de.ovgu.skunk.bugs.correlate.main.IHasProjectInfoFile;
 import de.ovgu.skunk.bugs.correlate.main.IHasResultsDir;
 import de.ovgu.skunk.bugs.correlate.main.IHasRevisionCsvFile;
 import de.ovgu.skunk.bugs.correlate.main.IHasSnapshotsDir;
+import de.ovgu.skunk.bugs.createsnapshots.input.RevisionsCsvReader;
 import org.apache.log4j.Logger;
 
 import java.io.BufferedReader;
@@ -49,7 +50,7 @@ public class ProjectInformationReader<TConfig extends IHasProjectInfoFile & IHas
     }
 
     /**
-     * Nimmt die ursprüngliche CSV-Datei von MetricMiner2 und erstellt die
+     * Nimmt die ursprüngliche CSV-Datei von {@line FindBugfixCommits} und erstellt die
      * Listen der Bugfixes und geänderten Dateien mit ihren Änderungsdaten
      */
     private void processRevisionsFile() {
@@ -65,6 +66,9 @@ public class ProjectInformationReader<TConfig extends IHasProjectInfoFile & IHas
         try {
 
             br = new BufferedReader(new FileReader(conf.revisionCsvFile()));
+            String headerLine = br.readLine();
+            RevisionsCsvReader.assertRevisionsFullCsvHeaderIsSane(headerLine);
+
             String line;
             while ((line = br.readLine()) != null) {
 

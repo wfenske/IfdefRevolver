@@ -1,0 +1,4 @@
+Method_LoacToLocRatio=0.01;mandatory
+Method_NumberOfFeatureConstants=1;mandatory
+Method_NestingSum=0
+Method_NumberOfFeatureLocations=1;mandatory

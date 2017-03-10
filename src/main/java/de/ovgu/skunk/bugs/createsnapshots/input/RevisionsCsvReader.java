@@ -3,6 +3,8 @@ package de.ovgu.skunk.bugs.createsnapshots.input;
 import de.ovgu.skunk.bugs.createsnapshots.data.Commit;
 import de.ovgu.skunk.bugs.createsnapshots.data.FileChange;
 import de.ovgu.skunk.bugs.createsnapshots.data.ProperSnapshot;
+import de.ovgu.skunk.bugs.minecommits.RevisionsFullColumns;
+import de.ovgu.skunk.detection.output.CsvEnumUtils;
 import org.apache.log4j.Logger;
 
 import java.io.BufferedReader;
@@ -63,7 +65,10 @@ public class RevisionsCsvReader {
             fr = new FileReader(this.revisionsCsv);
             br = new BufferedReader(fr);
 
-            String line = "";
+            String header = br.readLine();
+            assertRevisionsFullCsvHeaderIsSane(header);
+
+            String line;
             while ((line = br.readLine()) != null) {
                 lineNo++;
 
@@ -125,6 +130,37 @@ public class RevisionsCsvReader {
                 + this.revisionsCsv.getAbsolutePath());
 
         return lineNo;
+    }
+
+    /**
+     * Checks the format of the header line of a revisionsFull.csv file.  The format is mandated by
+     * {@link RevisionsFullColumns}.  The header fields must be comma-separated and at least all the fields of the enum
+     * must occur in the header line.  They must occur in the same order.  Case and leading/trailing whitespace are
+     * ignored.
+     *
+     * @param headerLine First line of the revisionsCsvFile being read.
+     * @throws IllegalArgumentException if the header line does not match the expected format
+     * @throws NullPointerException     if the header line is <code>null</code>
+     */
+    public static void assertRevisionsFullCsvHeaderIsSane(String headerLine) {
+        if (headerLine == null) {
+            throw new NullPointerException("Header line of revisions file is null.");
+        }
+        String[] headerFields = headerLine.split(",");
+        String[] expectedHeader = CsvEnumUtils.headerRowStrings(RevisionsFullColumns.class);
+        if (headerFields.length < expectedHeader.length) {
+            throw new IllegalArgumentException("Missing fields in header of revisions file. Expected " +
+                    Arrays.toString(expectedHeader) + ". Got: " + headerLine);
+        }
+        for (int i = 0; i < expectedHeader.length; i++) {
+            String headerField = headerFields[i].trim();
+            String expectedField = expectedHeader[i];
+            if (!headerField.equalsIgnoreCase(expectedField)) {
+                throw new IllegalArgumentException("Mismatch in fields in header of revisions file. Expected " +
+                        Arrays.toString(expectedHeader) + ". Got: " + headerLine + ". Expected field at position "
+                        + (i + 1) + " to be " + expectedField + ". Got: " + headerField);
+            }
+        }
     }
 
     private void computeSnapshots() {

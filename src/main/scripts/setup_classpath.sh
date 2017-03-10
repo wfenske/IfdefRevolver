@@ -44,6 +44,12 @@ add_to_cp "${maven_repo}"/org/repodriller/repodriller/1.2.2-SNAPSHOT-no-git-bran
 # egit (required by repodriller)
 add_to_cp "${maven_repo}"/org/eclipse/jgit/org.eclipse.jgit/3.4.1.201406201815-r/org.eclipse.jgit-3.4.1.201406201815-r.jar
 
+# repodriller requires google collections
+add_to_cp "${maven_repo}"/com/google/guava/guava/18.0/guava-18.0.jar
+
+# repodriller requires org/apache/commons/lang3/time/DateFormatUtils
+add_to_cp "${maven_repo}"/org/apache/commons/commons-lang3/3.4/commons-lang3-3.4.jar
+
 # log4j-api
 #add_to_cp ${log4j_dir}/log4j-api-2.6.jar
 

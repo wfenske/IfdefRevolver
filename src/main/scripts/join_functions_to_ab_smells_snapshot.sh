@@ -1,39 +1,54 @@
 #!/usr/bin/env sh
 
 ### Combine snapshot-level information about all functions and
-### function changes.  The result is a complete picture about which
-### functions were present at the start of the snapshot, which of them
-### changed, and by how much.  Also, we know how many times a function
-### was changed by a bugfix commit.
+### function changes with information about Annotation Bundle smells.
+### The result is a complete picture about which functions were
+### present at the start of the snapshot, which contained annotations
+### or Annotation Bundle smells, which of them changed, and by how
+### much, and how many times they were bugfixed.
 
 real_me=$(realpath -- "$0")
 me_dir=$(dirname -- "${real_me}")
 
-ALL_FUNCTIONS_NO_EXT=all_functions
-FUNCTION_CHANGE_SNAPSHOT_NO_EXT=function_change_snapshot
+FUNCTIONS_NO_EXT=joint_function_change_snapshot
+SMELLS_NO_EXT=ABRes
 
 aggregate()
 {
+    ## Unprocessed header of the joint table
+    ##
+    ## SNAPSHOT_DATE,FUNCTION_SIGNATURE,FILE,FUNCTION_LOC,HUNKS,COMMITS,BUGFIXES,LINE_DELTA,LINES_DELETED,LINES_ADDED,FILE,Start,FUNCTION_SIGNATURE,ABSmell,LocationSmell,ConstantsSmell,NestingSmell,LOC,LOAC,LOFC,NOFL,NOFC_Dup,NOFC_NonDup,NONEST
+    
     csvsql -y 10000 --query \
            "SELECT
                 SNAPSHOT_DATE,
-                a.FUNCTION_SIGNATURE,
-                a.FILE,
-                a.FUNCTION_LOC           AS FUNCTION_LOC,
-                IFNULL(HUNKS, 0)         AS HUNKS,
-                IFNULL(COMMITS, 0)       AS COMMITS,
-                IFNULL(BUGFIXES, 0)      AS BUGFIXES,
-                IFNULL(LINE_DELTA, 0)    AS LINE_DELTA,
-                IFNULL(LINES_DELETED, 0) AS LINES_DELETED,
-                IFNULL(LINES_ADDED, 0)   AS LINES_ADDED
+                f.FUNCTION_SIGNATURE,
+                f.FILE,
+                f.FUNCTION_LOC,
+                HUNKS,
+                COMMITS,
+                BUGFIXES,
+                LINE_DELTA,
+                LINES_DELETED,
+                LINES_ADDED,
+		ABSmell,
+		LocationSmell,
+		ConstantsSmell,
+		NestingSmell,
+		LOAC,
+		LOFC,
+		NOFL,
+		NOFC_Dup,
+		NOFC_NonDup,
+		NONEST
             FROM
-                     ${ALL_FUNCTIONS_NO_EXT:?} a
+                     ${FUNCTIONS_NO_EXT:?} f
                 LEFT JOIN
-                     ${FUNCTION_CHANGE_SNAPSHOT_NO_EXT:?} c
+                     ${SMELLS_NO_EXT:?} s
                      ON
-                        a.function_signature = c.function_signature
-                        AND a.file = c.file" \
-   "${1:?all_functions file missing}" "${2:?function_change_snapshot file missing}"
+                        f.function_signature = s.function_signature
+                        AND f.file = s.file" \
+   "${1:?functions file missing}" "${2:?smells file missing}"
 }
 
 process_dirs()
@@ -44,11 +59,11 @@ process_dirs()
     err_dirs=""
     for dn_in in "$@"
     do
-	fn_in_1="${dn_in}/${ALL_FUNCTIONS_NO_EXT:?}.csv"
-	fn_in_2="${dn_in}/${FUNCTION_CHANGE_SNAPSHOT_NO_EXT:?}.csv"
-	fn_out=${dn_in:?}/joint_function_change_snapshot.csv
+	fn_in_1="${dn_in}/${FUNCTIONS_NO_EXT:?}.csv"
+	fn_in_2="${dn_in}/${SMELLS_NO_EXT:?}.csv"
+	fn_out=${dn_in:?}/joint_function_ab_smell_snapshot.csv
 	printf 'Processing directory %2d/%d: %s %s -> %s\n' ${i_dir} ${dirs_count} "${fn_in_1}" "${fn_in_2}" "${fn_out}" >&2
-	tmp_out=$(mktemp joint_function_change_snapshot.csv.XXXXXXXX)
+	tmp_out=$(mktemp "$fn_out".XXXXXXXX)
 	dir_err=$?
 	if [ $dir_err -ne 0 ]
 	then
