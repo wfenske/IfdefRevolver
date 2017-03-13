@@ -85,6 +85,7 @@ public class CreateSnapshots {
     }
 
     private Config conf;
+    private int erroneousSnapshots = 0;
 
     /**
      * Enumerates possible smells, such as {@link #AB} (for Annotation Bundle),
@@ -139,7 +140,15 @@ public class CreateSnapshots {
      */
     public static void main(String[] args) {
         try {
-            new CreateSnapshots().run(args);
+            CreateSnapshots snapshotCreator = new CreateSnapshots();
+            snapshotCreator.run(args);
+            int errors = snapshotCreator.erroneousSnapshots;
+            if (errors == 0) {
+                LOG.info("Successfully processed all snapshots.");
+            } else {
+                LOG.warn("Error processing " + errors + " snapshot(s). See previous log messages for details.");
+            }
+            System.exit(errors);
         } catch (Exception e) {
             System.err.flush();
             System.out.flush();
@@ -164,27 +173,30 @@ public class CreateSnapshots {
          * /&lt;date&gt;, where &lt;date&gt; hsa the format
          * &quot;YYYY-MM-DD&quot;.
          *
-         * @param previousSnapshot The previous snapshot
-         * @param curSnapshot      Start date of the current snapshot
+         * @param currentSnapshot Start date of the current snapshot
          */
-        void ensureSnapshot(ISnapshot previousSnapshot, ProperSnapshot curSnapshot);
+        void ensureSnapshot(ProperSnapshot currentSnapshot);
 
         /**
          * Run cppstats (if necessary) and Skunk
          *
-         * @param previousSnapshot The previous snapshot
-         * @param snapshot         The current snapshot
+         * @param currentSnapshot The current snapshot
          */
-        void processSnapshot(ISnapshot previousSnapshot, ProperSnapshot snapshot);
+        void processSnapshot(ProperSnapshot currentSnapshot);
 
         /**
          * @return String describing in human-readable form what this strategy is about to do.
          */
         String activityDisplayName();
+
+        boolean isCurrentSnapshotDependentOnPreviousSnapshot();
+
+        void setPreviousSnapshot(ISnapshot previousSnapshot);
     }
 
     static class CheckoutStrategy implements ISkunkModeStrategy {
         private final Config conf;
+        private ISnapshot previousSnapshot;
 
         public CheckoutStrategy(Config conf) {
             this.conf = conf;
@@ -207,9 +219,19 @@ public class CreateSnapshots {
         }
 
         @Override
-        public void ensureSnapshot(ISnapshot previousSnapShot, ProperSnapshot curSnapshot) {
+        public boolean isCurrentSnapshotDependentOnPreviousSnapshot() {
+            return true;
+        }
+
+        @Override
+        public void setPreviousSnapshot(ISnapshot previousSnapshot) {
+            this.previousSnapshot = previousSnapshot;
+        }
+
+        @Override
+        public void ensureSnapshot(ProperSnapshot currentSnapshot) {
             // GIT CHECKOUT
-            gitCheckout(curSnapshot);
+            gitCheckout(currentSnapshot);
             // Anzahl der .c Dateien checken
             LOG.debug("Looking for checkout .c files in directory " + conf.projectRepoDir().getAbsolutePath());
             List<File> filesFound = FileFinder.find(conf.projectRepoDir(), "(.*\\.c$)");
@@ -217,11 +239,11 @@ public class CreateSnapshots {
             LOG.info(String.format("Found %d .c file%s in %s", filesCount, filesCount == 1 ? "" : "s",
                     conf.projectRepoDir().getAbsolutePath()));
             conf.projectResultsDir().mkdirs();
-            writeProjectCsv(curSnapshot, filesFound);
-            writeProjectAnalysisCsv(curSnapshot, filesFound);
-            final File curSnapshotDir = conf.tmpSnapshotDir(curSnapshot.revisionDate());
+            appendToProjectCsv(currentSnapshot, filesFound);
+            appendToProjectAnalysisCsv(currentSnapshot, filesFound);
+            final File curSnapshotDir = conf.tmpSnapshotDir(currentSnapshot.revisionDate());
             curSnapshotDir.mkdirs();
-            copyCheckoutToTmpSnapshotDir(filesFound, previousSnapShot, curSnapshot);
+            copyCheckoutToTmpSnapshotDir(filesFound, currentSnapshot);
             writeCppstatsConfigFile(curSnapshotDir);
         }
 
@@ -235,7 +257,7 @@ public class CreateSnapshots {
             runExternalCommand(GIT_PROG, conf.projectRepoDir().getAbsoluteFile(), "checkout", "--force", hash);
         }
 
-        private void writeProjectAnalysisCsv(ProperSnapshot snapshot, List<File> filesFound) {
+        private void appendToProjectAnalysisCsv(ProperSnapshot snapshot, List<File> filesFound) {
             final File csvOutFile = conf.projectAnalysisCsv();
             FileWriter fileWriter = null;
             BufferedWriter buff = null;
@@ -254,7 +276,7 @@ public class CreateSnapshots {
             }
         }
 
-        private void writeProjectCsv(final ProperSnapshot snapshot, List<File> filesFound) {
+        private void appendToProjectCsv(final ProperSnapshot snapshot, List<File> filesFound) {
             BufferedWriter buff = null;
             FileWriter fileWriter = null;
             try {
@@ -290,13 +312,12 @@ public class CreateSnapshots {
             }
         }
 
-        private void copyCheckoutToTmpSnapshotDir(List<File> filesInCurrentCheckout, ISnapshot previousSnapShot,
-                                                  ProperSnapshot curSnapshot) {
-            final File cppstatsDir = new File(conf.tmpSnapshotDir(curSnapshot.revisionDate()), "source");
+        private void copyCheckoutToTmpSnapshotDir(List<File> filesInCurrentCheckout, ProperSnapshot currentSnapshot) {
+            final File cppstatsDir = new File(conf.tmpSnapshotDir(currentSnapshot.revisionDate()), "source");
             // Copy Files
-            if (conf.optimized && (previousSnapShot instanceof ProperSnapshot)) {
-                Collection<File> changedFiles = previousSnapShot.computeChangedFiles(filesInCurrentCheckout,
-                        curSnapshot);
+            if (conf.optimized) {
+                Collection<File> changedFiles = previousSnapshot.computeChangedFiles(filesInCurrentCheckout,
+                        currentSnapshot);
                 copyAllFiles(changedFiles, cppstatsDir);
             } else {
                 copyAllFiles(filesInCurrentCheckout, cppstatsDir);
@@ -350,8 +371,8 @@ public class CreateSnapshots {
         }
 
         @Override
-        public void processSnapshot(ISnapshot previousSnapshot, ProperSnapshot snapshot) {
-            final Date snapshotDate = snapshot.revisionDate();
+        public void processSnapshot(ProperSnapshot currentSnapshot) {
+            final Date snapshotDate = currentSnapshot.revisionDate();
             final File resultsSnapshotDir = conf.resultsSnapshotDir(snapshotDate);
             final File tmpSnapshotDir = conf.tmpSnapshotDir(snapshotDate);
             resultsSnapshotDir.mkdirs();
@@ -367,7 +388,7 @@ public class CreateSnapshots {
                 args.add("--lazyPreparation");
             }
             runExternalCommand(CPP_SKUNK_PROG, tmpSnapshotDir /* WD */, args.toArray(new String[args.size()]));
-            saveSnapshotCommitsHashes(snapshot);
+            saveSnapshotCommitsHashes(currentSnapshot);
         }
 
         @Override
@@ -419,14 +440,24 @@ public class CreateSnapshots {
         }
 
         @Override
-        public void ensureSnapshot(ISnapshot previousSnapShot, ProperSnapshot curSnapshot) {
+        public boolean isCurrentSnapshotDependentOnPreviousSnapshot() {
+            return false;
+        }
+
+        @Override
+        public void setPreviousSnapshot(ISnapshot previousSnapshot) {
+            // Since we don't depend on the previous snapshot, there is nothing to do here.
+        }
+
+        @Override
+        public void ensureSnapshot(ProperSnapshot currentSnapshot) {
             // The snapshot has already been created in a previous run in CHECKOUT
             // mode --> Nothing to do.
         }
 
         @Override
-        public void processSnapshot(ISnapshot previousSnapshot, ProperSnapshot snapshot) {
-            Date snapshotDate = snapshot.revisionDate();
+        public void processSnapshot(ProperSnapshot currentSnapshot) {
+            Date snapshotDate = currentSnapshot.revisionDate();
             File workingDir = conf.resultsSnapshotDir(snapshotDate);
             File snapshotDir = conf.tmpSnapshotDir(snapshotDate);
             if (!workingDir.isDirectory()) {
@@ -457,17 +488,27 @@ public class CreateSnapshots {
         }
 
         @Override
-        public void ensureSnapshot(ISnapshot previousSnapShot, ProperSnapshot curSnapshot) {
+        public boolean isCurrentSnapshotDependentOnPreviousSnapshot() {
+            return false;
+        }
+
+        @Override
+        public void setPreviousSnapshot(ISnapshot previousSnapshot) {
+            // Since we don't depend on the previous snapshot, there is nothing to do here.
+        }
+
+        @Override
+        public void ensureSnapshot(ProperSnapshot currentSnapshot) {
             // The snapshot has already been created in a previous run in CHECKOUT
             // mode --> Nothing to do.
         }
 
         @Override
-        public void processSnapshot(ISnapshot previousSnapshot, ProperSnapshot snapshot) {
-            Date snapshotDate = snapshot.revisionDate();
+        public void processSnapshot(ProperSnapshot currentSnapshot) {
+            Date snapshotDate = currentSnapshot.revisionDate();
             File resultsDir = conf.resultsSnapshotDir(snapshotDate);
             runExternalCommand(SKUNK_PROG, resultsDir, "--processed=.", "--config=" + conf.smellConfig);
-            moveSnapshotSmellDetectionResults(snapshot);
+            moveSnapshotSmellDetectionResults(currentSnapshot);
         }
 
         @Override
@@ -527,20 +568,88 @@ public class CreateSnapshots {
         final ISkunkModeStrategy skunkStrategy = conf.skunkMode.getNewStrategyInstance(conf);
 
         revisionsReader = new RevisionsCsvReader(conf.projectRevisionsCsvFile(), conf.commitWindowSizeInNumberOfBugfixes());
-        revisionsReader.processFile();
+        revisionsReader.readAllRevisionsAndComputeSnapshots();
+        applyStrategyToSnapshots(skunkStrategy);
+    }
+
+    private void applyStrategyToSnapshots(ISkunkModeStrategy skunkStrategy) {
+        this.erroneousSnapshots = 0;
         skunkStrategy.removeOutputFiles();
-        final String activityDisplayName = skunkStrategy.activityDisplayName();
-        // Date prevDate = revisionsReader.bugHashes.firstKey();
-        // for (Date curDate : revisionsReader.bugHashes.keySet()) {
-        ISnapshot previousSnapshot = NullSnapshot.getInstance();
-        for (ProperSnapshot curSnapshot : revisionsReader.getSnapshots()) {
-            LOG.info(activityDisplayName + " " + curSnapshot);
-            // LOG.debug("Key: " + curDateForm + " - " + "Value: " +
-            // revisionsReader.bugHashes.get(curDate));
-            skunkStrategy.ensureSnapshot(previousSnapshot, curSnapshot);
-            skunkStrategy.processSnapshot(previousSnapshot, curSnapshot);
-            previousSnapshot = curSnapshot;
+        if (skunkStrategy.isCurrentSnapshotDependentOnPreviousSnapshot()) {
+            processSnapshotsSequentially(skunkStrategy);
+        } else {
+            processSnapshotsInParallel(skunkStrategy);
         }
+    }
+
+    private void processSnapshotsInParallel(ISkunkModeStrategy skunkStrategy) {
+        Thread[] workers = createSnapshotProcessingWorkers(skunkStrategy);
+        executeSnapshotProcessingWorkers(workers);
+    }
+
+    private Thread[] createSnapshotProcessingWorkers(ISkunkModeStrategy skunkStrategy) {
+        Iterator<ProperSnapshot> snapshotIterator = revisionsReader.getSnapshots().iterator();
+        final int NUM_THREADS = 4;
+        Thread[] workers = new Thread[NUM_THREADS];
+
+        for (int i = 0; i < workers.length; i++) {
+            Runnable r = newSkunkStrategyExecutorRunnable(skunkStrategy, snapshotIterator);
+            workers[i] = new Thread(r);
+        }
+        return workers;
+    }
+
+    private void executeSnapshotProcessingWorkers(Thread[] workers) {
+        for (int iWorker = 0; iWorker < workers.length; iWorker++) {
+            workers[iWorker].start();
+        }
+
+        for (int iWorker = 0; iWorker < workers.length; iWorker++) {
+            try {
+                workers[iWorker].join();
+            } catch (InterruptedException e) {
+                LOG.warn("Interrupted while waiting for snapshot processing thread to finish.", e);
+            }
+        }
+    }
+
+    private void processSnapshotsSequentially(ISkunkModeStrategy skunkStrategy) {
+        final String activityDisplayName = skunkStrategy.activityDisplayName();
+        ISnapshot previousSnapshot = NullSnapshot.getInstance();
+        for (ProperSnapshot currentSnapshot : revisionsReader.getSnapshots()) {
+            LOG.info(activityDisplayName + " " + currentSnapshot);
+            skunkStrategy.setPreviousSnapshot(previousSnapshot);
+            skunkStrategy.ensureSnapshot(currentSnapshot);
+            skunkStrategy.processSnapshot(currentSnapshot);
+            previousSnapshot = currentSnapshot;
+        }
+    }
+
+    private Runnable newSkunkStrategyExecutorRunnable(ISkunkModeStrategy skunkStrategy,
+                                                      Iterator<ProperSnapshot> snapshotIterator) {
+        return () -> {
+            while (true) {
+                final ProperSnapshot snapshot;
+                synchronized (snapshotIterator) {
+                    if (!snapshotIterator.hasNext()) {
+                        break;
+                    }
+                    snapshot = snapshotIterator.next();
+                }
+                LOG.info(skunkStrategy.activityDisplayName() + " " + snapshot);
+                try {
+                    skunkStrategy.ensureSnapshot(snapshot);
+                    skunkStrategy.processSnapshot(snapshot);
+                } catch (Throwable t) {
+                    onSnapshotError(snapshot, t);
+                }
+            }
+        };
+    }
+
+    synchronized void onSnapshotError(ProperSnapshot snapshot, Throwable t) {
+        LOG.warn("Error processing " + snapshot, t);
+        erroneousSnapshots++;
     }
 
     static class StreamReader implements Runnable {
@@ -602,7 +711,7 @@ public class CreateSnapshots {
             try {
                 boolean somethingWasAlive = true;
                 while (somethingWasAlive && !interrupted) {
-                    somethingWasAlive = true;
+                    somethingWasAlive = false;
                     for (Thread t : threads) {
                         if (t.isAlive()) {
                             somethingWasAlive = true;

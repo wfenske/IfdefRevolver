@@ -42,7 +42,7 @@ public class RevisionsCsvReader {
         this.commitWindowSize = commitWindowSize;
     }
 
-    public void processFile() {
+    public void readAllRevisionsAndComputeSnapshots() {
         fileChangesByCommit = new TreeMap<>();
         bugfixCount = 0;
 
@@ -263,7 +263,7 @@ public class RevisionsCsvReader {
     }
 
     /**
-     * The list of snapshots, created by calling {@link #processFile()}. Each
+     * The list of snapshots, created by calling {@link #readAllRevisionsAndComputeSnapshots()}. Each
      * snapshot contains exactly {@link #commitWindowSize} bug-fix commits.
      *
      * @return The list of snapshots, in ascending order by date. Each snapshot

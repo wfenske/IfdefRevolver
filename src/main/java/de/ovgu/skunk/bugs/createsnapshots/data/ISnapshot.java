@@ -79,8 +79,7 @@ public interface ISnapshot {
      *
      * @param filesInNextSnapshotCheckout All the files that belong to the checkout of the following
      *                                    snapshot (second parameter)
-     * @param nextSnapshot                The snapshot that the files passed as the first argument
-     *                                    belong to
+     * @param nextSnapshot                The snapshot that the files (first argument) belong to
      * @return A collection of those files that have changed.
      */
     Collection<File> computeChangedFiles(Collection<File> filesInNextSnapshotCheckout, ISnapshot nextSnapshot);
