@@ -24,21 +24,19 @@ public class CreateSnapshots {
     private static final String CPPSTATS_INPUT_TXT = "cppstats_input.txt";
     private static Logger LOG = Logger.getLogger(CreateSnapshots.class);
 
-    public static class Config {
+    public static class Config extends ProjectInformationConfig {
         /**
          * Number of bug-fixes that a commit window should contain
          */
         public static final int DEFAULT_COMMIT_WINDOW_SIZE_IN_NUMBER_OF_BUGFIXES = 100;
         private final SimpleDateFormat dateFormatter = new SimpleDateFormat("yyyy-MM-dd");
         private String reposDir = null;
+
         public static final String DEFAULT_REPOS_DIR_NAME = "repos";
+
         private String smellConfig = null;
         public static final String DEFAULT_SMELL_CONFIGS_DIR_NAME = "smellconfigs";
-        private String resultsDir = null;
-        public static final String DEFAULT_RESULTS_DIR_NAME = "results";
-        private String snapshotsDir = null;
-        public static final String DEFAULT_SNAPSHOTS_DIR_NAME = "snapshots";
-        private String project = null;
+
         public SkunkMode skunkMode = null;
         public Smell smell = null;
         public boolean optimized = false;
@@ -48,15 +46,17 @@ public class CreateSnapshots {
         }
 
         public File projectRepoDir() {
-            return new File(reposDir, project);
+            return new File(reposDir, getProject());
         }
 
+        @Override
         public File projectResultsDir() {
-            return new File(resultsDir, project);
+            return new File(resultsDir, getProject());
         }
 
+        @Override
         public File projectSnapshotsDir() {
-            return new File(snapshotsDir, project);
+            return new File(snapshotsDir, getProject());
         }
 
         public int commitWindowSizeInNumberOfBugfixes() {
@@ -69,10 +69,6 @@ public class CreateSnapshots {
 
         public synchronized File resultsSnapshotDir(Date snapshotDate) {
             return new File(projectResultsDir(), dateFormatter.format(snapshotDate));
-        }
-
-        public File projectRevisionsCsvFile() {
-            return new File(projectResultsDir(), ProjectInformationConfig.REVISIONS_FILE_BASENAME);
         }
 
         public File projectInfoCsv() {
@@ -567,7 +563,7 @@ public class CreateSnapshots {
         this.conf = this.parseCommandLineArgs(args);
         final ISkunkModeStrategy skunkStrategy = conf.skunkMode.getNewStrategyInstance(conf);
 
-        revisionsReader = new RevisionsCsvReader(conf.projectRevisionsCsvFile(), conf.commitWindowSizeInNumberOfBugfixes());
+        revisionsReader = new RevisionsCsvReader(conf.revisionCsvFile(), conf.commitWindowSizeInNumberOfBugfixes());
         revisionsReader.readAllRevisionsAndComputeSnapshots();
         applyStrategyToSnapshots(skunkStrategy);
     }
@@ -616,6 +612,11 @@ public class CreateSnapshots {
     private void processSnapshotsSequentially(ISkunkModeStrategy skunkStrategy) {
         final String activityDisplayName = skunkStrategy.activityDisplayName();
         ISnapshot previousSnapshot = NullSnapshot.getInstance();
+
+        if (conf.getSnapshotFilter().isPresent()) {
+            throw new RuntimeException("Snapshot filter cannot be used in conjunction with " + conf.skunkMode);
+        }
+
         for (ProperSnapshot currentSnapshot : revisionsReader.getSnapshots()) {
             LOG.info(activityDisplayName + " " + currentSnapshot);
             skunkStrategy.setPreviousSnapshot(previousSnapshot);
@@ -924,13 +925,19 @@ public class CreateSnapshots {
             if (dummyLine.hasOption('h')) {
                 HelpFormatter formatter = new HelpFormatter();
                 System.err.flush();
-                formatter.printHelp(progName() + " [OPTIONS]",
+                formatter.printHelp(progName() + " [OPTIONS]... [SNAPSHOTS]...",
                         "Create snapshots of a VCS repository and detect variability-aware smells in those snapshots using Skunk and cppstats.\n\t" +
                                 "Snapshot creation requires information about the commits to this repository, which can be obtained by running " +
                                 FindBugfixCommits.class.getSimpleName() + " on the repository.\n\t" +
                                 "The snapshots will be created and an extensive Skunk analysis performed when this program is run with the `--" + OPT_CHECKOUT_L
-                                + "' option. Subsequent runs with the `" +
-                                OPT_DETECT_L + "' option will reuse the snapshots and Skunk analysis data and proceed much faster.\n\nOptions:\n",
+                                + "' option. Subsequent runs with the `"
+                                + OPT_PREPROCESS_L + "' and `"
+                                + OPT_DETECT_L + "' options will reuse the snapshots and Skunk analysis data and proceed much faster."
+                                + "\n\n"
+                                + "If you want to process only some snapshots of the project, you may optionally name the snapshots"
+                                + " to process by specifying multiple snapshot dates in YYYY-MM-DD format.  This is only possible if the `"
+                                + OPT_PREPROCESS_L + "' or `" + OPT_DETECT_L + "' options is present."
+                                + "\n\nOptions:\n",
                         actualOptions, null, false);
                 System.out.flush();
                 System.exit(0);
@@ -961,6 +968,10 @@ public class CreateSnapshots {
                     "Either `--" + OPT_CHECKOUT_L + "', `--" + OPT_PREPROCESS_L + "' or `--" + OPT_DETECT_L + "' must be specified!");
         }
 
+        ProjectInformationConfig.parseProjectNameFromCommandLine(line, res);
+        ProjectInformationConfig.parseSnapshotsDirFromCommandLine(line, res);
+        ProjectInformationConfig.parseProjectResultsDirFromCommandLine(line, res);
+
         res.optimized = line.hasOption(OPT_OPTIMIZED);
         final String reposDirName;
         if (line.hasOption(OPT_REPOS_DIR_L)) {
@@ -975,35 +986,16 @@ public class CreateSnapshots {
                     "The repository directory does not exist or is not a directory: " + reposDir.getAbsolutePath());
         }
         res.reposDir = reposDir.getAbsolutePath();
-        final String resultsDirName;
-        if (line.hasOption(OPT_RESULTS_DIR_L)) {
-            resultsDirName = line.getOptionValue(OPT_RESULTS_DIR_L);
-        } else {
-            resultsDirName = Config.DEFAULT_RESULTS_DIR_NAME;
+
+        List<String> snapshotDateNames = line.getArgList();
+        if (!snapshotDateNames.isEmpty()) {
+            if (res.skunkMode == SkunkMode.CHECKOUT) {
+                throw new RuntimeException("Processing individual snapshots is not supported in"
+                        + " `--" + OPT_CHECKOUT_L + "' mode.");
+            }
+            ProjectInformationConfig.parseSnapshotFilterDates(snapshotDateNames, res);
         }
-        File resultsDir = new File(resultsDirName);
-        if (!resultsDir.exists() || !resultsDir.isDirectory()) {
-            throw new RuntimeException(
-                    "The results directory does not exist or is not a directory: " + resultsDir.getAbsolutePath());
-        }
-        res.resultsDir = resultsDir.getAbsolutePath();
-        final String snapshotsDirName;
-        if (line.hasOption(OPT_SNAPSHOTS_DIR_L)) {
-            snapshotsDirName = line.getOptionValue(OPT_SNAPSHOTS_DIR_L);
-        } else {
-            snapshotsDirName = Config.DEFAULT_SNAPSHOTS_DIR_NAME;
-        }
-        File snapshotsDir = new File(snapshotsDirName);
-        if (!snapshotsDir.exists() || !snapshotsDir.isDirectory()) {
-            throw new RuntimeException(
-                    "The snapshots directory does not exist or is not a directory: " + snapshotsDir.getAbsolutePath());
-        }
-        res.snapshotsDir = snapshotsDir.getAbsolutePath();
-        res.project = line.getOptionValue(OPT_PROJECT);
-        if (res.project == null || "".equals(res.project)) {
-            throw new IllegalArgumentException(
-                    "Project name (given via option `--" + OPT_PROJECT_L + "') must not be empty!");
-        }
+
         return res;
     }
 

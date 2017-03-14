@@ -6,16 +6,13 @@ package de.ovgu.skunk.commitanalysis;
 import de.ovgu.skunk.bugs.correlate.main.ProjectInformationConfig;
 
 import java.io.File;
-import java.util.Date;
-import java.util.List;
-import java.util.Optional;
 
 /**
  * Runtime configuration options of this program
  *
  * @author wfenske
  */
-public class ListChangedFunctionsConfig extends ProjectInformationConfig implements IHasRepoDir, IHasSnapshots {
+public class ListChangedFunctionsConfig extends ProjectInformationConfig implements IHasRepoDir {
 
     public static final char OPT_THREADS = 't';
     public static final String OPT_THREADS_L = "threads";
@@ -37,13 +34,6 @@ public class ListChangedFunctionsConfig extends ProjectInformationConfig impleme
     public static final String DEFAULT_REPOS_DIR_NAME = "repos";
     public static final int DEFAULT_NUM_THREADS = 4;
     private String repoDir = null;
-
-    /**
-     * In case you don't want to analyze all snapshots of the project, but only some of them, their date strings will
-     * be saved in this list.  In that case, the predicate {@link Optional#isPresent()} will return <code>true</code>.
-     * Else, all snapshots should be analyzed.
-     */
-    private Optional<List<Date>> snapshots = Optional.empty();
 
     /**
      * The IDs of GIT commit which should be analyzed
@@ -83,32 +73,4 @@ public class ListChangedFunctionsConfig extends ProjectInformationConfig impleme
     public void setRepoDir(String repoDir) {
         this.repoDir = repoDir;
     }
-
-    @Override
-    public Optional<List<Date>> getSnapshots() {
-        return snapshots;
-    }
-
-    @Override
-    public void setSnapshots(List<Date> snapshots) {
-        // The constructor function will perform the null check for us.
-        this.snapshots = Optional.of(snapshots);
-    }
-
-    @Override
-    public void validateSnapshots() {
-        if (this.snapshots.isPresent()) {
-            for (Date snapshotDate : this.snapshots.get()) {
-                File snapshotDir = snapshotResultsDirForDate(snapshotDate);
-                if (!snapshotDir.exists()) {
-                    throw new IllegalArgumentException("Snapshot directory does not exist: " + snapshotDir);
-                }
-                if (!snapshotDir.isDirectory()) {
-                    throw new IllegalArgumentException("Snapshot directory is not a directory: " + snapshotDir);
-                }
-            }
-        }
-    }
-
-
 }

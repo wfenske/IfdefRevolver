@@ -19,7 +19,10 @@ import org.w3c.dom.NodeList;
 import java.io.File;
 import java.io.IOException;
 import java.io.PrintWriter;
-import java.util.*;
+import java.util.ArrayList;
+import java.util.Collection;
+import java.util.Iterator;
+import java.util.List;
 import java.util.function.Consumer;
 
 public class ListAllFunctions {
@@ -54,8 +57,8 @@ public class ListAllFunctions {
         LOG.debug("Reading project information");
         projectInfo.readSnapshotsAndRevisionsFile();
         LOG.debug("Done reading project information");
-        SortedMap<Date, Snapshot> snapshots = projectInfo.getSnapshots();
-        listFunctionsInSnapshots(snapshots.values());
+        Collection<Snapshot> snapshotsToProcess = projectInfo.getSnapshotsFiltered(config);
+        listFunctionsInSnapshots(snapshotsToProcess);
     }
 
     private void listFunctionsInSnapshots(Collection<Snapshot> snapshots) {
@@ -199,9 +202,13 @@ public class ListAllFunctions {
                 HelpFormatter formatter = new HelpFormatter();
                 //@formatter:off
                 formatter.printHelp(progName()
-                                + " [OPTIONS]"
-                        , "List functions defined in the C files of an IfdefRevolver snapshot. The snapshot is expected to have been created by the " +
-                                CreateSnapshots.class.getSimpleName() + " tool." /* header */
+                                + " [OPTION]... [SNAPSHOT]..."
+                        , "List all functions defined in the C files of an IfdefRevolver project." +
+                                "  The project is expected to have been created by the " +
+                                CreateSnapshots.class.getSimpleName() + " tool." +
+                                "  By default, all snapshots of the project will be" +
+                                " analyzed.  If you wish to analyze only specific snapshots, you can list their dates" +
+                                " in YYYY-MM-DD format after the last named command line option." /* header */
                         , actualOptions
                         , null /* footer */
                 );
@@ -235,6 +242,11 @@ public class ListAllFunctions {
         ProjectInformationConfig.parseProjectResultsDirFromCommandLine(line, this.config);
 
         ProjectInformationConfig.parseSnapshotsDirFromCommandLine(line, this.config);
+
+        List<String> snapshotDateNames = line.getArgList();
+        if (!snapshotDateNames.isEmpty()) {
+            ListChangedFunctionsConfig.parseSnapshotFilterDates(snapshotDateNames, config);
+        }
     }
 
     private Options makeOptions(boolean forHelp) {

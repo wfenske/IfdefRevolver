@@ -9,8 +9,8 @@ import org.apache.log4j.Logger;
 import java.io.File;
 import java.io.PrintWriter;
 import java.nio.file.Paths;
-import java.text.SimpleDateFormat;
-import java.util.*;
+import java.util.Collection;
+import java.util.List;
 
 public class ListChangedFunctions {
     private static final Logger LOG = Logger.getLogger(ListChangedFunctions.class);
@@ -39,29 +39,8 @@ public class ListChangedFunctions {
         LOG.debug("Reading project information");
         projectInfo.readSnapshotsAndRevisionsFile();
         LOG.debug("Done reading project information");
-        SortedMap<Date, Snapshot> snapshots = projectInfo.getSnapshots();
-        Collection<Snapshot> snapshotsToProcess = filterSnapshotsToProcess(snapshots);
+        Collection<Snapshot> snapshotsToProcess = projectInfo.getSnapshotsFiltered(config);
         listFunctionsInSnapshots(snapshotsToProcess);
-    }
-
-    private Collection<Snapshot> filterSnapshotsToProcess(SortedMap<Date, Snapshot> snapshots) {
-        Optional<List<Date>> explicitSnapshotDates = config.getSnapshots();
-        final Collection<Snapshot> snapshotsToProcess;
-        if (explicitSnapshotDates.isPresent()) {
-            Collection<Date> explicitSnapshotDatesValue = explicitSnapshotDates.get();
-            snapshotsToProcess = new ArrayList<>(explicitSnapshotDatesValue.size());
-            for (Date snapshotDate : explicitSnapshotDatesValue) {
-                Snapshot snapshot = snapshots.get(snapshotDate);
-                if (snapshot == null) {
-                    LOG.warn("No such snapshot: " + snapshotDate);
-                } else {
-                    snapshotsToProcess.add(snapshot);
-                }
-            }
-        } else {
-            snapshotsToProcess = snapshots.values();
-        }
-        return snapshotsToProcess;
     }
 
     private void listFunctionsInSnapshots(Collection<Snapshot> snapshots) {
@@ -214,25 +193,8 @@ public class ListChangedFunctions {
 
         List<String> snapshotDateNames = line.getArgList();
         if (!snapshotDateNames.isEmpty()) {
-            parseSnapshotDates(snapshotDateNames);
+            ListChangedFunctionsConfig.parseSnapshotFilterDates(snapshotDateNames, config);
         }
-    }
-
-    private void parseSnapshotDates(List<String> snapshotDateNames) {
-        List<Date> snapshotDates = new ArrayList<>(snapshotDateNames.size());
-        final SimpleDateFormat dateFormatter = new SimpleDateFormat("yyyy-MM-dd");
-
-        for (String snapshotDateString : snapshotDateNames) {
-            Date snapshotDate;
-            try {
-                snapshotDate = dateFormatter.parse(snapshotDateString);
-            } catch (java.text.ParseException e) {
-                throw new RuntimeException("Invalid snapshot (not in YYYY-MM-DD format): " + snapshotDateString, e);
-            }
-            snapshotDates.add(snapshotDate);
-        }
-        config.setSnapshots(snapshotDates);
-        config.validateSnapshots();
     }
 
     private Options makeOptions(boolean forHelp) {

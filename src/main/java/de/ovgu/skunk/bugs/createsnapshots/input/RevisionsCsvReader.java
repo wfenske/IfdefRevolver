@@ -1,9 +1,12 @@
 package de.ovgu.skunk.bugs.createsnapshots.input;
 
+import de.ovgu.skunk.bugs.correlate.data.Snapshot;
+import de.ovgu.skunk.bugs.correlate.input.ProjectInformationReader;
 import de.ovgu.skunk.bugs.createsnapshots.data.Commit;
 import de.ovgu.skunk.bugs.createsnapshots.data.FileChange;
 import de.ovgu.skunk.bugs.createsnapshots.data.ProperSnapshot;
 import de.ovgu.skunk.bugs.minecommits.RevisionsFullColumns;
+import de.ovgu.skunk.commitanalysis.IHasSnapshotFilter;
 import de.ovgu.skunk.detection.output.CsvEnumUtils;
 import org.apache.log4j.Logger;
 
@@ -272,5 +275,16 @@ public class RevisionsCsvReader {
      */
     public List<ProperSnapshot> getSnapshots() {
         return snapshots;
+    }
+
+    /**
+     * @return Snapshots, ordered according to the filter (if present) or by date (if no filter was given)
+     */
+    public Collection<Snapshot> getSnapshotsFiltered(IHasSnapshotFilter snapshotFilteringConfig) {
+        SortedMap<Date, Snapshot> snapshotsByDate = new TreeMap<>();
+        for (ProperSnapshot s : this.getSnapshots()) {
+            snapshotsByDate.put(s.g)
+        }
+        return ProjectInformationReader.getSnapshotsFiltered(, snapshotFilteringConfig);
     }
 }

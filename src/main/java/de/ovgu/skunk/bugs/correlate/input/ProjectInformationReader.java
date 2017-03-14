@@ -8,6 +8,7 @@ import de.ovgu.skunk.bugs.correlate.main.IHasResultsDir;
 import de.ovgu.skunk.bugs.correlate.main.IHasRevisionCsvFile;
 import de.ovgu.skunk.bugs.correlate.main.IHasSnapshotsDir;
 import de.ovgu.skunk.bugs.createsnapshots.input.RevisionsCsvReader;
+import de.ovgu.skunk.commitanalysis.IHasSnapshotFilter;
 import org.apache.log4j.Logger;
 
 import java.io.BufferedReader;
@@ -23,7 +24,7 @@ import java.util.*;
  * Created by wfenske on 09.02.17.
  */
 public class ProjectInformationReader<TConfig extends IHasProjectInfoFile & IHasResultsDir & IHasSnapshotsDir & IHasRevisionCsvFile> {
-    private static Logger log = Logger.getLogger(ProjectInformationReader.class);
+    private static Logger LOG = Logger.getLogger(ProjectInformationReader.class);
 
     protected TConfig conf;
 
@@ -54,7 +55,7 @@ public class ProjectInformationReader<TConfig extends IHasProjectInfoFile & IHas
      * Listen der Bugfixes und geänderten Dateien mit ihren Änderungsdaten
      */
     private void processRevisionsFile() {
-        log.info("Reading revisions file " + conf.revisionCsvFile());
+        LOG.info("Reading revisions file " + conf.revisionCsvFile());
 
         final String cvsSplitBy = ",";
         final DateFormat formatter = new SimpleDateFormat("yyyy-MM-dd");
@@ -79,7 +80,7 @@ public class ProjectInformationReader<TConfig extends IHasProjectInfoFile & IHas
                 Snapshot snapshot = snapshotsByCommit.get(curHash);
 
                 if (snapshot == null) {
-                    log.debug("Skipping commit " + curHash + ": not part of any snapshot");
+                    LOG.debug("Skipping commit " + curHash + ": not part of any snapshot");
                     continue;
                 }
 
@@ -246,6 +247,34 @@ public class ProjectInformationReader<TConfig extends IHasProjectInfoFile & IHas
      */
     public SortedMap<Date, Snapshot> getSnapshots() {
         return snapshots;
+    }
+
+    /**
+     * @return Snapshots, ordered according to the filter (if present) or by date (if no filter was given)
+     */
+    public Collection<Snapshot> getSnapshotsFiltered(IHasSnapshotFilter snapshotFilteringConfig) {
+        return getSnapshotsFiltered(this.getSnapshots(), snapshotFilteringConfig);
+    }
+
+    public static Collection<Snapshot> getSnapshotsFiltered(SortedMap<Date, Snapshot> allSnapshots, IHasSnapshotFilter snapshotFilteringConfig) {
+        Optional<List<Date>> explicitSnapshotDates = snapshotFilteringConfig.getSnapshotFilter();
+        final Collection<Snapshot> snapshotsToProcess;
+        if (!explicitSnapshotDates.isPresent()) {
+            return allSnapshots.values();
+        }
+
+        Collection<Date> explicitSnapshotDatesValue = explicitSnapshotDates.get();
+        snapshotsToProcess = new ArrayList<>(explicitSnapshotDatesValue.size());
+        for (Date snapshotDate : explicitSnapshotDatesValue) {
+            Snapshot snapshot = allSnapshots.get(snapshotDate);
+            if (snapshot == null) {
+                LOG.warn("No such snapshot: " + snapshotDate);
+            } else {
+                snapshotsToProcess.add(snapshot);
+            }
+        }
+
+        return snapshotsToProcess;
     }
 
     protected Map<String, Snapshot> mapSnapshotsToCommits() {

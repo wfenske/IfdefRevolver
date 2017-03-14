@@ -9,10 +9,10 @@ import java.util.Optional;
  * <p>
  * For a configuration that supports analyzing/processing only specific snapshots of a project, instead of all of them
  */
-public interface IHasSnapshots {
-    Optional<List<Date>> getSnapshots();
+public interface IHasSnapshotFilter {
+    Optional<List<Date>> getSnapshotFilter();
 
-    void setSnapshots(List<Date> snapshots);
+    void setSnapshotFilter(List<Date> snapshotFilter);
 
-    void validateSnapshots();
+    void validateSnapshotFilter();
 }

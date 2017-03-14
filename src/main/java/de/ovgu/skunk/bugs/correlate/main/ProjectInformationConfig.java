@@ -1,17 +1,21 @@
 package de.ovgu.skunk.bugs.correlate.main;
 
+import de.ovgu.skunk.commitanalysis.IHasSnapshotFilter;
 import org.apache.commons.cli.CommandLine;
 import org.apache.commons.cli.Option;
 import org.apache.commons.cli.PatternOptionBuilder;
 
 import java.io.File;
 import java.text.SimpleDateFormat;
+import java.util.ArrayList;
 import java.util.Date;
+import java.util.List;
+import java.util.Optional;
 
 /**
  * Created by wfenske on 13.02.17.
  */
-public class ProjectInformationConfig implements IHasSnapshotsDir, IHasResultsDir, IHasRevisionCsvFile, IHasProjectInfoFile, IHasProjectName {
+public class ProjectInformationConfig implements IHasSnapshotsDir, IHasResultsDir, IHasRevisionCsvFile, IHasProjectInfoFile, IHasProjectName, IHasSnapshotFilter {
     private final SimpleDateFormat dateFormatter = new SimpleDateFormat("yyyy-MM-dd");
 
     public static final char OPT_HELP = 'h';
@@ -39,26 +43,33 @@ public class ProjectInformationConfig implements IHasSnapshotsDir, IHasResultsDi
     /**
      * Name of the project to be analyzed, e.g., "openvpn"
      */
-    private String project;
+    protected String project;
 
     /**
      * Name of the results directory. Below this directory we expect a folder with the name of the project (see {@link #project}), e.g. "results/openvpn".
      */
-    private String resultsDir = null;
+    protected String resultsDir = null;
     public static final String DEFAULT_RESULTS_DIR_NAME = "results";
 
     /**
      * Name of the revisionsFull.csv of this project, e.g.
      * "results/openvpn/revisionsFull.csv"
      */
-    private File revisionCsvFile = null;
+    protected File revisionCsvFile = null;
     public static final String REVISIONS_FILE_BASENAME = "revisionsFull.csv";
 
     /**
      * Name of the snapshots directory of this project, e.g. "snapshots/openvpn"
      */
-    private String snapshotsDir = null;
+    protected String snapshotsDir = null;
     public static final String DEFAULT_SNAPSHOTS_DIR_NAME = "snapshots";
+
+    /**
+     * In case you don't want to analyze all snapshots of the project, but only some of them, their date strings will
+     * be saved in this list.  In that case, the predicate {@link Optional#isPresent()} will return <code>true</code>.
+     * Else, all snapshots should be analyzed.
+     */
+    protected Optional<List<Date>> snapshotFilter = Optional.empty();
 
     public static <TConfig extends IHasResultsDir & IHasProjectName> void parseProjectResultsDirFromCommandLine(CommandLine line, TConfig config) {
         final String resultsDirName;
@@ -97,6 +108,23 @@ public class ProjectInformationConfig implements IHasSnapshotsDir, IHasResultsDi
                             + projectSnapshotsDir.getAbsolutePath());
         }
         config.setSnapshotsDir(snapshotsDir.getAbsolutePath());
+    }
+
+    public static void parseSnapshotFilterDates(List<String> snapshotDateNames, IHasSnapshotFilter config) {
+        List<Date> snapshotDates = new ArrayList<>(snapshotDateNames.size());
+        final SimpleDateFormat dateFormatter = new SimpleDateFormat("yyyy-MM-dd");
+
+        for (String snapshotDateString : snapshotDateNames) {
+            Date snapshotDate;
+            try {
+                snapshotDate = dateFormatter.parse(snapshotDateString);
+            } catch (java.text.ParseException e) {
+                throw new RuntimeException("Invalid snapshot (not in YYYY-MM-DD format): " + snapshotDateString, e);
+            }
+            snapshotDates.add(snapshotDate);
+        }
+        config.setSnapshotFilter(snapshotDates);
+        config.validateSnapshotFilter();
     }
 
     public static void parseProjectNameFromCommandLine(CommandLine line, IHasProjectName config) {
@@ -164,7 +192,7 @@ public class ProjectInformationConfig implements IHasSnapshotsDir, IHasResultsDi
         initializeRevisionsCsvFileOrDie(resultsDir);
     }
 
-    private void initializeRevisionsCsvFileOrDie(String resultsDir) {
+    protected void initializeRevisionsCsvFileOrDie(String resultsDir) {
         File revisionsCsvFile = new File(projectResultsDir(), Config.REVISIONS_FILE_BASENAME);
         if (!revisionsCsvFile.exists() || revisionsCsvFile.isDirectory()) {
             throw new RuntimeException("The revisions CSV file does not exist or is a directory: "
@@ -200,11 +228,42 @@ public class ProjectInformationConfig implements IHasSnapshotsDir, IHasResultsDi
 
     @Override
     public File projectSnapshotDirForDate(Date date) {
-        return new File(projectSnapshotsDir(), dateFormatter.format(date));
+        synchronized (dateFormatter) {
+            return new File(projectSnapshotsDir(), dateFormatter.format(date));
+        }
     }
 
     @Override
     public File snapshotResultsDirForDate(Date date) {
-        return new File(projectResultsDir(), dateFormatter.format(date));
+        synchronized (dateFormatter) {
+            return new File(projectResultsDir(), dateFormatter.format(date));
+        }
+    }
+
+    @Override
+    public Optional<List<Date>> getSnapshotFilter() {
+        return snapshotFilter;
+    }
+
+    @Override
+    public void setSnapshotFilter(List<Date> snapshotFilter) {
+        // The constructor function will perform the null check for us.
+        this.snapshotFilter = Optional.of(snapshotFilter);
+    }
+
+    @Override
+    public void validateSnapshotFilter() {
+        Optional<List<Date>> filter = getSnapshotFilter();
+        if (filter.isPresent()) {
+            for (Date snapshotDate : filter.get()) {
+                File snapshotDir = snapshotResultsDirForDate(snapshotDate);
+                if (!snapshotDir.exists()) {
+                    throw new IllegalArgumentException("Snapshot directory does not exist: " + snapshotDir);
+                }
+                if (!snapshotDir.isDirectory()) {
+                    throw new IllegalArgumentException("Snapshot directory is not a directory: " + snapshotDir);
+                }
+            }
+        }
     }
 }
