@@ -10,7 +10,7 @@ me_dir=$(dirname -- "${real_me}")
 
 aggregate()
 {
-    csvsql -y 10000 --query \
+    csvsql -d, -q '"' -y 10000 --query \
 	   "SELECT
 		FUNCTION_SIGNATURE,
 		FILE,
@@ -25,47 +25,9 @@ aggregate()
        	   GROUP BY FUNCTION_SIGNATURE,FILE,FUNCTION_LOC,COMMIT_ID,BUGFIX"
 }
 
-main()
-{
-    if [ $# -eq 0 ]
-    then
-	aggregate
-    elif [ $# -eq 1 ]
-    then
-	cat -- "$1"|aggregate
-    else
-	i_file=1
-	files_count=$#
-	err=0
-	err_files=""
-	for fn_in in "$@"
-	do
-	    fn_out=$(dirname -- "$fn_in")/function_change_commits.csv
-	    printf 'Processing file %2d/%d: %s -> %s\n' ${i_file} ${files_count} "${fn_in}" "${fn_out}" >&2
-	    cat -- "$fn_in" | aggregate > "${fn_out}"
-	    if [ $? -ne 0 ]
-	    then
-		echo "Error processing file ${fn_in}" >&2
-		if [ -z "${err_files}" ]
-		then
-		    err_files="${fn_in}"
-		else
-		    err_files=$(printf '%s\n%s\n' "${err_files}" "${fn_in}")
-		fi
-		err=$(( $err + 1 ))
-	    fi
-	    i_file=$(( $i_file + 1 ))
-	done
-	if [ $err -ne 0 ]
-	then
-	    echo "Errors occurred while processing the following files:" >&2
-	    echo "${err_files}" >&2
-	    echo "($err errors)" >&2
-	else
-	    echo "Successfully processed $files_count files."
-	fi
-	return $err
-    fi
-}
+AGG_INPUT_CSV=function_change_hunks.csv
+AGG_OUTPUT_CSV=function_change_commits.csv
+
+. "${me_dir}/function_change_aggregate_main.sh"
 
 main "$@"

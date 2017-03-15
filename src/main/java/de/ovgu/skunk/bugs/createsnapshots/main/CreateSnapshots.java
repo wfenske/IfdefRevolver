@@ -584,7 +584,8 @@ public class CreateSnapshots {
     }
 
     private Thread[] createSnapshotProcessingWorkers(ISkunkModeStrategy skunkStrategy) {
-        Iterator<ProperSnapshot> snapshotIterator = revisionsReader.getSnapshots().iterator();
+        Collection<ProperSnapshot> snapshotsToProcess = revisionsReader.getSnapshotsFiltered(conf);
+        Iterator<ProperSnapshot> snapshotIterator = snapshotsToProcess.iterator();
         final int NUM_THREADS = 4;
         Thread[] workers = new Thread[NUM_THREADS];
 

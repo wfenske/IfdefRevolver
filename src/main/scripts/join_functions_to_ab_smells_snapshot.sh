@@ -19,7 +19,7 @@ aggregate()
     ##
     ## SNAPSHOT_DATE,FUNCTION_SIGNATURE,FILE,FUNCTION_LOC,HUNKS,COMMITS,BUGFIXES,LINE_DELTA,LINES_DELETED,LINES_ADDED,FILE,Start,FUNCTION_SIGNATURE,ABSmell,LocationSmell,ConstantsSmell,NestingSmell,LOC,LOAC,LOFC,NOFL,NOFC_Dup,NOFC_NonDup,NONEST
     
-    csvsql -y 10000 --query \
+    csvsql -d, -q '"' -y 10000 --query \
            "SELECT
                 SNAPSHOT_DATE,
                 f.FUNCTION_SIGNATURE,

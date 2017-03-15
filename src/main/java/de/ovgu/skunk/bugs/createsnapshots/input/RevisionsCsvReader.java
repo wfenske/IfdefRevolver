@@ -1,7 +1,5 @@
 package de.ovgu.skunk.bugs.createsnapshots.input;
 
-import de.ovgu.skunk.bugs.correlate.data.Snapshot;
-import de.ovgu.skunk.bugs.correlate.input.ProjectInformationReader;
 import de.ovgu.skunk.bugs.createsnapshots.data.Commit;
 import de.ovgu.skunk.bugs.createsnapshots.data.FileChange;
 import de.ovgu.skunk.bugs.createsnapshots.data.ProperSnapshot;
@@ -19,7 +17,7 @@ import java.text.SimpleDateFormat;
 import java.util.*;
 
 public class RevisionsCsvReader {
-    private static Logger log = Logger.getLogger(RevisionsCsvReader.class);
+    private static Logger LOG = Logger.getLogger(RevisionsCsvReader.class);
 
     private final File revisionsCsv;
     private final int commitWindowSize;
@@ -54,7 +52,7 @@ public class RevisionsCsvReader {
     }
 
     private int readAllFileChanges() {
-        log.info("Reading all file changes in " + this.revisionsCsv.getAbsolutePath());
+        LOG.info("Reading all file changes in " + this.revisionsCsv.getAbsolutePath());
 
         Map<String, Commit> commitsByHash = new HashMap<>();
 
@@ -102,7 +100,7 @@ public class RevisionsCsvReader {
                 filesChangedByCommit.add(chFile);
 
                 if (lineNo % 10000 == 0) {
-                    log.debug("Processed " + lineNo + " lines of file changes ...");
+                    LOG.debug("Processed " + lineNo + " lines of file changes ...");
                 }
             }
         } catch (IOException e) {
@@ -128,8 +126,8 @@ public class RevisionsCsvReader {
             }
         }
 
-        log.debug("Processed " + lineNo + " lines in " + this.revisionsCsv.getAbsolutePath());
-        log.info("Found " + commitsByHash.size() + " commits and " + bugfixCount + " bugfix(es) in "
+        LOG.debug("Processed " + lineNo + " lines in " + this.revisionsCsv.getAbsolutePath());
+        LOG.info("Found " + commitsByHash.size() + " commits and " + bugfixCount + " bugfix(es) in "
                 + this.revisionsCsv.getAbsolutePath());
 
         return lineNo;
@@ -167,7 +165,7 @@ public class RevisionsCsvReader {
     }
 
     private void computeSnapshots() {
-        log.info("Computing snapshots from " + revisionsCsv.getAbsolutePath());
+        LOG.info("Computing snapshots from " + revisionsCsv.getAbsolutePath());
         snapshots = new ArrayList<>();
 
         if (commitWindowSize <= 0) {
@@ -178,12 +176,12 @@ public class RevisionsCsvReader {
         final int skipFront = bugfixCount % commitWindowSize;
 
         if (numSnapshots == 0) {
-            log.info("Insufficient amount of bug-fix commits: " + bugfixCount + ". Need at least " + commitWindowSize
+            LOG.info("Insufficient amount of bug-fix commits: " + bugfixCount + ". Need at least " + commitWindowSize
                     + ". No snapshots will be created.");
             return;
         }
 
-        log.debug("Skipping first " + skipFront + " bugfix(es) since they don't fit into a commit window.");
+        LOG.debug("Skipping first " + skipFront + " bugfix(es) since they don't fit into a commit window.");
         Iterator<Commit> iter = fileChangesByCommit.keySet().iterator();
         // Skip the first couple of entries and advance to the first bug-fix
         // commit. Yes, we actually need to add 1 to the skipFront number
@@ -212,7 +210,7 @@ public class RevisionsCsvReader {
 
         validateSnapshots();
 
-        log.info("Successfully created " + numSnapshots + " snapshots.");
+        LOG.info("Successfully created " + numSnapshots + " snapshots.");
     }
 
     /**
@@ -280,11 +278,28 @@ public class RevisionsCsvReader {
     /**
      * @return Snapshots, ordered according to the filter (if present) or by date (if no filter was given)
      */
-    public Collection<Snapshot> getSnapshotsFiltered(IHasSnapshotFilter snapshotFilteringConfig) {
-        SortedMap<Date, Snapshot> snapshotsByDate = new TreeMap<>();
-        for (ProperSnapshot s : this.getSnapshots()) {
-            snapshotsByDate.put(s.g)
+    public Collection<ProperSnapshot> getSnapshotsFiltered(IHasSnapshotFilter snapshotFilteringConfig) {
+        Optional<List<Date>> filterDates = snapshotFilteringConfig.getSnapshotFilter();
+        List<ProperSnapshot> allSnapshots = this.getSnapshots();
+        if (!filterDates.isPresent()) {
+            return allSnapshots;
         }
-        return ProjectInformationReader.getSnapshotsFiltered(, snapshotFilteringConfig);
+
+        Map<Date, ProperSnapshot> snapshotsByDate = new HashMap<>();
+        for (ProperSnapshot s : allSnapshots) {
+            snapshotsByDate.put(s.revisionDate(), s);
+        }
+
+        List<ProperSnapshot> result = new ArrayList<>();
+        for (Date selectedDate : filterDates.get()) {
+            ProperSnapshot s = snapshotsByDate.get(selectedDate);
+            if (s == null) {
+                LOG.warn("No such snapshot: " + selectedDate);
+            } else {
+                result.add(s);
+            }
+        }
+
+        return result;
     }
 }

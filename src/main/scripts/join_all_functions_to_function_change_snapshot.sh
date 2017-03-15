@@ -14,7 +14,7 @@ FUNCTION_CHANGE_SNAPSHOT_NO_EXT=function_change_snapshot
 
 aggregate()
 {
-    csvsql -y 10000 --query \
+    csvsql -d, -q '"' -y 10000 --query \
            "SELECT
                 SNAPSHOT_DATE,
                 a.FUNCTION_SIGNATURE,
