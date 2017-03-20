@@ -1,5 +1,15 @@
 #!/usr/bin/env Rscript
 
+## Example:
+## for indep in NOFL ABSmell NOFC_Dup NONEST; do
+##   for dep in HUNKS COMMITS BUGFIXES; do
+##     for p in openvpn apache openldap; do
+##       echo "Processing $p"
+##       ratioscmp.R --independent=$indep --dependent=$dep $p/[0-9]*[0-9]/joint_function_ab_smell_snapshot.csv || break
+##     done
+##   done
+## done
+
 library(optparse)
 
 options <- list(
@@ -17,7 +27,7 @@ options <- list(
               , help="Column delimiter, e.g. `,' or `;'. [default: %default]"
                 )
   , make_option("--independent"
-              , help="Name of independent variable.  Valid values are: ABSmell,LocationSmell,ConstantsSmell,NestingSmell,NOFL,NOFC_Dup,NOFC_NonDup,NONEST. [default: %default]"
+              , help="Name of independent variable.  Valid values are: ABSmell, LocationSmell, ConstantsSmell, NestingSmell, NOFL, NOFC_Dup, NOFC_NonDup, NONEST. [default: %default]"
                 ## NOTE, 2017-03-18, wf: We also have LOAC,LOFC
               , default="ABSmell"
                 )
@@ -39,17 +49,17 @@ args <- parse_args(OptionParser(
 opts <- args$options
 inputFns <- args$args
 
-if ( !is.null(opts$systemname) ) {
-    systemname <- opts$systemname
-} else {
-    systemdir <- dirname(inputFns[0])
+if ( is.null(opts$systemname) ) {
+    systemdir <- dirname(dirname(inputFns[[1]]))
     systemname <- basename(systemdir)
+} else {
+    systemname <- opts$systemname
 }
 
 if ( !is.null(opts$output) ) {
     outputFn <- opts$output
 } else {
-    outputFn <- paste(systemname, "pdf", sep=".")
+    outputFn <- paste("ratios-", opts$independent, "-", opts$dependent, "-", systemname, ".pdf", sep="")
 }
 
 xAxisName <- "Commit Window"
@@ -61,7 +71,7 @@ if ( opts$noyaxislabels ) {
     yAxisName <- ""
     yAxisLabels <- sprintf(yLabels, fmt="")
 } else {
-    yAxisName <- "Percentage"
+    yAxisName <- paste(opts$dependent, "/LOC", sep="")
     yAxisLabels <- sprintf(round(100*yLabels), fmt="%2d%%")
 }
 
@@ -75,46 +85,62 @@ readSnapshotFile <- function(inputFn) {
     return (snapshotData)
 }
 
-processSnapshot <- function(snapshotData) {
-    ixLoc		<- which( colnames(snapshotData)=="FUNCTION_LOC")
-    ixHunks		<- which( colnames(snapshotData)=="HUNKS")
-    ixCommits		<- which( colnames(snapshotData)=="COMMITS")
-    ixBugfixes		<- which( colnames(snapshotData)=="BUGFIXES")
-    ixAbSmell		<- which( colnames(snapshotData)=="ABSmell")
-    ixLoac		<- which( colnames(snapshotData)=="LOAC")
-    ixLofc		<- which( colnames(snapshotData)=="LOFC")
-    ixNolf		<- which( colnames(snapshotData)=="NOFL")
-    ixNofcDup		<- which( colnames(snapshotData)=="NOFC_Dup")
-    ixNofcNonDup	<- which( colnames(snapshotData)=="NOFC_NonDup")
-
-    averageFixesPerLoc	<- sum(snapshotData[ixBugfixes]) / sum(snapshotData[ixLoc])
+processSnapshot <- function(df) {
+    ixLoc		<- which( colnames(df)=="FUNCTION_LOC")
+    ##ixHunks		<- which( colnames(df)=="HUNKS")
+    ##ixCommits		<- which( colnames(df)=="COMMITS")
+    ##ixBugfixes	<- which( colnames(df)=="BUGFIXES")
+    ##ixAbSmell		<- which( colnames(df)=="ABSmell")
+    ##ixLoac		<- which( colnames(df)=="LOAC")
+    ##ixLofc		<- which( colnames(df)=="LOFC")
+    ##ixNolf		<- which( colnames(df)=="NOFL")
+    ##ixNofcDup		<- which( colnames(df)=="NOFC_Dup")
+    ##ixNofcNonDup	<- which( colnames(df)=="NOFC_NonDup")
 
     ## Replace all missing values with zeroes
-    snapshotData[is.na(snapshotData)] <- 0.0
+    df[is.na(df)] <- 0.0
 
-    ixIndep <- ixAbSmell
-    ixDep <- ixBugfixes
+    ##ixIndep <- ixAbSmell
+    ##ixDep <- ixBugfixes
+    ixIndep <- which( colnames(df)==opts$independent )
+    ixDep   <- which( colnames(df)==opts$dependent )
 
-    snapshotData[,'INDEP'] <- snapshotData[,ixIndep] > 0.0
-    snapshotData[,'DEP'] <- snapshotData[,ixDep] > 0
+    df$INDEPV	<- df[,ixIndep]
+    df$DEPV	<- df[,ixDep]
 
-    ##numFuncs <- nrow(snapshotData)
-    numIndepFalse	<- nrow(snapshotData[snapshotData$INDEP == FALSE,])
-    numIndepTrue	<- nrow(snapshotData[snapshotData$INDEP == TRUE,])
+    ## e.g., INDEP=NOFL, DEP=HUNKS
+    df$INDEP_BOOL	<- df$INDEPV > 0 ## e.g., NOLF > 0
 
-    numDepTrueIndepFalse	<- nrow(snapshotData[snapshotData$DEP == TRUE & snapshotData$INDEP == FALSE,])
-    numDepTrueIndepTrue		<- nrow(snapshotData[snapshotData$DEP == TRUE & snapshotData$INDEP == TRUE,])
+    sumLocIndepTrue	<- sum(df$FUNCTION_LOC & df$INDEP_BOOL == TRUE)
+    sumDepvIndepTrue	<- sum(df$DEPV         & df$INDEP_BOOL == TRUE)
+
+    ratioIndepTrue	<- sumDepvIndepTrue / sumLocIndepTrue
+
+    sumLocIndepFalse	<- sum(df$FUNCTION_LOC & df$INDEP_BOOL == FALSE)
+    sumDepvIndepFalse	<- sum(df$DEPV         & df$INDEP_BOOL == FALSE)
+
+    ratioIndepFalse	<- sumDepvIndepFalse / sumLocIndepFalse
+
+    ##df[,'DEP']   <- df[,ixDep]   > 0
+
+    ##numFuncs <- nrow(df)
+    ##numIndepFalse	<- nrow(df[df$INDEP == FALSE,])
+    ##numIndepTrue	<- nrow(df[df$INDEP == TRUE,])
+
+    ##numDepTrueIndepFalse	<- nrow(df[df$DEP == TRUE & df$INDEP == FALSE,])
+    ##numDepTrueIndepTrue		<- nrow(df[df$DEP == TRUE & df$INDEP == TRUE,])
 
     ## ratio of functions with dep = true (e.g., function is
     ## fault-prone) given that indep = false (e.g., function is not
     ## smelly)
-    cleanRatio <- numDepTrueIndepFalse / numIndepFalse
+    ##cleanRatio <- numDepTrueIndepFalse / numIndepFalse
     
     ## ratio of functions with dep = true (e.g., function is
     ## fault-prone) given that indep = true (e.g., function is smelly)
-    dirtyRatio <- numDepTrueIndepTrue / numIndepTrue
+    ##dirtyRatio <- numDepTrueIndepTrue / numIndepTrue
 
-    return (c(cleanRatio,dirtyRatio))
+    ##return (c(cleanRatio,dirtyRatio))
+    return (c(ratioIndepFalse,ratioIndepTrue))
 }
 
 listOfSnapshotData <- lapply(inputFns, readSnapshotFile)
@@ -125,21 +151,21 @@ listOfRatios <- lapply(listOfSnapshotData, processSnapshot)
 ##listOfRatios
 
 df <- data.frame(Reduce(rbind, listOfRatios))
-df
+##df
 
 # Default width and height of PDFs is 7 inches
 pdf(file=outputFn,width=7,height=4)
 
 par(mfrow=c(1,1))
-plot(df[,1], type="l", col="blue", ylim=c(0,1),
+plot(df[,1], type="l", col="blue", #ylim=c(0,1),
      main=systemname,
      xlab=xAxisName,
      ylab=yAxisName, yaxt='n',
      cex.lab=axisNameFontScale,
      cex.main=plotNameFontScale)
-axis(2, at=yLabels, labels=yAxisLabels, las=1)
+##axis(2, at=yLabels, labels=yAxisLabels, las=1)
 par(new=TRUE)
-plot(df[,2], type="l", col="red", ylim=c(0,1),
+plot(df[,2], type="l", col="red", #ylim=c(0,1),
      xlab="", xaxt='n',
      ylab="", yaxt='n')
 
