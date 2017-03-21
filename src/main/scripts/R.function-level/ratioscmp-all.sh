@@ -2,21 +2,45 @@
 
 resultsdir=${1:-results}
 
+INDEPS=
+INDEPS+=" ABSmell"
+INDEPS+=" NOFL"
+INDEPS+=" NOFC_Dup"
+INDEPS+=" NONEST"
+
+DEPS=
+DEPS+=" BUGFIXES"
+DEPS+=" HUNKS"
+DEPS+=" COMMITS"
+
+SCALES=
+SCALES+=" none"
+SCALES+=" LOC"
+SCALES+=" COUNT"
+
+SYSTEMS=
+#SYSTEMS+=" Apache"
+#SYSTEMS+=" BusyBox"
+#SYSTEMS+=" OpenLDAP"
+#SYSTEMS+=" OpenVPN"
+#SYSTEMS+=" Pidgin"
+SYSTEMS+=" SQLite"
+
 err_combos=""
 err=0
 
-for indep in ABSmell NOFL NOFC_Dup NONEST
+for indep in $INDEPS
 do
-    for dep in BUGFIXES HUNKS COMMITS
+    for dep in $DEPS
     do
-	for scale in none LOC COUNT
+	for scale in $SCALES
 	do
 	    case $scale in
 		none) opt_ymax='';;
 		*) opt_ymax="--ymax=0.5";;
 	    esac
 	    
-	    for sys in Apache BusyBox OpenLDAP OpenVPN Pidgin SQLite
+	    for sys in $SYSTEMS
 	    do
 		# Only show Y-axis labels for some systems
 		case $sys in
