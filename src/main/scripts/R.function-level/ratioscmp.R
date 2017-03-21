@@ -147,6 +147,9 @@ readSnapshotFile <- function(inputFn) {
 }
 
 processSnapshot <- function(df) {
+    snapshotNo <- df$SNAPSHOT[1]
+    snapshotDate <- df$SNAPSHOT_DATE[1]
+    
     ixLoc		<- which( colnames(df)=="FUNCTION_LOC")
     ##ixHunks		<- which( colnames(df)=="HUNKS")
     ##ixCommits		<- which( colnames(df)=="COMMITS")
@@ -180,14 +183,16 @@ processSnapshot <- function(df) {
     scaleIndepTrue	<- computeScaleBy(df, TRUE)
     sumDepvIndepTrue	<- sum(df$DEPV & df$INDEP_BOOL == TRUE)
 
-    if (scaleIndepFalse == 0) {
+    if (is.na(scaleIndepFalse) || (scaleIndepFalse == 0)) {
         resIndepFalse	<- NaN
+        cat(paste("WARNING: ", "Invalid scale factor for indep=false values in snapshot ", snapshotDate, ": ", scaleIndepFalse, "\n", sep=""))
     } else {
         resIndepFalse	<- sumDepvIndepFalse / scaleIndepFalse
     }
 
-    if (scaleIndepTrue == 0) {
+    if (is.na(scaleIndepTrue) || (scaleIndepTrue == 0)) {
         resIndepTrue	<- NaN
+        cat(paste("WARNING: ", "Invalid scale factor for indep=true values in snapshot ", snapshotDate, ": ", scaleIndepTrue, "\n", sep=""))
     } else {
         resIndepTrue	<- sumDepvIndepTrue / scaleIndepTrue
     }
@@ -212,8 +217,7 @@ processSnapshot <- function(df) {
 
     ##return (c(cleanRatio,dirtyRatio))
 
-    snapshot <- df$SNAPSHOT[1]
-    r <- data.frame(CommitWindow=c(snapshot,snapshot),
+    r <- data.frame(CommitWindow=c(snapshotNo,snapshotNo),
                     Value=c(resIndepFalse, resIndepTrue),
                     Marker=c(0,1))
     
@@ -221,6 +225,8 @@ processSnapshot <- function(df) {
 }
 
 listOfSnapshotData <- lapply(inputFns, readSnapshotFile)
+
+##warnings()
 
 ## returns a list of cleanRatio, dirtyRatio pairs
 listOfValueFrames <- lapply(listOfSnapshotData, processSnapshot)
