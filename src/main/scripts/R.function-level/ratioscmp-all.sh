@@ -3,10 +3,10 @@
 resultsdir=${1:-results}
 
 INDEPS=
-INDEPS+=" ABSmell"
+#INDEPS+=" ABSmell"
 INDEPS+=" NOFL"
 INDEPS+=" NOFC_Dup"
-INDEPS+=" NONEST"
+#INDEPS+=" NONEST"
 
 DEPS=
 DEPS+=" BUGFIXES"
@@ -14,9 +14,9 @@ DEPS+=" HUNKS"
 DEPS+=" COMMITS"
 
 SCALES=
-SCALES+=" none"
+#SCALES+=" none"
 SCALES+=" LOC"
-SCALES+=" COUNT"
+#SCALES+=" COUNT"
 
 SYSTEMS=
 #SYSTEMS+=" Apache"

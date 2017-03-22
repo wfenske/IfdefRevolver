@@ -105,6 +105,9 @@ plotNameFontScale <- 1.75
 parseScaleOptValue <- function(value) {
     if ( value == "LOC" ) {
         computeScaleBy <<- function(df, indepValue) {
+            cat("XXX\n")
+            df$FUNCTION_LOC
+            cat("YYY\n")
             return ( sum(df$FUNCTION_LOC & df$INDEP_BOOL == indepValue) )
         }
 
@@ -139,9 +142,28 @@ if ( opts$noyaxislabels ) {
 snapshotIx <- 1
 
 readSnapshotFile <- function(inputFn) {
-    snapshotData <- read.csv(inputFn, head=TRUE, sep=",")
+    snapshotData <- read.csv(inputFn, header=TRUE, sep=",",
+                             colClasses=c(
+                                 "SNAPSHOT_DATE"="character"
+                               , "FUNCTION_SIGNATUE"="string"
+                               , "FUNCTION_LOC"="numeric"
+                               , "HUNKS"="numeric"
+                               , "COMMITS"="numeric"
+                               , "BUGFIXES"="numeric"
+                               , "LINE_DELTA"="numeric"
+                               , "LINES_DELETD"="numeric"
+                               , "LINES_ADDED"="numeric"
+                               , "LOAC"="numeric"
+                               , "LOFC"="numeric"
+                               , "NOFL"="numeric"
+                               , "NOFC_Dup"="numeric"
+                               , "NOFC_NonDup"="numeric"
+                               , "NONEST"="numeric"))
+    cat(snapshotData$SNAPSHOT_DATE[1], "\n")
     snapshotData["SNAPSHOT"] <- snapshotIx
     ## Change the value of the global variable using <<-
+    ##cat(str(max(as.numeric(snapshotData$FUNCTION_LOC), na.rm=T)))
+    ##cat(str(max(snapshotData$FUNCTION_LOC), na.rm=T))
     snapshotIx <<- snapshotIx + 1
     return (snapshotData)
 }
