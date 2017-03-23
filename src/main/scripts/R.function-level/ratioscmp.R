@@ -105,9 +105,6 @@ plotNameFontScale <- 1.75
 parseScaleOptValue <- function(value) {
     if ( value == "LOC" ) {
         computeScaleBy <<- function(df, indepValue) {
-            cat("XXX\n")
-            df$FUNCTION_LOC
-            cat("YYY\n")
             return ( sum(df$FUNCTION_LOC & df$INDEP_BOOL == indepValue) )
         }
 
