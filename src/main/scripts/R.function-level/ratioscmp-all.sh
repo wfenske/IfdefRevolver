@@ -3,9 +3,10 @@
 resultsdir=${1:-results}
 
 INDEPS=
-INDEPS+=" ABSmell"
+#INDEPS+=" ABSmell"
 INDEPS+=" NOFL"
 INDEPS+=" NOFC_Dup"
+INDEPS+=" NOFC_NonDup"
 INDEPS+=" NONEST"
 
 DEPS=
@@ -14,16 +15,16 @@ DEPS+=" HUNKS"
 DEPS+=" COMMITS"
 
 SCALES=
-SCALES+=" none"
+#SCALES+=" none"
 SCALES+=" LOC"
 SCALES+=" COUNT"
 
 SYSTEMS=
-#SYSTEMS+=" Apache"
+SYSTEMS+=" Apache"
 #SYSTEMS+=" BusyBox"
-#SYSTEMS+=" OpenLDAP"
+ESYSTEMS+=" OpenLDAP"
 #SYSTEMS+=" OpenVPN"
-#SYSTEMS+=" Pidgin"
+SYSTEMS+=" Pidgin"
 SYSTEMS+=" SQLite"
 
 err_combos=""
@@ -36,16 +37,18 @@ do
 	for scale in $SCALES
 	do
 	    case $scale in
-		none) opt_ymax='';;
-		*) opt_ymax="--ymax=0.5";;
+		##LOC|COUNT) opt_ymax="--ymax=1.0";;
+		*) opt_ymax='';;
 	    esac
 	    
 	    for sys in $SYSTEMS
 	    do
 		# Only show Y-axis labels for some systems
 		case $sys in
-		    Apache|OpenVPN) opt_omit_y_axis=;;
-		    *)              opt_omit_y_axis="-Y";;
+		    Apache|OpenVPN) ##opt_omit_y_axis=
+				    ;;
+		    *)              ##opt_omit_y_axis="-Y"
+				    ;;
 		esac
 
 		combo="$indep -> $dep/$scale in $sys"
