@@ -104,16 +104,9 @@ plotNameFontScale <- 1.75
 
 parseScaleOptValue <- function(value) {
     if ( value == "LOC" ) {
-        computeScaleBy <<- function(df, indepValue, biggerThanP) {
-###            if (biggerThanP) {
-###                return ( sum(df$FUNCTION_LOC & df$INDEPV > indepValue) )
-###            }
-###            else {
-###                return ( sum(df$FUNCTION_LOC & df$INDEPV == indepValue) )
-###            }
-            
-            if (biggerThanP) {
-                dfSubset <- subset(df, INDEPV > indepValue)
+        computeScaleBy <<- function(df, indepValue, includeBiggerP) {
+            if (includeBiggerP) {
+                dfSubset <- subset(df, INDEPV >= indepValue)
             } else {
                 dfSubset <- subset(df, INDEPV == indepValue)
             }
@@ -122,9 +115,9 @@ parseScaleOptValue <- function(value) {
 
         yAxisScaleSuffix <<- "/LOC"
     } else if ( value == "COUNT" ) {
-        computeScaleBy <<- function(df, indepValue, biggerThanP) {
-            if (biggerThanP) {
-                return ( sum(df$INDEPV > indepValue) )
+        computeScaleBy <<- function(df, indepValue, includeBiggerP) {
+            if (includeBiggerP) {
+                return ( sum(df$INDEPV >= indepValue) )
             } else {
                 return ( sum(df$INDEPV == indepValue) )
             }
@@ -132,7 +125,7 @@ parseScaleOptValue <- function(value) {
         
         yAxisScaleSuffix <<- "/FUNCTION"
     } else if ( value == "none" ) {
-        computeScaleBy <<- function(df, indepValue, biggerThanP) {
+        computeScaleBy <<- function(df, indepValue, includeBiggerP) {
             return (1)
         }
         
@@ -181,11 +174,11 @@ readSnapshotFile <- function(inputFn) {
     return (snapshotData)
 }
 
-computeIndepValue <- function(df, valIndep, biggerThanP=FALSE) {
-    scaleIndep		<- computeScaleBy(df, valIndep, biggerThanP)
-    if (biggerThanP) {
-        ##sumDepvIndep	<- sum(df$DEPV & df$INDEPV > valIndep)
-        dfSubset	<- subset(df, INDEPV > valIndep)
+computeIndepValue <- function(df, valIndep, includeBiggerP=FALSE) {
+    scaleIndep		<- computeScaleBy(df, valIndep, includeBiggerP)
+    if (includeBiggerP) {
+        ##sumDepvIndep	<- sum(df$DEPV & df$INDEPV >= valIndep)
+        dfSubset	<- subset(df, INDEPV >= valIndep)
     } else {
         ##sumDepvIndep	<- sum(df$DEPV & df$INDEPV == valIndep)
         dfSubset	<- subset(df, INDEPV == valIndep)
@@ -197,12 +190,12 @@ computeIndepValue <- function(df, valIndep, biggerThanP=FALSE) {
     ##cat(paste((df$DEPV & df$INDEPV == valIndep), "\n", sep=""))
 
 ###    cat(paste("DEBUG: ", df$SNAPSHOT_DATE[1], ": sum(", opts$dependent, ") where ",
-###              opts$independent, (if (biggerThanP) '>' else '=' ), valIndep,
+###              opts$independent, (if (includeBiggerP) '>=' else '=' ), valIndep,
 ###              " = ", sumDepvIndep, "\n", sep=""))
 
     if (is.na(scaleIndep) || (scaleIndep == 0)) {
         snapshotDate <- df$SNAPSHOT_DATE[1]
-        cmp <- if (biggerThanP) '>' else '=='
+        cmp <- if (includeBiggerP) '>=' else '=='
         cat(paste("WARNING: ", "Invalid scale factor for indep", cmp, valIndep,
                   " values in snapshot ",
                   snapshotDate, ": ", scaleIndep, "\n", sep=""))
@@ -216,66 +209,30 @@ processSnapshot <- function(df) {
     snapshotNo <- df$SNAPSHOT[1]
     snapshotDate <- df$SNAPSHOT_DATE[1]
     
-    ###ixLoc		<- which( colnames(df)=="FUNCTION_LOC")
-    ##ixHunks		<- which( colnames(df)=="HUNKS")
-    ##ixCommits		<- which( colnames(df)=="COMMITS")
-    ##ixBugfixes	<- which( colnames(df)=="BUGFIXES")
-    ##ixAbSmell		<- which( colnames(df)=="ABSmell")
-    ##ixLoac		<- which( colnames(df)=="LOAC")
-    ##ixLofc		<- which( colnames(df)=="LOFC")
-    ##ixNolf		<- which( colnames(df)=="NOFL")
-    ##ixNofcDup		<- which( colnames(df)=="NOFC_Dup")
-    ##ixNofcNonDup	<- which( colnames(df)=="NOFC_NonDup")
-
     ## Replace all missing values with zeroes
     df[is.na(df)] <- 0.0
 
-    ##ixIndep <- ixAbSmell
-    ##ixDep <- ixBugfixes
     ixIndep <- which( colnames(df)==opts$independent )
     ixDep   <- which( colnames(df)==opts$dependent )
 
     df$INDEPV	<- df[,ixIndep]
     df$DEPV	<- df[,ixDep]
 
-    ## e.g., INDEP=NOFL, DEP=HUNKS
-    ##df$INDEP_BOOL	<- df$INDEPV > 0 ## e.g., NOLF > 0
-
-    ##df[,'DEP']   <- df[,ixDep]   > 0
-
-    ##numFuncs <- nrow(df)
-    ##numIndepFalse	<- nrow(df[df$INDEP == FALSE,])
-    ##numIndepTrue	<- nrow(df[df$INDEP == TRUE,])
-
-    ##numDepTrueIndepFalse	<- nrow(df[df$DEP == TRUE & df$INDEP == FALSE,])
-    ##numDepTrueIndepTrue		<- nrow(df[df$DEP == TRUE & df$INDEP == TRUE,])
-
-    ## ratio of functions with dep = true (e.g., function is
-    ## fault-prone) given that indep = false (e.g., function is not
-    ## smelly)
-    ##cleanRatio <- numDepTrueIndepFalse / numIndepFalse
-    
-    ## ratio of functions with dep = true (e.g., function is
-    ## fault-prone) given that indep = true (e.g., function is smelly)
-    ##dirtyRatio <- numDepTrueIndepTrue / numIndepTrue
-
-    ##return (c(cleanRatio,dirtyRatio))
-
     r <- data.frame(CommitWindow=c(snapshotNo
                                  , snapshotNo
-                                        #, snapshotNo
+                                 , snapshotNo
                                         #, snapshotNo
                                         #, snapshotNo
                                    ),
                     Value=c(computeIndepValue(df, 0)
-                          , computeIndepValue(df, 1, TRUE)
-                          ##, computeIndepValue(df, 2)
+                          , computeIndepValue(df, 1)
+                          , computeIndepValue(df, 2, TRUE)
                           ##, computeIndepValue(df, 3),
                           ##, computeIndepValue(df, 3, TRUE)
                             ),
-                    Marker=c('0'
-                           , '>0'
-                             ##, '2'
+                    Marker=c('=0'
+                           , '=1'
+                           , '>1'
                              ##, '3'
                              ##, '>3'
                              ))
@@ -293,21 +250,6 @@ combinedValueFrame <- Reduce(rbind, listOfValueFrames)
 
 ## Default width and height of PDFs is 7 inches
 pdf(file=outputFn,width=7,height=4)
-##p <- ggplot(combinedValueFrame,
-##            aes(x=CommitWindow, colour=Marker)) +
-##    geom_density() +
-##    ggtitle(paste(yAxisName, " in ", systemname, sep=""))
-myAes <-aes(x=CommitWindow, y=Value)
-plotData <- list(subset(combinedValueFrame, Marker=='0')
-               , subset(combinedValueFrame, Marker=='>0')
-               ##, subset(combinedValueFrame, Marker=='2')
-               ##, subset(combinedValueFrame, Marker=='3')
-               ##, subset(combinedValueFrame, Marker=='>3')
-                 )
-smoothMethod <- "loess"
-smoothSize <- 1
-showSE <- FALSE
-colors <- heat.colors(length(plotData))
 
 ## See http://www.sthda.com/english/wiki/ggplot2-point-shapes for more
 ## shapes for geom_point
@@ -318,39 +260,28 @@ shapes <- list(16 # 16=a black, filled dot
              , 20
                )
 
-addPlot <- function(p, n) {
-    shape <- shapes[[n]]
-    data <- plotData[[n]]
-    color <- colors[[n]]
-    return (p +
-            geom_point(data=data, myAes, shape=shape) + 
-            geom_smooth(data=data
-                      , myAes, colour=color, fill=color, se=showSE
-                      , size=smoothSize
-                      , method=smoothMethod
-                        ))
-}
+p <- ggplot(data=combinedValueFrame, aes(x=CommitWindow, y=Value,
+                                         group=Marker, shape=Marker,
+                                         colour=Marker)) +
+    geom_point() +
+    geom_smooth(
+        se=FALSE
+      , size=0.85 # line thickness
+      , method="loess" # loess is the default for datasets with n<1000 anyway
+      , span = 0.5 # amount of smoothness; defaults to 0.75; bigger = smoother
+    )
 
-p <- ggplot()
-p <- addPlot(p, 1)
-p <- addPlot(p, 2)
-##p <- addPlot(p, 3)
-##p <- addPlot(p, 4)
-##p <- addPlot(p, 5)
-##    ## blue plot
-##    geom_point(data=d0, myAes, shape=shape0) + 
-##    geom_smooth(data=d0
-##              , myAes, colour=colors[1], fill=colors[1], se=showSE
-##              , size=smoothSize
-##              , method=smoothMethod
-##                ) +
-##    ## red plot
-##    geom_point(data=d1, myAes, shape=shape1) + 
-##    geom_smooth(data=d1
-##              , myAes,  colour=colors[2], fill=color[2], se=showSE
-##              , size=smoothSize
-##              , method=smoothMethod
-##                ) +
+p <- p +
+    scale_colour_discrete(name=opts$independent) +
+    scale_shape_discrete(name =opts$independent)
+
+##scaleColorList <- lapply(seq(1, length(plotData)), getLegendColorTranslationElt)
+##scaleColorDf <- Reduce(rbind, scaleColorList)
+
+##p <- p +
+##    scale_color_manual("" # what's that for?
+##                       , breaks=scaleColorDf$breaks
+##                       , values=scaleColorDf$values)
 
 ## Other graph settings
 p <- p +
