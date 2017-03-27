@@ -15,20 +15,20 @@ DEPS+=" HUNKS"
 DEPS+=" COMMITS"
 
 SCALES=
-#SCALES+=" none"
+SCALES+=" none"
 SCALES+=" LOC"
 SCALES+=" COUNT"
 
 SYSTEMS=
 SYSTEMS+=" Apache"
 #SYSTEMS+=" BusyBox"
-ESYSTEMS+=" OpenLDAP"
+#SYSTEMS+=" OpenLDAP"
 #SYSTEMS+=" OpenVPN"
-SYSTEMS+=" Pidgin"
-SYSTEMS+=" SQLite"
+#SYSTEMS+=" Pidgin"
+#SYSTEMS+=" SQLite"
 
 err_combos=""
-err=0
+combo_err=0
 
 for indep in $INDEPS
 do
@@ -71,7 +71,7 @@ do
 		    else
 			err_combos=$(printf '%s\n%s\n' "$err_combos" "$combo")
 		    fi
-		    err=$(( $err + 1 ))
+		    combo_err=$(( $combo_err + 1 ))
 		    break
 		fi
 	    done
@@ -82,14 +82,14 @@ do
     test $combo_err -gt 3 && break
 done
 
-if [ $err -eq 0 ]
+if [ $combo_err -eq 0 ]
 then
     echo "Successfully created all plots." >&2
 else
-    echo "$err error(s) occurred." >&2
+    echo "$combo_err error(s) occurred." >&2
     echo "Errors occurred plotting the following combinations:" >&2
     printf '%s\n' "$err_combos" >&2
-    exit $err
+    exit $combo_err
 fi
 
 ##printf " cropping ..."
