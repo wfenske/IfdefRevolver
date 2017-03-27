@@ -10,22 +10,22 @@ INDEPS+=" NOFC_NonDup"
 INDEPS+=" NONEST"
 
 DEPS=
-DEPS+=" BUGFIXES"
+#DEPS+=" BUGFIXES"
 DEPS+=" HUNKS"
 DEPS+=" COMMITS"
 
 SCALES=
-SCALES+=" none"
+#SCALES+=" none"
 SCALES+=" LOC"
 SCALES+=" COUNT"
 
 SYSTEMS=
 SYSTEMS+=" Apache"
-#SYSTEMS+=" BusyBox"
-#SYSTEMS+=" OpenLDAP"
+SYSTEMS+=" BusyBox"
+SYSTEMS+=" OpenLDAP"
 #SYSTEMS+=" OpenVPN"
-#SYSTEMS+=" Pidgin"
-#SYSTEMS+=" SQLite"
+SYSTEMS+=" Pidgin"
+SYSTEMS+=" SQLite"
 
 err_combos=""
 combo_err=0
@@ -36,28 +36,32 @@ do
     do
 	for scale in $SCALES
 	do
-	    case $scale in
-		##LOC|COUNT) opt_ymax="--ymax=1.0";;
+###	    case $scale in
+###		##LOC|COUNT) opt_ymax="--ymax=1.0";;
+###		*) opt_ymax='';;
+###	    esac
+	    case ${dep}/${scale} in
+		HUNKS/LOC) opt_ymax="--ymax=0.2";;
 		*) opt_ymax='';;
 	    esac
 	    
 	    for sys in $SYSTEMS
 	    do
-		# Only show Y-axis labels for some systems
-		case $sys in
-		    Apache|OpenVPN) ##opt_omit_y_axis=
-				    ;;
-		    *)              ##opt_omit_y_axis="-Y"
-				    ;;
-		esac
+###		# Only show Y-axis labels for some systems
+###		case $sys in
+###		    Apache|OpenVPN) ##opt_omit_y_axis=
+###				    ;;
+###		    *)              ##opt_omit_y_axis="-Y"
+###				    ;;
+###		esac
 
 		combo="$indep -> $dep/$scale in $sys"
 		echo "Plotting $indep -> $dep/$scale in $sys"
 		sysdir=$(echo "$sys"|tr '[[:upper:]]' '[[:lower:]]')
-		ratioscmp.R $opt_ymax \
-			    --independent=$indep \
+		ratioscmp.R --independent=$indep \
 			    --dependent=$dep \
 			    --scale=$scale \
+			    $opt_ymax \
 			    --systemname=$sys \
 			    -s $resultsdir/$sysdir
 		combo_err=$?
@@ -76,6 +80,9 @@ do
 		fi
 	    done
 	    test $combo_err -gt 3 && break
+	    pdfjam-slides6up -o summary-ratios-${indep}-${dep}.${scale}.pdf \
+			     --landscape \
+			     ratios-${indep}-${dep}.${scale}-*.pdf
 	done
 	test $combo_err -gt 3 && break
     done
