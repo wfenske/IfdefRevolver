@@ -9,11 +9,13 @@ import java.util.Date;
  * @author wfenske
  */
 public class Commit implements Comparable<Commit> {
+    private final int sortIndex;
     private final String hash;
     private final Date date;
     private final boolean bugfix;
 
-    public Commit(String hash, Date date, boolean bugfix) {
+    public Commit(int sortIndex, String hash, Date date, boolean bugfix) {
+        this.sortIndex = sortIndex;
         this.hash = hash;
         this.date = date;
         this.bugfix = bugfix;
@@ -65,9 +67,10 @@ public class Commit implements Comparable<Commit> {
 
     @Override
     public int compareTo(Commit o) {
-        int cmp = this.getDate().compareTo(o.getDate());
-        if (cmp != 0)
-            return cmp;
-        return this.getHash().compareTo(o.getHash());
+//        int cmp = this.getDate().compareTo(o.getDate());
+//        if (cmp != 0)
+//            return cmp;
+//        return this.getHash().compareTo(o.getHash());
+        return this.sortIndex - o.sortIndex;
     }
 }

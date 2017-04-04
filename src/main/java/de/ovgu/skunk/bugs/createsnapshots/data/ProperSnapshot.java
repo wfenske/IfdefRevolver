@@ -37,16 +37,9 @@ public class ProperSnapshot implements ISnapshot {
     }
 
     @Override
-    public void validate(int expectedNumberOfBugFixes) throws AssertionError {
-        int fixes = 0;
-        for (Commit c : commits.keySet()) {
-            if (c.isBugfix()) {
-                fixes++;
-            }
-        }
-
-        if (fixes != expectedNumberOfBugFixes) {
-            throw new AssertionError("Snapshot contains " + fixes + " bug fix(es), expected " + expectedNumberOfBugFixes
+    public void validate(int expectedNumberOfCommits) throws AssertionError {
+        if (commits.size() != expectedNumberOfCommits) {
+            throw new AssertionError("Snapshot contains " + commits.size() + " commits, expected " + expectedNumberOfCommits
                     + ". Commits: " + commits.keySet());
         }
     }

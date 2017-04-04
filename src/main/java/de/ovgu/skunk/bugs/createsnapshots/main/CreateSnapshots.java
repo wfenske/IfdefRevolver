@@ -28,7 +28,9 @@ public class CreateSnapshots {
         /**
          * Number of bug-fixes that a commit window should contain
          */
-        public static final int DEFAULT_COMMIT_WINDOW_SIZE_IN_NUMBER_OF_BUGFIXES = 100;
+        //public static final int DEFAULT_COMMIT_WINDOW_SIZE_IN_NUMBER_OF_BUGFIXES = 100;
+        public static final int DEFAULT_COMMIT_WINDOW_SIZE = 200;
+
         private final SimpleDateFormat dateFormatter = new SimpleDateFormat("yyyy-MM-dd");
         private String reposDir = null;
 
@@ -40,6 +42,11 @@ public class CreateSnapshots {
         public SkunkMode skunkMode = null;
         public Smell smell = null;
         public boolean optimized = false;
+
+        /**
+         * Number of commits that make up a commit window
+         */
+        private int commitWindowSize = DEFAULT_COMMIT_WINDOW_SIZE;
 
         public String smellModeFile() {
             return smell.fileName;
@@ -59,8 +66,15 @@ public class CreateSnapshots {
             return new File(snapshotsDir, getProject());
         }
 
-        public int commitWindowSizeInNumberOfBugfixes() {
-            return DEFAULT_COMMIT_WINDOW_SIZE_IN_NUMBER_OF_BUGFIXES;
+        //public int commitWindowSizeInNumberOfBugfixes() {
+        //    return DEFAULT_COMMIT_WINDOW_SIZE_IN_NUMBER_OF_BUGFIXES;
+        //}
+        public int commitWindowSize() {
+            return commitWindowSize;
+        }
+
+        public void setCommitWindowSize(int commitWindowSize) {
+            this.commitWindowSize = commitWindowSize;
         }
 
         public synchronized File tmpSnapshotDir(Date snapshotDate) {
@@ -563,7 +577,7 @@ public class CreateSnapshots {
         this.conf = this.parseCommandLineArgs(args);
         final ISkunkModeStrategy skunkStrategy = conf.skunkMode.getNewStrategyInstance(conf);
 
-        revisionsReader = new RevisionsCsvReader(conf.revisionCsvFile(), conf.commitWindowSizeInNumberOfBugfixes());
+        revisionsReader = new RevisionsCsvReader(conf.revisionCsvFile(), conf.commitWindowSize());
         revisionsReader.readAllRevisionsAndComputeSnapshots();
         applyStrategyToSnapshots(skunkStrategy);
     }
@@ -871,11 +885,17 @@ public class CreateSnapshots {
     // mutex groupof options controlling how Skunk is called
     private static final String OPT_CHECKOUT_L = "checkout";
     private static final String OPT_PREPROCESS_L = "preprocess";
-    private static final String OPT_DETECT_L = "detect";
     /**
-     * --smell=AB|AF|LF
+     * --detect=AB|AF|LF
      */
-    private static final String OPT_SMELL = "s";
+    private static final String OPT_DETECT_L = "detect";
+
+    /**
+     * Size of a commit window, requires positive integer argument
+     */
+    private static final String OPT_COMMIT_WINDOW_SIZE_L = "windowsize";
+    private static final char OPT_COMMIT_WINDOW_SIZE = 's';
+
     /**
      * Optional flag for optimizing some unknown magical stuff
      */
@@ -969,11 +989,21 @@ public class CreateSnapshots {
                     "Either `--" + OPT_CHECKOUT_L + "', `--" + OPT_PREPROCESS_L + "' or `--" + OPT_DETECT_L + "' must be specified!");
         }
 
+        if (line.hasOption(OPT_COMMIT_WINDOW_SIZE)) {
+            if (res.skunkMode != SkunkMode.CHECKOUT) {
+                LOG.warn("Ignoring custom commit window size because `--" + OPT_CHECKOUT_L + "' was not specified.");
+            } else {
+                int windowSizeNum = parseCommitWindowSizeOrDie(line);
+                res.setCommitWindowSize(windowSizeNum);
+            }
+        }
+
         ProjectInformationConfig.parseProjectNameFromCommandLine(line, res);
         ProjectInformationConfig.parseSnapshotsDirFromCommandLine(line, res);
         ProjectInformationConfig.parseProjectResultsDirFromCommandLine(line, res);
 
         res.optimized = line.hasOption(OPT_OPTIMIZED);
+
         final String reposDirName;
         if (line.hasOption(OPT_REPOS_DIR_L)) {
             reposDirName = line.getOptionValue(OPT_REPOS_DIR_L);
@@ -998,6 +1028,22 @@ public class CreateSnapshots {
         }
 
         return res;
+    }
+
+    private int parseCommitWindowSizeOrDie(CommandLine line) {
+        String windowSizeString = line.getOptionValue(OPT_COMMIT_WINDOW_SIZE);
+        int windowSizeNum;
+        try {
+            windowSizeNum = Integer.valueOf(windowSizeString);
+        } catch (NumberFormatException e) {
+            throw new RuntimeException("Invalid value for option `--" + OPT_COMMIT_WINDOW_SIZE_L
+                    + "': Not a valid integer: " + windowSizeString);
+        }
+        if (windowSizeNum < 1) {
+            throw new RuntimeException("Invalid value for option `--" + OPT_COMMIT_WINDOW_SIZE_L
+                    + "': Commit window size must be an integer >= 1.");
+        }
+        return windowSizeNum;
     }
 
     private void parseSmellDetectionArgs(Config res, CommandLine line) {
@@ -1043,8 +1089,13 @@ public class CreateSnapshots {
         Options options = new Options();
         // @formatter:off
         // --help= option
-        options.addOption(Option.builder(String.valueOf(OPT_HELP)).longOpt("help")
-                .desc("print this help screen and exit").build());
+
+
+        options.addOption(ProjectInformationConfig.helpCommandLineOption());
+
+        options.addOption(ProjectInformationConfig.projectNameCommandLineOption(required));
+        options.addOption(ProjectInformationConfig.snapshotsDirCommandLineOption());
+        options.addOption(ProjectInformationConfig.resultsDirCommandLineOption());
 
         options.addOption(
                 Option.builder().longOpt(OPT_SMELL_CONFIGS_DIR_L)
@@ -1059,25 +1110,19 @@ public class CreateSnapshots {
                         + "') can be found." + " [Default=" + Config.DEFAULT_REPOS_DIR_NAME + "]")
                 .hasArg().argName("DIR").build());
 
-        options.addOption(Option.builder(String.valueOf(OPT_PROJECT)).longOpt(OPT_PROJECT_L)
-                .desc("Name of the project to be analyzed; must specify an existing git folder below the folder given via `--"
-                        + OPT_REPOS_DIR_L + "'.")
-                .hasArg().argName("DIR").required(required).build());
 
-        options.addOption(Option.builder().longOpt(OPT_SNAPSHOTS_DIR_L).desc(
-                "Snapshots will be created in this directory." + " [Default=" + Config.DEFAULT_SNAPSHOTS_DIR_NAME + "]")
-                .hasArg().argName("DIR").build());
-
-        options.addOption(Option.builder().longOpt(OPT_RESULTS_DIR_L)
-                .desc("Directory where to put results." + " [Default=" + Config.DEFAULT_RESULTS_DIR_NAME + "]").hasArg()
-                .argName("DIR").build());
+        options.addOption(Option.builder(String.valueOf(OPT_COMMIT_WINDOW_SIZE)).longOpt(OPT_COMMIT_WINDOW_SIZE_L)
+                .desc("Size of a commit window, specified as a positive integer. This option is only relevant during" +
+                        " snapshot creation, i.e., when running in `--" + OPT_CHECKOUT_L
+                        + "' mode." + " [Default=" + Config.DEFAULT_COMMIT_WINDOW_SIZE + "]")
+                .hasArg().argName("NUM").build());
 
         // --checkout, --preprocess and --detect options
         OptionGroup skunkModeOptions = new OptionGroup();
         skunkModeOptions.setRequired(required);
 
         skunkModeOptions.addOption(Option.builder().longOpt(OPT_CHECKOUT_L)
-                .desc("Run Skunk on fresh set of sources, for which no analysis has been performed, yet.")
+                .desc("Create snapshots from the specified repository and convert them to srcML using cppstats.")
                 .build());
         skunkModeOptions.addOption(Option.builder().longOpt(OPT_PREPROCESS_L)
                 .desc("Preprocess cppstats files using Skunk.  Requires a previous run of this"

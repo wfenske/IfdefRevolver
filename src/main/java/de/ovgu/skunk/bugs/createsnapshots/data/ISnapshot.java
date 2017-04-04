@@ -15,11 +15,11 @@ import java.util.SortedMap;
 public interface ISnapshot {
 
     /**
-     * @param expectedNumberOfBugfixes Number of expected bug-fix commits
+     * @param expectedNumberOfCommits Number of expected commits
      * @throws AssertionError if the snapshot does not contain the specified number of
-     *                        bug-fix commits
+     *                        commits
      */
-    void validate(int expectedNumberOfBugfixes) throws AssertionError;
+    void validate(int expectedNumberOfCommits) throws AssertionError;
 
     /**
      * @return The hash of the git commit that should be checked out to get the
