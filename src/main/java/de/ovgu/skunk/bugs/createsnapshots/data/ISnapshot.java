@@ -15,13 +15,6 @@ import java.util.SortedMap;
 public interface ISnapshot {
 
     /**
-     * @param expectedNumberOfCommits Number of expected commits
-     * @throws AssertionError if the snapshot does not contain the specified number of
-     *                        commits
-     */
-    void validate(int expectedNumberOfCommits) throws AssertionError;
-
-    /**
      * @return The hash of the git commit that should be checked out to get the
      * source code of this snapshot. If this is the {@link NullSnapshot}
      * , <code>null</code> is returned, otherwise, the return value is

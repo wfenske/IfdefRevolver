@@ -25,15 +25,6 @@ public class NullSnapshot implements ISnapshot {
     }
 
     @Override
-    public void validate(int expectedNumberOfBugfixes) throws AssertionError {
-        if (expectedNumberOfBugfixes != 0) {
-            throw new AssertionError(
-                    "The null-snapshot contains exactly 0 commits (bug-fix or otherwise). Caller expected "
-                            + expectedNumberOfBugfixes + " bug-fix commit(s).");
-        }
-    }
-
-    @Override
     public Date revisionDate() {
         return null;
     }

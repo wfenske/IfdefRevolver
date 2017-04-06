@@ -36,14 +36,6 @@ public class ProperSnapshot implements ISnapshot {
         this.sortIndex = sortIndex;
     }
 
-    @Override
-    public void validate(int expectedNumberOfCommits) throws AssertionError {
-        if (commits.size() != expectedNumberOfCommits) {
-            throw new AssertionError("Snapshot contains " + commits.size() + " commits, expected " + expectedNumberOfCommits
-                    + ". Commits: " + commits.keySet());
-        }
-    }
-
     private Commit representativeCommit() {
         return commits.firstKey();
     }

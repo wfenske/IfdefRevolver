@@ -3,6 +3,8 @@ package de.ovgu.skunk.bugs.createsnapshots.input;
 import de.ovgu.skunk.bugs.createsnapshots.data.Commit;
 import de.ovgu.skunk.bugs.createsnapshots.data.FileChange;
 import de.ovgu.skunk.bugs.createsnapshots.data.ProperSnapshot;
+import de.ovgu.skunk.bugs.createsnapshots.main.CommitWindowSizeMode;
+import de.ovgu.skunk.bugs.createsnapshots.main.CreateSnapshots;
 import de.ovgu.skunk.bugs.minecommits.RevisionsFullColumns;
 import de.ovgu.skunk.commitanalysis.IHasSnapshotFilter;
 import de.ovgu.skunk.detection.output.CsvEnumUtils;
@@ -20,13 +22,6 @@ public class RevisionsCsvReader {
     private static Logger LOG = Logger.getLogger(RevisionsCsvReader.class);
 
     private final File revisionsCsv;
-    private final int commitWindowSizeX;
-
-    // Liste für geänderte Dateien
-    // private SortedMap<FileChange, String> changedFiles = new
-    // TreeMap<FileChange, String>();
-    // Liste für jeden x-ten Bugfix Commit
-    // private SortedMap<Date, String> bugHashes = new TreeMap<Date, String>();
 
     private SortedMap<Commit, Set<FileChange>> fileChangesByCommit;
     private List<ProperSnapshot> snapshots;
@@ -36,20 +31,13 @@ public class RevisionsCsvReader {
      *
      * @param revisionsCsv the path of the revisionsFull.csv
      */
-    public RevisionsCsvReader(File revisionsCsv, int commitWindowSize) {
+    public RevisionsCsvReader(File revisionsCsv) {
         this.revisionsCsv = revisionsCsv;
-        this.commitWindowSizeX = commitWindowSize;
     }
 
-    public void readAllRevisionsAndComputeSnapshots() {
-        fileChangesByCommit = new TreeMap<>();
-
-        readAllFileChanges();
-        computeSnapshots();
-    }
-
-    private int readAllFileChanges() {
+    public int readAllCommits() {
         LOG.info("Reading all file changes in " + this.revisionsCsv.getAbsolutePath());
+        fileChangesByCommit = new TreeMap<>();
 
         Map<String, Commit> commitsByHash = new HashMap<>();
 
@@ -163,20 +151,22 @@ public class RevisionsCsvReader {
         }
     }
 
-    private void computeSnapshots() {
+    public void computeSnapshots(CreateSnapshots.Config conf) {
         LOG.info("Computing snapshots from " + revisionsCsv.getAbsolutePath());
         snapshots = new ArrayList<>();
+        final CommitWindowSizeMode commitWindowSizeMode = conf.commitWindowSizeMode();
+        final int commitWindowSize = conf.commitWindowSize();
 
-        if (commitWindowSizeX <= 0) {
-            throw new IllegalArgumentException("Invalid commit window size (should be >= 1): " + commitWindowSizeX);
+        if (commitWindowSize <= 0) {
+            throw new IllegalArgumentException("Invalid commit window size (should be >= 1): " + commitWindowSize);
         }
 
-        final int totalNumberOfCommits = fileChangesByCommit.size();
-        final int numSnapshots = totalNumberOfCommits / commitWindowSizeX;
-        final int skipFront = totalNumberOfCommits % commitWindowSizeX;
+        final int totalNumberOfCommits = commitWindowSizeMode.countRelevantCommits(fileChangesByCommit.keySet());
+        final int numSnapshots = totalNumberOfCommits / commitWindowSize;
+        final int skipFront = totalNumberOfCommits % commitWindowSize;
 
         if (numSnapshots == 0) {
-            LOG.info("Insufficient amount of commits: " + totalNumberOfCommits + ". Need at least " + commitWindowSizeX
+            LOG.info("Insufficient amount of commits: " + totalNumberOfCommits + ". Need at least " + commitWindowSize
                     + ". No snapshots will be created.");
             return;
         }
@@ -190,11 +180,11 @@ public class RevisionsCsvReader {
         // bugfix commit. This also works if skipFront is 0: In this case, the
         // function will stop at the first bug-fix commit, which is exactly what
         // we want.
-        Commit snapshotStart = skipNCommits(iter, skipFront + 1);
+        Commit snapshotStart = commitWindowSizeMode.skipNRelevantCommits(iter, skipFront + 1);
 
         int sortIndex = 1;
         while (true) {
-            Commit snapshotEnd = skipNCommits(iter, commitWindowSizeX);
+            Commit snapshotEnd = commitWindowSizeMode.skipNRelevantCommits(iter, commitWindowSize);
             if (snapshotEnd == null) {
                 SortedMap<Commit, Set<FileChange>> snapshotCommits = fileChangesByCommit.tailMap(snapshotStart);
                 snapshots.add(new ProperSnapshot(snapshotCommits, sortIndex));
@@ -208,7 +198,7 @@ public class RevisionsCsvReader {
             sortIndex++;
         }
 
-        validateSnapshots();
+        validateSnapshots(conf);
 
         LOG.info("Successfully created " + numSnapshots + " snapshots.");
     }
@@ -219,12 +209,15 @@ public class RevisionsCsvReader {
      *
      * @throws AssertionError if the contents of {@link #snapshots} are invalid
      */
-    private void validateSnapshots() {
+    private void validateSnapshots(CreateSnapshots.Config conf) {
+        final CommitWindowSizeMode commitWindowSizeMode = conf.commitWindowSizeMode();
+        final int commitWindowSize = conf.commitWindowSize();
+
         for (ProperSnapshot snapshot : snapshots) {
-            snapshot.validate(commitWindowSizeX);
+            commitWindowSizeMode.validateSnapshotSize(snapshot, commitWindowSize);
         }
 
-        int expectedNumSnapshots = fileChangesByCommit.size() / commitWindowSizeX;
+        int expectedNumSnapshots = commitWindowSizeMode.countRelevantCommits(fileChangesByCommit.keySet()) / commitWindowSize;
         int actualNumSnapshots = snapshots.size();
         if (actualNumSnapshots != expectedNumSnapshots) {
             throw new AssertionError("Expected " + expectedNumSnapshots + " snapshots to be created, but got  "
@@ -233,68 +226,7 @@ public class RevisionsCsvReader {
     }
 
     /**
-     * Call {@link Iterator#next()} until n-many bug fix-commits have been seen,
-     * or until the iterator does not provide any more elements.
-     *
-     * @param iter an Iterator
-     * @param n    A non-negative number indicating the number of bug-fixes which
-     *             should be skipped. If 0, the iterator will be advanced to the
-     *             next bug-fix commit, if such a commit exists.
-     * @return The n-th bug-fix commit. If no such bug-fix commit exists
-     * (because the iterator stops returning elements before that),
-     * <code>null</code> is returned.
-     */
-    private Commit skipNBugfixes(Iterator<Commit> iter, final int n) {
-        if (n < 0) {
-            throw new IllegalArgumentException("Number of bug fixes to skip must not be < 0. Received " + n);
-        }
-
-        int fixesSeen = 0;
-        while (iter.hasNext()) {
-            Commit c = iter.next();
-            if (c.isBugfix()) {
-                fixesSeen++;
-                if (fixesSeen >= n) {
-                    return c;
-                }
-            }
-        }
-
-        return null;
-    }
-
-    /**
-     * Call {@link Iterator#next()} until n-many commits have been seen,
-     * or until the iterator does not provide any more elements.
-     *
-     * @param iter an Iterator
-     * @param n    A non-negative number indicating the number of commits to
-     *             skip. If 0, the iterator will be advanced to the next commit,
-     *             if such a commit exists.
-     * @return The n-th commit. If no such commit exists
-     * (because the iterator stops returning elements before that),
-     * <code>null</code> is returned.
-     */
-    private Commit skipNCommits(Iterator<Commit> iter, final int n) {
-        if (n < 0) {
-            throw new IllegalArgumentException("Number of commits to skip must not be < 0. Received " + n);
-        }
-
-        int commitsSeen = 0;
-        while (iter.hasNext()) {
-            Commit c = iter.next();
-            commitsSeen++;
-            if (commitsSeen >= n) {
-                return c;
-            }
-        }
-
-        return null;
-    }
-
-    /**
-     * The list of snapshots, created by calling {@link #readAllRevisionsAndComputeSnapshots()}. Each
-     * snapshot contains exactly {@link #commitWindowSizeX} commits.
+     * The list of snapshots. Each snapshot contains exactly the same number of commits.
      *
      * @return The list of snapshots, in ascending order by date. Each snapshot
      * contains at least one commit, i.e., the maps are guaranteed to be
