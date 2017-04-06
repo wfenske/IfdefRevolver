@@ -25,11 +25,11 @@ public class ProperSnapshot implements ISnapshot {
 
     public ProperSnapshot(SortedMap<Commit, Set<FileChange>> commits, int sortIndex) {
         if (commits == null) {
-            throw new NullPointerException("Attempt to instanciate proper snapshot with null for commits.");
+            throw new NullPointerException("Attempt to instantiate proper snapshot with null for commits.");
         }
 
         if (commits.isEmpty()) {
-            throw new NullPointerException("Attempt to instanciate proper snapshot with an empty map of commits.");
+            throw new NullPointerException("Attempt to instantiate proper snapshot with an empty map of commits.");
         }
 
         this.commits = commits;
@@ -55,7 +55,9 @@ public class ProperSnapshot implements ISnapshot {
     @Override
     public String revisionDateString() {
         Date d = revisionDate();
-        return dateFormatter.format(d);
+        synchronized (dateFormatter) {
+            return dateFormatter.format(d);
+        }
     }
 
     @Override
@@ -130,8 +132,16 @@ public class ProperSnapshot implements ISnapshot {
 
     @Override
     public String toString() {
-        return String.format("ProperSnapshot [revisionHash()=%s, from=%s, to=%s, commits=%d]", revisionHash(),
-                dateFormatter.format(startDate()), dateFormatter.format(endDate()), commits.size());
+        final String fromDateString;
+        final String toDateString;
+
+        synchronized (dateFormatter) {
+            fromDateString = dateFormatter.format(startDate());
+            toDateString = dateFormatter.format(endDate());
+        }
+
+        return String.format("%s [index: %d, from=%s, to=%s]",
+                this.getClass().getSimpleName(), sortIndex, fromDateString, toDateString);
     }
 
     public int getSortIndex() {

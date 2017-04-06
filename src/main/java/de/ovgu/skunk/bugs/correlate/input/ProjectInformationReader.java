@@ -9,6 +9,7 @@ import de.ovgu.skunk.bugs.correlate.main.IHasRevisionCsvFile;
 import de.ovgu.skunk.bugs.correlate.main.IHasSnapshotsDir;
 import de.ovgu.skunk.bugs.createsnapshots.input.RevisionsCsvReader;
 import de.ovgu.skunk.commitanalysis.IHasSnapshotFilter;
+import org.apache.commons.lang3.tuple.Pair;
 import org.apache.log4j.Logger;
 
 import java.io.BufferedReader;
@@ -38,12 +39,9 @@ public class ProjectInformationReader<TConfig extends IHasProjectInfoFile & IHas
     }
 
     /**
-     * <p>Main entry point of this class, reads the necessary project
-     * information:</p>
-     * <ul>
-     * <li>Snapshot information (accessible via {@link #getSnapshots()})</li>
-     * <li>Revisions information (accessible via {@link #getChangedFiles(Snapshot)} and {@link #getFixedFiles(Snapshot)})</li>
-     * </ul>
+     * <p>Main entry point of this class, reads the necessary project information:</p> <ul> <li>Snapshot information
+     * (accessible via {@link #getSnapshots()})</li> <li>Revisions information (accessible via {@link
+     * #getChangedFiles(Snapshot)} and {@link #getFixedFiles(Snapshot)})</li> </ul>
      */
     public void readSnapshotsAndRevisionsFile() {
         snapshots = readSnapshots();
@@ -121,26 +119,45 @@ public class ProjectInformationReader<TConfig extends IHasProjectInfoFile & IHas
     }
 
     protected SortedMap<Date, Snapshot> readSnapshots() {
+        List<RawSnapshotInfo> rawSnapshotInfos = readRawSnapshotInfos();
+
         SortedMap<Date, Snapshot> result = new TreeMap<>();
-        List<Date> snapshotDates = getProjectDates();
-
-        final DateFormat formatter = new SimpleDateFormat("yyyy-MM-dd");
-
-        File projSnapshotMetadataDir = new File(conf.projectResultsDir(), "snapshots");
-        for (Date snapshotDate : snapshotDates) {
-            File snapshotFile = new File(projSnapshotMetadataDir,
-                    formatter.format(snapshotDate) + ".csv");
-            Snapshot snapshot = readSnapshot(snapshotFile);
-            result.put(snapshotDate, snapshot);
+        for (RawSnapshotInfo rawSnapshotInfo : rawSnapshotInfos) {
+            Snapshot snapshot = new Snapshot(rawSnapshotInfo.sortIndex, rawSnapshotInfo.date,
+                    rawSnapshotInfo.commitHashes, rawSnapshotInfo.snapshotDir);
+            result.put(rawSnapshotInfo.date, snapshot);
         }
 
         return result;
     }
 
-    private Snapshot readSnapshot(File snapshotFile) {
+    public List<RawSnapshotInfo> readRawSnapshotInfos() {
+        final DateFormat formatter = new SimpleDateFormat("yyyy-MM-dd");
+
+        List<Date> snapshotDates = getProjectDates();
+        File projSnapshotMetadataDir = new File(conf.projectResultsDir(), "snapshots");
+
+        List<RawSnapshotInfo> rawSnapshotInfos = new ArrayList<>();
+        for (Date snapshotDate : snapshotDates) {
+            File snapshotFile = new File(projSnapshotMetadataDir,
+                    formatter.format(snapshotDate) + ".csv");
+
+            Pair<Integer, Set<String>> indexAndCommitHashes = readSnapshotCommitHashes(snapshotFile);
+            File snapshotDir = conf.projectSnapshotDirForDate(snapshotDate);
+
+            RawSnapshotInfo snapshotInfo = new RawSnapshotInfo(indexAndCommitHashes.getKey(), snapshotDate, indexAndCommitHashes.getValue(), snapshotDir);
+            rawSnapshotInfos.add(snapshotInfo);
+        }
+        return rawSnapshotInfos;
+    }
+
+    /**
+     * @param snapshotFile
+     * @return The sortindex and the commit hashes of the snapshot
+     */
+    private Pair<Integer, Set<String>> readSnapshotCommitHashes(final File snapshotFile) {
         Set<String> commitHashes = new LinkedHashSet<>();
         int snapshotIndex = -1;
-        Date snapshotDate = null;
         final SimpleDateFormat dateFormatter = new SimpleDateFormat("yyyy-MM-dd");
 
         CSVReader reader = null;
@@ -151,8 +168,8 @@ public class ProjectInformationReader<TConfig extends IHasProjectInfoFile & IHas
             String[] header = reader.readNext();
             try {
                 snapshotIndex = Integer.parseInt(header[0]);
-                snapshotDate = dateFormatter.parse(header[1]);
-            } catch (ParseException pe) {
+                //snapshotDate = dateFormatter.parse(header[1]); // ignored
+            } catch (NumberFormatException pe) {
                 throw new RuntimeException(
                         "Error parsing header of snapshot file " + snapshotFile.getAbsolutePath());
             }
@@ -180,8 +197,7 @@ public class ProjectInformationReader<TConfig extends IHasProjectInfoFile & IHas
             }
         }
 
-        File snapshotDir = conf.projectSnapshotDirForDate(snapshotDate);
-        return new Snapshot(snapshotIndex, snapshotDate, commitHashes, snapshotDir);
+        return Pair.of(snapshotIndex, commitHashes);
     }
 
     private List<Date> getProjectDates() {

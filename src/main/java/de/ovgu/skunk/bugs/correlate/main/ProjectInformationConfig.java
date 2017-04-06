@@ -46,7 +46,8 @@ public class ProjectInformationConfig implements IHasSnapshotsDir, IHasResultsDi
     protected String project;
 
     /**
-     * Name of the results directory. Below this directory we expect a folder with the name of the project (see {@link #project}), e.g. "results/openvpn".
+     * Name of the results directory. Below this directory we expect a folder with the name of the project (see {@link
+     * #project}), e.g. "results/openvpn".
      */
     protected String resultsDir = null;
     public static final String DEFAULT_RESULTS_DIR_NAME = "results";
@@ -94,6 +95,10 @@ public class ProjectInformationConfig implements IHasSnapshotsDir, IHasResultsDi
     }
 
     public static <TConfig extends IHasSnapshotsDir & IHasProjectName> void parseSnapshotsDirFromCommandLine(CommandLine line, TConfig config) {
+        parseSnapshotsDirFromCommandLine(line, config, SnapshotDirMissingStrategy.THROW_IF_MISSING);
+    }
+
+    public static <TConfig extends IHasSnapshotsDir & IHasProjectName> void parseSnapshotsDirFromCommandLine(CommandLine line, TConfig config, SnapshotDirMissingStrategy strategy) {
         final String snapshotsDirName;
         if (line.hasOption(OPT_SNAPSHOTS_DIR_L)) {
             snapshotsDirName = line.getOptionValue(OPT_SNAPSHOTS_DIR_L);
@@ -102,11 +107,18 @@ public class ProjectInformationConfig implements IHasSnapshotsDir, IHasResultsDi
         }
         final File snapshotsDir = new File(snapshotsDirName);
         final File projectSnapshotsDir = new File(snapshotsDir, config.getProject());
-        if (!projectSnapshotsDir.exists() || !projectSnapshotsDir.isDirectory()) {
-            throw new RuntimeException(
-                    "The project's snapshots directory does not exist or is not a directory: "
-                            + projectSnapshotsDir.getAbsolutePath());
+
+        if (projectSnapshotsDir.exists()) {
+            if (!projectSnapshotsDir.isDirectory()) {
+                throw new RuntimeException(
+                        "The project's snapshots directory already exists but is not a directory: "
+                                + projectSnapshotsDir.getAbsolutePath());
+            }
+        } else {
+            // Snapshot dir does not exist
+            strategy.handleMissingSnapshotDirectory(projectSnapshotsDir);
         }
+
         config.setSnapshotsDir(snapshotsDir.getAbsolutePath());
     }
 

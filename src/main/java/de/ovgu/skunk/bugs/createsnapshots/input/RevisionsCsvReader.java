@@ -1,10 +1,12 @@
 package de.ovgu.skunk.bugs.createsnapshots.input;
 
+import de.ovgu.skunk.bugs.correlate.input.ProjectInformationReader;
+import de.ovgu.skunk.bugs.correlate.input.RawSnapshotInfo;
 import de.ovgu.skunk.bugs.createsnapshots.data.Commit;
 import de.ovgu.skunk.bugs.createsnapshots.data.FileChange;
 import de.ovgu.skunk.bugs.createsnapshots.data.ProperSnapshot;
 import de.ovgu.skunk.bugs.createsnapshots.main.CommitWindowSizeMode;
-import de.ovgu.skunk.bugs.createsnapshots.main.CreateSnapshots;
+import de.ovgu.skunk.bugs.createsnapshots.main.CreateSnapshotsConfig;
 import de.ovgu.skunk.bugs.minecommits.RevisionsFullColumns;
 import de.ovgu.skunk.commitanalysis.IHasSnapshotFilter;
 import de.ovgu.skunk.detection.output.CsvEnumUtils;
@@ -23,7 +25,18 @@ public class RevisionsCsvReader {
 
     private final File revisionsCsv;
 
+    /**
+     * Initialized in {@link #readAllCommits()}
+     */
     private SortedMap<Commit, Set<FileChange>> fileChangesByCommit;
+    /**
+     * Initialized in {@link #readAllCommits()}
+     */
+    private Map<String, Commit> commitsByHash;
+
+    /**
+     * Initialized by {@link #computeSnapshots(CreateSnapshotsConfig)} and {@link #readPrecomputedSnapshots(CreateSnapshotsConfig)}
+     */
     private List<ProperSnapshot> snapshots;
 
     /**
@@ -37,9 +50,8 @@ public class RevisionsCsvReader {
 
     public int readAllCommits() {
         LOG.info("Reading all file changes in " + this.revisionsCsv.getAbsolutePath());
-        fileChangesByCommit = new TreeMap<>();
-
-        Map<String, Commit> commitsByHash = new HashMap<>();
+        this.fileChangesByCommit = new TreeMap<>();
+        this.commitsByHash = new HashMap<>();
 
         FileReader fr = null;
         BufferedReader br = null;
@@ -151,7 +163,7 @@ public class RevisionsCsvReader {
         }
     }
 
-    public void computeSnapshots(CreateSnapshots.Config conf) {
+    public void computeSnapshots(CreateSnapshotsConfig conf) {
         LOG.info("Computing snapshots from " + revisionsCsv.getAbsolutePath());
         snapshots = new ArrayList<>();
         final CommitWindowSizeMode commitWindowSizeMode = conf.commitWindowSizeMode();
@@ -209,7 +221,7 @@ public class RevisionsCsvReader {
      *
      * @throws AssertionError if the contents of {@link #snapshots} are invalid
      */
-    private void validateSnapshots(CreateSnapshots.Config conf) {
+    private void validateSnapshots(CreateSnapshotsConfig conf) {
         final CommitWindowSizeMode commitWindowSizeMode = conf.commitWindowSizeMode();
         final int commitWindowSize = conf.commitWindowSize();
 
@@ -228,9 +240,8 @@ public class RevisionsCsvReader {
     /**
      * The list of snapshots. Each snapshot contains exactly the same number of commits.
      *
-     * @return The list of snapshots, in ascending order by date. Each snapshot
-     * contains at least one commit, i.e., the maps are guaranteed to be
-     * non-empty.
+     * @return The list of snapshots, in ascending order by date. Each snapshot contains at least one commit, i.e., the
+     * maps are guaranteed to be non-empty.
      */
     public List<ProperSnapshot> getSnapshots() {
         return snapshots;
@@ -261,6 +272,40 @@ public class RevisionsCsvReader {
             }
         }
 
+        return result;
+    }
+
+    public void readPrecomputedSnapshots(CreateSnapshotsConfig conf) {
+        LOG.debug("Reading precomputed snapshots dates from " + conf.projectResultsDir().getAbsolutePath());
+
+        ProjectInformationReader helperReader = new ProjectInformationReader(conf);
+        List<RawSnapshotInfo> rawSnapshotInfos = helperReader.readRawSnapshotInfos();
+
+        this.snapshots = new ArrayList<>();
+        for (RawSnapshotInfo rawSnapshotInfo : rawSnapshotInfos) {
+            ProperSnapshot snapshot = properSnapshotFromRawSnapshotInfo(rawSnapshotInfo);
+            snapshots.add(snapshot);
+        }
+
+        LOG.info("Successfully read " + snapshots.size() + " snapshots.");
+    }
+
+    private ProperSnapshot properSnapshotFromRawSnapshotInfo(RawSnapshotInfo rawSnapshotInfo) {
+        SortedMap<Commit, Set<FileChange>> fileChangesByCommitForSnapshot = new TreeMap<>();
+
+        for (String commitHash : rawSnapshotInfo.commitHashes) {
+            final Commit commit = commitsByHash.get(commitHash);
+            if (commit == null) {
+                throw new IllegalArgumentException("Snapshot " + rawSnapshotInfo + " refers to an unknown commit hash: " + commitHash);
+            }
+            Set<FileChange> fileChanges = fileChangesByCommit.get(commit);
+            if (fileChanges == null) {
+                throw new IllegalStateException("Internal error: no file changes for commit " + commit);
+            }
+            fileChangesByCommitForSnapshot.put(commit, fileChanges);
+        }
+
+        ProperSnapshot result = new ProperSnapshot(fileChangesByCommitForSnapshot, rawSnapshotInfo.sortIndex);
         return result;
     }
 }
