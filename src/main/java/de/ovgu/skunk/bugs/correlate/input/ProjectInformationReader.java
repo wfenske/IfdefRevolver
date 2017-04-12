@@ -143,7 +143,7 @@ public class ProjectInformationReader<TConfig extends IHasProjectInfoFile & IHas
                     formatter.format(snapshotDate) + ".csv");
 
             Pair<Integer, Set<String>> indexAndCommitHashes = readSnapshotCommitHashes(snapshotFile);
-            File snapshotDir = conf.projectSnapshotDirForDate(snapshotDate);
+            File snapshotDir = conf.snapshotDirForDate(snapshotDate);
 
             RawSnapshotInfo snapshotInfo = new RawSnapshotInfo(indexAndCommitHashes.getKey(), snapshotDate, indexAndCommitHashes.getValue(), snapshotDir);
             rawSnapshotInfos.add(snapshotInfo);

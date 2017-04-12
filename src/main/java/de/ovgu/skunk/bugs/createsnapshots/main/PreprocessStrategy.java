@@ -73,8 +73,8 @@ class PreprocessStrategy implements ISnapshotProcessingModeStrategy {
     @Override
     public void processSnapshot(ProperSnapshot currentSnapshot) {
         Date snapshotDate = currentSnapshot.revisionDate();
-        File workingDir = conf.resultsSnapshotDir(snapshotDate);
-        File snapshotDir = conf.tmpSnapshotDir(snapshotDate);
+        File workingDir = conf.snapshotResultsDirForDate(snapshotDate);
+        File snapshotDir = conf.snapshotDirForDate(snapshotDate);
         if (!workingDir.isDirectory()) {
             boolean success = workingDir.mkdirs();
             if (!success) {

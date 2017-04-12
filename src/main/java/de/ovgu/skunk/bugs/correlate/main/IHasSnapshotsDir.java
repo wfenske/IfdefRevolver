@@ -11,5 +11,5 @@ public interface IHasSnapshotsDir {
 
     void setSnapshotsDir(String snapshotsDir);
 
-    File projectSnapshotDirForDate(Date date);
+    File snapshotDirForDate(Date date);
 }

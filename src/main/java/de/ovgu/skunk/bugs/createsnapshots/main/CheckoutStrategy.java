@@ -236,21 +236,21 @@ class CheckoutStrategy implements ISnapshotProcessingModeStrategy {
     }
 
     private File snapshotDir(ProperSnapshot snapshot) {
-        return conf.tmpSnapshotDir(snapshot.revisionDate());
+        return conf.snapshotDirForDate(snapshot.revisionDate());
     }
 
     @Override
     public void processSnapshot(ProperSnapshot currentSnapshot) {
         final Date snapshotDate = currentSnapshot.revisionDate();
-        final File resultsSnapshotDir = conf.resultsSnapshotDir(snapshotDate);
-        final File tmpSnapshotDir = conf.tmpSnapshotDir(snapshotDate);
+        final File resultsSnapshotDir = conf.snapshotResultsDirForDate(snapshotDate);
+        final File tmpSnapshotDir = conf.snapshotDirForDate(snapshotDate);
         resultsSnapshotDir.mkdirs();
         List<String> args = new ArrayList<>();
         //args.add(conf.smellConfig /* ARG1 */);
-        //args.add(resultsSnapshotDir.getAbsolutePath() /* ARG2 */);
+        //args.add(snapshotResultsDirForDate.getAbsolutePath() /* ARG2 */);
         final Date prevSnapshotDate = previousSnapshot.revisionDate();
         if (prevSnapshotDate != null) {
-            final File prevSnapshotDir = conf.tmpSnapshotDir(prevSnapshotDate);
+            final File prevSnapshotDir = conf.snapshotDirForDate(prevSnapshotDate);
             final File prevCppstatsInputList = new File(prevSnapshotDir, CPPSTATS_INPUT_TXT);
             args.add("--prepareFrom=" + prevCppstatsInputList.getAbsolutePath());
         } else {

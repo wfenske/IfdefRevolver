@@ -64,7 +64,7 @@ class DetectSmellsStrategy implements ISnapshotProcessingModeStrategy {
     @Override
     public void processSnapshot(ProperSnapshot currentSnapshot) {
         Date snapshotDate = currentSnapshot.revisionDate();
-        File resultsDir = conf.resultsSnapshotDir(snapshotDate);
+        File resultsDir = conf.snapshotResultsDirForDate(snapshotDate);
         CreateSnapshots.runExternalCommand(CreateSnapshotsConfig.SKUNK_PROG, resultsDir, "--processed=.", "--config=" + conf.smellConfig());
         moveSnapshotSmellDetectionResults(currentSnapshot);
     }
@@ -75,7 +75,7 @@ class DetectSmellsStrategy implements ISnapshotProcessingModeStrategy {
     }
 
     private void moveSnapshotSmellDetectionResults(ProperSnapshot curSnapshot) {
-        File sourcePath = conf.resultsSnapshotDir(curSnapshot.startDate());
+        File sourcePath = conf.snapshotResultsDirForDate(curSnapshot.startDate());
         File smellResultsDir = new File(conf.projectResultsDir(), conf.getSmell().name() + "Res");
         smellResultsDir.mkdirs(); // Create target directory
         moveSnapshotSmellDetectionResults(curSnapshot, sourcePath, smellResultsDir);

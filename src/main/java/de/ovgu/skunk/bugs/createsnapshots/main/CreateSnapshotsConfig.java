@@ -4,8 +4,6 @@ import de.ovgu.skunk.bugs.correlate.main.ProjectInformationConfig;
 import de.ovgu.skunk.bugs.createsnapshots.data.Smell;
 
 import java.io.File;
-import java.text.SimpleDateFormat;
-import java.util.Date;
 import java.util.Optional;
 
 /**
@@ -15,8 +13,6 @@ public class CreateSnapshotsConfig extends ProjectInformationConfig {
     public static final String GIT_PROG = "git";
     public static final String CPP_SKUNK_PROG = "cppSkunk.sh";
     public static final String SKUNK_PROG = "skunk.sh";
-
-    private final SimpleDateFormat dateFormatter = new SimpleDateFormat("yyyy-MM-dd");
 
     public void setReposDir(String reposDir) {
         this.reposDir = reposDir;
@@ -47,30 +43,12 @@ public class CreateSnapshotsConfig extends ProjectInformationConfig {
         return new File(reposDir, getProject());
     }
 
-    @Override
-    public File projectResultsDir() {
-        return new File(resultsDir, getProject());
-    }
-
-    @Override
-    public File projectSnapshotsDir() {
-        return projectSnapshotsDir();
-    }
-
     public CommitWindowSizeMode commitWindowSizeMode() {
         return this.commitWindowSizeMode;
     }
 
     public void setCommitWindowSize(int commitWindowSize) {
         this.commitWindowSize = commitWindowSize;
-    }
-
-    public File tmpSnapshotDir(Date snapshotDate) {
-        return projectSnapshotDirForDate(snapshotDate);
-    }
-
-    public synchronized File resultsSnapshotDir(Date snapshotDate) {
-        return new File(projectResultsDir(), dateFormatter.format(snapshotDate));
     }
 
     public File projectInfoCsv() {

@@ -239,7 +239,7 @@ public class ProjectInformationConfig implements IHasSnapshotsDir, IHasResultsDi
     }
 
     @Override
-    public File projectSnapshotDirForDate(Date date) {
+    public File snapshotDirForDate(Date date) {
         synchronized (dateFormatter) {
             return new File(projectSnapshotsDir(), dateFormatter.format(date));
         }
