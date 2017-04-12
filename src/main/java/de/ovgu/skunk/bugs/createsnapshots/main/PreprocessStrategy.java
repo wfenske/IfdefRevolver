@@ -9,6 +9,8 @@ import java.io.File;
 import java.util.Collection;
 import java.util.Date;
 
+import static de.ovgu.skunk.util.FileUtils.isNonEmptyRegularFile;
+
 /**
  * Only call Skunk to create its intermediate files, without doing anything else.  Requires cppstats to already have
  * run.
@@ -33,6 +35,18 @@ class PreprocessStrategy implements ISnapshotProcessingModeStrategy {
     @Override
     public Collection<ProperSnapshot> getSnapshotsToProcess() {
         return this.revisionsCsvReader.getSnapshotsFiltered(conf);
+    }
+
+    @Override
+    public boolean snapshotAlreadyProcessed(ProperSnapshot snapshot) {
+        File snapshotResultsDir = conf.snapshotResultsDirForDate(snapshot.revisionDate());
+        File featuresXml = new File(snapshotResultsDir, "skunk_intermediate_features.xml");
+        File filesXml = new File(snapshotResultsDir, "skunk_intermediate_files.xml");
+        File functionsXml = new File(snapshotResultsDir, "skunk_intermediate_functions.xml");
+
+        return (isNonEmptyRegularFile(featuresXml) &&
+                isNonEmptyRegularFile(filesXml) &&
+                isNonEmptyRegularFile(functionsXml));
     }
 
     @Override

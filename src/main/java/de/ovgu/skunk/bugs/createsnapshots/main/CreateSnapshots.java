@@ -116,8 +116,12 @@ public class CreateSnapshots {
             LOG.info(skunkStrategy.activityDisplayName() + " on snapshot " +
                     myProgressPosition + "/" + totalNumberOfSnapshots + ": " + currentSnapshot);
             skunkStrategy.setPreviousSnapshot(previousSnapshot);
-            skunkStrategy.ensureSnapshot(currentSnapshot);
-            skunkStrategy.processSnapshot(currentSnapshot);
+            if (skunkStrategy.snapshotAlreadyProcessed(currentSnapshot)) {
+                LOG.info(skunkStrategy.activityDisplayName() + " skipped on " + currentSnapshot + ": snapshot already processed.");
+            } else {
+                skunkStrategy.ensureSnapshot(currentSnapshot);
+                skunkStrategy.processSnapshot(currentSnapshot);
+            }
             previousSnapshot = currentSnapshot;
             myProgressPosition++;
         }
@@ -146,8 +150,12 @@ public class CreateSnapshots {
                 try {
                     LOG.info(skunkStrategy.activityDisplayName() + " on snapshot " +
                             myProgressPosition + "/" + totalNumberOfSnapshots + ": " + snapshot);
-                    skunkStrategy.ensureSnapshot(snapshot);
-                    skunkStrategy.processSnapshot(snapshot);
+                    if (skunkStrategy.snapshotAlreadyProcessed(snapshot)) {
+                        LOG.info(skunkStrategy.activityDisplayName() + " skipped on " + snapshot + ": snapshot already processed.");
+                    } else {
+                        skunkStrategy.ensureSnapshot(snapshot);
+                        skunkStrategy.processSnapshot(snapshot);
+                    }
                 } catch (Throwable t) {
                     onSnapshotError(snapshot, t);
                 }

@@ -44,4 +44,12 @@ interface ISnapshotProcessingModeStrategy {
     void readAllRevisionsAndComputeSnapshots();
 
     Collection<ProperSnapshot> getSnapshotsToProcess();
+
+    /**
+     * Check whether the given snapshot has already been processed.  If so, processing this snapshot can be skipped.
+     *
+     * @param snapshot The snapshot to test
+     * @return <code>true</code> if processing this snapshot can safely be skipped. <code>false</code> otherwise.
+     */
+    boolean snapshotAlreadyProcessed(ProperSnapshot snapshot);
 }

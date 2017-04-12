@@ -15,6 +15,8 @@ import java.util.Collection;
 import java.util.Date;
 import java.util.List;
 
+import static de.ovgu.skunk.util.FileUtils.isNonEmptyRegularFile;
+
 /**
  * <p>Checks out a project from GIT and creates the commit windows in the project's <code>snapshots</code>
  * directory<p/> <ol> <li>Reads all the commits of a repo,</li> <li>computes commit windows and writes them to disc
@@ -48,6 +50,17 @@ class CheckoutStrategy implements ISnapshotProcessingModeStrategy {
             LOG.warn("Ignoring snapshot filter: cannot be used in conjunction with " + this.getClass().getSimpleName());
         }
         return this.revisionsCsvReader.getSnapshots();
+    }
+
+    @Override
+    public boolean snapshotAlreadyProcessed(ProperSnapshot snapshot) {
+        File cppstatsConfigFile = cppstatsConfigFile(snapshot);
+        File snapshotDir = snapshotDir(snapshot);
+        File cppstatsGeneralCsv = new File(snapshotDir, "cppstats.csv");
+        File cppstatsFeatureLocationsCsv = new File(snapshotDir, "cppstats_featurelocations.csv");
+        return (isNonEmptyRegularFile(cppstatsConfigFile) &&
+                isNonEmptyRegularFile(cppstatsGeneralCsv) &&
+                isNonEmptyRegularFile(cppstatsFeatureLocationsCsv));
     }
 
     @Override
@@ -89,10 +102,10 @@ class CheckoutStrategy implements ISnapshotProcessingModeStrategy {
         conf.projectResultsDir().mkdirs();
         appendToProjectCsv(currentSnapshot, filesFound);
         appendToProjectAnalysisCsv(currentSnapshot, filesFound);
-        final File curSnapshotDir = conf.tmpSnapshotDir(currentSnapshot.revisionDate());
-        curSnapshotDir.mkdirs();
+        final File currentSnapshotDir = snapshotDir(currentSnapshot);
+        currentSnapshotDir.mkdirs();
         copyCheckoutToTmpSnapshotDir(filesFound, currentSnapshot);
-        writeCppstatsConfigFile(curSnapshotDir);
+        writeCppstatsConfigFile(currentSnapshot);
     }
 
     /**
@@ -161,7 +174,7 @@ class CheckoutStrategy implements ISnapshotProcessingModeStrategy {
     }
 
     private void copyCheckoutToTmpSnapshotDir(List<File> filesInCurrentCheckout, ProperSnapshot currentSnapshot) {
-        final File cppstatsDir = new File(conf.tmpSnapshotDir(currentSnapshot.revisionDate()), "source");
+        final File cppstatsDir = new File(snapshotDir(currentSnapshot), "source");
         // Copy Files
         if (conf.isOptimized()) {
             Collection<File> changedFiles = previousSnapshot.computeChangedFiles(filesInCurrentCheckout,
@@ -200,14 +213,13 @@ class CheckoutStrategy implements ISnapshotProcessingModeStrategy {
     /**
      * Create the cppstats_input.txt in the given directory
      *
-     * @param snapshotDir Directory where the files of the snapshot will be put
+     * @param snapshot Snapshot for which to create the cppstats config file
      */
-    private void writeCppstatsConfigFile(final File snapshotDir) {
-        File cppstatsConfigFile = new File(snapshotDir, CPPSTATS_INPUT_TXT);
+    private void writeCppstatsConfigFile(ProperSnapshot snapshot) {
+        final File snapshotDir = snapshotDir(snapshot);
+        final File cppstatsConfigFile = cppstatsConfigFile(snapshot);
         PrintWriter writer = null;
         try {
-            // File cppstatsConfigFile = new File(conf.projectTmpDir(),
-            // CPPSTATS_INPUT_TXT);
             writer = new PrintWriter(cppstatsConfigFile);
             writer.write(snapshotDir.getAbsolutePath());
         } catch (IOException e) {
@@ -216,6 +228,15 @@ class CheckoutStrategy implements ISnapshotProcessingModeStrategy {
             if (writer != null) writer.close();
         }
         LOG.info("Wrote " + cppstatsConfigFile.getAbsolutePath());
+    }
+
+    private File cppstatsConfigFile(ProperSnapshot snapshot) {
+        File snapshotDir = snapshotDir(snapshot);
+        return new File(snapshotDir, CPPSTATS_INPUT_TXT);
+    }
+
+    private File snapshotDir(ProperSnapshot snapshot) {
+        return conf.tmpSnapshotDir(snapshot.revisionDate());
     }
 
     @Override

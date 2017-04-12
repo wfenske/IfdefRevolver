@@ -119,4 +119,10 @@ class DetectSmellsStrategy implements ISnapshotProcessingModeStrategy {
             }
         }
     }
+
+    @Override
+    public boolean snapshotAlreadyProcessed(ProperSnapshot snapshot) {
+        // Too much hassle. Just have everything recomputed.
+        return false;
+    }
 }

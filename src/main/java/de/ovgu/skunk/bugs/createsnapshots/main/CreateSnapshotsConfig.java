@@ -54,7 +54,7 @@ public class CreateSnapshotsConfig extends ProjectInformationConfig {
 
     @Override
     public File projectSnapshotsDir() {
-        return new File(snapshotsDir, getProject());
+        return projectSnapshotsDir();
     }
 
     public CommitWindowSizeMode commitWindowSizeMode() {
@@ -65,8 +65,8 @@ public class CreateSnapshotsConfig extends ProjectInformationConfig {
         this.commitWindowSize = commitWindowSize;
     }
 
-    public synchronized File tmpSnapshotDir(Date snapshotDate) {
-        return new File(projectSnapshotsDir(), dateFormatter.format(snapshotDate));
+    public File tmpSnapshotDir(Date snapshotDate) {
+        return projectSnapshotDirForDate(snapshotDate);
     }
 
     public synchronized File resultsSnapshotDir(Date snapshotDate) {
