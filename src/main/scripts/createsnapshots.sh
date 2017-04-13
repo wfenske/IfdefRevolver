@@ -16,7 +16,7 @@ o_jvm="-Xmx768m"
 ##    esac
 ##done
 
-main_class=de.ovgu.skunk.bugs.createsnapshots.main.CreateSnapshots
+main_class=de.ovgu.ifdefrevolver.bugs.createsnapshots.main.CreateSnapshots
 #CP=$HOME/.m2/repository/de/ovgu/skunk/IfdefRevolver/1.0-SNAPSHOT/IfdefRevolver-1.0-SNAPSHOT-jar-with-dependencies.jar
 ##if [ -n "$o_smellconfigs_dir" ]
 ##then
