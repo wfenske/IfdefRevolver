@@ -6,4 +6,4 @@ me_dir=$(dirname -- "${real_me}")
 
 #( IFS=:; for e in $CP; do logcfg=${e}/log4j.xml; test -e "$logcfg" && echo $logcfg; done )
 
-exec java -cp "${CP:?}" de.ovgu.skunk.commitanalysis.ListChangedFunctions "$@"
+exec java -cp "${CP:?}" de.ovgu.ifdefrevolver.commitanalysis.ListChangedFunctions "$@"

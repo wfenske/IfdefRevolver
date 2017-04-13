@@ -38,7 +38,7 @@
     </logger>
 
 
-    <logger name="de.ovgu.skunk.commitanalysis.GitCommitChangedFunctionLister">
+    <logger name="de.ovgu.ifdefrevolver.commitanalysis.GitCommitChangedFunctionLister">
         <level value="warn"/>
     </logger>
 
