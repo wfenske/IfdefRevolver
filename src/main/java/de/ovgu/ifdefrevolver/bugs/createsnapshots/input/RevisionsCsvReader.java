@@ -16,6 +16,7 @@ import java.io.BufferedReader;
 import java.io.File;
 import java.io.FileReader;
 import java.io.IOException;
+import java.text.DateFormat;
 import java.text.ParseException;
 import java.text.SimpleDateFormat;
 import java.util.*;
@@ -257,16 +258,20 @@ public class RevisionsCsvReader {
             return allSnapshots;
         }
 
-        Map<Date, ProperSnapshot> snapshotsByDate = new HashMap<>();
+        DateFormat df = new SimpleDateFormat("yyyy-MM-dd");
+
+        Map<String, ProperSnapshot> snapshotsByDate = new HashMap<>();
         for (ProperSnapshot s : allSnapshots) {
-            snapshotsByDate.put(s.revisionDate(), s);
+            String dateString = df.format(s.revisionDate());
+            snapshotsByDate.put(dateString, s);
         }
 
         List<ProperSnapshot> result = new ArrayList<>();
         for (Date selectedDate : filterDates.get()) {
-            ProperSnapshot s = snapshotsByDate.get(selectedDate);
+            String selectedDateString = df.format(selectedDate);
+            ProperSnapshot s = snapshotsByDate.get(selectedDateString);
             if (s == null) {
-                LOG.warn("No such snapshot: " + selectedDate);
+                LOG.warn("No such snapshot: " + selectedDateString);
             } else {
                 result.add(s);
             }

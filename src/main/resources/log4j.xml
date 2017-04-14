@@ -23,7 +23,7 @@
         <appender-ref ref="stderr"/>
     </logger>
 
-    <logger name="de.ovgu.skunk.commitanalysis.GitCommitChangedFunctionLister" additivity="false">
+    <logger name="de.ovgu.skunk.commitanalySnapshotChangedFunctionListerster" additivity="false">
         <level value="warn"/>
         <appender-ref ref="stderr"/>
     </logger>
@@ -37,9 +37,12 @@
         <level value="warn"/>
     </logger>
 
-
-    <logger name="de.ovgu.ifdefrevolver.commitanalysis.GitCommitChangedFunctionLister">
+    <logger name="de.ovgu.ifdefrevolver.commitanalysis">
         <level value="warn"/>
+    </logger>
+
+    <logger name="de.ovgu.ifdefrevolver.commitanalysis.SnapshotChangedFunctionLister">
+        <level value="info"/>
     </logger>
 
     <root>

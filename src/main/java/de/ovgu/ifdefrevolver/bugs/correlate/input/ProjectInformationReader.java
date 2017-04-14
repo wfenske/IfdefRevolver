@@ -159,7 +159,6 @@ public class ProjectInformationReader<TConfig extends IHasProjectInfoFile & IHas
     private Pair<Integer, Set<String>> readSnapshotCommitHashes(final File snapshotFile) {
         Set<String> commitHashes = new LinkedHashSet<>();
         int snapshotIndex = -1;
-        final SimpleDateFormat dateFormatter = new SimpleDateFormat("yyyy-MM-dd");
 
         CSVReader reader = null;
         FileReader fileReader = null;
@@ -273,7 +272,7 @@ public class ProjectInformationReader<TConfig extends IHasProjectInfoFile & IHas
         return getSnapshotsFiltered(this.getSnapshots(), snapshotFilteringConfig);
     }
 
-    public static Collection<Snapshot> getSnapshotsFiltered(SortedMap<Date, Snapshot> allSnapshots, IHasSnapshotFilter snapshotFilteringConfig) {
+    private static Collection<Snapshot> getSnapshotsFiltered(SortedMap<Date, Snapshot> allSnapshots, IHasSnapshotFilter snapshotFilteringConfig) {
         Optional<List<Date>> explicitSnapshotDates = snapshotFilteringConfig.getSnapshotFilter();
         final Collection<Snapshot> snapshotsToProcess;
         if (!explicitSnapshotDates.isPresent()) {

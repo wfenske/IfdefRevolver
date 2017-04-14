@@ -70,7 +70,7 @@ public class ListChangedFunctions {
 
     private File listChangedFunctionsInSnapshot(Snapshot snapshot) {
         LOG.debug("Listing functions changed in " + snapshot);
-        GitCommitChangedFunctionLister lister = new GitCommitChangedFunctionLister(config, snapshot);
+        SnapshotChangedFunctionLister lister = new SnapshotChangedFunctionLister(config, snapshot);
         File resultCsv = lister.listChangedFunctions();
         if (lister.errorsOccurred()) {
             errors++;
