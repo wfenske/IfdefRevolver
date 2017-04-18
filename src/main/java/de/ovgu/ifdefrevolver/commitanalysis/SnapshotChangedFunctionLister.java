@@ -21,6 +21,7 @@ public class SnapshotChangedFunctionLister {
     private int errors = 0;
     private Git git = null;
     private Repository repo = null;
+    private File outputFile = null;
 
     public SnapshotChangedFunctionLister(ListChangedFunctionsConfig config, Snapshot snapshot) {
         this.config = config;
@@ -59,10 +60,23 @@ public class SnapshotChangedFunctionLister {
     }
 
     private File listChangedFunctionsInSnapshot() {
-        CsvFileWriterHelper helper = newCsvFileWriterForSnapshot(snapshot);
-        File outputFileDir = config.snapshotResultsDirForDate(snapshot.getSnapshotDate());
-        File outputFile = new File(outputFileDir, FunctionChangeHunksColumns.FILE_BASENAME);
-        helper.write(outputFile);
+        this.outputFile = null;
+        try {
+            CsvFileWriterHelper helper = newCsvFileWriterForSnapshot(snapshot);
+            File outputFileDir = config.snapshotResultsDirForDate(snapshot.getSnapshotDate());
+            this.outputFile = new File(outputFileDir, FunctionChangeHunksColumns.FILE_BASENAME);
+            helper.write(outputFile);
+        } catch (OutOfMemoryError ooe) {
+            LOG.warn("Out of memory while analyzing snapshot " + snapshot, ooe);
+            if (this.outputFile != null) {
+                if (this.outputFile.delete()) {
+                    this.outputFile = null;
+                } else {
+                    LOG.warn("Failed to delete output file " + this.outputFile.getAbsolutePath()
+                            + " after out of memory exception.");
+                }
+            }
+        }
         return outputFile;
     }
 

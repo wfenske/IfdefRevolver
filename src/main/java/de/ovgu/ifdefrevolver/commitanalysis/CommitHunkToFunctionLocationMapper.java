@@ -68,7 +68,7 @@ class CommitHunkToFunctionLocationMapper implements Consumer<Edit> {
         ChangeHunk hunk = hunkFromEdit(f, edit);
         FunctionChangeHunk fHunk = new FunctionChangeHunk(f, hunk, deletesFunction);
         changedFunctionConsumer.accept(fHunk);
-        logEdit(f, edit);
+        //logEdit(f, edit);
     }
 
     private ChangeHunk hunkFromEdit(Method f, Edit edit) {
@@ -105,6 +105,7 @@ class CommitHunkToFunctionLocationMapper implements Consumer<Edit> {
         return new ChangeHunk(commitId, oldPath, this.numHunkInFile, linesDeleted, linesAdded);
     }
 
+    /*
     private void logEdit(Method f, Edit edit) {
         if (LOG.isDebugEnabled() || LOG.isTraceEnabled()) {
             int editBegin = edit.getBeginA();
@@ -120,6 +121,7 @@ class CommitHunkToFunctionLocationMapper implements Consumer<Edit> {
             LOG.trace(f.sourceCodeWithLineNumbers());
         }
     }
+    */
 
     private boolean editOverlaps(Method func, final int editBegin, final int editEnd) {
         // NOTE, 2017-02-04, wf: We subtract 1 from the function's line

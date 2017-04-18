@@ -4,4 +4,7 @@ real_me=$(realpath -- "$0")
 me_dir=$(dirname -- "${real_me}")
 . "${me_dir}"/setup_classpath.sh || exit $?
 
-exec java -cp "${CP:?}" de.ovgu.ifdefrevolver.commitanalysis.ListAllFunctions "$@"
+# Increase memory
+o_jvm="-Xms2g -Xmx2g"
+
+exec java ${o_jvm} -cp "${CP:?}" de.ovgu.ifdefrevolver.commitanalysis.ListAllFunctions "$@"
