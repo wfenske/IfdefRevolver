@@ -66,23 +66,34 @@ public class ListAllFunctions {
         int numSnapshot = 1;
         for (final Snapshot s : snapshots) {
             LOG.info("Listing functions in snapshot " + (numSnapshot++) + "/" + totalSnapshots + ".");
-            CsvFileWriterHelper helper = newCsvFileWriterForSnapshot(s);
             File outputFileDir = config.snapshotResultsDirForDate(s.getSnapshotDate());
             File outputFile = new File(outputFileDir, AllSnapshotFunctionsColumns.FILE_BASENAME);
+            CsvFileWriterHelper helper = newCsvFileWriterForSnapshot(s, outputFile);
             helper.write(outputFile);
         }
         LOG.info("Done listing functions in " + totalSnapshots + " snapshots.");
     }
 
-    private CsvFileWriterHelper newCsvFileWriterForSnapshot(final Snapshot s) {
+    private CsvFileWriterHelper newCsvFileWriterForSnapshot(final Snapshot snapshot, File outputFile) {
+        final String uncaughtExceptionErrorMessage = "Uncaught exception while listing all functions in snapshot " + snapshot + ". Deleting output file " + outputFile.getAbsolutePath();
+        final String fileDeleteFailedErrorMessage = "Failed to delete output file " + outputFile.getAbsolutePath() + ". Must be deleted manually.";
         return new CsvFileWriterHelper() {
-            CsvRowProvider<Method, Snapshot, AllSnapshotFunctionsColumns> csvRowProvider = AllSnapshotFunctionsColumns.newCsvRowProviderForSnapshot(s);
+            CsvRowProvider<Method, Snapshot, AllSnapshotFunctionsColumns> csvRowProvider = AllSnapshotFunctionsColumns.newCsvRowProviderForSnapshot(snapshot);
 
             @Override
             protected void actuallyDoStuff(CSVPrinter csv) throws IOException {
                 csv.printRecord(csvRowProvider.headerRow());
                 Consumer<Method> csvRowFromFunction = newThreadSafeFunctionToCsvWriter(csv, csvRowProvider);
-                listFunctionsInSnapshot(s, csvRowFromFunction);
+                try {
+                    listFunctionsInSnapshot(snapshot, csvRowFromFunction);
+                } catch (UncaughtWorkerThreadException ex) {
+                    increaseErrorCount();
+                    LOG.error(uncaughtExceptionErrorMessage, ex);
+                    if (outputFile.delete()) {
+                    } else {
+                        LOG.error(fileDeleteFailedErrorMessage);
+                    }
+                }
             }
         };
     }
@@ -104,7 +115,7 @@ public class ListAllFunctions {
         };
     }
 
-    private void listFunctionsInSnapshot(Snapshot snapshot, Consumer<Method> functionDefinitionsConsumer) {
+    private void listFunctionsInSnapshot(final Snapshot snapshot, Consumer<Method> functionDefinitionsConsumer) throws UncaughtWorkerThreadException {
         LOG.debug("Listing all functions in " + snapshot);
         List<File> cFilesInSnapshot = snapshot.listSrcmlCFiles();
         Collection<String> filenames = filenamesFromFiles(cFilesInSnapshot);
@@ -119,17 +130,30 @@ public class ListAllFunctions {
         return filenames;
     }
 
-    private void listFunctionsInFilesByFilename(Collection<String> filenames, Consumer<Method> functionDefinitionsConsumer) {
+    private void listFunctionsInFilesByFilename(Collection<String> filenames, Consumer<Method> functionDefinitionsConsumer) throws UncaughtWorkerThreadException {
         final Iterator<String> filenameIter = filenames.iterator();
 
         final int NUM_FUNCTION_LISTING_WORKER_THREADS = 4;
-        Thread[] workers = new Thread[NUM_FUNCTION_LISTING_WORKER_THREADS];
+        final TerminableThread[] workers = new TerminableThread[NUM_FUNCTION_LISTING_WORKER_THREADS];
+        final List<Throwable> uncaughtWorkerThreadException = new ArrayList<>(NUM_FUNCTION_LISTING_WORKER_THREADS);
+
+        Thread.UncaughtExceptionHandler uncaughtExceptionHandler = new Thread.UncaughtExceptionHandler() {
+            public void uncaughtException(Thread th, Throwable ex) {
+                increaseErrorCount();
+                for (TerminableThread wt : workers) {
+                    wt.requestTermination();
+                }
+                synchronized (uncaughtWorkerThreadException) {
+                    uncaughtWorkerThreadException.add(ex);
+                }
+            }
+        };
 
         for (int iWorker = 0; iWorker < workers.length; iWorker++) {
-            workers[iWorker] = new Thread() {
+            TerminableThread t = new TerminableThread() {
                 @Override
                 public void run() {
-                    while (true) {
+                    while (!terminationRequested) {
                         final String nextFilename;
                         synchronized (filenameIter) {
                             if (!filenameIter.hasNext()) {
@@ -145,11 +169,21 @@ public class ListAllFunctions {
                             increaseErrorCount();
                         }
                     }
+
+                    if (terminationRequested) {
+                        LOG.info("Terminating thread " + this + ": termination requested.");
+                    }
                 }
             };
+            t.setUncaughtExceptionHandler(uncaughtExceptionHandler);
+            workers[iWorker] = t;
         }
 
         executeWorkers(workers);
+
+        for (Throwable ex : uncaughtWorkerThreadException) {
+            throw new UncaughtWorkerThreadException(ex);
+        }
     }
 
     private void executeWorkers(Thread[] workers) {

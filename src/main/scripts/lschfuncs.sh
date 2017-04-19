@@ -8,5 +8,6 @@ me_dir=$(dirname -- "${real_me}")
 
 # Increase memory
 o_jvm="-Xms2g -Xmx2g"
+#o_jvm="-Xms32m -Xmx32m"
 
 exec java ${o_jvm} -cp "${CP:?}" de.ovgu.ifdefrevolver.commitanalysis.ListChangedFunctions "$@"

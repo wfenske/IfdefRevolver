@@ -10,8 +10,10 @@ import org.eclipse.jgit.lib.Repository;
 
 import java.io.File;
 import java.io.IOException;
+import java.util.ArrayList;
 import java.util.Collection;
 import java.util.Iterator;
+import java.util.List;
 import java.util.function.Consumer;
 
 public class SnapshotChangedFunctionLister {
@@ -21,7 +23,6 @@ public class SnapshotChangedFunctionLister {
     private int errors = 0;
     private Git git = null;
     private Repository repo = null;
-    private File outputFile = null;
 
     public SnapshotChangedFunctionLister(ListChangedFunctionsConfig config, Snapshot snapshot) {
         this.config = config;
@@ -60,27 +61,17 @@ public class SnapshotChangedFunctionLister {
     }
 
     private File listChangedFunctionsInSnapshot() {
-        this.outputFile = null;
-        try {
-            CsvFileWriterHelper helper = newCsvFileWriterForSnapshot(snapshot);
-            File outputFileDir = config.snapshotResultsDirForDate(snapshot.getSnapshotDate());
-            this.outputFile = new File(outputFileDir, FunctionChangeHunksColumns.FILE_BASENAME);
-            helper.write(outputFile);
-        } catch (OutOfMemoryError ooe) {
-            LOG.warn("Out of memory while analyzing snapshot " + snapshot, ooe);
-            if (this.outputFile != null) {
-                if (this.outputFile.delete()) {
-                    this.outputFile = null;
-                } else {
-                    LOG.warn("Failed to delete output file " + this.outputFile.getAbsolutePath()
-                            + " after out of memory exception.");
-                }
-            }
-        }
+        File outputFileDir = config.snapshotResultsDirForDate(snapshot.getSnapshotDate());
+        File outputFile = new File(outputFileDir, FunctionChangeHunksColumns.FILE_BASENAME);
+        CsvFileWriterHelper helper = newCsvFileWriterForSnapshot(snapshot, outputFile);
+        helper.write(outputFile);
         return outputFile;
     }
 
-    private CsvFileWriterHelper newCsvFileWriterForSnapshot(final Snapshot snapshot) {
+    private CsvFileWriterHelper newCsvFileWriterForSnapshot(final Snapshot snapshot, final File outputFile) {
+        final String uncaughtExceptionErrorMessage = "Uncaught exception while listing changing functions in snapshot " + snapshot + ". Deleting output file " + outputFile.getAbsolutePath();
+        final String fileDeleteFailedErrorMessage = "Failed to delete output file " + outputFile.getAbsolutePath() + ". Must be deleted manually.";
+
         return new CsvFileWriterHelper() {
             CsvRowProvider<FunctionChangeHunk, Snapshot, FunctionChangeHunksColumns> csvRowProvider = FunctionChangeHunksColumns.newCsvRowProviderForSnapshot(snapshot);
 
@@ -88,7 +79,16 @@ public class SnapshotChangedFunctionLister {
             protected void actuallyDoStuff(CSVPrinter csv) throws IOException {
                 csv.printRecord(csvRowProvider.headerRow());
                 Consumer<FunctionChangeHunk> csvRowFromFunction = newThreadSafeFunctionToCsvWriter(csv, csvRowProvider);
-                listChangedFunctions(snapshot.getCommitHashes(), csvRowFromFunction);
+                try {
+                    listChangedFunctions(snapshot.getCommitHashes(), csvRowFromFunction);
+                } catch (UncaughtWorkerThreadException ex) {
+                    increaseErrorCount();
+                    LOG.error(uncaughtExceptionErrorMessage, ex);
+                    if (outputFile.delete()) {
+                    } else {
+                        LOG.error(fileDeleteFailedErrorMessage);
+                    }
+                }
             }
         };
     }
@@ -96,12 +96,12 @@ public class SnapshotChangedFunctionLister {
     private Consumer<FunctionChangeHunk> newThreadSafeFunctionToCsvWriter(final CSVPrinter csv, final CsvRowProvider<FunctionChangeHunk, Snapshot, FunctionChangeHunksColumns> csvRowProvider) {
         return functionChange -> {
             if (functionChange.deletesFunction()) {
-                LOG.info("Ignoring change " + functionChange + ". The whole function is deleted (probably moved someplace else).");
+                LOG.debug("Ignoring change " + functionChange + ". The whole function is deleted (probably moved someplace else).");
                 return;
             }
             ChangeHunk hunk = functionChange.getHunk();
             if ((hunk.getLinesAdded() == 0) && (hunk.getLinesDeleted() == 0)) {
-                LOG.info("Ignoring change " + functionChange + ". No lines are added or deleted.");
+                LOG.debug("Ignoring change " + functionChange + ". No lines are added or deleted.");
                 return;
             }
             Object[] rowForFunc = csvRowProvider.dataRow(functionChange);
@@ -116,15 +116,28 @@ public class SnapshotChangedFunctionLister {
         };
     }
 
-    private void listChangedFunctions(Collection<String> commitIds, Consumer<FunctionChangeHunk> changedFunctionConsumer) {
+    private void listChangedFunctions(Collection<String> commitIds, Consumer<FunctionChangeHunk> changedFunctionConsumer) throws UncaughtWorkerThreadException {
         Iterator<String> commitIdIter = commitIds.iterator();
-        Thread[] workers = new Thread[config.getNumThreads()];
+        TerminableThread[] workers = new TerminableThread[config.getNumThreads()];
+        final List<Throwable> uncaughtWorkerThreadException = new ArrayList<>(workers.length);
+
+        Thread.UncaughtExceptionHandler uncaughtExceptionHandler = new Thread.UncaughtExceptionHandler() {
+            public void uncaughtException(Thread th, Throwable ex) {
+                increaseErrorCount();
+                for (TerminableThread wt : workers) {
+                    wt.requestTermination();
+                }
+                synchronized (uncaughtWorkerThreadException) {
+                    uncaughtWorkerThreadException.add(ex);
+                }
+            }
+        };
 
         for (int iWorker = 0; iWorker < workers.length; iWorker++) {
-            workers[iWorker] = new Thread() {
+            TerminableThread t = new TerminableThread() {
                 @Override
                 public void run() {
-                    while (true) {
+                    while (!terminationRequested) {
                         final String nextCommitId;
                         synchronized (commitIdIter) {
                             if (!commitIdIter.hasNext()) {
@@ -143,9 +156,15 @@ public class SnapshotChangedFunctionLister {
                     }
                 }
             };
+            t.setUncaughtExceptionHandler(uncaughtExceptionHandler);
+            workers[iWorker] = t;
         }
 
         executeWorkers(workers);
+
+        for (Throwable ex : uncaughtWorkerThreadException) {
+            throw new UncaughtWorkerThreadException(ex);
+        }
     }
 
     private void executeWorkers(Thread[] workers) {
