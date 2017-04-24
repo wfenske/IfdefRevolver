@@ -56,7 +56,7 @@ options <- list(
 )
 
 args <- parse_args(OptionParser(
-    description = "Plot ratio of some dependent variable (e.g., bug-fixes) for functions having some property (e.g., ABSmell > 0) vs. those that don't have the property. Inputs are CSV files where each CSV file represent the data for one snapshot."
+    description = "Plot ratio of some dependent variable (e.g., bug-fixes) for functions having some property (e.g., ABSmell > 0) vs. those that don't have the property. Inputs are CSV files where each CSV file represent the data for one snapshot. If no input files are named, the directory containing the results for all the snapshots must be specified via the `--snapshotsdir' (`-s') option."
   , usage = "%prog [options]... [file]..."
   , option_list=options)
   , positional_arguments = c(0, Inf))
@@ -64,12 +64,12 @@ args <- parse_args(OptionParser(
 opts <- args$options
 
 getInputFilenames <- function(commandLineArgs) {
-    result <- args$args
+    result <- commandLineArgs$args
     if ( length(result) > 0 ) {
         return (result)
     }
 
-    opts <- args$options
+    opts <- commandLineArgs$options
     if ( is.null(opts$snapshotresultsdir) ) {
             stop("Missing input files.  Either specify explicit input files or specify the directory containing the snapshot results via the `--snapshotresultsdir' option (`-s' for short).")
     }
