@@ -40,21 +40,78 @@ reportModel <- function(model) {
 }
 
 options <- list(
-    make_option(c("-f", "--fixes"), type="integer", default=1, metavar="NUM",
-                help="Minimum number of bug-fix commits to the file to consider it fault-prone [default %default]")
+    make_option(c("-s", "--snapshotresultsdir")
+              , help="Name of the directory where the snaphsot results are located.  This folder is expected to contain folder named, e.g., `1996-07-01', which, in turn, contain CSV files named `joint_function_ab_smell_snapshot.csv'."
+              , default = NULL
+                )
+    #make_option(c("-f", "--fixes"), type="integer", default=1, metavar="NUM",
+                                        #help="Minimum number of bug-fix commits to the file to consider it fault-prone [default %default]")
     , make_option(c("-c", "--changes"), type="integer", default=1, metavar="NUM",
-                    help="Minimum number of commits to the file to consider it change-prone [default %default]")
-    , make_option(c("-l", "--large"), type="double", default=30.0, metavar="PERCENT",
-                help="Large files must belong to the given top-x percent, SLOC-wise [default %default, meaning %default%]")
+                  help="Minimum number of commits to the file to consider it change-prone [default %default]")
+    #, make_option(c("-l", "--large"), type="double", default=30.0, metavar="PERCENT",
+    #help="Large files must belong to the given top-x percent, SLOC-wise [default %default, meaning %default%]")
 )
 
-args <- parse_args(OptionParser(usage = "%prog [options] file [file ...]",
-                                option_list=options),
-                   positional_arguments = c(1, Inf))
+args <- parse_args(OptionParser(
+    description = "Build a logistic regression model to determine which independent variables have asignificant effect on functions being (or not) change-prone. If no input files are named, the directory containing the results for all the snapshots must be specified via the `--snapshotsdir' (`-s') option."
+  , usage = "%prog [options] [file ...]"
+  , option_list=options)
+  , positional_arguments = c(1, Inf))
 opts <- args$options
-inputFns <- args$args
 
-data <- do.call("rbind", lapply(inputFns, read.csv, header = TRUE))
+getInputFilenames <- function(commandLineArgs) {
+    result <- commandLineArgs$args
+    if ( length(result) > 0 ) {
+        return (result)
+    }
+
+    opts <- commandLineArgs$options
+    if ( is.null(opts$snapshotresultsdir) ) {
+            stop("Missing input files.  Either specify explicit input files or specify the directory containing the snapshot results via the `--snapshotresultsdir' option (`-s' for short).")
+    }
+
+    baseDir <- opts$snapshotresultsdir
+    snapshotDirs <- list.files(baseDir, pattern="[0-9][0-9][0-9][0-9]-[0-9][0-9]-[0-9][0-9]")
+    if (length(snapshotDirs) == 0) {
+        stop(paste("No snapshot directories found in `", baseDir, "'", sep=""))
+    }
+    return (lapply(snapshotDirs, function(snapshotDir) { file.path(baseDir, snapshotDir, "joint_function_ab_smell_snapshot.csv") }))
+}
+
+
+
+snapshotIx <- 1
+
+readSnapshotFile <- function(inputFn) {
+    snapshotData <- read.csv(inputFn, header=TRUE, sep=",",
+                             colClasses=c(
+                                 "SNAPSHOT_DATE"="character"
+                               , "FUNCTION_SIGNATURE"="character"
+                               , "FUNCTION_LOC"="numeric"
+                               , "HUNKS"="numeric"
+                               , "COMMITS"="numeric"
+                               , "BUGFIXES"="numeric"
+                               , "LINE_DELTA"="numeric"
+                               , "LINES_DELETED"="numeric"
+                               #, "LINES_ADDED"="numeric"
+                               #, "LOAC"="numeric"
+                               , "LOFC"="numeric"
+                               , "NOFL"="numeric"
+                               , "NOFC_Dup"="numeric"
+                               , "NOFC_NonDup"="numeric"
+                               , "NONEST"="numeric"))
+    cat("INFO: Reading snapshot ", snapshotData$SNAPSHOT_DATE[1], "\n", sep="")
+    snapshotData["SNAPSHOT"] <- snapshotIx
+    ## Change the value of the global variable using <<-
+    ##cat(str(max(as.numeric(snapshotData$FUNCTION_LOC), na.rm=T)))
+    ##cat(str(max(snapshotData$FUNCTION_LOC), na.rm=T))
+    snapshotIx <<- snapshotIx + 1
+    return (snapshotData)
+}
+
+inputFns <- getInputFilenames(args)
+
+data <- do.call("rbind", lapply(inputFns, readSnapshotFile))
 
 tryModel <- function (formula, modelName) {
     if (missing(modelName)) { modelName <- formula }
@@ -68,8 +125,7 @@ tryModel <- function (formula, modelName) {
 }
 
 ### Compute some more independent variables from the data
-data$FAULT_PRONE <- data$FIX_COUNT >= opts$fixes
-data$CHANGE_PRONE <- data$CHANGE_COUNT >= opts$changes
+data$CHANGE_PRONE <- data$COMMITS >= opts$changes
 
 ### Independent variables for taking smell presence into account
 
