@@ -182,11 +182,23 @@ public class CreateSnapshots {
 
         @Override
         public void run() {
-            Scanner scanner = new Scanner(stream);
+            final String logLinePrefix = "[" + progBasename + suffix + "] ";
+            final Scanner scanner = new Scanner(stream);
             try {
                 while (true) {
                     if (scanner.hasNextLine()) {
-                        LOG.debug("[" + progBasename + suffix + "] " + scanner.nextLine());
+                        String line = scanner.nextLine();
+                        if (line.contains("ERROR ")) {
+                            LOG.error(logLinePrefix + line.replaceFirst("^.*ERROR ", ""));
+                        } else if (line.contains("WARN ")) {
+                            LOG.warn(logLinePrefix + line.replaceFirst("^.*WARN ", ""));
+                        } else if (line.contains("INFO ")) {
+                            LOG.info(logLinePrefix + line.replaceFirst("^.*INFO ", ""));
+                        } else {
+                            if (LOG.isDebugEnabled()) {
+                                LOG.debug(logLinePrefix + line.replaceFirst("^.*DEBUG ", "").replaceFirst("^.*TRACE ", ""));
+                            }
+                        }
                     } else {
                         break;
                     }
