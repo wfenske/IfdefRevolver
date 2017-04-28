@@ -176,7 +176,6 @@ public class RevisionsCsvReader {
 
         final int totalNumberOfCommits = commitWindowSizeMode.countRelevantCommits(fileChangesByCommit.keySet());
         final int numSnapshots = totalNumberOfCommits / commitWindowSize;
-        final int skipFront = totalNumberOfCommits % commitWindowSize;
 
         if (numSnapshots == 0) {
             LOG.info("Insufficient amount of commits: " + totalNumberOfCommits + ". Need at least " + commitWindowSize
@@ -184,19 +183,12 @@ public class RevisionsCsvReader {
             return;
         }
 
-        LOG.debug("Skipping first " + skipFront + " commits since they don't fit into a commit window.");
         Iterator<Commit> iter = fileChangesByCommit.keySet().iterator();
         // Skip the first couple of entries and advance to the first bug-fix
-        // commit. Yes, we actually need to add 1 to the skipFront number
-        // because if called, for instance, with 5, the return value will be the
-        // 5th bugfix commit. However, what we really want is to go to the 6th
-        // bugfix commit. This also works if skipFront is 0: In this case, the
-        // function will stop at the first bug-fix commit, which is exactly what
-        // we want.
-        Commit snapshotStart = commitWindowSizeMode.skipNRelevantCommits(iter, skipFront + 1);
+        // commit or the first regular commit, depending on size mode.
+        Commit snapshotStart = commitWindowSizeMode.skipNRelevantCommits(iter, 0);
 
-        int sortIndex = 1;
-        while (true) {
+        for (int sortIndex = 1; sortIndex <= numSnapshots; sortIndex++) {
             Commit snapshotEnd = commitWindowSizeMode.skipNRelevantCommits(iter, commitWindowSize);
             if (snapshotEnd == null) {
                 SortedMap<Commit, Set<FileChange>> snapshotCommits = fileChangesByCommit.tailMap(snapshotStart);
@@ -208,7 +200,6 @@ public class RevisionsCsvReader {
                 snapshots.add(new ProperSnapshot(snapshotCommits, sortIndex));
                 snapshotStart = snapshotEnd;
             }
-            sortIndex++;
         }
 
         validateSnapshots(conf);

@@ -62,6 +62,7 @@ public class BugfixCommitVisitor implements CommitVisitor {
         //final String branches = branchNamesCsvOut(commit.getBranches());
 
         /* holt alle Modifikationen eines Commits */
+        boolean commitMadeItToOutput = false;
         for (Modification m : commit.getModifications()) {
 
             /* führt den git diff Befehl für das File aus */
@@ -100,7 +101,12 @@ public class BugfixCommitVisitor implements CommitVisitor {
                         delLine, addLine, formattedTimeStamp
                         //, inMainBranch, branches
                 );
+                commitMadeItToOutput = true;
             }
+        }
+
+        if (!commitMadeItToOutput) {
+            LOG.info("Ignoring commit " + commit.getHash() + ". No relevant modifications to .c files were found.");
         }
     }
 
