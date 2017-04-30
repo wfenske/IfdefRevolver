@@ -28,6 +28,7 @@ aggregate()
                 HUNKS,
                 COMMITS,
                 BUGFIXES,
+                LINES_CHANGED,
                 LINE_DELTA,
                 LINES_DELETED,
                 LINES_ADDED,

@@ -19,13 +19,14 @@ aggregate()
                 SNAPSHOT_DATE,
                 a.FUNCTION_SIGNATURE,
                 a.FILE,
-                a.FUNCTION_LOC           AS FUNCTION_LOC,
-                IFNULL(HUNKS, 0)         AS HUNKS,
-                IFNULL(COMMITS, 0)       AS COMMITS,
-                IFNULL(BUGFIXES, 0)      AS BUGFIXES,
-                IFNULL(LINE_DELTA, 0)    AS LINE_DELTA,
-                IFNULL(LINES_DELETED, 0) AS LINES_DELETED,
-                IFNULL(LINES_ADDED, 0)   AS LINES_ADDED
+                a.FUNCTION_LOC            AS FUNCTION_LOC,
+                IFNULL(HUNKS, 0)          AS HUNKS,
+                IFNULL(COMMITS, 0)        AS COMMITS,
+                IFNULL(BUGFIXES, 0)       AS BUGFIXES,
+                (IFNULL(LINES_ADDED, 0) + IFNULL(LINES_DELETED, 0)) AS LINES_CHANGED,
+                IFNULL(LINE_DELTA, 0)     AS LINE_DELTA,
+                IFNULL(LINES_DELETED, 0)  AS LINES_DELETED,
+                IFNULL(LINES_ADDED, 0)    AS LINES_ADDED
             FROM
                      ${ALL_FUNCTIONS_NO_EXT:?} a
                 LEFT JOIN
