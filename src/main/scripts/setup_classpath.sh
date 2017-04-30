@@ -38,6 +38,9 @@ add_to_cp "${maven_repo}"/com/opencsv/opencsv/3.8/opencsv-3.8.jar
 # apache CSV
 add_to_cp "${maven_repo}"/org/apache/commons/commons-csv/1.4/commons-csv-1.4.jar
 
+# apache IO
+add_to_cp "${maven_repo}"/commons-io/commons-io/2.5/commons-io-2.5.jar
+
 # repodriller classes
 add_to_cp "${maven_repo}"/org/repodriller/repodriller/1.2.2-SNAPSHOT-no-git-branches/repodriller-1.2.2-SNAPSHOT-no-git-branches.jar
 
