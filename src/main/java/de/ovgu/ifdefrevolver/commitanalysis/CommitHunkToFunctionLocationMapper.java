@@ -24,7 +24,8 @@ class CommitHunkToFunctionLocationMapper implements Consumer<Edit> {
     private final String commitId;
     private final Consumer<FunctionChangeHunk> changedFunctionConsumer;
     /**
-     * Number of the change hunk within the file for which this mapper has been created.  It is increased each time {@link #accept(Edit)} is called.
+     * Number of the change hunk within the file for which this mapper has been created.  It is increased each time
+     * {@link #accept(Edit)} is called.
      */
     int numHunkInFile = 0;
 
@@ -82,8 +83,8 @@ class CommitHunkToFunctionLocationMapper implements Consumer<Edit> {
         if (remBegin <= fBegin) {
             if (remEnd >= fEnd) {
                 // Edit deletes the function
-                linesDeleted = f.loc;
-                linesAdded = Math.min(f.loc, edit.getLengthB());
+                linesDeleted = f.getGrossLoc();
+                linesAdded = Math.min(f.getGrossLoc(), edit.getLengthB());
             } else {
                 // Edit starts before the function, and ends within it.
                 linesDeleted = remEnd - fBegin;

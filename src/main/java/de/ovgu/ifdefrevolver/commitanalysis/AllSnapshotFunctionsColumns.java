@@ -8,10 +8,8 @@ import de.ovgu.skunk.detection.output.CsvRowProvider;
 import java.text.SimpleDateFormat;
 
 /**
- * <p>Describes the columns of the CSV file listing all the functions defined in the C files within an individual snapshot.</p>
- * <p>
- * Created by wfenske on 28.02.17.
- * </p>
+ * <p>Describes the columns of the CSV file listing all the functions defined in the C files within an individual
+ * snapshot.</p> <p> Created by wfenske on 28.02.17. </p>
  */
 public enum AllSnapshotFunctionsColumns implements CsvColumnValueProvider<Method, Snapshot> {
 
@@ -52,7 +50,7 @@ public enum AllSnapshotFunctionsColumns implements CsvColumnValueProvider<Method
     FUNCTION_LOC {
         @Override
         public Integer csvColumnValue(Method func, Snapshot snapshot) {
-            return func.loc;
+            return func.getNetLoc();
         }
     };
 

@@ -5,10 +5,8 @@ import de.ovgu.skunk.detection.output.CsvColumnValueProvider;
 import de.ovgu.skunk.detection.output.CsvRowProvider;
 
 /**
- * <p>Describes the columns of the CSV file that lists all the individual hunks of change to functions defined in the C files within an individual snapshot.</p>
- * <p>
- * Created by wfenske on 28.02.17.
- * </p>
+ * <p>Describes the columns of the CSV file that lists all the individual hunks of change to functions defined in the C
+ * files within an individual snapshot.</p> <p> Created by wfenske on 28.02.17. </p>
  */
 public enum FunctionChangeHunksColumns implements CsvColumnValueProvider<FunctionChangeHunk, Snapshot> {
     /**
@@ -32,10 +30,10 @@ public enum FunctionChangeHunksColumns implements CsvColumnValueProvider<Functio
     /**
      * cppstats-normalized LOC of the function
      */
-    FUNCTION_LOC {
+    FUNCTION_GROSS_LOC {
         @Override
         public Integer csvColumnValue(FunctionChangeHunk changedFunc, Snapshot snapshot) {
-            return changedFunc.getFunction().loc;
+            return changedFunc.getFunction().getGrossLoc();
         }
     },
     /**
