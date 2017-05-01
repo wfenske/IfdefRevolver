@@ -21,7 +21,7 @@ findrevisions: $(REVISIONS_FILE)
 $(REVISIONS_FILE):
 	@mkdir -p logs/$(PROJECT)
 	@mkdir -p results/$(PROJECT)
-	findbugfixcommits.sh -r repos/$(PROJECT) -o $(REVISIONS_FILE) > logs/$(PROJECT)/findbugfixcommits.log 2>&1
+	findbugfixcommits.sh -r repos/$(PROJECT) -o $(REVISIONS_FILE) >> logs/$(PROJECT)/findbugfixcommits.log 2>&1
 
 checkout: $(CHECKOUT_MARKER)
 
@@ -29,7 +29,7 @@ $(CHECKOUT_MARKER): $(REVISIONS_FILE)
 	@mkdir -p logs/$(PROJECT)
 	@mkdir -p snapshots/$(PROJECT)
 	rm -f $@
-	createsnapshots.sh -p $(PROJECT) --checkout -s $(WINDOW_SIZE) > logs/$(PROJECT)/createsnapshots.log 2>&1 && \
+	createsnapshots.sh -p $(PROJECT) --checkout -s $(WINDOW_SIZE) >> logs/$(PROJECT)/createsnapshots.log 2>&1 && \
 	touch $@
 
 analyze: $(ANALYSIS_MARKER)
@@ -38,7 +38,7 @@ $(ANALYSIS_MARKER): $(ANALYZE_MAKEFILE) $(CHECKOUT_MARKER)
 	@mkdir -p logs/$(PROJECT)
 	@mkdir -p snapshots/$(PROJECT)
 	rm -f $(ANALYSIS_MARKER)
-	make -f $< > logs/$(PROJECT)/analyze.log 2>&1 && \
+	make -f $< >> logs/$(PROJECT)/analyze.log 2>&1 && \
 	touch $(ANALYSIS_MARKER)
 
 $(ANALYZE_MAKEFILE): $(CHECKOUT_MARKER)
