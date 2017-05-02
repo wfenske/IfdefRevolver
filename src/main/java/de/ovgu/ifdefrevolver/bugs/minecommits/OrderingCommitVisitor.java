@@ -121,7 +121,12 @@ public class OrderingCommitVisitor implements CommitVisitor {
         if (!parentHash.isPresent()) {
             return false;
         }
-        OrderedCommit parent = allCommitsByHash.get(parentHash.get());
+        String parentHashValue = parentHash.get();
+        OrderedCommit parent = allCommitsByHash.get(parentHashValue);
+        if (parent == null) {
+            LOG.warn("Commit " + c.getHash() + " refers to unknown parent: " + parentHashValue);
+            return false;
+        }
         if (isCommitBetterChildOf(c, parent)) {
             makeCommitChildOf(c, parent);
             return true;
@@ -228,7 +233,7 @@ public class OrderingCommitVisitor implements CommitVisitor {
     private boolean commitModifiesCFile(Commit commit) {
         for (Modification m : commit.getModifications()) {
             String fileName = m.getFileName();
-            if (fileName.endsWith(".c") || !fileName.endsWith(".C")) {
+            if (fileName.endsWith(".c") || fileName.endsWith(".C")) {
                 return true;
             }
         }
