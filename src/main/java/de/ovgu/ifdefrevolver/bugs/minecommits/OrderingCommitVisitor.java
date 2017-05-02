@@ -83,38 +83,87 @@ public class OrderingCommitVisitor implements CommitVisitor {
 
     private void tryToBuildLongerBranches() {
         LOG.info("Trying to build longer branches.");
-        final int MAGIC_UPPER_BOUNDARY = 1000;
-        boolean changed = true;
+        final int MAGIC_UPPER_BOUNDARY_1 = allCommitsByHash.size() + 1000;
         int numberOfReassignments = 0;
-        for (int i = 0; changed && (i < MAGIC_UPPER_BOUNDARY); i++) {
-            changed = false;
-            Set<OrderedCommit> commitsWithTakenParents = findCommitsWithTakenParents();
-            LOG.debug("Found " + commitsWithTakenParents.size() + " commits whose parent is already assigned elsewhere.");
-            for (OrderedCommit c : commitsWithTakenParents) {
-                OrderedCommit parent = allCommitsByHash.get(c.getParentHash().get());
-                // NOTE, 2017-05-02, wf: Parent must be non-null.  After all, this is the list of commits whose
-                // parents are already assigned elsewhere.
-                Optional<OrderedCommit> currentChild = parent.getChild();
-                final int currentNumberOfChildren;
-                if (currentChild.isPresent()) {
-                    currentNumberOfChildren = currentChild.get().countDescendants();
-                } else {
-                    currentNumberOfChildren = 0;
-                }
-                if (c.countDescendants() > currentNumberOfChildren) {
-                    Optional<OrderedCommit> oldChild = c.assignParent(parent);
-                    if (oldChild.isPresent()) {
-                        OrderedCommit oldChildValue = oldChild.get();
-                        commitsWithoutParents.put(oldChildValue.getHash(), oldChildValue);
-                    }
-                    commitsWithoutParents.remove(c.getHash());
-                    numberOfReassignments++;
-                    changed = true;
-                    break;
-                }
+        int iRunCommitsWithTakenParents;
+        for (iRunCommitsWithTakenParents = 0; iRunCommitsWithTakenParents < MAGIC_UPPER_BOUNDARY_1; iRunCommitsWithTakenParents++) {
+            boolean foundBetterParentsForCommitsWithTakenParents = tryAssignBetterParentsToCommitsWithTakenParents();
+            if (foundBetterParentsForCommitsWithTakenParents) {
+                numberOfReassignments++;
+            } else {
+                break;
             }
         }
-        LOG.info("Reassigned " + numberOfReassignments + " parent/child relationships.");
+
+        LOG.info("Reassigned " + numberOfReassignments + " parent/child relationships in total in " + iRunCommitsWithTakenParents + " iteration(s).");
+    }
+
+    private boolean tryAssignBetterParentsToCommitsWithTakenParents() {
+        boolean changed = false;
+        Set<OrderedCommit> commitsWithTakenParents = findCommitsWithTakenParents();
+        LOG.debug("Found " + commitsWithTakenParents.size() + " commits whose parent is already assigned elsewhere.");
+        for (OrderedCommit c : commitsWithTakenParents) {
+            boolean parentReassigned = tryAssignBetterParent(c);
+            if (parentReassigned) {
+                changed = true;
+                break;
+            }
+        }
+        return changed;
+    }
+
+    /**
+     * @param c
+     * @return <code>true</code> if the parent/child relationship of the commit was changed
+     */
+    private boolean tryAssignBetterParent(OrderedCommit c) {
+        Optional<String> parentHash = c.getParentHash();
+        if (!parentHash.isPresent()) {
+            return false;
+        }
+        OrderedCommit parent = allCommitsByHash.get(parentHash.get());
+        if (isCommitBetterChildOf(c, parent)) {
+            makeCommitChildOf(c, parent);
+            return true;
+        } else {
+            return false;
+        }
+    }
+
+    /**
+     * Turns <code>c</code> into the child of <code>parent</code> and updates the map {@link #commitsWithoutParents}.
+     *
+     * @param newChild The new child
+     * @param parent   The parent
+     */
+    private void makeCommitChildOf(OrderedCommit newChild, OrderedCommit parent) {
+        Optional<OrderedCommit> oldChild = newChild.assignParent(parent);
+        if (oldChild.isPresent()) {
+            OrderedCommit oldChildValue = oldChild.get();
+            commitsWithoutParents.put(oldChildValue.getHash(), oldChildValue);
+        }
+        commitsWithoutParents.remove(newChild.getHash());
+    }
+
+    /**
+     * @param potentialNewChild
+     * @param parent
+     * @return <code>true</code> iff the chain of commits starting with <code>parent</code> becomes longer with
+     * <code>potentialNewChild</code> as the child of <code>parent</code>.
+     */
+    private boolean isCommitBetterChildOf(OrderedCommit potentialNewChild, OrderedCommit parent) {
+        Optional<OrderedCommit> currentChild = parent.getChild();
+        final int currentNumberOfChildrenOfParent;
+        if (currentChild.isPresent()) {
+            OrderedCommit currentChildValue = currentChild.get();
+            if (currentChildValue == potentialNewChild) {
+                return false;
+            }
+            currentNumberOfChildrenOfParent = currentChildValue.countDescendants();
+        } else {
+            currentNumberOfChildrenOfParent = 0;
+        }
+        return (potentialNewChild.countDescendants() > currentNumberOfChildrenOfParent);
     }
 
     private Set<OrderedCommit> findCommitsWithTakenParents() {
