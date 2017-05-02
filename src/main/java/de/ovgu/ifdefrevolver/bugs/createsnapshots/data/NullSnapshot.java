@@ -3,8 +3,9 @@
  */
 package de.ovgu.ifdefrevolver.bugs.createsnapshots.data;
 
-import java.io.File;
-import java.util.*;
+import java.util.Collections;
+import java.util.Date;
+import java.util.SortedSet;
 
 /**
  * @author wfenske
@@ -35,8 +36,8 @@ public class NullSnapshot implements ISnapshot {
     }
 
     @Override
-    public SortedMap<Commit, Set<FileChange>> getCommits() {
-        return Collections.emptySortedMap();
+    public SortedSet<Commit> getCommits() {
+        return Collections.emptySortedSet();
     }
 
     @Override
@@ -52,11 +53,6 @@ public class NullSnapshot implements ISnapshot {
     @Override
     public String revisionHash() {
         return null;
-    }
-
-    @Override
-    public Collection<File> computeChangedFiles(Collection<File> filesInNextSnapshotCheckout, ISnapshot nextSnapshot) {
-        return filesInNextSnapshotCheckout;
     }
 
     @Override

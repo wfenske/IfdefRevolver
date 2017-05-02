@@ -36,7 +36,7 @@ public class ListCommits {
                 HelpFormatter formatter = new HelpFormatter();
                 System.err.flush();
                 formatter.printHelp(progName() + " [OPTIONS]",
-                        "List relevant commits in a GIT repository.\n\nOptions:\n",
+                        "List commits in a GIT repository, excluding merge commits and excluding commits that don't change .c files.\n\nOptions:\n",
                         actualOptions, null, false);
                 System.out.flush();
                 System.exit(0);

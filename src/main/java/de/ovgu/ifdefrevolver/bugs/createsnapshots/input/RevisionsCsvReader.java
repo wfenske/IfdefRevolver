@@ -3,11 +3,10 @@ package de.ovgu.ifdefrevolver.bugs.createsnapshots.input;
 import de.ovgu.ifdefrevolver.bugs.correlate.input.ProjectInformationReader;
 import de.ovgu.ifdefrevolver.bugs.correlate.input.RawSnapshotInfo;
 import de.ovgu.ifdefrevolver.bugs.createsnapshots.data.Commit;
-import de.ovgu.ifdefrevolver.bugs.createsnapshots.data.FileChange;
 import de.ovgu.ifdefrevolver.bugs.createsnapshots.data.ProperSnapshot;
 import de.ovgu.ifdefrevolver.bugs.createsnapshots.main.CommitWindowSizeMode;
 import de.ovgu.ifdefrevolver.bugs.createsnapshots.main.CreateSnapshotsConfig;
-import de.ovgu.ifdefrevolver.bugs.minecommits.RevisionsFullColumns;
+import de.ovgu.ifdefrevolver.bugs.minecommits.OrderedRevisionsColumns;
 import de.ovgu.ifdefrevolver.commitanalysis.IHasSnapshotFilter;
 import de.ovgu.skunk.detection.output.CsvEnumUtils;
 import org.apache.log4j.Logger;
@@ -29,7 +28,7 @@ public class RevisionsCsvReader {
     /**
      * Initialized in {@link #readAllCommits()}
      */
-    private SortedMap<Commit, Set<FileChange>> fileChangesByCommit;
+    private SortedSet<Commit> commits;
     /**
      * Initialized in {@link #readAllCommits()}
      */
@@ -51,13 +50,13 @@ public class RevisionsCsvReader {
 
     public int readAllCommits() {
         LOG.info("Reading all file changes in " + this.revisionsCsv.getAbsolutePath());
-        this.fileChangesByCommit = new TreeMap<>();
+        this.commits = new TreeSet<>();
         this.commitsByHash = new HashMap<>();
 
         FileReader fr = null;
         BufferedReader br = null;
         final String cvsSplitBy = ",";
-        final SimpleDateFormat formatter = new SimpleDateFormat(RevisionsFullColumns.TIMESTAMP_FORMAT);
+        final SimpleDateFormat formatter = new SimpleDateFormat(OrderedRevisionsColumns.TIMESTAMP_FORMAT);
         int lineNo = 0;
         int bugfixCount = 0;
 
@@ -74,30 +73,19 @@ public class RevisionsCsvReader {
 
                 // use comma as separator
                 String[] hunkInfo = line.split(cvsSplitBy);
-                String commitHash = hunkInfo[0];
-                boolean bugfix = Boolean.parseBoolean(hunkInfo[1]);
-                // int bugfixCount = Integer.parseInt(hunkInfo[8]);
-                String comDateStr = hunkInfo[7];
+                int branch = Integer.parseInt(hunkInfo[OrderedRevisionsColumns.BRANCH.ordinal()]);
+                int positionInBranch = Integer.parseInt(hunkInfo[OrderedRevisionsColumns.POSITION.ordinal()]);
+                String commitHash = hunkInfo[OrderedRevisionsColumns.COMMIT_ID.ordinal()];
+                boolean bugfix = false;
+                String comDateStr = hunkInfo[OrderedRevisionsColumns.TIMESTAMP.ordinal()];
                 Date comDate = formatter.parse(comDateStr);
-                String fileName = hunkInfo[3];
 
-                final Set<FileChange> filesChangedByCommit;
-                Commit commit = commitsByHash.get(commitHash);
-                if (commit == null) {
-                    //int sortIndex = commitsByHash.size();
-                    commit = new Commit(commitHash, comDate, bugfix);
-                    commitsByHash.put(commitHash, commit);
-                    filesChangedByCommit = new HashSet<>();
-                    fileChangesByCommit.put(commit, filesChangedByCommit);
-                    if (bugfix) {
-                        bugfixCount++;
-                    }
-                } else {
-                    filesChangedByCommit = fileChangesByCommit.get(commit);
+                Commit commit = new Commit(branch, positionInBranch, commitHash, comDate, bugfix);
+                commitsByHash.put(commitHash, commit);
+                commits.add(commit);
+                if (bugfix) {
+                    bugfixCount++;
                 }
-
-                FileChange chFile = new FileChange(fileName, commit);
-                filesChangedByCommit.add(chFile);
 
                 if (lineNo % 10000 == 0) {
                     LOG.debug("Processed " + lineNo + " lines of file changes ...");
@@ -134,10 +122,9 @@ public class RevisionsCsvReader {
     }
 
     /**
-     * Checks the format of the header line of a revisionsFull.csv file.  The format is mandated by
-     * {@link RevisionsFullColumns}.  The header fields must be comma-separated and at least all the fields of the enum
-     * must occur in the header line.  They must occur in the same order.  Case and leading/trailing whitespace are
-     * ignored.
+     * Checks the format of the header line of a revisionsFull.csv file.  The format is mandated by {@link
+     * OrderedRevisionsColumns}.  The header fields must be comma-separated and at least all the fields of the enum must
+     * occur in the header line.  They must occur in the same order.  Case and leading/trailing whitespace are ignored.
      *
      * @param headerLine First line of the revisionsCsvFile being read.
      * @throws IllegalArgumentException if the header line does not match the expected format
@@ -148,7 +135,7 @@ public class RevisionsCsvReader {
             throw new NullPointerException("Header line of revisions file is null.");
         }
         String[] headerFields = headerLine.split(",");
-        String[] expectedHeader = CsvEnumUtils.headerRowStrings(RevisionsFullColumns.class);
+        String[] expectedHeader = CsvEnumUtils.headerRowStrings(OrderedRevisionsColumns.class);
         if (headerFields.length < expectedHeader.length) {
             throw new IllegalArgumentException("Missing fields in header of revisions file. Expected " +
                     Arrays.toString(expectedHeader) + ". Got: " + headerLine);
@@ -174,37 +161,62 @@ public class RevisionsCsvReader {
             throw new IllegalArgumentException("Invalid commit window size (should be >= 1): " + commitWindowSize);
         }
 
-        final int totalNumberOfCommits = commitWindowSizeMode.countRelevantCommits(fileChangesByCommit.keySet());
-        final int numSnapshots = totalNumberOfCommits / commitWindowSize;
+        final SortedMap<Integer, SortedSet<Commit>> commitsByBranch = groupCommitsByBranch();
+        final int totalNumberOfCommits = commitWindowSizeMode.countRelevantCommits(commits);
 
-        if (numSnapshots == 0) {
-            LOG.info("Insufficient amount of commits: " + totalNumberOfCommits + ". Need at least " + commitWindowSize
-                    + ". No snapshots will be created.");
-            return;
+        int globalSnapshotIndex = 1;
+        int totalNumSnapshots = 0;
+        for (Map.Entry<Integer, SortedSet<Commit>> e : commitsByBranch.entrySet()) {
+            SortedSet<Commit> commits = e.getValue();
+            final int relevantCommits = commitWindowSizeMode.countRelevantCommits(commits);
+            final int numSnapshots = relevantCommits / commitWindowSize;
+            if (numSnapshots == 0) continue;
+            totalNumSnapshots += numSnapshots;
+
+            Iterator<Commit> iter = commits.iterator();
+            // Skip the first couple of entries and advance to the first bug-fix
+            // commit or the first regular commit, depending on size mode.
+            Commit snapshotStart = commitWindowSizeMode.skipNRelevantCommits(iter, 0);
+
+            for (int iSnapshotIndexInBranch = 1; iSnapshotIndexInBranch <= numSnapshots; iSnapshotIndexInBranch++) {
+                Commit snapshotEnd = commitWindowSizeMode.skipNRelevantCommits(iter, commitWindowSize);
+                if (snapshotEnd == null) {
+                    SortedSet<Commit> snapshotCommits = commits.tailSet(snapshotStart);
+                    snapshots.add(new ProperSnapshot(snapshotCommits, globalSnapshotIndex));
+                    break;
+                } else {
+                    SortedSet<Commit> snapshotCommits = commits.subSet(snapshotStart, snapshotEnd);
+                    snapshots.add(new ProperSnapshot(snapshotCommits, globalSnapshotIndex));
+                    snapshotStart = snapshotEnd;
+                }
+                globalSnapshotIndex++;
+            }
         }
 
-        Iterator<Commit> iter = fileChangesByCommit.keySet().iterator();
-        // Skip the first couple of entries and advance to the first bug-fix
-        // commit or the first regular commit, depending on size mode.
-        Commit snapshotStart = commitWindowSizeMode.skipNRelevantCommits(iter, 0);
 
-        for (int sortIndex = 1; sortIndex <= numSnapshots; sortIndex++) {
-            Commit snapshotEnd = commitWindowSizeMode.skipNRelevantCommits(iter, commitWindowSize);
-            if (snapshotEnd == null) {
-                SortedMap<Commit, Set<FileChange>> snapshotCommits = fileChangesByCommit.tailMap(snapshotStart);
-                snapshots.add(new ProperSnapshot(snapshotCommits, sortIndex));
-                break;
-            } else {
-                SortedMap<Commit, Set<FileChange>> snapshotCommits = fileChangesByCommit.subMap(snapshotStart,
-                        snapshotEnd);
-                snapshots.add(new ProperSnapshot(snapshotCommits, sortIndex));
-                snapshotStart = snapshotEnd;
-            }
+        if (totalNumSnapshots == 0) {
+            LOG.info("Insufficient amount of commits: " + totalNumberOfCommits + ". Need at least " + commitWindowSize
+                    + ". No snapshots were created.");
+            return;
         }
 
         validateSnapshots(conf);
 
-        LOG.info("Successfully created " + numSnapshots + " snapshots.");
+        LOG.info("Successfully created " + totalNumSnapshots + " snapshots.");
+    }
+
+    private SortedMap<Integer, SortedSet<Commit>> groupCommitsByBranch() {
+        SortedMap<Integer, SortedSet<Commit>> commitsByBranch = new TreeMap<>();
+        for (Commit c : commits) {
+            int branch = c.getBranch();
+            SortedSet<Commit> commitsInBranch = commitsByBranch.get(branch);
+            if (commitsInBranch == null) {
+                commitsInBranch = new TreeSet<>();
+                commitsByBranch.put(branch, commitsInBranch);
+            }
+            commitsInBranch.add(c);
+        }
+        return commitsByBranch;
     }
 
     /**
@@ -221,7 +233,12 @@ public class RevisionsCsvReader {
             commitWindowSizeMode.validateSnapshotSize(snapshot, commitWindowSize);
         }
 
-        int expectedNumSnapshots = commitWindowSizeMode.countRelevantCommits(fileChangesByCommit.keySet()) / commitWindowSize;
+        int expectedNumSnapshots = 0;
+        SortedMap<Integer, SortedSet<Commit>> groupedCommits = groupCommitsByBranch();
+        for (Collection<Commit> cs : groupedCommits.values()) {
+            int snapshots = commitWindowSizeMode.countRelevantCommits(cs) / commitWindowSize;
+            expectedNumSnapshots += snapshots;
+        }
         int actualNumSnapshots = snapshots.size();
         if (actualNumSnapshots != expectedNumSnapshots) {
             throw new AssertionError("Expected " + expectedNumSnapshots + " snapshots to be created, but got  "
@@ -287,18 +304,14 @@ public class RevisionsCsvReader {
     }
 
     private ProperSnapshot properSnapshotFromRawSnapshotInfo(RawSnapshotInfo rawSnapshotInfo) {
-        SortedMap<Commit, Set<FileChange>> fileChangesByCommitForSnapshot = new TreeMap<>();
+        SortedSet<Commit> fileChangesByCommitForSnapshot = new TreeSet<>();
 
         for (String commitHash : rawSnapshotInfo.commitHashes) {
             final Commit commit = commitsByHash.get(commitHash);
             if (commit == null) {
                 throw new IllegalArgumentException("Snapshot " + rawSnapshotInfo + " refers to an unknown commit hash: " + commitHash);
             }
-            Set<FileChange> fileChanges = fileChangesByCommit.get(commit);
-            if (fileChanges == null) {
-                throw new IllegalStateException("Internal error: no file changes for commit " + commit);
-            }
-            fileChangesByCommitForSnapshot.put(commit, fileChanges);
+            fileChangesByCommitForSnapshot.add(commit);
         }
 
         ProperSnapshot result = new ProperSnapshot(fileChangesByCommitForSnapshot, rawSnapshotInfo.sortIndex);

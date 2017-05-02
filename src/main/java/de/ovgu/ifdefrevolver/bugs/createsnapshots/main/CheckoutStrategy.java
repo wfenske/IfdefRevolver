@@ -174,14 +174,7 @@ class CheckoutStrategy implements ISnapshotProcessingModeStrategy {
 
     private void copyCheckoutToTmpSnapshotDir(List<File> filesInCurrentCheckout, ProperSnapshot currentSnapshot) {
         final File cppstatsDir = new File(snapshotDir(currentSnapshot), "source");
-        // Copy Files
-        if (conf.isOptimized()) {
-            Collection<File> changedFiles = previousSnapshot.computeChangedFiles(filesInCurrentCheckout,
-                    currentSnapshot);
-            copyAllFiles(changedFiles, cppstatsDir);
-        } else {
-            copyAllFiles(filesInCurrentCheckout, cppstatsDir);
-        }
+        copyAllFiles(filesInCurrentCheckout, cppstatsDir);
     }
 
     /**
@@ -277,7 +270,7 @@ class CheckoutStrategy implements ISnapshotProcessingModeStrategy {
             buff = new BufferedWriter(fileWriter);
             buff.write(snapshot.getSortIndex() + "," + snapshot.revisionDateString());
             buff.newLine();
-            for (Commit commit : snapshot.getCommits().keySet()) {
+            for (Commit commit : snapshot.getCommits()) {
                 buff.write(commit.getHash());
                 buff.newLine();
             }

@@ -15,7 +15,7 @@ import java.util.*;
 public class OrderingCommitVisitor implements CommitVisitor {
     private static Logger LOG = Logger.getLogger(OrderingCommitVisitor.class);
 
-    private final DateFormat dateFormat = new SimpleDateFormat(RevisionsFullColumns.TIMESTAMP_FORMAT);
+    private final DateFormat dateFormat = new SimpleDateFormat(OrderedRevisionsColumns.TIMESTAMP_FORMAT);
 
     public OrderingCommitVisitor() {
     }

@@ -42,20 +42,4 @@ public enum OrderedRevisionsColumns {
     public static final String TIMESTAMP_FORMAT = "yyyy-MM-dd HH:mm:ss";
 
     public abstract String stringValue(OrderedCommit c);
-
-    public String commitToString(OrderedCommit c) {
-        if (c.isMerge()) {
-            LOG.info("Ignoring commit " + c.getHash() + ": merge commit.");
-        }
-        StringBuilder line = new StringBuilder();
-        for (OrderedRevisionsColumns columns : OrderedRevisionsColumns.values()) {
-            if (line.length() != 0) {
-                line.append(',');
-            }
-            line.append(columns.stringValue(c));
-        }
-        String s = line.toString();
-        System.out.println(s);
-        return s;
-    }
 }

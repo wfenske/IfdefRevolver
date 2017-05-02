@@ -415,11 +415,7 @@ public class CreateSnapshots {
     private static final String OPT_COMMIT_WINDOW_SIZE_MODE_L = "sizemode";
 
     /**
-     * Optional flag for optimizing some unknown magical stuff
-     */
-    private static final String OPT_OPTIMIZED = "O";
-    /**
-     * --reposdir=, e.g. /home/hnes/Masterarbeit/Repositories/
+     * --reposdir=, e.g. /home/me/Repositories/
      */
     private static final String OPT_REPOS_DIR_L = "reposdir";
     /**
@@ -493,8 +489,6 @@ public class CreateSnapshots {
         ProjectInformationConfig.parseProjectNameFromCommandLine(line, res);
         ProjectInformationConfig.parseSnapshotsDirFromCommandLine(line, res, res.skunkMode().snapshotDirMissingStrategy());
         ProjectInformationConfig.parseProjectResultsDirFromCommandLine(line, res);
-
-        res.setOptimized(line.hasOption(OPT_OPTIMIZED));
 
         final String reposDirName;
         if (line.hasOption(OPT_REPOS_DIR_L)) {
@@ -676,9 +670,6 @@ public class CreateSnapshots {
                 .build());
 
         options.addOptionGroup(skunkModeOptions);
-
-        options.addOption(Option.builder(OPT_OPTIMIZED).longOpt("optimized")
-                .desc("Magic optimization option. I don't know what it does.").build());
         // @formatter:on
         return options;
     }

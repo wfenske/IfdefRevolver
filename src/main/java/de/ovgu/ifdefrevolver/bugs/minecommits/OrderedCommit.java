@@ -12,7 +12,7 @@ public class OrderedCommit {
     final Optional<String> parentHash;
     final boolean merge;
     final boolean modifiesCFile;
-    Optional<OrderedCommit> parent;
+    Optional<OrderedCommit> parent = Optional.empty();
     Optional<OrderedCommit> child = Optional.empty();
     /**
      * number assigned to this chain of parent-child related commits

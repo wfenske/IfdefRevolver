@@ -21,7 +21,7 @@ findrevisions: $(REVISIONS_FILE)
 $(REVISIONS_FILE):
 	@mkdir -p logs/$(PROJECT)
 	@mkdir -p results/$(PROJECT)
-	findbugfixcommits.sh -r repos/$(PROJECT) -o $(REVISIONS_FILE) >> logs/$(PROJECT)/findbugfixcommits.log 2>&1
+	lscommits.sh -r repos/$(PROJECT) -o $(REVISIONS_FILE) >> logs/$(PROJECT)/lscommits.log 2>&1
 
 checkout: $(CHECKOUT_MARKER)
 

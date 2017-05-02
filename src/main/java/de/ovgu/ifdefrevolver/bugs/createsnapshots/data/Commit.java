@@ -12,8 +12,12 @@ public class Commit implements Comparable<Commit> {
     private final String hash;
     private final Date date;
     private final boolean bugfix;
+    private final int branch;
+    private final int positionInBranch;
 
-    public Commit(String hash, Date date, boolean bugfix) {
+    public Commit(int branch, int positionInBranch, String hash, Date date, boolean bugfix) {
+        this.branch = branch;
+        this.positionInBranch = positionInBranch;
         this.hash = hash;
         this.date = date;
         this.bugfix = bugfix;
@@ -34,8 +38,7 @@ public class Commit implements Comparable<Commit> {
     }
 
     /**
-     * @return <code>true</code> if this is a bugfix commit, <code>false</code>
-     * otherwise
+     * @return <code>true</code> if this is a bugfix commit, <code>false</code> otherwise
      */
     public boolean isBugfix() {
         return bugfix;
@@ -63,11 +66,16 @@ public class Commit implements Comparable<Commit> {
         return true;
     }
 
+    public int getBranch() {
+        return branch;
+    }
+
     @Override
     public int compareTo(Commit o) {
-        int cmp = this.getDate().compareTo(o.getDate());
+        int cmp = this.branch - o.branch;
         if (cmp != 0)
             return cmp;
-        return this.getHash().compareTo(o.getHash());
+        cmp = this.positionInBranch - o.positionInBranch;
+        return cmp;
     }
 }

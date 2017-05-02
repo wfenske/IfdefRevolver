@@ -27,7 +27,6 @@ public class CreateSnapshotsConfig extends ProjectInformationConfig {
 
     private SnapshotProcessingMode snapshotProcessingMode = null;
     private Smell smell = null;
-    private boolean optimized = false;
 
     private int commitWindowSize = -1;
     public static final CommitWindowSizeMode DEFAULT_COMMIT_WINDOW_SIZE_MODE = CommitWindowSizeMode.COMMITS;
@@ -84,14 +83,6 @@ public class CreateSnapshotsConfig extends ProjectInformationConfig {
 
     public void setSmell(Smell smell) {
         this.smell = smell;
-    }
-
-    public boolean isOptimized() {
-        return optimized;
-    }
-
-    public void setOptimized(boolean optimized) {
-        this.optimized = optimized;
     }
 
     public String smellConfig() {

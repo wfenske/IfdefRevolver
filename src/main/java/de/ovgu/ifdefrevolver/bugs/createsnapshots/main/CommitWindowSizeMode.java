@@ -1,13 +1,11 @@
 package de.ovgu.ifdefrevolver.bugs.createsnapshots.main;
 
 import de.ovgu.ifdefrevolver.bugs.createsnapshots.data.Commit;
-import de.ovgu.ifdefrevolver.bugs.createsnapshots.data.FileChange;
 import de.ovgu.ifdefrevolver.bugs.createsnapshots.data.ISnapshot;
 
 import java.util.Collection;
 import java.util.Iterator;
-import java.util.Set;
-import java.util.SortedMap;
+import java.util.SortedSet;
 
 /**
  * Created by wfenske on 05.04.17.
@@ -24,11 +22,11 @@ public enum CommitWindowSizeMode {
 
         @Override
         public void validateSnapshotSize(ISnapshot snapshot, int expectedSize) {
-            SortedMap<Commit, Set<FileChange>> changesByCommits = snapshot.getCommits();
-            int size = changesByCommits.size();
+            SortedSet<Commit> commits = snapshot.getCommits();
+            int size = commits.size();
             if (size != expectedSize) {
                 throw new AssertionError("Snapshot contains " + size + " commits, expected " + expectedSize
-                        + ". Commits: " + changesByCommits.keySet());
+                        + ". Commits: " + commits.toString());
             }
         }
 
@@ -56,7 +54,8 @@ public enum CommitWindowSizeMode {
         }
     },
     /**
-     * Each commit window contains a fixed number of bug-fix commits.  The total number of commits per window therefore varies.
+     * Each commit window contains a fixed number of bug-fix commits.  The total number of commits per window therefore
+     * varies.
      */
     FIXES {
         @Override
@@ -66,8 +65,7 @@ public enum CommitWindowSizeMode {
 
         @Override
         public void validateSnapshotSize(ISnapshot snapshot, int expectedSize) {
-            SortedMap<Commit, Set<FileChange>> changesByCommits = snapshot.getCommits();
-            Collection<Commit> commits = changesByCommits.keySet();
+            Collection<Commit> commits = snapshot.getCommits();
             int size = countRelevantCommits(commits);
             if (size != expectedSize) {
                 throw new AssertionError("Snapshot contains " + size + " bug-fix commits, expected " + expectedSize
@@ -115,8 +113,7 @@ public enum CommitWindowSizeMode {
     /**
      * @param snapshot     The snapshot to validate
      * @param expectedSize Number of expected commits or bug-fixes, depending on the mode
-     * @throws AssertionError if the snapshot does not contain the specified number of
-     *                        commits
+     * @throws AssertionError if the snapshot does not contain the specified number of commits
      */
     public abstract void validateSnapshotSize(ISnapshot snapshot, final int expectedSize) throws AssertionError;
 
@@ -127,12 +124,10 @@ public enum CommitWindowSizeMode {
      * or until the iterator does not provide any more elements.
      *
      * @param iter an Iterator
-     * @param n    A non-negative number indicating the number of commits which
-     *             should be skipped. If 0, the iterator will be advanced to the
-     *             next bug-fix commit, if such a commit exists.
-     * @return The n-th bug-fix commit. If no such relevant commit exists
-     * (because the iterator stops returning elements before that),
-     * <code>null</code> is returned.
+     * @param n    A non-negative number indicating the number of commits which should be skipped. If 0, the iterator
+     *             will be advanced to the next bug-fix commit, if such a commit exists.
+     * @return The n-th bug-fix commit. If no such relevant commit exists (because the iterator stops returning elements
+     * before that), <code>null</code> is returned.
      */
     public abstract Commit skipNRelevantCommits(Iterator<Commit> iter, final int n);
 }

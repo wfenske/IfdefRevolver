@@ -8,7 +8,7 @@ import de.ovgu.ifdefrevolver.bugs.correlate.main.IHasResultsDir;
 import de.ovgu.ifdefrevolver.bugs.correlate.main.IHasRevisionCsvFile;
 import de.ovgu.ifdefrevolver.bugs.correlate.main.IHasSnapshotsDir;
 import de.ovgu.ifdefrevolver.bugs.createsnapshots.input.RevisionsCsvReader;
-import de.ovgu.ifdefrevolver.bugs.minecommits.RevisionsFullColumns;
+import de.ovgu.ifdefrevolver.bugs.minecommits.OrderedRevisionsColumns;
 import de.ovgu.ifdefrevolver.commitanalysis.IHasSnapshotFilter;
 import org.apache.commons.lang3.tuple.Pair;
 import org.apache.log4j.Logger;
@@ -57,7 +57,7 @@ public class ProjectInformationReader<TConfig extends IHasProjectInfoFile & IHas
         LOG.info("Reading revisions file " + conf.revisionCsvFile());
 
         final String cvsSplitBy = ",";
-        final DateFormat formatter = new SimpleDateFormat(RevisionsFullColumns.TIMESTAMP_FORMAT);
+        final DateFormat formatter = new SimpleDateFormat(OrderedRevisionsColumns.TIMESTAMP_FORMAT);
 
         final Map<String, Snapshot> snapshotsByCommit = mapSnapshotsToCommits();
 

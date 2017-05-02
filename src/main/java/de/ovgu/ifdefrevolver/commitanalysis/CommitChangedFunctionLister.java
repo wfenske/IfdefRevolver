@@ -38,11 +38,8 @@ class CommitChangedFunctionLister {
     }
 
     /**
-     * <p>
-     * Code partially taken from <a href=
-     * 'http://stackoverflow.com/questions/19467305/using-the-jgit-how-can-i-retrieve-the-line-numbers-of-added-deleted-lines'>
-     * Stackoverflow</a>
-     * </p>
+     * <p> Code partially taken from <a href= 'http://stackoverflow.com/questions/19467305/using-the-jgit-how-can-i-retrieve-the-line-numbers-of-added-deleted-lines'>
+     * Stackoverflow</a> </p>
      */
     public void listChangedFunctions() {
         LOG.info("Analyzing commit " + commitId);
@@ -109,7 +106,7 @@ class CommitChangedFunctionLister {
         Set<String> aSideCFilePaths = new HashSet<>();
         for (DiffEntry diff : diffs) {
             String oldPath = diff.getOldPath();
-            if (oldPath.endsWith(".c")) {
+            if (oldPath.endsWith(".c") || oldPath.endsWith(".C")) {
                 aSideCFilePaths.add(oldPath);
             }
         }
