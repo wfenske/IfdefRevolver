@@ -2,6 +2,7 @@
 
 PROJECT="${1:?no project name}"
 
+printf 'DATE,BRANCH,POSITION,COMMIT\n'
 for f in results/$PROJECT/snapshots/*.csv
 do
     date=$(basename $f)
