@@ -3,6 +3,8 @@
  */
 package de.ovgu.ifdefrevolver.bugs.createsnapshots.data;
 
+import de.ovgu.ifdefrevolver.util.DateUtils;
+
 import java.util.Date;
 
 /**
@@ -10,16 +12,16 @@ import java.util.Date;
  */
 public class Commit implements Comparable<Commit> {
     private final String hash;
-    private final Date date;
+    private Date timestamp;
     private final boolean bugfix;
     private final int branch;
     private final int positionInBranch;
 
-    public Commit(int branch, int positionInBranch, String hash, Date date, boolean bugfix) {
+    public Commit(int branch, int positionInBranch, String hash, Date timestamp, boolean bugfix) {
         this.branch = branch;
         this.positionInBranch = positionInBranch;
         this.hash = hash;
-        this.date = date;
+        this.timestamp = timestamp;
         this.bugfix = bugfix;
     }
 
@@ -33,8 +35,8 @@ public class Commit implements Comparable<Commit> {
     /**
      * @return the date of the commit
      */
-    public Date getDate() {
-        return date;
+    public Date getTimestamp() {
+        return timestamp;
     }
 
     /**
@@ -77,5 +79,13 @@ public class Commit implements Comparable<Commit> {
             return cmp;
         cmp = this.positionInBranch - o.positionInBranch;
         return cmp;
+    }
+
+    public boolean isAtLeastOneDayBefore(Commit other) {
+        return DateUtils.isAtLeastOneDayBefore(this.getTimestamp(), other.getTimestamp());
+    }
+
+    public void advanceTimestampOneDay() {
+        timestamp = org.apache.commons.lang3.time.DateUtils.addDays(timestamp, 1);
     }
 }

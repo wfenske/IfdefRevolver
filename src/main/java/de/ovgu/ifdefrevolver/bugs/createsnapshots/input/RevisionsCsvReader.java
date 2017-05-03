@@ -164,7 +164,6 @@ public class RevisionsCsvReader {
         final SortedMap<Integer, SortedSet<Commit>> commitsByBranch = groupCommitsByBranch();
         final int totalNumberOfCommits = commitWindowSizeMode.countRelevantCommits(commits);
 
-        int globalSnapshotIndex = 1;
         int totalNumSnapshots = 0;
         for (Map.Entry<Integer, SortedSet<Commit>> e : commitsByBranch.entrySet()) {
             SortedSet<Commit> commits = e.getValue();
@@ -182,19 +181,21 @@ public class RevisionsCsvReader {
                 Commit snapshotEnd = commitWindowSizeMode.skipNRelevantCommits(iter, commitWindowSize);
                 if (snapshotEnd == null) {
                     SortedSet<Commit> snapshotCommits = commits.tailSet(snapshotStart);
-                    snapshots.add(new ProperSnapshot(snapshotCommits, globalSnapshotIndex));
+                    snapshots.add(new ProperSnapshot(snapshotCommits));
                     break;
                 } else {
                     SortedSet<Commit> snapshotCommits = commits.subSet(snapshotStart, snapshotEnd);
-                    snapshots.add(new ProperSnapshot(snapshotCommits, globalSnapshotIndex));
+                    snapshots.add(new ProperSnapshot(snapshotCommits));
                     snapshotStart = snapshotEnd;
                 }
-                globalSnapshotIndex++;
             }
         }
 
+        orderSnapshotsByDate();
+        ensureStrictlyAscendingSnapshotStartingDates();
+        initializeSnapshotIndices();
 
-        if (totalNumSnapshots == 0) {
+        if (snapshots.isEmpty()) {
             LOG.info("Insufficient amount of commits: " + totalNumberOfCommits + ". Need at least " + commitWindowSize
                     + ". No snapshots were created.");
             return;
@@ -203,6 +204,46 @@ public class RevisionsCsvReader {
         validateSnapshots(conf);
 
         LOG.info("Successfully created " + totalNumSnapshots + " snapshots.");
+    }
+
+    private void initializeSnapshotIndices() {
+        int globalSnapshotIndex = 1;
+        for (ProperSnapshot s : snapshots) {
+            s.setSortIndex(globalSnapshotIndex);
+            globalSnapshotIndex++;
+        }
+    }
+
+    private void ensureStrictlyAscendingSnapshotStartingDates() {
+        LOG.info("Adjusting timestamps of snapshots to ensure distinct, ascending starting dates.");
+        final int len = snapshots.size();
+        boolean changed = true;
+        int numChanges = 0;
+        while (changed) {
+            changed = false;
+            for (int i = len - 2; i >= 0; i--) {
+                ProperSnapshot current = snapshots.get(i);
+                ProperSnapshot next = snapshots.get(i + 1);
+                if (current.isAtLeastOneDayBefore(next)) {
+                    // This is exactly how we want it.
+                    continue;
+                } else {
+                    next.advanceStartDateOneDay();
+                    changed = true;
+                    numChanges++;
+                }
+            }
+        }
+        LOG.info("Adjusted " + numChanges + " conflicting snapshot start dates.");
+    }
+
+    private void orderSnapshotsByDate() {
+        Collections.sort(snapshots, new Comparator<ProperSnapshot>() {
+            @Override
+            public int compare(ProperSnapshot o1, ProperSnapshot o2) {
+                return o1.startDate().compareTo(o2.startDate());
+            }
+        });
     }
 
     private SortedMap<Integer, SortedSet<Commit>> groupCommitsByBranch() {
@@ -244,6 +285,7 @@ public class RevisionsCsvReader {
             throw new AssertionError("Expected " + expectedNumSnapshots + " snapshots to be created, but got  "
                     + actualNumSnapshots + ".");
         }
+        assertStrictlyAscendingSnapshotDates();
     }
 
     /**
@@ -299,8 +341,20 @@ public class RevisionsCsvReader {
             ProperSnapshot snapshot = properSnapshotFromRawSnapshotInfo(rawSnapshotInfo);
             snapshots.add(snapshot);
         }
+        assertStrictlyAscendingSnapshotDates();
 
         LOG.info("Successfully read " + snapshots.size() + " snapshots.");
+    }
+
+    private void assertStrictlyAscendingSnapshotDates() {
+        final int len = snapshots.size();
+        for (int i = len - 2; i >= 0; i--) {
+            ProperSnapshot current = snapshots.get(i);
+            ProperSnapshot next = snapshots.get(i + 1);
+            if (!current.isAtLeastOneDayBefore(next)) {
+                throw new AssertionError("Snapshots don't have strictly ascending dates!");
+            }
+        }
     }
 
     private ProperSnapshot properSnapshotFromRawSnapshotInfo(RawSnapshotInfo rawSnapshotInfo) {
@@ -314,7 +368,8 @@ public class RevisionsCsvReader {
             fileChangesByCommitForSnapshot.add(commit);
         }
 
-        ProperSnapshot result = new ProperSnapshot(fileChangesByCommitForSnapshot, rawSnapshotInfo.sortIndex);
+        ProperSnapshot result = new ProperSnapshot(fileChangesByCommitForSnapshot);
+        result.setSortIndex(rawSnapshotInfo.sortIndex);
         return result;
     }
 }

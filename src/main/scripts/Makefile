@@ -29,7 +29,7 @@ $(CHECKOUT_MARKER): $(REVISIONS_FILE)
 	@mkdir -p logs/$(PROJECT)
 	@mkdir -p snapshots/$(PROJECT)
 	rm -f $@
-	createsnapshots.sh -p $(PROJECT) --checkout -s $(WINDOW_SIZE) >> logs/$(PROJECT)/createsnapshots.log 2>&1 && \
+	createsnapshots.sh -p $(PROJECT) --checkout -s $(WINDOW_SIZE) >> logs/$(PROJECT)/checkout.log 2>&1 && \
 	touch $@
 
 analyze: $(ANALYSIS_MARKER)
@@ -42,4 +42,4 @@ $(ANALYSIS_MARKER): $(ANALYZE_MAKEFILE) $(CHECKOUT_MARKER)
 	touch $(ANALYSIS_MARKER)
 
 $(ANALYZE_MAKEFILE): $(CHECKOUT_MARKER)
-	configure-project.sh $(PROJECT) > $@
+	configure-project.sh $(PROJECT) > $@ || ( rm -f $@; false )

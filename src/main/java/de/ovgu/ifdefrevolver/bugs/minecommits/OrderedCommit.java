@@ -1,8 +1,8 @@
 package de.ovgu.ifdefrevolver.bugs.minecommits;
 
-import java.util.Calendar;
-import java.util.Comparator;
-import java.util.Optional;
+import de.ovgu.ifdefrevolver.util.DateUtils;
+
+import java.util.*;
 
 /**
  * Created by wfenske on 02.05.17.
@@ -10,7 +10,6 @@ import java.util.Optional;
 public class OrderedCommit {
     final String hash;
     final Calendar timestamp;
-    final String formattedTimestamp;
     final Optional<String> parentHash;
     final boolean merge;
     final boolean modifiesCFile;
@@ -32,10 +31,9 @@ public class OrderedCommit {
         }
     };
 
-    public OrderedCommit(String hash, Calendar timestamp, String formattedTimestamp, String parentHash, boolean merge, boolean modifiesCFile) {
+    public OrderedCommit(String hash, Calendar timestamp, String parentHash, boolean merge, boolean modifiesCFile) {
         this.hash = hash;
         this.timestamp = timestamp;
-        this.formattedTimestamp = formattedTimestamp;
         if (parentHash == null || parentHash.isEmpty()) {
             this.parentHash = Optional.empty();
         } else {
@@ -47,10 +45,6 @@ public class OrderedCommit {
 
     public String getHash() {
         return hash;
-    }
-
-    public String getFormattedTimestamp() {
-        return formattedTimestamp;
     }
 
     public Optional<String> getParentHash() {
@@ -110,12 +104,51 @@ public class OrderedCommit {
      */
     public int countDescendants() {
         int r = 0;
-        Optional<OrderedCommit> point = Optional.of(this);
-        while (point.isPresent()) {
+        for (Iterator<OrderedCommit> it = descendantsIterator(); it.hasNext(); it.next()) {
             r++;
-            point = point.get().getChild();
         }
         return r;
+    }
+
+    private static class DescendentsIterator implements Iterator<OrderedCommit> {
+        private Optional<OrderedCommit> point;
+
+        public DescendentsIterator(OrderedCommit root) {
+            this.point = Optional.ofNullable(root);
+        }
+
+        @Override
+        public boolean hasNext() {
+            return point.isPresent();
+        }
+
+        @Override
+        public OrderedCommit next() {
+            if (!point.isPresent()) {
+                throw new NoSuchElementException();
+            }
+            OrderedCommit pointValue = point.get();
+            point = pointValue.getChild();
+            return pointValue;
+        }
+    }
+
+    public Iterator<OrderedCommit> descendantsIterator() {
+        return new DescendentsIterator(this);
+    }
+
+    /**
+     * Creates a fresh list of this commit and all of its descendants.  Changes to this list will not affect the
+     * parent/child relationships in this chain of commits.  Neither will such changes be reflected in this list.
+     *
+     * @return A fresh list of this commit and all of its descendants.
+     */
+    public List<OrderedCommit> descendants() {
+        List<OrderedCommit> result = new LinkedList<>();
+        for (Iterator<OrderedCommit> it = descendantsIterator(); it.hasNext(); ) {
+            result.add(it.next());
+        }
+        return result;
     }
 
     @Override
@@ -147,5 +180,17 @@ public class OrderedCommit {
 
     public void setBranchPosition(int branchPosition) {
         this.branchPosition = branchPosition;
+    }
+
+    public Calendar getTimestamp() {
+        return timestamp;
+    }
+
+    public void advanceTimestampOneDay() {
+        timestamp.add(Calendar.DATE, 1);
+    }
+
+    public boolean isAtLeastOneDayBefore(OrderedCommit other) {
+        return DateUtils.isAtLeastOneDayBefore(this.timestamp, other.timestamp);
     }
 }

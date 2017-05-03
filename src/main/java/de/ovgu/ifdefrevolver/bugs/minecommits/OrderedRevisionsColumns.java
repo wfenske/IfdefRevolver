@@ -2,6 +2,9 @@ package de.ovgu.ifdefrevolver.bugs.minecommits;
 
 import org.apache.log4j.Logger;
 
+import java.text.DateFormat;
+import java.text.SimpleDateFormat;
+
 /**
  * Created by wfenske on 10.03.17.
  */
@@ -33,7 +36,8 @@ public enum OrderedRevisionsColumns {
     }, TIMESTAMP {
         @Override
         public String stringValue(OrderedCommit c) {
-            return c.getFormattedTimestamp();
+            DateFormat format = new SimpleDateFormat(TIMESTAMP_FORMAT);
+            return format.format(c.getTimestamp().getTime());
         }
     };
 

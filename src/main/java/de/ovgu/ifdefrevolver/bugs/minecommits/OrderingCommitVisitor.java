@@ -39,7 +39,7 @@ public class OrderingCommitVisitor implements CommitVisitor {
         }
 
         final String commitHash = commit.getHash();
-        OrderedCommit orderedCommit = new OrderedCommit(commitHash, cal, formattedTimeStamp, commit.getParent(),
+        OrderedCommit orderedCommit = new OrderedCommit(commitHash, cal, commit.getParent(),
                 commit.isMerge(), commitModifiesCFile);
 
         allCommitsByHash.put(commitHash, orderedCommit);
@@ -187,49 +187,82 @@ public class OrderingCommitVisitor implements CommitVisitor {
         assignMissingParents();
         tryToBuildLongerBranches();
         LOG.info("Ordering commits by branch and timestamp.");
-        List<OrderedCommit> roots = new ArrayList<>(commitsWithoutParents.values());
-        Collections.sort(roots, OrderedCommit.ORDER_BY_TIMESTAMP);
-        List<OrderedCommit> result = new ArrayList<>();
-        int branchNumber = 0;
-        OrderedCommit lastRoot = null;
-        for (OrderedCommit root : roots) {
-            if (lastRoot != null) {
-                LOG.info("last ts: " + lastRoot.formattedTimestamp + " new ts: " + root.formattedTimestamp + " cmp: " + OrderedCommit.ORDER_BY_TIMESTAMP.compare(lastRoot, root));
+
+        Map<OrderedCommit, List<OrderedCommit>> branchesByRoot = new HashMap<>();
+        for (OrderedCommit root : commitsWithoutParents.values()) {
+            List<OrderedCommit> branch = listIncludableDescendants(root);
+            if (!branch.isEmpty()) {
+                OrderedCommit adjustedRoot = branch.get(0);
+                branchesByRoot.put(adjustedRoot, branch);
             }
-            lastRoot = root;
-            branchNumber++;
-            //printBranch(root, branchNumber);
-            appendCommitsInBranch(root, result, branchNumber);
         }
-        LOG.info("Found " + result.size() + " commits in " + branchNumber + " branches.");
+        List<OrderedCommit> orderedRoots = new ArrayList<>(branchesByRoot.keySet());
+        Collections.sort(orderedRoots, OrderedCommit.ORDER_BY_TIMESTAMP);
+        ensureStrictlyAscendingStartingDates(orderedRoots);
+
+        List<OrderedCommit> result = new ArrayList<>();
+        int branchNumber = 1;
+        for (OrderedCommit root : orderedRoots) {
+            List<OrderedCommit> branch = branchesByRoot.get(root);
+            appendCommitsInBranch(branch, result, branchNumber);
+            branchNumber++;
+        }
+        LOG.info("Found " + result.size() + " relevant commits in " + branchNumber + " branches.");
         return result;
     }
 
-    private void appendCommitsInBranch(OrderedCommit root, List<OrderedCommit> result, int branchNumber) {
-        OrderedCommit point = root;
-        int branchPosition = 1;
-        while (true) {
-            point.setBranchNumber(branchNumber);
-            boolean includeCommit = isIncludeCommit(point);
-            if (includeCommit) {
-                point.setBranchPosition(branchPosition);
-                branchPosition++;
-                result.add(point);
+    private void ensureStrictlyAscendingStartingDates(List<OrderedCommit> orderedRoots) {
+        LOG.info("Adjusting timestamps of roots to ensure distinct, ascending starting dates.");
+        final int len = orderedRoots.size();
+        boolean changed = true;
+        int numChanges = 0;
+        while (changed) {
+            changed = false;
+            for (int i = len - 2; i >= 0; i--) {
+                OrderedCommit current = orderedRoots.get(i);
+                OrderedCommit next = orderedRoots.get(i + 1);
+                if (current.isAtLeastOneDayBefore(next)) {
+                    // This is exactly how we want it.
+                    continue;
+                } else {
+                    next.advanceTimestampOneDay();
+                    changed = true;
+                    numChanges++;
+                }
             }
-            Optional<OrderedCommit> child = point.getChild();
-            if (!child.isPresent()) break;
-            point = child.get();
+        }
+        LOG.info("Adjusted " + numChanges + " conflicting timestamps.");
+    }
+
+    private List<OrderedCommit> listIncludableDescendants(OrderedCommit root) {
+        List<OrderedCommit> branch = root.descendants();
+        for (Iterator<OrderedCommit> it = branch.iterator(); it.hasNext(); ) {
+            OrderedCommit commit = it.next();
+            if (!isIncludeCommit(commit)) {
+                it.remove();
+            }
+        }
+        return branch;
+    }
+
+    private void appendCommitsInBranch(List<OrderedCommit> branch, List<OrderedCommit> result, final int branchNumber) {
+        int branchPosition = 1;
+        for (OrderedCommit c : branch) {
+            c.setBranchNumber(branchNumber);
+            c.setBranchPosition(branchPosition);
+            branchPosition++;
+            result.add(c);
         }
     }
 
-    private boolean isIncludeCommit(OrderedCommit point) {
+    private boolean isIncludeCommit(OrderedCommit commit) {
         boolean includeCommit = true;
-        if (point.isMerge()) {
-            LOG.info("Ignoring commit " + point.getHash() + ": is a merge.");
+        if (commit.isMerge()) {
+            LOG.info("Ignoring commit " + commit.getHash() + ": is a merge.");
             includeCommit = false;
         }
-        if (!point.isModifiesCFile()) {
-            LOG.info("Ignoring commit " + point.getHash() + ": no .c files are modified.");
+        if (!commit.isModifiesCFile()) {
+            LOG.info("Ignoring commit " + commit.getHash() + ": no .c files are modified.");
             includeCommit = false;
         }
         return includeCommit;

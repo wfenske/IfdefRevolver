@@ -19,7 +19,7 @@ public class FileChange implements Comparable<FileChange> {
     }
 
     public Date getDate() {
-        return this.commit.getDate();
+        return this.commit.getTimestamp();
     }
 
     public String getHash() {

@@ -21,9 +21,9 @@ public class ProperSnapshot implements ISnapshot {
 
     private final SortedSet<Commit> commits;
     private final SimpleDateFormat dateFormatter = new SimpleDateFormat("yyyy-MM-dd");
-    private final int sortIndex;
+    private int sortIndex = -1;
 
-    public ProperSnapshot(SortedSet<Commit> commits, int sortIndex) {
+    public ProperSnapshot(SortedSet<Commit> commits) {
         if (commits == null) {
             throw new NullPointerException("Attempt to instantiate proper snapshot with null for commits.");
         }
@@ -33,23 +33,22 @@ public class ProperSnapshot implements ISnapshot {
         }
 
         this.commits = commits;
-        this.sortIndex = sortIndex;
     }
 
-    private Commit representativeCommit() {
+    public Commit startCommit() {
         return commits.first();
     }
 
     @Override
     public String revisionHash() {
-        Commit c = representativeCommit();
+        Commit c = startCommit();
         return c.getHash();
     }
 
     @Override
     public Date revisionDate() {
-        Commit c = representativeCommit();
-        return c.getDate();
+        Commit c = startCommit();
+        return c.getTimestamp();
     }
 
     @Override
@@ -62,12 +61,12 @@ public class ProperSnapshot implements ISnapshot {
 
     @Override
     public Date startDate() {
-        return commits.first().getDate();
+        return commits.first().getTimestamp();
     }
 
     @Override
     public Date endDate() {
-        return commits.last().getDate();
+        return commits.last().getTimestamp();
     }
 
     /**
@@ -94,5 +93,17 @@ public class ProperSnapshot implements ISnapshot {
 
     public int getSortIndex() {
         return sortIndex;
+    }
+
+    public void setSortIndex(int sortIndex) {
+        this.sortIndex = sortIndex;
+    }
+
+    public boolean isAtLeastOneDayBefore(ProperSnapshot otherSnapshot) {
+        return this.startCommit().isAtLeastOneDayBefore(otherSnapshot.startCommit());
+    }
+
+    public void advanceStartDateOneDay() {
+        this.startCommit().advanceTimestampOneDay();
     }
 }
