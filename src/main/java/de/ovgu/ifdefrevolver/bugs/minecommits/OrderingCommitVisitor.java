@@ -39,7 +39,7 @@ public class OrderingCommitVisitor implements CommitVisitor {
         }
 
         final String commitHash = commit.getHash();
-        OrderedCommit orderedCommit = new OrderedCommit(commitHash, formattedTimeStamp, commit.getParent(),
+        OrderedCommit orderedCommit = new OrderedCommit(commitHash, cal, formattedTimeStamp, commit.getParent(),
                 commit.isMerge(), commitModifiesCFile);
 
         allCommitsByHash.put(commitHash, orderedCommit);
@@ -187,11 +187,16 @@ public class OrderingCommitVisitor implements CommitVisitor {
         assignMissingParents();
         tryToBuildLongerBranches();
         LOG.info("Ordering commits by branch and timestamp.");
-        List<OrderedCommit> commits = new ArrayList<>(commitsWithoutParents.values());
+        List<OrderedCommit> roots = new ArrayList<>(commitsWithoutParents.values());
+        Collections.sort(roots, OrderedCommit.ORDER_BY_TIMESTAMP);
         List<OrderedCommit> result = new ArrayList<>();
-        Collections.sort(commits, OrderedCommit.ORDER_BY_TIMESTAMP);
         int branchNumber = 0;
-        for (OrderedCommit root : commits) {
+        OrderedCommit lastRoot = null;
+        for (OrderedCommit root : roots) {
+            if (lastRoot != null) {
+                LOG.info("last ts: " + lastRoot.formattedTimestamp + " new ts: " + root.formattedTimestamp + " cmp: " + OrderedCommit.ORDER_BY_TIMESTAMP.compare(lastRoot, root));
+            }
+            lastRoot = root;
             branchNumber++;
             //printBranch(root, branchNumber);
             appendCommitsInBranch(root, result, branchNumber);
@@ -240,12 +245,16 @@ public class OrderingCommitVisitor implements CommitVisitor {
         return false;
     }
 
+    private boolean finalized = false;
+
     @Override
-    public void finalize(SCMRepository repo, PersistenceMechanism writer) {
+    public synchronized void finalize(SCMRepository repo, PersistenceMechanism writer) {
+        if (finalized) return;
+        finalized = true;
         List<OrderedCommit> commitsInOrder = this.getCommitsInOrder();
         OrderedRevisionsColumns[] columns = OrderedRevisionsColumns.values();
-        Object line[] = new Object[columns.length];
         for (OrderedCommit c : commitsInOrder) {
+            Object line[] = new Object[columns.length];
             for (int iCol = 0; iCol < columns.length; iCol++) {
                 OrderedRevisionsColumns column = columns[iCol];
                 line[iCol] = column.stringValue(c);

@@ -1,5 +1,6 @@
 package de.ovgu.ifdefrevolver.bugs.minecommits;
 
+import java.util.Calendar;
 import java.util.Comparator;
 import java.util.Optional;
 
@@ -8,6 +9,7 @@ import java.util.Optional;
  */
 public class OrderedCommit {
     final String hash;
+    final Calendar timestamp;
     final String formattedTimestamp;
     final Optional<String> parentHash;
     final boolean merge;
@@ -26,12 +28,13 @@ public class OrderedCommit {
     public static final Comparator<OrderedCommit> ORDER_BY_TIMESTAMP = new Comparator<OrderedCommit>() {
         @Override
         public int compare(OrderedCommit a, OrderedCommit b) {
-            return a.getFormattedTimestamp().compareTo(b.getFormattedTimestamp());
+            return a.timestamp.compareTo(b.timestamp);
         }
     };
 
-    public OrderedCommit(String hash, String formattedTimestamp, String parentHash, boolean merge, boolean modifiesCFile) {
+    public OrderedCommit(String hash, Calendar timestamp, String formattedTimestamp, String parentHash, boolean merge, boolean modifiesCFile) {
         this.hash = hash;
+        this.timestamp = timestamp;
         this.formattedTimestamp = formattedTimestamp;
         if (parentHash == null || parentHash.isEmpty()) {
             this.parentHash = Optional.empty();
