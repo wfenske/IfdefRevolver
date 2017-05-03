@@ -358,18 +358,19 @@ public class RevisionsCsvReader {
     }
 
     private ProperSnapshot properSnapshotFromRawSnapshotInfo(RawSnapshotInfo rawSnapshotInfo) {
-        SortedSet<Commit> fileChangesByCommitForSnapshot = new TreeSet<>();
+        SortedSet<Commit> commits = new TreeSet<>();
 
         for (String commitHash : rawSnapshotInfo.commitHashes) {
             final Commit commit = commitsByHash.get(commitHash);
             if (commit == null) {
                 throw new IllegalArgumentException("Snapshot " + rawSnapshotInfo + " refers to an unknown commit hash: " + commitHash);
             }
-            fileChangesByCommitForSnapshot.add(commit);
+            commits.add(commit);
         }
 
-        ProperSnapshot result = new ProperSnapshot(fileChangesByCommitForSnapshot);
+        ProperSnapshot result = new ProperSnapshot(commits);
         result.setSortIndex(rawSnapshotInfo.sortIndex);
+        result.setStartDate(rawSnapshotInfo.date);
         return result;
     }
 }

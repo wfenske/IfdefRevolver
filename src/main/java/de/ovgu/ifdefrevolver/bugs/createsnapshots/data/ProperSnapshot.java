@@ -106,4 +106,8 @@ public class ProperSnapshot implements ISnapshot {
     public void advanceStartDateOneDay() {
         this.startCommit().advanceTimestampOneDay();
     }
+
+    public void setStartDate(Date startDate) {
+        startCommit().setDate(startDate);
+    }
 }

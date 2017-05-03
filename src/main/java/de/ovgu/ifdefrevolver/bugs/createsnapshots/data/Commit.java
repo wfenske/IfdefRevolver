@@ -88,4 +88,8 @@ public class Commit implements Comparable<Commit> {
     public void advanceTimestampOneDay() {
         timestamp = org.apache.commons.lang3.time.DateUtils.addDays(timestamp, 1);
     }
+
+    public void setDate(Date date) {
+        this.timestamp = date;
+    }
 }
