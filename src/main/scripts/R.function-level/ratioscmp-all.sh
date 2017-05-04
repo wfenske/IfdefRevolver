@@ -4,31 +4,32 @@ resultsdir=${1:-results}
 
 INDEPS=
 #INDEPS+=" ABSmell"
-INDEPS+=" NOFL"
-INDEPS+=" NOFC_Dup"
+#INDEPS+=" NOFL"
+#INDEPS+=" NOFC_Dup"
 INDEPS+=" NOFC_NonDup"
-INDEPS+=" NONEST"
+#INDEPS+=" NONEST"
 
 DEPS=
 #DEPS+=" BUGFIXES"
 #DEPS+=" HUNKS"
 #DEPS+=" COMMITS"
-DEPS+=" LINE_DELTA"
-DEPS+=" LINES_ADDED"
-DEPS+=" LINES_DELETED"
+#DEPS+=" LINE_DELTA"
+#DEPS+=" LINES_ADDED"
+#DEPS+=" LINES_DELETED"
+DEPS+=" LINES_CHANGED"
 
 SCALES=
 #SCALES+=" none"
-SCALES+=" LOC"
+#SCALES+=" LOC"
 SCALES+=" COUNT"
 
 SYSTEMS=
-SYSTEMS+=" Apache"
-SYSTEMS+=" BusyBox"
+#SYSTEMS+=" Apache"
+#SYSTEMS+=" BusyBox"
 SYSTEMS+=" OpenLDAP"
 #SYSTEMS+=" OpenVPN"
-SYSTEMS+=" Pidgin"
-SYSTEMS+=" SQLite"
+#SYSTEMS+=" Pidgin"
+#SYSTEMS+=" SQLite"
 
 err_combos=""
 combo_err=0
@@ -45,6 +46,8 @@ do
 ###	    esac
 	    case ${dep}/${scale} in
 		HUNKS/LOC) opt_ymax="--ymax=0.2";;
+		LINES_CHANGED/LOC) opt_ymax="--ymax=0.5";;
+		LINES_CHANGED/COUNT) opt_ymax="--ymax=50";;
 		*) opt_ymax='';;
 	    esac
 	    
