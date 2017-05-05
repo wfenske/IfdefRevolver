@@ -1,6 +1,6 @@
 #!/usr/bin/env Rscript
 
-### Performs logistic regression the totals over all snapshots of a system
+### Performs linear regression the totals over all snapshots of a system
 ###
 ### Input files are the snapshot files under Correlated/
 
@@ -54,7 +54,7 @@ options <- list(
 )
 
 args <- parse_args(OptionParser(
-    description = "Build a logistic regression model to determine which independent variables have asignificant effect on functions being (or not) change-prone. If no input files are named, the directory containing the results for all the snapshots must be specified via the `--snapshotsdir' (`-s') option."
+    description = "Build a linear regression model to determine which independent variables have a significant effect on functions being (or not) change-prone. If no input files are named, the directory containing the results for all the snapshots must be specified via the `--snapshotsdir' (`-s') option."
   , usage = "%prog [options] [file ...]"
   , option_list=options)
   , positional_arguments = c(0, Inf))
