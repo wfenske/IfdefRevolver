@@ -3,11 +3,15 @@ package de.ovgu.ifdefrevolver.bugs.minecommits.main;
 import de.ovgu.ifdefrevolver.bugs.minecommits.Config;
 import de.ovgu.ifdefrevolver.bugs.minecommits.OrderingCommitStudy;
 import org.apache.commons.cli.*;
+import org.apache.log4j.Logger;
 import org.repodriller.RepoDriller;
 
+import java.io.File;
 import java.io.PrintWriter;
 
 public class ListCommits {
+    private static Logger LOG = Logger.getLogger(ListCommits.class);
+
 
     public static final String OPT_HELP = "h";
     public static final String OPT_OUTPUT_FILE = "o";
@@ -22,6 +26,22 @@ public class ListCommits {
 
         OrderingCommitStudy study = new OrderingCommitStudy(conf);
         new RepoDriller().start(study);
+        if (!study.wasStudySuccessful()) {
+            LOG.error("Study was unsuccessful. See previous log messages for details. Output file "
+                    + conf.outputFileName + " will be removed.");
+            deleteOutputFileIfExists(conf);
+            System.err.flush();
+            System.out.flush();
+            System.exit(1);
+        }
+    }
+
+    private static void deleteOutputFileIfExists(Config conf) {
+        File outFile = new File(conf.outputFileName);
+        boolean deleted = outFile.delete();
+        if (!deleted && outFile.exists()) {
+            LOG.warn("Failed to delete output file " + conf.outputFileName + ". Please delete it manually.");
+        }
     }
 
     private Config parseCommandLine(String[] args) {

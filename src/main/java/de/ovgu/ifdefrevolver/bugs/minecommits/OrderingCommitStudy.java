@@ -16,6 +16,7 @@ public class OrderingCommitStudy implements Study {
     private static Logger LOG = Logger.getLogger(OrderingCommitStudy.class);
 
     private final Config conf;
+    private boolean studySuccessful = false;
 
     public OrderingCommitStudy(Config conf) {
         this.conf = conf;
@@ -23,6 +24,7 @@ public class OrderingCommitStudy implements Study {
 
     @Override
     public void execute() {
+        studySuccessful = false;
         File outFile = new File(conf.outputFileName);
         File canonicalOutFile;
         try {
@@ -78,5 +80,10 @@ public class OrderingCommitStudy implements Study {
                 .process(visitor, writer)
                 .mine();
         // @formatter:on
+        studySuccessful = true;
+    }
+
+    public boolean wasStudySuccessful() {
+        return studySuccessful;
     }
 }
