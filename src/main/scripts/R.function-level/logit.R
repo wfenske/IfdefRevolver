@@ -34,9 +34,10 @@ checkSignificanceOfIndividualPredictors <- function(model, modelName) {
     cat("\n")
 }
 
-reportModel <- function(model) {
+reportModel <- function(model, modelName) {
     ##print(summary(model))
     print(exp(cbind(OR = coef(model), suppressMessages(confint(model)))))
+    checkSignificanceOfIndividualPredictors(model, modelName)
 }
 
 options <- list(
@@ -56,7 +57,7 @@ args <- parse_args(OptionParser(
     description = "Build a logistic regression model to determine which independent variables have asignificant effect on functions being (or not) change-prone. If no input files are named, the directory containing the results for all the snapshots must be specified via the `--snapshotsdir' (`-s') option."
   , usage = "%prog [options] [file ...]"
   , option_list=options)
-  , positional_arguments = c(1, Inf))
+  , positional_arguments = c(0, Inf))
 opts <- args$options
 
 getInputFilenames <- function(commandLineArgs) {
@@ -94,7 +95,8 @@ readSnapshotFile <- function(inputFn) {
                                , "LINE_DELTA"="numeric"
                                , "LINES_DELETED"="numeric"
                                #, "LINES_ADDED"="numeric"
-                               #, "LOAC"="numeric"
+                               , "LOAC"="numeric"
+                               , "LINES_CHANGED"="numeric"
                                , "LOFC"="numeric"
                                , "NOFL"="numeric"
                                , "NOFC_Dup"="numeric"
@@ -113,45 +115,27 @@ inputFns <- getInputFilenames(args)
 
 data <- do.call("rbind", lapply(inputFns, readSnapshotFile))
 
-tryModel <- function (formula, modelName) {
+tryLogitModel <- function (formula, modelName) {
     if (missing(modelName)) { modelName <- formula }
     cat("\n\n")
     cat("***************************\n")
     cat("*** "); cat(modelName); cat(" ***\n")
 
     model <- glm(formula, data = data, family = binomial(logit))
-    reportModel(model)
+    reportModel(model, modelName)
     return(model)
 }
 
-### Compute some more independent variables from the data
-data$CHANGE_PRONE <- data$COMMITS >= opts$changes
+tryLinearModel <- function (formula, modelName) {
+    if (missing(modelName)) { modelName <- formula }
+    cat("\n\n")
+    cat("***************************\n")
+    cat("*** "); cat(modelName); cat(" ***\n")
 
-### Independent variables for taking smell presence into account
-
-data$ANY_COUNT <- (0
-                   + data$AB_COUNT
-                   ##+ data$AF_COUNT
-                   + data$AF_COUNT)
-
-### Consider smells numerically
-data$AB <- data$AB_COUNT
-data$AF <- data$AF_COUNT
-data$LF <- data$LF_COUNT
-data$ANY <- data$ANY_COUNT
-
-## Consider smells binary
-##data$AB <- data$AB_COUNT >= 1
-##data$AF <- data$AF_COUNT >= 1
-##data$LF <- data$LF_COUNT >= 1
-##data$ANY <- data$ANY_COUNT >= 1
-
-### Independent variables for taking file size into account
-topSLOCValue <- quantile(data$SLOC, 1.0 - opts$large / 100.0)
-data$logSLOC <- log(data$SLOC + 1)
-data$binLARGE <- data$SLOC > topSLOCValue
-
-data$SIZE <- data$logSLOC
+    model <- lm(formula, data = data)
+    reportModel(model, modelName)
+    return(model)
+}
 
 computeOrTable <- function(dep, indep) {
     truePos  <- sum(dep    & indep)
@@ -169,6 +153,7 @@ calcPrecisionRecallFmeasure <- function(predict, actual_labels) {
     return(c(precision, recall, fmeasure))
 }
 
+## TODO: Fix or delete
 printOrTable <- function(ort, nameDep, nameIndep) {
     Fsmelly  <- ort[1]
     Fclean   <- ort[2]
@@ -194,23 +179,48 @@ tryOrs <- function(dep, nameDep, indep, nameIndep) {
     cat(sprintf(nameIndep, prf[1], prf[2], prf[3], fmt="%s;%.3f;%.3f;%.3f\n"))
 }
 
-if (TRUE) {
-    cat("*** Fault-Proneness ***\n")
-    tryOrs(data$FAULT_PRONE, "Fault-Prone", data$ANY > 0, "Smelly (Any)")
-    cat("\n")
-    tryOrs(data$FAULT_PRONE, "Fault-Prone", data$binLARGE, sprintf(opts$large, fmt="SLOC>=%.1f%%"))
-    cat("\n")
-    tryOrs(data$FAULT_PRONE, "Fault-Prone", data$binLARGE | (data$ANY > 0), sprintf(opts$large, fmt="Large||Smelly"))
-}
+### Independent variables for taking smell presence into account
+
+## Independent variables for taking file size into account
+##topSLOCValue <- quantile(data$SLOC, 1.0 - opts$large / 100.0)
+##data$binLARGE <- data$SLOC > topSLOCValue
+
+### Independent variables
+## FUNCTION_LOC,LOAC,LOFC,NOFL,NOFC_Dup,NOFC_NonDup,NONEST
+
+## Some renaming
+data$LOC <- data$FUNCTION_LOC
+data$logLOC <- log(data$LOC)
+
+## LOAC and LOFC are taken as is, but also log() and ratio (to LOC)
+data$logLOAC <- log(data$LOAC + 1)
+data$LOACratio <- data$LOAC / data$LOC
+
+data$logLOFC <- log(data$LOFC + 1)
+data$LOFCratio <- data$LOFC / data$LOC
+
+data$FL <- data$NOFL
+data$FLratio <- data$FL / data$LOC
+
+data$FC <- data$NOFC_NonDup
+data$FCratio <- data$FC / data$LOC
+
+data$ND <- data$NONEST
+data$NDratio <- data$ND / data$LOC
+
+### Dependent variables
+## HUNKS,COMMITS,LINES_CHANGED,LINE_DELTA,LINES_DELETED,LINES_ADDED
+
+### Compute some more independent variables from the data
+##data$CHANGE_PRONE <- data$COMMITS >= opts$changes
 
 if (FALSE) {
-    cat("\n")
     cat("*** Change-Proneness ***\n")
     tryOrs(data$CHANGE_PRONE, "Change-Prone", data$ANY > 0, "Smelly")
-    cat("\n")
-    tryOrs(data$CHANGE_PRONE, "Change-Prone", data$binLARGE, sprintf(opts$large, fmt="SLOC in top-%.1f%%"))
-    cat("\n")
-    tryOrs(data$CHANGE_PRONE, "Change-Prone", data$binLARGE | (data$ANY > 0), sprintf(opts$large, fmt="Large||Smelly"))
+    ##cat("\n")
+    ##tryOrs(data$CHANGE_PRONE, "Change-Prone", data$binLARGE, sprintf(opts$large, fmt="SLOC in top-%.1f%%"))
+    ##cat("\n")
+    ##tryOrs(data$CHANGE_PRONE, "Change-Prone", data$binLARGE | (data$ANY > 0), sprintf(opts$large, fmt="Large||Smelly"))
 }
 
 
@@ -220,17 +230,17 @@ if (FALSE) {
 ##               , family = binomial(logit))
 ##reportModel(slocModel)
 
-##tryModel("FAULT_PRONE ~ SIZE", "Size Only")
+##tryLogitModel("FAULT_PRONE ~ SIZE", "Size Only")
 
 ##plot(fitted(largeModel), residuals(largeModel),
 ##     xlab = "Fitted Values", ylab = "Residuals")
 ##abline(h=0, lty=2)
 ##lines(smooth.spline(fitted(largeModel), residuals(largeModel)))
 
-##tryModel("FAULT_PRONE ~ AB + AF + LF",        "Individual Smells Only")
-##tryModel("FAULT_PRONE ~ SIZE + AB + AF + LF", "Size & Individual Smells")
-##tryModel("FAULT_PRONE ~ ANY",                 "Any Smell")
-##tryModel("FAULT_PRONE ~ SIZE + ANY",          "Size & Any Smell")
+##tryLogitModel("FAULT_PRONE ~ AB + AF + LF",        "Individual Smells Only")
+##tryLogitModel("FAULT_PRONE ~ SIZE + AB + AF + LF", "Size & Individual Smells")
+##tryLogitModel("FAULT_PRONE ~ ANY",                 "Any Smell")
+##tryLogitModel("FAULT_PRONE ~ SIZE + ANY",          "Size & Any Smell")
 
 ##anova(largeModel, smellAndLargeModel, test ="Chisq")
 ##
@@ -261,12 +271,23 @@ if (FALSE) {
 ##
 ##cat("*** Smell Model ***\n")
 ##
-##smellModel <- glm(FAULT_PRONE ~
-##                  AB_COUNT
-##                 + AF_COUNT
-##                 + LF_COUNT
-##               , data = data
-##               , family = binomial(logit))
+##tryLinearModel(HUNKS ~ FL + FC + ND + LOACratio,          "#ifdef only -> HUNKS")
+##tryLinearModel(HUNKS ~ FL + FC + ND + LOACratio + LOC,    "#ifdef & LOC -> HUNKS")
+##tryLinearModel(HUNKS ~ FL + FC + ND + LOACratio + logLOC, "#ifdef & log(LOC) -> HUNKS")
+tryLinearModel(HUNKS ~ #
+                   ##FL + #
+                   FLratio + #
+                   ##FC + #
+                   FCratio + #
+                   ##ND + #
+                   NDratio + #
+                   LOACratio + #
+                   LOFCratio + #
+                   ##logLOAC + #
+                   ##logLOFC +
+                   logLOC, #
+               "#ifdef & others -> HUNKS")
+
 ##
 ##summary(smellModel)
 ##
