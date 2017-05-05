@@ -104,6 +104,7 @@ readSnapshotFile <- function(inputFn) {
                                , "NONEST"="numeric"))
     cat("INFO: Reading snapshot ", snapshotData$SNAPSHOT_DATE[1], "\n", sep="")
     snapshotData["SNAPSHOT"] <- snapshotIx
+    snapshotData[is.na(snapshotData)] = 0
     ## Change the value of the global variable using <<-
     ##cat(str(max(as.numeric(snapshotData$FUNCTION_LOC), na.rm=T)))
     ##cat(str(max(snapshotData$FUNCTION_LOC), na.rm=T))
@@ -113,7 +114,7 @@ readSnapshotFile <- function(inputFn) {
 
 inputFns <- getInputFilenames(args)
 
-data <- do.call("rbind", lapply(inputFns, readSnapshotFile))
+allData <- do.call("rbind", lapply(inputFns, readSnapshotFile))
 
 tryLogitModel <- function (formula, modelName) {
     if (missing(modelName)) { modelName <- formula }
@@ -126,13 +127,13 @@ tryLogitModel <- function (formula, modelName) {
     return(model)
 }
 
-tryLinearModel <- function (formula, modelName) {
+tryLinearModel <- function (dataFrame, formula, modelName) {
     if (missing(modelName)) { modelName <- formula }
     cat("\n\n")
     cat("***************************\n")
     cat("*** "); cat(modelName); cat(" ***\n")
 
-    model <- lm(formula, data = data)
+    model <- lm(formula, data = dataFrame)
     reportModel(model, modelName)
     return(model)
 }
@@ -189,30 +190,38 @@ tryOrs <- function(dep, nameDep, indep, nameIndep) {
 ## FUNCTION_LOC,LOAC,LOFC,NOFL,NOFC_Dup,NOFC_NonDup,NONEST
 
 ## Some renaming
-data$LOC <- data$FUNCTION_LOC
-data$logLOC <- log(data$LOC)
+allData$LOC <- allData$FUNCTION_LOC
+allData$logLOC <- log(allData$LOC)
 
 ## LOAC and LOFC are taken as is, but also log() and ratio (to LOC)
-data$logLOAC <- log(data$LOAC + 1)
-data$LOACratio <- data$LOAC / data$LOC
+allData$logLOAC <- log(allData$LOAC + 1)
+allData$LOACratio <- allData$LOAC / allData$LOC
 
-data$logLOFC <- log(data$LOFC + 1)
-data$LOFCratio <- data$LOFC / data$LOC
+allData$logLOFC <- log(allData$LOFC + 1)
+allData$LOFCratio <- allData$LOFC / allData$LOC
 
-data$FL <- data$NOFL
-data$FLratio <- data$FL / data$LOC
+allData$FL <- allData$NOFL
+allData$FLratio <- allData$FL / allData$LOC
 
-data$FC <- data$NOFC_NonDup
-data$FCratio <- data$FC / data$LOC
+allData$FC <- allData$NOFC_NonDup
+allData$FCratio <- allData$FC / allData$LOC
 
-data$ND <- data$NONEST
-data$NDratio <- data$ND / data$LOC
+allData$ND <- allData$NONEST
+allData$NDratio <- allData$ND / allData$LOC
 
 ### Dependent variables
 ## HUNKS,COMMITS,LINES_CHANGED,LINE_DELTA,LINES_DELETED,LINES_ADDED
+allData$HUNKSratio <- allData$HUNKS / allData$LOC
+allData$COMMITSratio <- allData$COMMITS / allData$LOC
+allData$LCHratio <- allData$LINES_CHANGED / allData$LOC
 
 ### Compute some more independent variables from the data
 ##data$CHANGE_PRONE <- data$COMMITS >= opts$changes
+
+annotationData <- subset(allData, FL > 0)
+
+##nrow(allData)
+##nrow(annotationData)
 
 if (FALSE) {
     cat("*** Change-Proneness ***\n")
@@ -274,19 +283,39 @@ if (FALSE) {
 ##tryLinearModel(HUNKS ~ FL + FC + ND + LOACratio,          "#ifdef only -> HUNKS")
 ##tryLinearModel(HUNKS ~ FL + FC + ND + LOACratio + LOC,    "#ifdef & LOC -> HUNKS")
 ##tryLinearModel(HUNKS ~ FL + FC + ND + LOACratio + logLOC, "#ifdef & log(LOC) -> HUNKS")
-tryLinearModel(HUNKS ~ #
-                   ##FL + #
-                   FLratio + #
-                   ##FC + #
-                   FCratio + #
-                   ##ND + #
-                   NDratio + #
+tryLinearModel(allData,
+               HUNKS #
+               ##LCHratio #
+               ~ #
+                   FL + #
+                   ##FLratio + #
+                   FC + #
+                   ##FCratio + #
+                   ND + #
+                   ##NDratio + #
                    LOACratio + #
-                   LOFCratio + #
+                   ##LOFCratio + #
                    ##logLOAC + #
                    ##logLOFC +
                    logLOC, #
-               "#ifdef & others -> HUNKS")
+               "all: #ifdef & others -> HUNKS")
+
+tryLinearModel(annotationData,
+               HUNKS #
+               ##LCHratio #
+               ~ #
+                   FL + #
+                   ##FLratio + #
+                   FC + #
+                   ##FCratio + #
+                   ND + #
+                   ##NDratio + #
+                   LOACratio + #
+                   ##LOFCratio + #
+                   ##logLOAC + #
+                   ##logLOFC +
+                   logLOC, #
+               "annotated: #ifdef & others -> HUNKS")
 
 ##
 ##summary(smellModel)
