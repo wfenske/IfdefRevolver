@@ -297,8 +297,8 @@ tryLinearModel(allData,
                    ##LOFCratio + #
                    ##logLOAC + #
                    ##logLOFC +
-                   logLOC, #
-               "all: #ifdef & others -> HUNKS")
+                   logLOC
+             , "all: #ifdef & others -> HUNKS")
 
 tryLinearModel(annotationData,
                HUNKS #
@@ -314,8 +314,8 @@ tryLinearModel(annotationData,
                    ##LOFCratio + #
                    ##logLOAC + #
                    ##logLOFC +
-                   logLOC, #
-               "annotated: #ifdef & others -> HUNKS")
+                   logLOC #
+             , "annotated: #ifdef & others -> HUNKS")
 
 ##
 ##summary(smellModel)
