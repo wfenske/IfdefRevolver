@@ -68,7 +68,7 @@ valGroup <- function(v) {
 }
 
 ##allData$FLbool <- allData$FL > 0
-allData$grouped <- mapply(valGroup, allData$FC)
+allData$grouped <- mapply(valGroup, allData$FL)
 
 outputFn <- paste("LOC_", opts$name, ".pdf", sep="")
 
