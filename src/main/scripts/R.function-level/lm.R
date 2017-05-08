@@ -10,10 +10,42 @@ library(optparse)
 ##library(methods)
 suppressMessages(library(aod))
 
+options <- list(
+    make_option(c("-p", "--project")
+              , help="Name of the project whose data to load.  We expect the input R data to reside in `results/<projec-name>/allData.rdata' below the current working directory."
+              , default = NULL
+                )
+)
+
+args <- parse_args(OptionParser(
+    description = "Build a linear regression model to determine which independent variables have a significant effect on functions being (or not) change-prone. If no input R data set is given, the project must be specified via the `--project' (`-p') option."
+  , usage = "%prog [options] [file]"
+  , option_list=options)
+  , positional_arguments = c(0, 1))
+opts <- args$options
+
+readData <- function(commandLineArgs) {
+    fns <- commandLineArgs$args
+    if ( length(fns) == 1 ) {
+        dataFn <- fns[1]
+    } else {
+        opts <- commandLineArgs$options
+        if ( is.null(opts$project) ) {
+            stop("Missing input files.  Either specify explicit input files or specify the name of the project the `--project' option (`-p' for short).")
+        }
+        dataFn <-  file.path("results", opts$project, "allData.rdata")
+    }
+    cat("DEBUG: Reading data from ", dataFn, "\n", sep="")
+    result <- readRDS(dataFn)
+    cat("DEBUG: Sucessfully read data.\n")
+    return (result)
+}
+
+allData <- readData(args)
+
 ## Get the P-value of the wald test like this
 ##
 ## wald.test(b = coef(mylogit1), Sigma = vcov(mylogit1), Terms = 4:4)$result$chi2["P"]
-
 waldP <- function(testRes) {
     return (testRes$result$chi2["P"])
 }
@@ -39,82 +71,6 @@ reportModel <- function(model, modelName) {
     print(exp(cbind(OR = coef(model), suppressMessages(confint(model)))))
     checkSignificanceOfIndividualPredictors(model, modelName)
 }
-
-options <- list(
-    make_option(c("-s", "--snapshotresultsdir")
-              , help="Name of the directory where the snaphsot results are located.  This folder is expected to contain folder named, e.g., `1996-07-01', which, in turn, contain CSV files named `joint_function_ab_smell_snapshot.csv'."
-              , default = NULL
-                )
-    #make_option(c("-f", "--fixes"), type="integer", default=1, metavar="NUM",
-                                        #help="Minimum number of bug-fix commits to the file to consider it fault-prone [default %default]")
-    , make_option(c("-c", "--changes"), type="integer", default=1, metavar="NUM",
-                  help="Minimum number of commits to the file to consider it change-prone [default %default]")
-    #, make_option(c("-l", "--large"), type="double", default=30.0, metavar="PERCENT",
-    #help="Large files must belong to the given top-x percent, SLOC-wise [default %default, meaning %default%]")
-)
-
-args <- parse_args(OptionParser(
-    description = "Build a linear regression model to determine which independent variables have a significant effect on functions being (or not) change-prone. If no input files are named, the directory containing the results for all the snapshots must be specified via the `--snapshotsdir' (`-s') option."
-  , usage = "%prog [options] [file ...]"
-  , option_list=options)
-  , positional_arguments = c(0, Inf))
-opts <- args$options
-
-getInputFilenames <- function(commandLineArgs) {
-    result <- commandLineArgs$args
-    if ( length(result) > 0 ) {
-        return (result)
-    }
-
-    opts <- commandLineArgs$options
-    if ( is.null(opts$snapshotresultsdir) ) {
-            stop("Missing input files.  Either specify explicit input files or specify the directory containing the snapshot results via the `--snapshotresultsdir' option (`-s' for short).")
-    }
-
-    baseDir <- opts$snapshotresultsdir
-    snapshotDirs <- list.files(baseDir, pattern="[0-9][0-9][0-9][0-9]-[0-9][0-9]-[0-9][0-9]")
-    if (length(snapshotDirs) == 0) {
-        stop(paste("No snapshot directories found in `", baseDir, "'", sep=""))
-    }
-    return (lapply(snapshotDirs, function(snapshotDir) { file.path(baseDir, snapshotDir, "joint_function_ab_smell_snapshot.csv") }))
-}
-
-
-
-snapshotIx <- 1
-
-readSnapshotFile <- function(inputFn) {
-    snapshotData <- read.csv(inputFn, header=TRUE, sep=",",
-                             colClasses=c(
-                                 "SNAPSHOT_DATE"="character"
-                               , "FUNCTION_SIGNATURE"="character"
-                               , "FUNCTION_LOC"="numeric"
-                               , "HUNKS"="numeric"
-                               , "COMMITS"="numeric"
-                               , "BUGFIXES"="numeric"
-                               , "LINE_DELTA"="numeric"
-                               , "LINES_DELETED"="numeric"
-                               #, "LINES_ADDED"="numeric"
-                               , "LOAC"="numeric"
-                               , "LINES_CHANGED"="numeric"
-                               , "LOFC"="numeric"
-                               , "NOFL"="numeric"
-                               , "NOFC_Dup"="numeric"
-                               , "NOFC_NonDup"="numeric"
-                               , "NONEST"="numeric"))
-    cat("INFO: Reading snapshot ", snapshotData$SNAPSHOT_DATE[1], "\n", sep="")
-    snapshotData["SNAPSHOT"] <- snapshotIx
-    snapshotData[is.na(snapshotData)] = 0
-    ## Change the value of the global variable using <<-
-    ##cat(str(max(as.numeric(snapshotData$FUNCTION_LOC), na.rm=T)))
-    ##cat(str(max(snapshotData$FUNCTION_LOC), na.rm=T))
-    snapshotIx <<- snapshotIx + 1
-    return (snapshotData)
-}
-
-inputFns <- getInputFilenames(args)
-
-allData <- do.call("rbind", lapply(inputFns, readSnapshotFile))
 
 tryLogitModel <- function (formula, modelName) {
     if (missing(modelName)) { modelName <- formula }
@@ -187,36 +143,20 @@ tryOrs <- function(dep, nameDep, indep, nameIndep) {
 ##data$binLARGE <- data$SLOC > topSLOCValue
 
 ### Independent variables
-## FUNCTION_LOC,LOAC,LOFC,NOFL,NOFC_Dup,NOFC_NonDup,NONEST
-
-## Some renaming
-allData$LOC <- allData$FUNCTION_LOC
-allData$logLOC <- log(allData$LOC)
-
-## LOAC and LOFC are taken as is, but also log() and ratio (to LOC)
-allData$logLOAC <- log(allData$LOAC + 1)
-allData$LOACratio <- allData$LOAC / allData$LOC
-
-allData$logLOFC <- log(allData$LOFC + 1)
-allData$LOFCratio <- allData$LOFC / allData$LOC
-
-allData$FL <- allData$NOFL
-allData$FLratio <- allData$FL / allData$LOC
-
-allData$FC <- allData$NOFC_NonDup
-allData$FCratio <- allData$FC / allData$LOC
-
-allData$ND <- allData$NONEST
-allData$NDratio <- allData$ND / allData$LOC
+## LOC,logLOC,
+## LOAC,logLOAC,LOACratio,
+## LOFC,logLOFC,LOFCratio,
+## FL (NOFL), FLratio (FL per LOC)
+## FC (from NOFC_NonDup), FCratio (FC per LOC)
+## ND (from NONEST), NDratio (ND per LOC)
 
 ### Dependent variables
-## HUNKS,COMMITS,LINES_CHANGED,LINE_DELTA,LINES_DELETED,LINES_ADDED
-allData$HUNKSratio <- allData$HUNKS / allData$LOC
-allData$COMMITSratio <- allData$COMMITS / allData$LOC
-allData$LCHratio <- allData$LINES_CHANGED / allData$LOC
-
-### Compute some more independent variables from the data
-##data$CHANGE_PRONE <- data$COMMITS >= opts$changes
+## HUNKS, HUNKSratio (HUNKS per LOC)
+## COMMITS, COMMITSratio (COMMITS per LOC)
+## LINES_CHANGED, LCHratio (LINES_CHANGED per LOC)
+## LINE_DELTA,
+## LINES_DELETED,
+## LINES_ADDED
 
 annotationData <- subset(allData, FL > 0)
 
@@ -283,6 +223,7 @@ if (FALSE) {
 ##tryLinearModel(HUNKS ~ FL + FC + ND + LOACratio,          "#ifdef only -> HUNKS")
 ##tryLinearModel(HUNKS ~ FL + FC + ND + LOACratio + LOC,    "#ifdef & LOC -> HUNKS")
 ##tryLinearModel(HUNKS ~ FL + FC + ND + LOACratio + logLOC, "#ifdef & log(LOC) -> HUNKS")
+
 tryLinearModel(allData,
                HUNKS #
                ##LCHratio #
