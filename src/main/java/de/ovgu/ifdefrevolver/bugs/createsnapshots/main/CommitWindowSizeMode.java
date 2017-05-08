@@ -17,7 +17,7 @@ public enum CommitWindowSizeMode {
     COMMITS {
         @Override
         public int defaultSize() {
-            return 200;
+            return 100;
         }
 
         @Override
@@ -60,7 +60,7 @@ public enum CommitWindowSizeMode {
     FIXES {
         @Override
         public int defaultSize() {
-            return 100;
+            return 50;
         }
 
         @Override

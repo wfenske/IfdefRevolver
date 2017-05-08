@@ -6,7 +6,10 @@
 
 ### From the environment
 #PROJECT ?= $(PROJECT)
-WINDOW_SIZE ?= 200
+WINDOW_SIZE_OPT =
+ifdef WINDOW_SIZE
+WINDOW_SIZE_OPT	= -s $(WINDOW_SIZE)
+endif
 ###
 
 REVISIONS_FILE = results/$(PROJECT)/revisionsFull.csv
@@ -29,7 +32,7 @@ $(CHECKOUT_MARKER): $(REVISIONS_FILE)
 	@mkdir -p logs/$(PROJECT)
 	@mkdir -p snapshots/$(PROJECT)
 	rm -f $@
-	createsnapshots.sh -p $(PROJECT) --checkout -s $(WINDOW_SIZE) >> logs/$(PROJECT)/checkout.log 2>&1 && \
+	createsnapshots.sh -p $(PROJECT) --checkout $(WINDOW_SIZE_OPT) >> logs/$(PROJECT)/checkout.log 2>&1 && \
 	touch $@
 
 analyze: $(ANALYSIS_MARKER)

@@ -135,13 +135,14 @@ public class ListAllFunctions {
         final List<Throwable> uncaughtWorkerThreadException = new ArrayList<>(NUM_FUNCTION_LISTING_WORKER_THREADS);
 
         Thread.UncaughtExceptionHandler uncaughtExceptionHandler = new Thread.UncaughtExceptionHandler() {
+            @Override
             public void uncaughtException(Thread th, Throwable ex) {
                 increaseErrorCount();
-                for (TerminableThread wt : workers) {
-                    wt.requestTermination();
-                }
                 synchronized (uncaughtWorkerThreadException) {
                     uncaughtWorkerThreadException.add(ex);
+                }
+                for (TerminableThread wt : workers) {
+                    wt.requestTermination();
                 }
             }
         };
