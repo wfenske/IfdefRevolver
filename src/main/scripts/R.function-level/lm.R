@@ -50,8 +50,18 @@ waldP <- function(testRes) {
     return (testRes$result$chi2["P"])
 }
 
+significanceCode <- function(p) {
+    if (p < 0.0001) { return ("***"); }
+    else if (p < 0.001) { return ("**"); }
+    else if (p < 0.01) { return ("*"); }
+    else if (p < 0.05) { return ("."); }
+    else { return (""); }
+}
+
 catWaldP <- function(smellName, testRes) {
-    cat(sprintf(smellName, waldP(testRes), fmt="\n\t% 10s = %.3f"))
+    p <- waldP(testRes)
+    pCode <- significanceCode(p)
+    cat(sprintf(smellName, p, pCode, fmt="\n\t% 10s = %.3f %s"))
 }
 
 checkSignificanceOfIndividualPredictors <- function(model, modelName) {
@@ -64,6 +74,7 @@ checkSignificanceOfIndividualPredictors <- function(model, modelName) {
         termPos <- termPos + 1
     }
     cat("\n")
+    cat("Signif. codes:  < 0.0001 '***' 0.001 '**' 0.01 '*' 0.05 '.'\n")
 }
 
 reportModel <- function(model, modelName) {
@@ -224,39 +235,43 @@ if (FALSE) {
 ##tryLinearModel(HUNKS ~ FL + FC + ND + LOACratio + LOC,    "#ifdef & LOC -> HUNKS")
 ##tryLinearModel(HUNKS ~ FL + FC + ND + LOACratio + logLOC, "#ifdef & log(LOC) -> HUNKS")
 
-tryLinearModel(allData,
-               HUNKS #
-               ##LCHratio #
-               ~ #
-                   FL + #
-                   ##FLratio + #
-                   FC + #
-                   ##FCratio + #
-                   ND + #
-                   ##NDratio + #
-                   LOACratio + #
-                   ##LOFCratio + #
-                   ##logLOAC + #
-                   ##logLOFC +
-                   logLOC
-             , "all: #ifdef & others -> HUNKS")
+controlIndep <- "logLOC"
+indeps <- c("FL", "FC", "ND", "LOACratio", controlIndep)
+##FLratio + #
+##FCratio + #
+##NDratio + #
+##LOFCratio + #
+##logLOAC + #
+##logLOFC +
 
-tryLinearModel(annotationData,
-               HUNKS #
-               ##LCHratio #
-               ~ #
-                   FL + #
-                   ##FLratio + #
-                   FC + #
-                   ##FCratio + #
-                   ND + #
-                   ##NDratio + #
-                   LOACratio + #
-                   ##LOFCratio + #
-                   ##logLOAC + #
-                   ##logLOFC +
-                   logLOC #
-             , "annotated: #ifdef & others -> HUNKS")
+tryLinearModel2 <- function(indeps, controlIndep, dep, data) {
+    formulaString <- paste(dep, paste(indeps, collapse=" + "), sep=" ~ ")
+    formula <- as.formula(formulaString)
+    modelName <- paste("ifdef + ", controlIndep, " -> ", dep, sep="")
+    model <- tryLinearModel(data, formula, modelName)
+    cat("\n")
+    cat(paste("*** ANOVA of model '", modelName, "' ***\n", sep=""))
+    print(anova(model, test ="Chisq"))
+    ##print(summary(model))
+    return (model)
+}
+
+tryLinearModel2(indeps, controlIndep, "LINES_CHANGED", allData)
+tryLinearModel2(indeps, controlIndep, "HUNKS", allData)
+
+##cat("\n")
+##cat(paste("*** LR test of model '", modelName, "' ***\n", sep=""))
+##suppressMessages(library(lmtest))
+##lrtest(reducedModel, slocModel)
+
+##cat("\n")
+##cat("*** Step model ***\n")
+##reducedModel <- step(allDataModel, trace=0)
+##summary(reducedModel)
+
+##cat("\n")
+##cat("*** ANOVA of reduced model ***\n")
+##anova(reducedModel, test ="Chisq")
 
 ##
 ##summary(smellModel)
@@ -270,6 +285,3 @@ tryLinearModel(annotationData,
 
 #anova(smellOnlyModel)
 #anova(largeModel)
-
-##suppressMessages(library(lmtest))
-##lrtest(reducedModel, slocModel)
