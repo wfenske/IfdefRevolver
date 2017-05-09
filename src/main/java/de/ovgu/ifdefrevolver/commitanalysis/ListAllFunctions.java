@@ -16,10 +16,7 @@ import org.apache.log4j.Logger;
 import java.io.File;
 import java.io.IOException;
 import java.io.PrintWriter;
-import java.util.ArrayList;
-import java.util.Collection;
-import java.util.Iterator;
-import java.util.List;
+import java.util.*;
 import java.util.function.Consumer;
 
 public class ListAllFunctions {
@@ -112,11 +109,55 @@ public class ListAllFunctions {
         };
     }
 
+    private static interface IFileFailHandlingStrategy {
+        void handleFailedFile(String filename, RuntimeException ex);
+    }
+
+    private static class CollectErroneousFilesStrategy implements IFileFailHandlingStrategy {
+        private Set<String> failedFiles = new LinkedHashSet<>();
+
+        @Override
+        public void handleFailedFile(String filename, RuntimeException ex) {
+            LOG.warn("Error processing file " + filename + ". Will retry.", ex);
+            synchronized (failedFiles) {
+                failedFiles.add(filename);
+            }
+        }
+
+        public Set<String> getFailedFiles() {
+            return failedFiles;
+        }
+    }
+
+    private class ThrowOnErroneousFile implements IFileFailHandlingStrategy {
+        @Override
+        public void handleFailedFile(String filename, RuntimeException ex) {
+            LOG.warn("Error processing file " + filename + ". Giving up.", ex);
+            increaseErrorCount();
+            throw ex;
+        }
+    }
+
     private void listFunctionsInSnapshot(final Snapshot snapshot, Consumer<Method> functionDefinitionsConsumer) throws UncaughtWorkerThreadException {
         LOG.debug("Listing all functions in " + snapshot);
         List<File> cFilesInSnapshot = snapshot.listSrcmlCFiles();
         Collection<String> filenames = filenamesFromFiles(cFilesInSnapshot);
-        listFunctionsInFilesByFilename(filenames, functionDefinitionsConsumer);
+        Collection<String> filesWithErrors = tryListFunctionsInFilesCollectingErroneousFiles(functionDefinitionsConsumer, filenames);
+        if (!filesWithErrors.isEmpty()) {
+            LOG.info("Retrying to list functions in " + filesWithErrors.size() + " erroneous file(s).");
+            listFunctionsInFilesOrDie(functionDefinitionsConsumer, filesWithErrors);
+        }
+    }
+
+    private void listFunctionsInFilesOrDie(Consumer<Method> functionDefinitionsConsumer, Collection<String> filesWithErrors) throws UncaughtWorkerThreadException {
+        ThrowOnErroneousFile fileFailHandlingStrategy = new ThrowOnErroneousFile();
+        listFunctionsInFilesByFilename(filesWithErrors, 1, functionDefinitionsConsumer, fileFailHandlingStrategy);
+    }
+
+    private Collection<String> tryListFunctionsInFilesCollectingErroneousFiles(Consumer<Method> functionDefinitionsConsumer, Collection<String> filenames) throws UncaughtWorkerThreadException {
+        CollectErroneousFilesStrategy collectErroneousFiles = new CollectErroneousFilesStrategy();
+        listFunctionsInFilesByFilename(filenames, 4, functionDefinitionsConsumer, collectErroneousFiles);
+        return collectErroneousFiles.getFailedFiles();
     }
 
     private static Collection<String> filenamesFromFiles(Collection<File> files) {
@@ -127,12 +168,11 @@ public class ListAllFunctions {
         return filenames;
     }
 
-    private void listFunctionsInFilesByFilename(Collection<String> filenames, Consumer<Method> functionDefinitionsConsumer) throws UncaughtWorkerThreadException {
+    private void listFunctionsInFilesByFilename(Collection<String> filenames, final int numberOfThreads, Consumer<Method> functionDefinitionsConsumer, IFileFailHandlingStrategy fileFailHandlingStrategy) throws UncaughtWorkerThreadException {
         final Iterator<String> filenameIter = filenames.iterator();
 
-        final int NUM_FUNCTION_LISTING_WORKER_THREADS = 4;
-        final TerminableThread[] workers = new TerminableThread[NUM_FUNCTION_LISTING_WORKER_THREADS];
-        final List<Throwable> uncaughtWorkerThreadException = new ArrayList<>(NUM_FUNCTION_LISTING_WORKER_THREADS);
+        final TerminableThread[] workers = new TerminableThread[numberOfThreads];
+        final List<Throwable> uncaughtWorkerThreadException = new ArrayList<>(numberOfThreads);
 
         Thread.UncaughtExceptionHandler uncaughtExceptionHandler = new Thread.UncaughtExceptionHandler() {
             @Override
@@ -151,7 +191,16 @@ public class ListAllFunctions {
             TerminableThread t = new TerminableThread() {
                 @Override
                 public void run() {
+                    List<Method> functionsInCurrentFile = new ArrayList<>();
+                    Consumer<Method> localFunctionDefinitionConsumer = new Consumer<Method>() {
+                        @Override
+                        public void accept(Method f) {
+                            functionsInCurrentFile.add(f);
+                        }
+                    };
+
                     while (!terminationRequested) {
+                        functionsInCurrentFile.clear();
                         final String nextFilename;
                         synchronized (filenameIter) {
                             if (!filenameIter.hasNext()) {
@@ -159,18 +208,29 @@ public class ListAllFunctions {
                             }
                             nextFilename = filenameIter.next();
                         }
-                        try {
-                            //LOG.info("Processing file " + (ixFile++) + "/" + numFiles);
-                            listFunctions(nextFilename, functionDefinitionsConsumer);
-                        } catch (RuntimeException t) {
-                            LOG.warn("Error processing file " + nextFilename, t);
-                            increaseErrorCount();
+
+                        boolean success = parseFunctionsInCurrentFile(nextFilename, localFunctionDefinitionConsumer);
+                        if (success) {
+                            for (Method f : functionsInCurrentFile) {
+                                functionDefinitionsConsumer.accept(f);
+                            }
                         }
                     }
 
                     if (terminationRequested) {
                         LOG.info("Terminating thread " + this + ": termination requested.");
                     }
+                }
+
+                private boolean parseFunctionsInCurrentFile(String filename, Consumer<Method> localFunctionDefinitionConsumer) {
+                    try {
+                        //LOG.info("Processing file " + (ixFile++) + "/" + numFiles);
+                        listFunctions(filename, localFunctionDefinitionConsumer);
+                    } catch (RuntimeException t) {
+                        fileFailHandlingStrategy.handleFailedFile(filename, t);
+                        return false;
+                    }
+                    return true;
                 }
             };
             t.setUncaughtExceptionHandler(uncaughtExceptionHandler);
