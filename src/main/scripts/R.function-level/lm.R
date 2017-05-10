@@ -9,6 +9,7 @@
 library(optparse)
 ##library(methods)
 suppressMessages(library(aod))
+library(MASS) # for glm.nb
 
 options <- list(
     make_option(c("-p", "--project")
@@ -80,6 +81,8 @@ checkSignificanceOfIndividualPredictors <- function(model, modelName) {
 reportModel <- function(model, modelName) {
     ##print(summary(model))
     print(exp(cbind(OR = coef(model), suppressMessages(confint(model)))))
+    cat("Coefficients:\n")
+    print(coef(model))
     checkSignificanceOfIndividualPredictors(model, modelName)
 }
 
@@ -101,6 +104,16 @@ tryLinearModel <- function (dataFrame, formula, modelName) {
     cat("*** "); cat(modelName); cat(" ***\n")
 
     model <- lm(formula, data = dataFrame)
+    reportModel(model, modelName)
+    return(model)
+}
+
+tryNbModel <- function (dataFrame, formula, modelName) {
+    cat("\n\n")
+    cat("***************************\n")
+    cat("*** "); cat(modelName); cat(" ***\n")
+
+    model <- glm.nb(formula, data = dataFrame)
     reportModel(model, modelName)
     return(model)
 }
@@ -147,6 +160,76 @@ tryOrs <- function(dep, nameDep, indep, nameIndep) {
     cat(sprintf(nameIndep, prf[1], prf[2], prf[3], fmt="%s;%.3f;%.3f;%.3f\n"))
 }
 
+tryLinearModel2 <- function(indeps, dep, data, controlIndep=NULL) {
+    formulaString <- paste(dep, paste(indeps, collapse=" + "), sep=" ~ ")
+    formula <- as.formula(formulaString)
+    if (is.null(controlIndep)) {
+        controlIndep <- indeps[length(indeps)]
+    }
+    ##modelName <- paste("ifdef + ", controlIndep, " -> ", dep, sep="")
+    modelName <- formulaString
+    model <- tryLinearModel(data, formula, modelName)
+    ##cat("\n")
+    ##cat(paste("*** ANOVA of model '", modelName, "' ***\n", sep=""))
+    ##print(anova(model, test ="Chisq"))
+    ##print(summary(model))
+    return (model)
+}
+
+tryNbModel2 <- function(indeps, dep, data) {
+    formulaString <- paste(dep, paste(indeps, collapse=" + "), sep=" ~ ")
+    formula <- as.formula(formulaString)
+    modelName <- formulaString
+    model <- tryNbModel(data, formula, modelName)
+    ##cat("\n")
+    ##cat(paste("*** ANOVA of model '", modelName, "' ***\n", sep=""))
+    ##print(anova(model, test ="Chisq"))
+    ##print(summary(model))
+    return (model)
+}
+
+plotResiduals <- function(model) {
+    ## Taken from https://www.r-bloggers.com/model-validation-interpreting-residual-plots/
+    fit <- fitted(model)
+    res <- residuals(model)
+
+    qPercent <- 2.5
+    q <- qPercent / 100.0
+
+    fitQuantiles <- quantile(x=fit, probs = c(q, 1 - q))
+    fitLimits <- c(fitQuantiles[[1]], fitQuantiles[[2]])
+
+    resQuantiles <- quantile(x=res, probs = c(q, 1 - q))
+    resLimits <- c(resQuantiles[[1]], resQuantiles[[2]])
+    
+    plot(x=fit, xlab = "Fitted Values",
+         y=res, ylab = "Residuals",
+         xlim = fitLimits,
+         ylim = resLimits,
+         ##log = "x"
+         )
+    abline(h=0, lty=2)
+    lines(smooth.spline(x=fit, y=res
+                        ## Smaller nknots values (e.g., 12) make
+                        ## spline more smooth, higher ones (e.g., 100) more jagged.
+                        
+                      , nknots=63
+                        )
+         ,col="red"
+          ,lwd=2
+          )
+    return (model)
+}
+
+sampleDf <- function(df, sz) {
+    rowCount <- nrow(df)
+    if (rowCount < sz) {
+        return (df)
+    } else {
+        return (df[sample(rowCount, sz), ])
+    }
+}
+
 ### Independent variables for taking smell presence into account
 
 ## Independent variables for taking file size into account
@@ -169,74 +252,29 @@ tryOrs <- function(dep, nameDep, indep, nameIndep) {
 ## LINES_DELETED,
 ## LINES_ADDED
 
-annotationData <- subset(allData, FL > 0)
+##annotationData <- subset(allData, FL > 0)
 
-##nrow(allData)
-##nrow(annotationData)
+allData$sqrtLOC <- sqrt(allData$LOC)
+allData$logFL <- log(allData$FL + 1)
+allData$logFC <- log(allData$FC + 1)
+allData$logND <- log(allData$ND + 1)
 
-if (FALSE) {
-    cat("*** Change-Proneness ***\n")
-    tryOrs(data$CHANGE_PRONE, "Change-Prone", data$ANY > 0, "Smelly")
-    ##cat("\n")
-    ##tryOrs(data$CHANGE_PRONE, "Change-Prone", data$binLARGE, sprintf(opts$large, fmt="SLOC in top-%.1f%%"))
-    ##cat("\n")
-    ##tryOrs(data$CHANGE_PRONE, "Change-Prone", data$binLARGE | (data$ANY > 0), sprintf(opts$large, fmt="Large||Smelly"))
-}
+## Some artificial dependent variables
+allData$logLINES_CHANGED <- log(allData$LINES_CHANGED + 1)
+allData$sqrtLINES_CHANGED <- sqrt(allData$LINES_CHANGED)
 
+##onlyChanged <- subset(allData, COMMITS > 0)
 
-##cat("*** SLOC Model ***\n")
-##slocModel <- glm(FAULT_PRONE ~ SLOC
-##               , data = data
-##               , family = binomial(logit))
-##reportModel(slocModel)
+sampleSize <- 10000
+sampleData <- sampleDf(allData, sampleSize)
+##sampleData <- allData
 
-##tryLogitModel("FAULT_PRONE ~ SIZE", "Size Only")
-
-##plot(fitted(largeModel), residuals(largeModel),
-##     xlab = "Fitted Values", ylab = "Residuals")
-##abline(h=0, lty=2)
-##lines(smooth.spline(fitted(largeModel), residuals(largeModel)))
-
-##tryLogitModel("FAULT_PRONE ~ AB + AF + LF",        "Individual Smells Only")
-##tryLogitModel("FAULT_PRONE ~ SIZE + AB + AF + LF", "Size & Individual Smells")
-##tryLogitModel("FAULT_PRONE ~ ANY",                 "Any Smell")
-##tryLogitModel("FAULT_PRONE ~ SIZE + ANY",          "Size & Any Smell")
-
-##anova(largeModel, smellAndLargeModel, test ="Chisq")
-##
-##cat("\n*** ANOVA of Smell Only Model ***\n\n")
-##anova(smellOnlyModel, test ="Chisq")
-##
-#### Try to simplify the model and output the resulting formula
-##cat("\n*** Reduced Model ***\n")
-##
-##reducedModel <- step(smellOnlyModel, trace=0)
-##summary(reducedModel)
-##
-##reducedOrs <- exp(cbind(OR = coef(reducedModel), suppressMessages(confint(reducedModel))))
-##reducedOrs
-##formula(reducedModel)
-##
-##cat("\n*** Checking Individual Predictors ***\n")
-##
-##suppressMessages(library(survey))
-##
-###cat("\n")
-###checkSignificanceOfIndividualPredictors(smellOnlyModel,    "Full Model")
-##cat("\n")
-##checkSignificanceOfIndividualPredictors(reducedModel, "Reduced Model")
-##
-##cat("\n*** ANOVA of Reduced Model ***\n\n")
-##anova(reducedModel, test ="Chisq")
-##
-##cat("*** Smell Model ***\n")
-##
-##tryLinearModel(HUNKS ~ FL + FC + ND + LOACratio,          "#ifdef only -> HUNKS")
-##tryLinearModel(HUNKS ~ FL + FC + ND + LOACratio + LOC,    "#ifdef & LOC -> HUNKS")
-##tryLinearModel(HUNKS ~ FL + FC + ND + LOACratio + logLOC, "#ifdef & log(LOC) -> HUNKS")
-
-controlIndep <- "logLOC"
-indeps <- c("FL", "FC", "ND", "LOACratio", controlIndep)
+indeps <- c(##"logFL", "logFC", "logND"
+    ##"FLratio", "FCratio", "NDratio",
+    "FL", "FC", "ND",
+    ##, "LOACratio",
+    "LOC" # last variable is the independent control variable
+)
 ##FLratio + #
 ##FCratio + #
 ##NDratio + #
@@ -244,23 +282,27 @@ indeps <- c("FL", "FC", "ND", "LOACratio", controlIndep)
 ##logLOAC + #
 ##logLOFC +
 
-tryLinearModel2 <- function(indeps, controlIndep, dep, data) {
-    formulaString <- paste(dep, paste(indeps, collapse=" + "), sep=" ~ ")
-    formula <- as.formula(formulaString)
-    modelName <- paste("ifdef + ", controlIndep, " -> ", dep, sep="")
-    model <- tryLinearModel(data, formula, modelName)
-    cat("\n")
-    cat(paste("*** ANOVA of model '", modelName, "' ***\n", sep=""))
-    print(anova(model, test ="Chisq"))
-    ##print(summary(model))
-    return (model)
-}
+##modelOnSample <- tryLinearModel2(indeps, "logLINES_CHANGED", sampleData)
+modelOnSample <- tryNbModel2(indeps, "LINES_CHANGED", sampleData)
 
-tryLinearModel2(indeps, controlIndep, "LINES_CHANGED", allData)
-tryLinearModel2(indeps, controlIndep, "HUNKS", allData)
+##locLinesChangedModelOnSample <- tryLinearModel2(c("logLOC"), "logLINES_CHANGED", sampleData)
 
-##cat("\n")
-##cat(paste("*** LR test of model '", modelName, "' ***\n", sep=""))
+##anova(modelOnSample # complex model
+##    , locLinesChangedModelOnSample # simple model
+##    , test ="Chisq")
+
+##cat(paste("*** LR test of model ***\n", sep=""))
+##suppressMessages(library(lmtest))
+##lrtest(locLinesChangedModelOnSample, modelOnSample)
+
+### Begin plot creation
+
+outputFn <- paste("Residuals_", "Sample_", opts$project, ".pdf", sep="")
+pdf(file=outputFn)
+dummy <- plotResiduals(modelOnSample)
+##dev.off()
+cat(outputFn,"\n",sep="")
+
 ##suppressMessages(library(lmtest))
 ##lrtest(reducedModel, slocModel)
 
@@ -269,19 +311,3 @@ tryLinearModel2(indeps, controlIndep, "HUNKS", allData)
 ##reducedModel <- step(allDataModel, trace=0)
 ##summary(reducedModel)
 
-##cat("\n")
-##cat("*** ANOVA of reduced model ***\n")
-##anova(reducedModel, test ="Chisq")
-
-##
-##summary(smellModel)
-##
-##smellOrs <- exp(cbind(OR = coef(smellModel), suppressMessages(confint(smellModel))))
-##smellOrs
-
-##cat("\n\n***************************\n")
-##cat("*** Checking Goodness of Fit of Large-File Model Against Smell & Large-File Model ***\n\n")
-##anova(largeModel, smellAndLargeModel, test ="Chisq")
-
-#anova(smellOnlyModel)
-#anova(largeModel)
