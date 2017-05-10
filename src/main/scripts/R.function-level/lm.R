@@ -86,19 +86,17 @@ reportModel <- function(model, modelName) {
     checkSignificanceOfIndividualPredictors(model, modelName)
 }
 
-tryLogitModel <- function (formula, modelName) {
-    if (missing(modelName)) { modelName <- formula }
+tryGlmModel <- function (family, dataFrame, formula, modelName) {
     cat("\n\n")
     cat("***************************\n")
     cat("*** "); cat(modelName); cat(" ***\n")
 
-    model <- glm(formula, data = data, family = binomial(logit))
+    model <- glm(formula, data = dataFrame, family = family)
     reportModel(model, modelName)
     return(model)
 }
 
 tryLinearModel <- function (dataFrame, formula, modelName) {
-    if (missing(modelName)) { modelName <- formula }
     cat("\n\n")
     cat("***************************\n")
     cat("*** "); cat(modelName); cat(" ***\n")
@@ -188,6 +186,18 @@ tryNbModel2 <- function(indeps, dep, data) {
     return (model)
 }
 
+tryGlm <- function(family, indeps, dep, data) {
+    formulaString <- paste(dep, paste(indeps, collapse=" + "), sep=" ~ ")
+    formula <- as.formula(formulaString)
+    modelName <- formulaString
+    model <- tryGlmModel(family, data, formula, modelName)
+    ##cat("\n")
+    ##cat(paste("*** ANOVA of model '", modelName, "' ***\n", sep=""))
+    ##print(anova(model, test ="Chisq"))
+    ##print(summary(model))
+    return (model)
+}
+
 plotResiduals <- function(model) {
     ## Taken from https://www.r-bloggers.com/model-validation-interpreting-residual-plots/
     fit <- fitted(model)
@@ -265,9 +275,9 @@ allData$sqrtLINES_CHANGED <- sqrt(allData$LINES_CHANGED)
 
 ##onlyChanged <- subset(allData, COMMITS > 0)
 
-sampleSize <- 10000
-sampleData <- sampleDf(allData, sampleSize)
-##sampleData <- allData
+##sampleSize <- 100000
+##sampleData <- sampleDf(allData, sampleSize)
+sampleData <- allData
 
 indeps <- c(##"logFL", "logFC", "logND"
     ##"FLratio", "FCratio", "NDratio",
@@ -283,7 +293,7 @@ indeps <- c(##"logFL", "logFC", "logND"
 ##logLOFC +
 
 ##modelOnSample <- tryLinearModel2(indeps, "logLINES_CHANGED", sampleData)
-modelOnSample <- tryNbModel2(indeps, "LINES_CHANGED", sampleData)
+modelOnSample <- tryGlm("poisson", indeps, "LINES_CHANGED", sampleData)
 
 ##locLinesChangedModelOnSample <- tryLinearModel2(c("logLOC"), "logLINES_CHANGED", sampleData)
 
