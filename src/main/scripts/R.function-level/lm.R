@@ -158,13 +158,9 @@ tryOrs <- function(dep, nameDep, indep, nameIndep) {
     cat(sprintf(nameIndep, prf[1], prf[2], prf[3], fmt="%s;%.3f;%.3f;%.3f\n"))
 }
 
-tryLinearModel2 <- function(indeps, dep, data, controlIndep=NULL) {
+tryLinearModel2 <- function(indeps, dep, data) {
     formulaString <- paste(dep, paste(indeps, collapse=" + "), sep=" ~ ")
     formula <- as.formula(formulaString)
-    if (is.null(controlIndep)) {
-        controlIndep <- indeps[length(indeps)]
-    }
-    ##modelName <- paste("ifdef + ", controlIndep, " -> ", dep, sep="")
     modelName <- formulaString
     model <- tryLinearModel(data, formula, modelName)
     ##cat("\n")
@@ -186,7 +182,7 @@ tryNbModel2 <- function(indeps, dep, data) {
     return (model)
 }
 
-tryGlm <- function(family, indeps, dep, data) {
+tryGlmModel2 <- function(family, indeps, dep, data) {
     formulaString <- paste(dep, paste(indeps, collapse=" + "), sep=" ~ ")
     formula <- as.formula(formulaString)
     modelName <- formulaString
@@ -203,6 +199,11 @@ plotResiduals <- function(model) {
     fit <- fitted(model)
     res <- residuals(model)
 
+    ##cat("*** Shapiro test of normality of residuals ***\n")
+    ##print(shapiro.test(sample(res, min(2500,length(res)))))
+    qqnorm(res); qqline(res, col = 2)
+    ##qqplot(qnorm(ppoints(length(res))), qnorm(res))
+
     qPercent <- 2.5
     q <- qPercent / 100.0
 
@@ -217,16 +218,17 @@ plotResiduals <- function(model) {
          xlim = fitLimits,
          ylim = resLimits,
          ##log = "x"
+         ##pch=16, ## plot dots, not circles
          )
     abline(h=0, lty=2)
     lines(smooth.spline(x=fit, y=res
                         ## Smaller nknots values (e.g., 12) make
                         ## spline more smooth, higher ones (e.g., 100) more jagged.
                         
-                      , nknots=63
+                      ##, nknots=max(min(42, length(res) %% 10), 4)
                         )
          ,col="red"
-          ,lwd=2
+         ,lwd=2
           )
     return (model)
 }
@@ -265,6 +267,10 @@ sampleDf <- function(df, sz) {
 ##annotationData <- subset(allData, FL > 0)
 
 allData$sqrtLOC <- sqrt(allData$LOC)
+allData$sqrtFL <- sqrt(allData$FL)
+allData$sqrtFC <- sqrt(allData$FC)
+allData$sqrtND <- sqrt(allData$ND)
+
 allData$logFL <- log(allData$FL + 1)
 allData$logFC <- log(allData$FC + 1)
 allData$logND <- log(allData$ND + 1)
@@ -273,17 +279,35 @@ allData$logND <- log(allData$ND + 1)
 allData$logLINES_CHANGED <- log(allData$LINES_CHANGED + 1)
 allData$sqrtLINES_CHANGED <- sqrt(allData$LINES_CHANGED)
 
-##onlyChanged <- subset(allData, COMMITS > 0)
+##allData$sqrtLogLINES_CHANGED <- sqrt(allData$logLINES_CHANGED)
+##allData$logLogLINES_CHANGED <- log(allData$logLINES_CHANGED)
 
-##sampleSize <- 100000
+onlyChanged0 <- subset(allData, COMMITS > 0)
+medianLCHratio <- median(onlyChanged0$LCHratio)
+cat("Median changed lines/LOC for all changed functions: ", medianLCHratio, "\n", sep="")
+
+allData$CHURN_PRONE <- allData$LCHratio > medianLCHratio
+
+allNRow <- nrow(allData)
+churnProneNRow <- nrow(subset(allData, CHURN_PRONE))
+churnPronePercent <- churnProneNRow * 100.0 / allNRow
+cat(sprintf(churnPronePercent, fmt="Number of churn-prone rows: %.1f%%\n"))
+
+onlyChanged <- subset(allData, COMMITS > 0)
+
+##sampleSize <- 10000
 ##sampleData <- sampleDf(allData, sampleSize)
+##sampleData <- sampleDf(onlyChanged, sampleSize)
 sampleData <- allData
+##sampleData <- onlyChanged
 
-indeps <- c(##"logFL", "logFC", "logND"
+## last variable is the independent control variable
+indeps <- c(
     ##"FLratio", "FCratio", "NDratio",
-    "FL", "FC", "ND",
+    "FL", "FC", "ND", "LOC"
     ##, "LOACratio",
-    "LOC" # last variable is the independent control variable
+    ##"logFL", "logFC", "logND", "logLOC"
+    ##"sqrtFL", "sqrtFC", "sqrtND", "sqrtLOC"
 )
 ##FLratio + #
 ##FCratio + #
@@ -291,11 +315,14 @@ indeps <- c(##"logFL", "logFC", "logND"
 ##LOFCratio + #
 ##logLOAC + #
 ##logLOFC +
+##dep <- "logLINES_CHANGED"
+dep <- "CHURN_PRONE"
+##dep <- "LINES_CHANGED"
 
-##modelOnSample <- tryLinearModel2(indeps, "logLINES_CHANGED", sampleData)
-modelOnSample <- tryGlm("poisson", indeps, "LINES_CHANGED", sampleData)
-
-##locLinesChangedModelOnSample <- tryLinearModel2(c("logLOC"), "logLINES_CHANGED", sampleData)
+##modelOnSample <- tryLinearModel2(indeps, dep, sampleData)
+modelOnSample <- tryGlmModel2(binomial(link='logit'), indeps, dep, sampleData)
+##modelOnSample <- tryGlmModel2("poisson", indeps, dep, sampleData)
+##modelOnSample <- tryNbModel2(indeps, "LINES_CHANGED", sampleData)
 
 ##anova(modelOnSample # complex model
 ##    , locLinesChangedModelOnSample # simple model
@@ -307,11 +334,21 @@ modelOnSample <- tryGlm("poisson", indeps, "LINES_CHANGED", sampleData)
 
 ### Begin plot creation
 
-outputFn <- paste("Residuals_", "Sample_", opts$project, ".pdf", sep="")
-pdf(file=outputFn)
-dummy <- plotResiduals(modelOnSample)
+
+## A linear model in which all independent variables are tranformed by
+## a logarithm and the depent variable is, too (i.e.,
+## log(LINES_CHANGED) ~ log(FL) + ... + log(LOC)), leads to a QQ plot
+## where the lower and the upper part is bent upwards.  This indicates
+## a chi-square distribution.
+##
+## Reference: http://data.library.virginia.edu/understanding-q-q-plots/
+
+##outputFn <- paste("Residuals_", "Sample_", opts$project, ".pdf", sep="")
+##pdf(file=outputFn)
+##dummy <- plotResiduals(modelOnSample)
+
 ##dev.off()
-cat(outputFn,"\n",sep="")
+##cat(outputFn,"\n",sep="")
 
 ##suppressMessages(library(lmtest))
 ##lrtest(reducedModel, slocModel)
