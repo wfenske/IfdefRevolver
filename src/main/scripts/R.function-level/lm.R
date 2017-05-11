@@ -282,29 +282,34 @@ allData$sqrtLINES_CHANGED <- sqrt(allData$LINES_CHANGED)
 ##allData$sqrtLogLINES_CHANGED <- sqrt(allData$logLINES_CHANGED)
 ##allData$logLogLINES_CHANGED <- log(allData$logLINES_CHANGED)
 
-onlyChanged0 <- subset(allData, COMMITS > 0)
-medianLCHratio <- median(onlyChanged0$LCHratio)
+changedData0 <- subset(allData, COMMITS > 0)
+medianLCHratio <- median(changedData0$LCHratio)
 cat("Median changed lines/LOC for all changed functions: ", medianLCHratio, "\n", sep="")
 
 allData$CHURN_PRONE <- allData$LCHratio > medianLCHratio
 
-allNRow <- nrow(allData)
-churnProneNRow <- nrow(subset(allData, CHURN_PRONE))
-churnPronePercent <- churnProneNRow * 100.0 / allNRow
-cat(sprintf(churnPronePercent, fmt="Number of churn-prone rows: %.1f%%\n"))
+changedData <- subset(allData, COMMITS > 0)
 
-onlyChanged <- subset(allData, COMMITS > 0)
+allNRow <- nrow(allData)
+allChurnProneNRow <- nrow(subset(allData, CHURN_PRONE))
+allChurnPronePercent <- allChurnProneNRow * 100.0 / allNRow
+cat(sprintf(allChurnPronePercent, fmt="Amount of churn-prone rows among all rows: %.1f%%\n"))
+
+changedNRow <- nrow(changedData)
+changedChurnProneNRow <- nrow(subset(changedData, CHURN_PRONE))
+changedChurnPronePercent <- changedChurnProneNRow * 100.0 / changedNRow
+cat(sprintf(changedChurnPronePercent, fmt="Amount of churn-prone rows among rows with changes: %.1f%%\n"))
 
 ##sampleSize <- 10000
 ##sampleData <- sampleDf(allData, sampleSize)
-##sampleData <- sampleDf(onlyChanged, sampleSize)
-sampleData <- allData
-##sampleData <- onlyChanged
+##sampleData <- sampleDf(changedData, sampleSize)
+##sampleData <- allData
+sampleData <- changedData
 
 ## last variable is the independent control variable
 indeps <- c(
     ##"FLratio", "FCratio", "NDratio",
-    "FL", "FC", "ND", "LOC"
+    "FL", "FC", "ND" ##, "LOC"
     ##, "LOACratio",
     ##"logFL", "logFC", "logND", "logLOC"
     ##"sqrtFL", "sqrtFC", "sqrtND", "sqrtLOC"
