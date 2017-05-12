@@ -9,7 +9,7 @@
 library(optparse)
 ##library(methods)
 suppressMessages(library(aod))
-library(MASS) # for glm.nb
+suppressMessages(library(MASS)) # for glm.nb
 
 options <- list(
     make_option(c("-p", "--project")
@@ -84,6 +84,16 @@ reportModel <- function(model, modelName) {
     cat("Coefficients:\n")
     print(coef(model))
     checkSignificanceOfIndividualPredictors(model, modelName)
+    modelSummary <- summary(model)
+    chiSqStat <- 1 - pchisq(modelSummary$deviance, modelSummary$df.residual)
+    chiSqStatThreshold <- 0.05
+    if (chiSqStat > chiSqStatThreshold) {
+        judgement <- "fits the data"
+    } else {
+        judgement <- "does *not* fit the data"
+    }
+    cat(sprintf(judgement, chiSqStat, chiSqStatThreshold,
+                fmt="Model %s.\nChi-square-test statistic: %.3f (should be > %.3f).\n"))
 }
 
 tryGlmModel <- function (family, dataFrame, formula, modelName) {
@@ -161,7 +171,7 @@ tryOrs <- function(dep, nameDep, indep, nameIndep) {
 tryLinearModel2 <- function(indeps, dep, data) {
     formulaString <- paste(dep, paste(indeps, collapse=" + "), sep=" ~ ")
     formula <- as.formula(formulaString)
-    modelName <- formulaString
+    modelName <- paste("linear:", formulaString)
     model <- tryLinearModel(data, formula, modelName)
     ##cat("\n")
     ##cat(paste("*** ANOVA of model '", modelName, "' ***\n", sep=""))
@@ -173,7 +183,7 @@ tryLinearModel2 <- function(indeps, dep, data) {
 tryNbModel2 <- function(indeps, dep, data) {
     formulaString <- paste(dep, paste(indeps, collapse=" + "), sep=" ~ ")
     formula <- as.formula(formulaString)
-    modelName <- formulaString
+    modelName <- paste("negbin:", formulaString)
     model <- tryNbModel(data, formula, modelName)
     ##cat("\n")
     ##cat(paste("*** ANOVA of model '", modelName, "' ***\n", sep=""))
@@ -185,7 +195,7 @@ tryNbModel2 <- function(indeps, dep, data) {
 tryGlmModel2 <- function(family, indeps, dep, data) {
     formulaString <- paste(dep, paste(indeps, collapse=" + "), sep=" ~ ")
     formula <- as.formula(formulaString)
-    modelName <- formulaString
+    modelName <- paste("glm('", family, "'): ", formulaString, sep="")
     model <- tryGlmModel(family, data, formula, modelName)
     ##cat("\n")
     ##cat(paste("*** ANOVA of model '", modelName, "' ***\n", sep=""))
@@ -300,18 +310,18 @@ changedChurnProneNRow <- nrow(subset(changedData, CHURN_PRONE))
 changedChurnPronePercent <- changedChurnProneNRow * 100.0 / changedNRow
 cat(sprintf(changedChurnPronePercent, fmt="Amount of churn-prone rows among rows with changes: %.1f%%\n"))
 
-##sampleSize <- 10000
+sampleSize <- 10000
 ##sampleData <- sampleDf(allData, sampleSize)
-##sampleData <- sampleDf(changedData, sampleSize)
+sampleData <- sampleDf(changedData, sampleSize)
 ##sampleData <- allData
-sampleData <- changedData
+##sampleData <- changedData
 
 ## last variable is the independent control variable
 indeps <- c(
     ##"FLratio", "FCratio", "NDratio",
-    "FL", "FC", "ND" ##, "LOC"
+    ##"FL", "FC", "ND", "LOC"
     ##, "LOACratio",
-    ##"logFL", "logFC", "logND", "logLOC"
+    "logFL", "logFC", "logND", "logLOC"
     ##"sqrtFL", "sqrtFC", "sqrtND", "sqrtLOC"
 )
 ##FLratio + #
@@ -320,14 +330,14 @@ indeps <- c(
 ##LOFCratio + #
 ##logLOAC + #
 ##logLOFC +
-##dep <- "logLINES_CHANGED"
-dep <- "CHURN_PRONE"
+dep <- "logLINES_CHANGED"
+##dep <- "CHURN_PRONE"
 ##dep <- "LINES_CHANGED"
 
 ##modelOnSample <- tryLinearModel2(indeps, dep, sampleData)
-modelOnSample <- tryGlmModel2(binomial(link='logit'), indeps, dep, sampleData)
-##modelOnSample <- tryGlmModel2("poisson", indeps, dep, sampleData)
-##modelOnSample <- tryNbModel2(indeps, "LINES_CHANGED", sampleData)
+##modelOnSample <- tryGlmModel2(binomial(link='logit'), indeps, dep, sampleData)
+modelOnSample <- tryGlmModel2("poisson", indeps, dep, sampleData)
+##modelOnSample <- tryNbModel2(indeps, dep, sampleData)
 
 ##anova(modelOnSample # complex model
 ##    , locLinesChangedModelOnSample # simple model
