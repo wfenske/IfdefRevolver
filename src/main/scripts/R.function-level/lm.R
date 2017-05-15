@@ -10,6 +10,7 @@ library(optparse)
 ##library(methods)
 suppressMessages(library(aod))
 suppressMessages(library(MASS)) # for glm.nb
+suppressMessages(library(pscl)) # for Zero-inflated Poisson models
 
 options <- list(
     make_option(c("-p", "--project")
@@ -85,15 +86,26 @@ reportModel <- function(model, modelName) {
     print(coef(model))
     checkSignificanceOfIndividualPredictors(model, modelName)
     modelSummary <- summary(model)
-    chiSqStat <- 1 - pchisq(modelSummary$deviance, modelSummary$df.residual)
-    chiSqStatThreshold <- 0.05
-    if (chiSqStat > chiSqStatThreshold) {
-        judgement <- "fits the data"
-    } else {
-        judgement <- "does *not* fit the data"
+    chisqp <- TRUE
+    if (is.null(modelSummary$deviance)) {
+        cat("WARN: Cannot determine model fitness: modelSummary$deviance is missing.\n")
+        chisqp <- FALSE
     }
-    cat(sprintf(judgement, chiSqStat, chiSqStatThreshold,
-                fmt="Model %s.\nChi-square-test statistic: %.3f (should be > %.3f).\n"))
+    if (is.null(modelSummary$df.residual)) {
+        cat("WARN: Cannot determine model fitness: modelSummary$df.residual is missing.\n")
+        chisqp <- FALSE
+    }
+    if (chisqp) {
+        chiSqStat <- 1 - pchisq(modelSummary$deviance, modelSummary$df.residual)
+        chiSqStatThreshold <- 0.05
+        if (chiSqStat > chiSqStatThreshold) {
+            judgement <- "fits the data"
+        } else {
+            judgement <- "does *not* fit the data"
+        }
+        cat(sprintf(judgement, chiSqStat, chiSqStatThreshold,
+                    fmt="Model %s.\nChi-square-test statistic: %.3f (should be > %.3f).\n"))
+    }
 }
 
 tryGlmModel <- function (family, dataFrame, formula, modelName) {
@@ -112,16 +124,6 @@ tryLinearModel <- function (dataFrame, formula, modelName) {
     cat("*** "); cat(modelName); cat(" ***\n")
 
     model <- lm(formula, data = dataFrame)
-    reportModel(model, modelName)
-    return(model)
-}
-
-tryNbModel <- function (dataFrame, formula, modelName) {
-    cat("\n\n")
-    cat("***************************\n")
-    cat("*** "); cat(modelName); cat(" ***\n")
-
-    model <- glm.nb(formula, data = dataFrame)
     reportModel(model, modelName)
     return(model)
 }
@@ -180,11 +182,18 @@ tryLinearModel2 <- function(indeps, dep, data) {
     return (model)
 }
 
-tryNbModel2 <- function(indeps, dep, data) {
+tryNbModel <- function(indeps, dep, data) {
     formulaString <- paste(dep, paste(indeps, collapse=" + "), sep=" ~ ")
     formula <- as.formula(formulaString)
     modelName <- paste("negbin:", formulaString)
-    model <- tryNbModel(data, formula, modelName)
+
+    cat("\n\n")
+    cat("***************************\n")
+    cat("*** "); cat(modelName); cat(" ***\n")
+
+    model <- glm.nb(formula, data = data)
+    reportModel(model, modelName)
+    
     ##cat("\n")
     ##cat(paste("*** ANOVA of model '", modelName, "' ***\n", sep=""))
     ##print(anova(model, test ="Chisq"))
@@ -202,6 +211,83 @@ tryGlmModel2 <- function(family, indeps, dep, data) {
     ##print(anova(model, test ="Chisq"))
     ##print(summary(model))
     return (model)
+}
+
+tryZeroInflModel <- function(indeps, dep, data) {
+    ## See for more information on how to interpret these models:
+    ##
+    ## http://datavoreconsulting.com/programming-tips/count-data-glms-choosing-poisson-negative-binomial-zero-inflated-poisson/
+
+    indepsStr <- paste(indeps, collapse=" + ")
+
+    ## Step 1: find out whether there are significantly more zeros
+    ## than expected for a Poisson distribution.
+    ##
+    ## Formula: y ~ x|1.
+    ##
+    ## Probably, the intercept of the zero model is significant if
+    ## there are mode zeros than expected for a Poisson distribution.
+    formulaString1 <- paste(dep, " ~ ", indepsStr, "|1", sep="")
+    formula1 <- as.formula(formulaString1)
+
+    ## Step 2: Fit a zero-inflated model to test a treatment effect
+    ## for both the counts and the zeros (with '~ x|x') and check
+    ## whether the probability of zero is significantly different
+    ## between the two.
+    ##
+    ## Formula: y ~ x|x
+    ##
+    ## I don't know how to find that out. :-(
+    formulaString2 <- paste(dep, " ~ ", indepsStr, "|", indepsStr, sep="")
+    formula2 <- as.formula(formulaString2)
+
+    ## Step 3: Test for overdispersion in the count part of the
+    ## zero-inflated model by specifying a negative binomial
+    ## distribution.
+    ##
+    ## Formula: y ~ x|1 ... dist="negbin"
+    ##
+    ## If the estimated theta parameter is **not** significant, the
+    ## zero-inflated Poisson model is appropriate.  Otherwise, the
+    ## negative binomial model is appropriate.
+    
+    ## A simple inflation model where all zero counts have the same
+    ## probability of belonging to the zero component can by specified
+    ## by the formula y ~ x1 + x2 | 1.
+    
+    modelName1 <- paste("zero-inflated:", formulaString1)
+    cat("\n\n")
+    cat("***************************\n")
+    cat("*** "); cat(modelName1); cat(" ***\n")
+
+    model.poisson1 <- zeroinfl(formula1, data = data)
+    print(summary(model.poisson1))
+
+    modelName2 <- paste("zero-inflated:", formulaString2)
+    cat("\n\n")
+    cat("***************************\n")
+    cat("*** "); cat(modelName2); cat(" ***\n")
+    model.poisson2 <- zeroinfl(formula2, data = data)
+    print(summary(model.poisson2))
+    ## If the estimated theta parameter is **not** significant, this
+    ## indicates that the zero-inflated Poisson model is more
+    ## appropriate than the neg-bin model.
+
+    modelName1negbin <- paste("zero-inflated negative binomial:", formulaString1)
+    cat("\n\n")
+    cat("***************************\n")
+    cat("*** "); cat(modelName1negbin); cat(" ***\n")
+    model.negbin1 <- zeroinfl(formula1, data = data, dist = "negbin")
+    print(summary(model.negbin1))
+
+    modelName2negbin <- paste("zero-inflated negative binomial:", formulaString2)
+    cat("\n\n")
+    cat("***************************\n")
+    cat("*** "); cat(modelName2negbin); cat(" ***\n")
+    model.negbin2 <- zeroinfl(formula2, data = data, dist = "negbin")
+    print(summary(model.negbin2))
+    
+    return (model.negbin2)
 }
 
 plotResiduals <- function(model) {
@@ -294,6 +380,7 @@ allData$sqrtLINES_CHANGED <- sqrt(allData$LINES_CHANGED)
 
 changedData0 <- subset(allData, COMMITS > 0)
 medianLCHratio <- median(changedData0$LCHratio)
+
 cat("Median changed lines/LOC for all changed functions: ", medianLCHratio, "\n", sep="")
 
 allData$CHURN_PRONE <- allData$LCHratio > medianLCHratio
@@ -310,34 +397,54 @@ changedChurnProneNRow <- nrow(subset(changedData, CHURN_PRONE))
 changedChurnPronePercent <- changedChurnProneNRow * 100.0 / changedNRow
 cat(sprintf(changedChurnPronePercent, fmt="Amount of churn-prone rows among rows with changes: %.1f%%\n"))
 
-sampleSize <- 10000
-##sampleData <- sampleDf(allData, sampleSize)
-sampleData <- sampleDf(changedData, sampleSize)
-##sampleData <- allData
-##sampleData <- changedData
+changedPercent <- nrow(changedData0) * 100 / allNRow
+cat(sprintf(changedPercent, fmt="Amount of changed functions among all functions: %.1f%%\n"))
+
+##nrow(subset(allData, is.na(LINES_CHANGED) || !is.finite(LINES_CHANGED)))
+##nrow(subset(allData, is.na(LOC) || !is.finite(LOC)))
+##nrow(subset(allData, is.na(FL) || !is.finite(FL)))
+##nrow(subset(allData, is.na(FC) || !is.finite(FC)))
+##nrow(subset(allData, is.na(ND) || !is.finite(ND)))
+
+sampleChangedSize <- 10000
+sampleChangedData <- sampleDf(changedData, sampleChangedSize)
+##sampleChangedData <- allData
+##sampleChangedData <- changedData
 
 ## last variable is the independent control variable
-indeps <- c(
+##indeps <- c(
     ##"FLratio", "FCratio", "NDratio",
     ##"FL", "FC", "ND", "LOC"
     ##, "LOACratio",
-    "logFL", "logFC", "logND", "logLOC"
+##    "logFL", "logFC", "logND", "logLOC"
     ##"sqrtFL", "sqrtFC", "sqrtND", "sqrtLOC"
-)
+##)
 ##FLratio + #
 ##FCratio + #
 ##NDratio + #
 ##LOFCratio + #
 ##logLOAC + #
 ##logLOFC +
-dep <- "logLINES_CHANGED"
-##dep <- "CHURN_PRONE"
-##dep <- "LINES_CHANGED"
 
-##modelOnSample <- tryLinearModel2(indeps, dep, sampleData)
-##modelOnSample <- tryGlmModel2(binomial(link='logit'), indeps, dep, sampleData)
-modelOnSample <- tryGlmModel2("poisson", indeps, dep, sampleData)
-##modelOnSample <- tryNbModel2(indeps, dep, sampleData)
+##model.linear.orig <- tryLinearModel2(indeps=c("FL", "FC", "ND", "LOC"), dep="LINES_CHANGED", data=sampleChangedData)
+##model.linear.log <- tryLinearModel2(indeps=c("logFL", "logFC", "logND", "logLOC"), dep="logLINES_CHANGED", data=sampleChangedData)
+##modelOnSample <- tryGlmModel2(binomial(link='logit'), indeps, dep="CHURN_PRONE", sampleChangedData)
+##model.poisson.orig <- tryGlmModel2("poisson", indeps=c("FL", "FC", "ND", "LOC"), dep="LINES_CHANGED", data=sampleChangedData)
+##model.poisson.orig <- tryGlmModel2("poisson", indeps=c("LOC"), dep="LINES_CHANGED", data=sampleChangedData)
+##model.poisson.log <- tryGlmModel2("poisson", indeps=c("logFL", "logFC", "logND", "logLOC"), dep="logLINES_CHANGED", data=sampleChangedData)
+##model.nb.orig <- tryNbModel(indeps=c("FL", "FC", "ND", "LOC"), dep="LINES_CHANGED", data=sampleChangedData)
+##model.nb.orig <- tryNbModel(indeps=c("LOC"), dep="LINES_CHANGED", data=sampleChangedData)
+
+ziSampleSize <- 10000
+ziSampleData <- sampleDf(allData, ziSampleSize)
+model.LCH.zip = tryZeroInflModel(indeps=c("FL", "FC", "ND", "LOC"), dep="LINES_CHANGED", data=ziSampleData)
+##model.HUNKS.zip = tryZeroInflModel(indeps=c("FL", "FC", "ND", "LOC"), dep="HUNKS", data=ziSampleData)
+
+##nd <- sampleDf(changedData, 100)
+##ndMeanSE <- cbind(nd,
+##                  Mean = predict(model.nb.orig, newdata = nd, type = "response"), 
+##                  SE = predict(model.nb.orig, newdata = nd, type="response", se.fit = T)$se.fit
+##                  )
 
 ##anova(modelOnSample # complex model
 ##    , locLinesChangedModelOnSample # simple model
