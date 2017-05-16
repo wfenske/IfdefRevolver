@@ -74,7 +74,13 @@ readData <- function(commandLineArgs) {
     return (result)
 }
 
-mkGrp <- function(name, funcs) {
+ssubset <- function(superset, fieldName, cmp, threshold) {
+    conditionString <- paste(fieldName, cmp, threshold)
+    return (subset(superset, eval(parse(text=conditionString))))
+}
+
+mkGrp <- function(name, funcsToSubset, fieldName, cmp, threshold) {
+    funcs <- ssubset(funcsToSubset, fieldName, cmp, threshold)
     grp <- c() # dummy to create a fresh object
     grp$name <- name
     grp$funcs <- funcs
@@ -83,28 +89,36 @@ mkGrp <- function(name, funcs) {
     return (grp)
 }
 
-allData <- readData(args)
+funcsAll <- readData(args)
 
-annotationThresh <- 1
-##changeThresh <- 1
-funcsChanged <- subset(allData, COMMITS > 0)
+annotationThresh <- 2
+funcsChanged <- subset(funcsAll, COMMITS > 0)
 
-LCRratioQuantiles <- quantile(funcsChanged$LCHratio, c(.5, .75))
-changeThresh <- LCRratioQuantiles[2]
+indep <- "FL"
 
-funcsA   <- subset(allData, (FL >= annotationThresh))
-funcsU <- subset(allData, (FL < annotationThresh))
+funcsA <- ssubset(funcsAll, indep, ">=", annotationThresh)
+funcsU <- ssubset(funcsAll, indep, "<",  annotationThresh)
 
-grpAC  <- mkGrp("annotated, change-prone functions",
-                subset(funcsA, (LCHratio >= changeThresh)))
-grpUC  <- mkGrp("unannotated, change-prone functions",
-                subset(funcsU, (LCHratio >= changeThresh)))
-grpAU  <- mkGrp("annotated, un-change-prone functions",
-                subset(funcsA, (LCHratio < changeThresh)))
-grpUU  <- mkGrp("unannotated, un-change-prone functions",
-                subset(funcsU, (LCHratio < changeThresh)))
+dep <- "HUNKSratio"
+depQuantiles <- quantile(eval(parse(text=paste("funcsChanged", dep,
+                                               sep="$"))),
+                         c(.5, .75))
+depThresh <- depQuantiles[2]
+
+formulaStringDepHigher <- paste(dep, depThresh, sep=" >= ")
+formulaStringDepLower  <- paste(dep, depThresh, sep=" < ")
+
+grpAC  <- mkGrp("annotated, change-prone functions", funcsA,
+                dep, " >= ", depThresh)
+grpUC  <- mkGrp("unannotated, change-prone functions", funcsU,
+                dep, " >= ", depThresh)
+grpAU  <- mkGrp("annotated, un-change-prone functions", funcsA,
+                dep, " < ", depThresh)
+grpUU  <- mkGrp("unannotated, un-change-prone functions", funcsU,
+                dep, " < ", depThresh)
 
 if ( opts$normalize ) {
+    stop("Normalization is currently broken.")
     averageLoc <- function(setOfFunctions) {
         return (mean(setOfFunctions$LOC))
     }
@@ -123,7 +137,7 @@ if ( opts$normalize ) {
 
 grpVal <- function(grp) {
     r <- round(grp$nrow * grp$scale)
-    cat(grp$name, ":", grp$nrow, grp$scale, r, "\n")
+    ##cat(grp$name, ":", grp$nrow, grp$scale, r, "\n")
     return (r)
 }
 
