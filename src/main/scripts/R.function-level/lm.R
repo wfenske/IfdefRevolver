@@ -437,7 +437,7 @@ sampleChangedData <- sampleDf(changedData, sampleChangedSize)
 
 ziSampleSize <- 10000
 ziSampleData <- sampleDf(allData, ziSampleSize)
-model.LCH.zip = tryZeroInflModel(indeps=c("FL", "FC", "ND", "LOC"), dep="LINES_CHANGED", data=ziSampleData)
+##model.LCH.zip = tryZeroInflModel(indeps=c("FL", "FC", "ND", "LOC"), dep="LINES_CHANGED", data=ziSampleData)
 ##model.HUNKS.zip = tryZeroInflModel(indeps=c("FL", "FC", "ND", "LOC"), dep="HUNKS", data=ziSampleData)
 
 ##nd <- sampleDf(changedData, 100)
