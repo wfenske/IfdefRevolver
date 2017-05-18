@@ -117,13 +117,23 @@ mkTitle <- function(titleExtra="") {
 
 ggplotHistDiscrete <- function(df, varName, titleExtra="") {
     uniqueValues <- unique(df[,varName])
+    maxBins <- 20
+    if (length(uniqueValues) <= maxBins) {
+        limits <- sort(uniqueValues)
+    } else {
+        limits <- sapply(seq(from=min(uniqueValues),
+                             to=max(uniqueValues),
+                             length.out=maxBins),
+                         round)
+    }
+    
     return (ggplot(df, aes(x=eval(varSymbolExpr(varName))))
             + geom_histogram(color="black"
                              ##, fill="lightblue"
                              ## , linetype="dashed"
-                           , bins=length(uniqueValues)
+                           , bins=length(limits)
                              )
-            + scale_x_discrete(limits=sort(uniqueValues),name=varName)
+            + scale_x_discrete(limits=limits,name=varName)
             ##+ scale_y_log10()
             + ggtitle(mkTitle(titleExtra))
             )
@@ -134,7 +144,6 @@ ggplotHistContinuous <- function(df, varName, titleExtra="") {
             + geom_histogram(color="black"
                              ##, fill="lightblue"
                              ## , linetype="dashed"
-                             ##, bins=length(uniqueValues)
                              )
             + scale_x_continuous(name=varName)
             ##+ scale_y_log10()
