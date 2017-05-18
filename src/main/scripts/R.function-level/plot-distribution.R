@@ -14,24 +14,33 @@ options <- list(
               , default = NULL
                 )
     
-    , make_option(c("-a", "--annotation_variable")
-              , help="Name of the annotation variable (FL, FC, or ND) whose distribution should be plotted."
+    , make_option(c("-v", "--variable")
+              , help="Name of the variable whose distribution to plot. Valid names include FC, FL, or ND for annotations, COMMMITS, HUNKS, LINES_CHANGED for changes, FCratio, FLratio, ... COMMITSratio, HUNKSratio, and LCHratio for those variables scaled to the function's LOC."
               , default = NULL
                 )
     
-    , make_option(c("--amin")
-                , help="Lower limit to the frequency of occurrence of the values specified via `-a' to be included in the histogram.  Given as a percentage. [default: %default]"
+    , make_option(c("--min")
+                , help="Lower limit to the frequency of occurrence of the values specified via `-v' to be included in the histogram.  Given as a percentage.  This optoin basically controls the lenght of the tail in case the distribution of the variable has a long tail.  [default: %default]"
+                , type = "numeric",
                 , default = 1.0
                 )
     
-    , make_option(c("-c", "--change_variable")
-              , help="Name of the change variable (COMMITS, HUNKS, LINES_CHANGED) whose distribution should be plotted."
-              , default = NULL
+    , make_option(c("--maxx")
+                , help="Absolute maximum value of values on the x-axis to display."
+                , type = "numeric",
+                , default = NULL
                 )
     
-    , make_option(c("--cmin")
-                , help="Lower limit to the frequency of occurrence of the values specified via `-c' to be included in the histogram.  Given as a percentage. [default: %default]"
-                , default = 1.0
+    , make_option(c("-c", "--changed")
+                , help="Consider only the values of changed functions. [default: %default]"
+                , action = "store_true"
+                , default = FALSE
+                )
+    
+    , make_option(c("-a", "--annotated")
+                , help="Whether to consider only annotated function or only un-annotated functions or both. [default: %default]"
+                , default = "both"
+                , metavar = "{yes,no,both}"
                 )
 )
 
@@ -98,9 +107,16 @@ plotHist <- function(values) {
     return (h)
 }
 
-ggplotHist <- function(df, varName) {
-    uniqueValues <- unique(df[,varName])
+mkTitle <- function(titleExtra="") {
+    title <- opts$name
+    if (titleExtra != "") {
+        title <- paste(title, titleExtra)
+    }
+    return (title)
+}
 
+ggplotHistDiscrete <- function(df, varName, titleExtra="") {
+    uniqueValues <- unique(df[,varName])
     return (ggplot(df, aes(x=eval(varSymbolExpr(varName))))
             + geom_histogram(color="black"
                              ##, fill="lightblue"
@@ -109,17 +125,34 @@ ggplotHist <- function(df, varName) {
                              )
             + scale_x_discrete(limits=sort(uniqueValues),name=varName)
             ##+ scale_y_log10()
-            + ggtitle(opts$name)
+            + ggtitle(mkTitle(titleExtra))
             )
 }
 
-outputFn <- function(varName) {
-    return (paste(paste("distribution", varName, opts$name, sep="_"),
+ggplotHistContinuous <- function(df, varName, titleExtra="") {
+    return (ggplot(df, aes(x=eval(varSymbolExpr(varName))))
+            + geom_histogram(color="black"
+                             ##, fill="lightblue"
+                             ## , linetype="dashed"
+                             ##, bins=length(uniqueValues)
+                             )
+            + scale_x_continuous(name=varName)
+            ##+ scale_y_log10()
+            + ggtitle(mkTitle(titleExtra))
+            )
+}
+
+outputFn <- function(varName, fileNameExtra="") {
+    base <- varName
+    if (fileNameExtra != "") {
+        base <- paste(varName, fileNameExtra, sep="_")
+    }
+    return (paste(paste("distribution", base, opts$name, sep="_"),
                   ".pdf", sep=""))
 }
 
-openOutputFile <- function(varName) {
-    fn <- outputFn(varName)
+openOutputFile <- function(varName, fileNameExtra="") {
+    fn <- outputFn(varName, fileNameExtra)
     pdf(file=fn,width=6,height=4)
     return (fn)
 }
@@ -128,47 +161,97 @@ println <- function (line) {
     cat(line,"\n",sep="")
 }
 
-createHistPlot <- function(data, varName) {
-    fn <- openOutputFile(varName)
-    p <- ggplotHist(data, varName)
+createHistPlot <- function(data, varName, plotFunc,
+                           fileNameExtra="", titleExtra="") {
+    fn <- openOutputFile(varName, fileNameExtra)
+    p <- plotFunc(data, varName, titleExtra)
     print(p)
     invisible(dev.off())
     println(fn)
     return (fn)
 }
 
-createHistPlotComfy <- function(baseData, varName, minLim) {
+applyRelLim <- function(baseData, varName, minLim) {
     values <- baseData[, varName]
-    minLimD <- as.double(minLim)
+    threshold <- quantile(values, c((100.0 - minLim) / 100.0))[1]
+    return (subset(baseData, eval(varSymbolExpr(varName)) <= threshold))
+}
 
-    threshold <- quantile(values, c((100.0 - minLimD) / 100.0))
-    dataFiltered <- subset(baseData,
-                           eval(varSymbolExpr(varName)) <= threshold[1])
-    
-    r <- createHistPlot(dataFiltered, varName)
+applyAbsLim <- function(baseData, varName, threshold) {
+    return (subset(baseData, eval(varSymbolExpr(varName)) <= threshold))
+}
 
-    return (r)
+appendUnlessEmpty <- function(a, b, sep="") {
+    if (a == "") {
+        return (b)
+    } else {
+        return (paste(a,b,sep=sep))
+    }
 }
 
 allData <- readData(args)
 
-havePlot <- FALSE
+varName <- opts$variable
 
-annVar <- opts$annotation_variable
-chgVar <- opts$change_variable
-
-if (!is.null(annVar)) {
-    annData <- subset(allData, FL > 0)
-    dummy <- createHistPlotComfy(annData, annVar, opts$amin)
-    havePlot <- TRUE
+if (is.null(varName)) {
+    stop("Missing variable name.  Specify via `--variable' (`-v').")
 }
 
-if (!is.null(chgVar)) {
-    chgData <- subset(allData, COMMITS > 0)
-    dummy <- createHistPlotComfy(chgData, chgVar, opts$cmin)
-    havePlot <- TRUE
+if (!(varName %in% colnames(allData))) {
+    stop(paste("No such column: `", varName, "'. "
+             , "Valid names are: ", paste(colnames(allData), collapse=', ')
+             , sep=""))
 }
 
-if (!havePlot) {
-    stop("Missing variable name.  Specify via `--annotation_variable' (`-a') or `--change_variable' (`-c').")
+filteredData <- allData
+
+filterName <- ""
+filterDisplayName <- ""
+
+if (opts$annotated=="yes") {
+    filteredData <- subset(filteredData, FL > 0)
+    filterName <- appendUnlessEmpty(filterName, "annotated", sep=".")
+    filterDisplayName <- appendUnlessEmpty(filterDisplayName, "annotated", sep=", ")
+} else if (opts$annotated=="no") {
+    filteredData <- subset(filteredData, FL == 0)
+    filterName <- appendUnlessEmpty(filterName, "unannotated", sep=".")
+    filterDisplayName <- appendUnlessEmpty(filterDisplayName, "un-annotated", sep=", ")
+} else if (opts$annotated != "both") {
+    stop(paste("Invalid value for option `-a':", opts$annotated))
 }
+
+if (opts$changed) {
+    filteredData <- subset(filteredData, COMMITS > 0)
+    filterName <- appendUnlessEmpty(filterName, "changed", sep=".")
+    filterDisplayName <- appendUnlessEmpty(filterDisplayName, "changed", sep=", ")
+}
+
+if (filterName == "") {
+    filterName <- "all"
+    filterDisplayName <- "all"
+}
+
+titleExtra <- paste("(", filterDisplayName, " functions", ")", sep="")
+
+if (!is.null(opts$maxx)) {
+    filteredData <- applyAbsLim(filteredData, varName, opts$maxx)
+}
+
+if (opts$min > 0.0) {
+    filteredData <- applyRelLim(filteredData, varName, opts$min)
+}
+
+plotFunc <- NULL
+if (varName %in% c('FC', 'FL', 'ND', 'COMMITS', 'HUNKS', 'LINE_CHANGED',
+                   'LINES_ADDED', 'LINES_DELETED', 'LOC')) {
+    plotFunc <- ggplotHistDiscrete
+} else if (varName %in% c('FCratio', 'FLratio', 'NDratio',
+                          'COMMITSratio', 'HUNKSratio', 'LCHratio')) {
+        plotFunc <- ggplotHistContinuous
+} else {
+    stop(paste("Don't know whether to plot variable discreetely or continuously:",
+               varName))
+}
+
+dummy <- createHistPlot(filteredData, varName, plotFunc, fileNameExtra=filterName,
+                        titleExtra=titleExtra)
