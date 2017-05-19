@@ -54,9 +54,10 @@ help()
     echo "Options:"
     echo " -p${lo_project} PROJECT_NAME Name of the project to analyze"
     echo " -s${lo_windowsize} WINDOW_SIZE  Number of commits for a commit window."
-    echo "   ${indent}              See createsnapshots.sh(1) to see what the default value is."
-    echo " -n${lo_dry_run}              Print the commands that would be executed, but do not execute"
-    echo "   ${indent}              them."
+    echo "   ${indent}              See createsnapshots.sh(1) to see what the default"
+    echo "   ${indent}              value is."
+    echo " -n${lo_dry_run}              Print the commands that would be executed, but do"
+    echo "   ${indent}              not execute them."
     echo
     echo "Example:"
     echo " $me -p openldap"
