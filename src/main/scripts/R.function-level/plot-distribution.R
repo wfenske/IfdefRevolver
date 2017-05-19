@@ -251,10 +251,12 @@ if (opts$min > 0.0) {
 }
 
 plotFunc <- NULL
-if (varName %in% c('FC', 'FL', 'ND', 'COMMITS', 'HUNKS', 'LINE_CHANGED',
-                   'LINES_ADDED', 'LINES_DELETED', 'LOC')) {
+if (varName %in% c('FC', 'FL', 'ND', 'COMMITS', 'HUNKS',
+                   'LINES_CHANGED', 'LINES_ADDED', 'LINES_DELETED',
+                   'LOC', 'LOAC', 'LOFC')) {
     plotFunc <- ggplotHistDiscrete
 } else if (varName %in% c('FCratio', 'FLratio', 'NDratio',
+                          'LOACratio', 'LOFCratio',
                           'COMMITSratio', 'HUNKSratio', 'LCHratio')) {
         plotFunc <- ggplotHistContinuous
 } else {
