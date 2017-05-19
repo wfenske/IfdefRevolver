@@ -12,28 +12,69 @@ echo_as_me()
 usage()
 {
     echo "Usage:"
-    echo " $me --project=PROJECT_NAME [--windowsize=NUM] [-n]"
-    echo " $me --help"
+    echo " $me -p PROJECT_NAME [-w WINDOW_SIZE] [-n]"
+    echo " $me -h"
 }
+
+getop_flavor=gnu
+case $(uname) in
+    Darwin) getop_flavor=bsd
+	    break
+	    ;;
+    Linux) getop_flavor=gnu
+	   break
+	   ;;
+    *) getop_flavor=bsd
+       break
+       ;;
+esac
+
+have_long_opt=false
+case $getop_flavor in
+    gnu) have_long_opt=true;;
+esac
 
 help()
 {
+    lo_project=
+    lo_windowsize=
+    lo_dry_run=
+    indent=
+
+    if $have_long_opt
+    then
+	   lo_project=', --project   '
+	lo_windowsize=', --windowsize'
+	   lo_dry_run=', --dry-run   '
+	       indent='              '
+    fi
+    
     usage
     echo
     echo "Options:"
-    echo ' -p, --project    PROJECT_NAME Name of the project to analyze'
-    echo ' -s, --windowsize NUM Number of commits for a commit window.'
-    echo '                  See createsnapshots.sh(1) to see what the default value is.'
-    echo ' -n, --dry-run    Print the commands that would be executed, but do not execute them.'
+    echo " -p${lo_project} PROJECT_NAME Name of the project to analyze"
+    echo " -s${lo_windowsize} WINDOW_SIZE  Number of commits for a commit window."
+    echo "   ${indent}              See createsnapshots.sh(1) to see what the default value is."
+    echo " -n${lo_dry_run}              Print the commands that would be executed, but do not execute"
+    echo "   ${indent}              them."
     echo
     echo "Example:"
     echo " $me -p openldap"
 }
 
-ARGS=`getopt -o "p:s:hn" -l "project:,windowsize:,help,dry-run" -n "$me" -- "$@"`
+short_opts="p:s:hn"
+case $getop_flavor in
+    gnu) ARGS=`getopt -o "$short_opts" -l "project:,windowsize:,help,dry-run" -n "$me" -- "$@"`
+	 err=$?
+	 break
+	 ;;
+    bsd|*) ARGS=`getopt "$short_opts" "$@"`
+	 err=$?
+	 break
+	 ;;
+esac
 
 # Getopt error
-err=$?
 if [ $err -ne 0 ]
 then
     usage >&2
