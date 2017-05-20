@@ -54,10 +54,21 @@ options <- list(
               , help="Name of the dependent variable (e.g., COMMITS, COMMITSratio, LCHratio)."
               , default = NULL
                 )
-  , make_option(c("-H", "--no_header"),
-                default=FALSE,
-                action="store_true",
-                help="Omit header row. [default: %default]")
+  , make_option(c("--dependent-base"),
+              , dest="depBase"
+              , default="changed",
+              , metavar="CHOICE"
+              , help="Consider all functions or just the changed ones to calculate the threshold for the dependent variable. Allowed values: `all', `changed'. [default: %default]")
+  , make_option(c("--dependent-average"),
+              , dest="depAvg"
+              , default="median",
+              , metavar="CHOICE"
+              , help="How to compute the threshold for the dependent variable. Allowed values: `median', `mean'. [default: %default]")
+  , make_option(c("-H", "--no-header")
+              , dest="no_header"
+              , default=FALSE
+              , action="store_true"
+              , help="Omit header row. [default: %default]")
   , make_option(c("--debug")
               , help="Print some diagnostic messages. [default: %default]"
               , default = FALSE
@@ -120,8 +131,13 @@ mkGrp <- function(subsetBaseName, funcsToSubset, fieldName, cmp, threshold) {
     return (grp)
 }
 
-printGrp <- function(grp) {
-    write(sprintf(grp$name, grp$nrow, fmt="DEBUG: %s: %d"), stderr())
+printGrp <- function(grp, numAllChanged=NULL) {
+    percentage <- ""
+    if (!is.null(numAllChanged)) {
+        percentage <- sprintf((grp$nrow * 100.0 / numAllChanged),
+                              fmt=" (%02.2f%% of changed functions fulfilling the first criterion)")
+    }
+    write(sprintf(grp$name, grp$nrow, percentage, fmt="DEBUG: %s: %6d%s"), stderr())
 }
 
 funcsAll <- readData(args)
@@ -150,10 +166,41 @@ doTheFisher <- function(indep,dep,indepThresh=NULL) {
     
     funcsIndepAbove <- ssubset(funcsAll, indep, indepAboveCmp, indepThresh)
     indepAboveName  <- sprintf(          indep, indepAboveCmp, indepThresh, fmt=indepNameFmt)
+
+    depBase <- NULL
+    if (opts$depBase == "changed") {
+        ##write("INFO: dependent variable threshold is computed over just the CHANGED functions, not over all functions.", stderr())
+        depBase <- funcsChanged
+    } else if (opts$depBase == "all") {
+        ##write("INFO: dependent variable threshold is computed over ALL functions, not just the changed ones.", stderr())
+        depBase <- funcsAll
+    } else {
+        stop(paste("Invalid value for option `--dependent-base': ", opts$depBase))
+    }
     
-    ##dep <- "LCHratio"
-    ##depThresh <- quantile(funcsChanged[,dep], c(.5))[1]
-    depThresh <- median(funcsChanged[,dep])
+    depFunc <- NULL
+    if (opts$depAvg == "median") {
+        depFunc <- median
+    } else if (opts$depAvg == "mean") {
+        depFunc <- mean
+    } else {
+        stop(paste("Invalid value for option `--dependent-average': ", opts$depAvg))
+    }
+    
+    depThresh <- depFunc(depBase[,dep])
+    
+    if (opts$debug) {
+        write(sprintf(dep, median(funcsAll[,dep]), mean(funcsAll[,dep]),
+                      median(funcsChanged[,dep]), mean(funcsChanged[,dep]),
+                      fmt="DEBUG: %s averages: median(all), mean(all), median(changed), mean(changed): %.3f, %.3f, %.3f, %.3f"), stderr())
+
+        dAllLoc <- sum(funcsAll$LOC)
+        dAllHunks <- sum(funcsAll$HUNKS) * 1.0
+        dAllCommits <- sum(funcsAll$COMMITS) * 1.0
+        dAllLchg <- sum(funcsAll$LINES_CHANGED) * 1.0
+        write(sprintf(dAllLoc, (dAllCommits/dAllLoc), (dAllHunks/dAllLoc), (dAllLchg/dAllLoc),
+                      fmt="DEBUG: total LOC: %d.  Total averages (COMMITS/LOC, HUNKS/LOC, LCHG/LOC): %.3f, %.3f, %.3f"), stderr())
+    }
     
     depNameFmt <- "%s%-2s%.3f"
     depAboveName <- sprintf(dep, ">" , depThresh, fmt=depNameFmt)
@@ -172,8 +219,11 @@ doTheFisher <- function(indep,dep,indepThresh=NULL) {
                                         c(depAboveName,   depBelowName)))
 
     if (opts$debug) {
-        printGrp(grpAProne)
-        printGrp(grpUProne)
+        numChangedIndepAbove <- nrow(subset(funcsIndepAbove, COMMITS > 0))
+        numChangedIndepBelow <- nrow(subset(funcsIndepBelow, COMMITS > 0))
+
+        printGrp(grpAProne, numAllChanged=numChangedIndepAbove)
+        printGrp(grpUProne, numAllChanged=numChangedIndepBelow)
         printGrp(grpAUnprone)
         printGrp(grpUUnprone)
         
