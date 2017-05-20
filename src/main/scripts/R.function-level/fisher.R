@@ -40,14 +40,29 @@ options <- list(
               , help="Name of the project whose data to load.  We expect the input R data to reside in `results/<projec-name>/allData.rdata' below the current working directory."
               , default = NULL
                 )
-  , make_option(c("-n", "--normalize"),
+  , make_option(c("-i", "--independent")
+              , help="Name of the independent variable (e.g., FL, LOC)."
+              , default = NULL
+                )
+  , make_option(c("--ithresh")
+              , help="Absolute threshold value for the independent variable. If a function's metric value for the independent variable is <= than this threshold, the function is considered to not have the marker. If the value is above the threshold, the function has the marker. If not specified, the median value of the independent variable is chosen as the threshold."
+              , metavar = "NUMBER"
+              , type = "numeric"
+              , default = NULL
+                )
+  , make_option(c("-d", "--dependent")
+              , help="Name of the dependent variable (e.g., COMMITS, COMMITSratio, LCHratio)."
+              , default = NULL
+                )
+  , make_option(c("-H", "--no_header"),
                 default=FALSE,
                 action="store_true",
-                help="Normalize counts for each window to the LOC count for the function.")
-    , make_option(c("-H", "--no_header"),
-                default=FALSE,
-                action="store_true",
-                help="Omit header row")
+                help="Omit header row. [default: %default]")
+  , make_option(c("--debug")
+              , help="Print some diagnostic messages. [default: %default]"
+              , default = FALSE
+              , action="store_true"
+                )
 )
 
 args <- parse_args(OptionParser(
@@ -68,112 +83,146 @@ readData <- function(commandLineArgs) {
         }
         dataFn <-  file.path("results", opts$project, "allData.rdata")
     }
-    cat("DEBUG: Reading data from ", dataFn, "\n", sep="")
+    if (opts$debug) {
+        write(sprintf(dataFn, fmt="DEBUG: Reading data from %s"), stderr())
+    }
     result <- readRDS(dataFn)
-    cat("DEBUG: Sucessfully read data.\n")
+    if (opts$debug) {
+        write("DEBUG: Sucessfully read data.", stderr())
+    }
     return (result)
 }
 
 ssubset <- function(superset, fieldName, cmp, threshold) {
-    conditionString <- paste(fieldName, cmp, threshold)
-    return (subset(superset, eval(parse(text=conditionString))))
+    pfn <- parse(text=fieldName)
+    if (cmp == "<") {
+        return (subset(superset, eval(pfn) < threshold))
+    }
+    if (cmp == "<=") {
+        return (subset(superset, eval(pfn) <= threshold))
+    }
+    if (cmp == ">") {
+        return (subset(superset, eval(pfn) > threshold))
+    }
+    if (cmp == ">=") {
+        return (subset(superset, eval(pfn) >= threshold))
+    }
+    stop(paste("Invalid comparison operator:", cmp))
 }
 
-mkGrp <- function(name, funcsToSubset, fieldName, cmp, threshold) {
+mkGrp <- function(subsetBaseName, funcsToSubset, fieldName, cmp, threshold) {
     funcs <- ssubset(funcsToSubset, fieldName, cmp, threshold)
+    depName <- sprintf(fieldName,cmp,threshold,fmt="%s%-2s%.3f")
     grp <- c() # dummy to create a fresh object
-    grp$name <- name
+    grp$name <- paste("f/(", subsetBaseName, " & ", depName, ")", sep="")
     grp$funcs <- funcs
-    grp$scale <- 1
     grp$nrow <- nrow(funcs)
     return (grp)
 }
 
-funcsAll <- readData(args)
+printGrp <- function(grp) {
+    write(sprintf(grp$name, grp$nrow, fmt="DEBUG: %s: %d"), stderr())
+}
 
-annotationThresh <- 2
+funcsAll <- readData(args)
 funcsChanged <- subset(funcsAll, COMMITS > 0)
 
-indep <- "FL"
+belowCmp <- "<="
+aboveCmp <- ">"
+indepBelowCmp <- belowCmp
+indepAboveCmp <- aboveCmp
+depBelowCmp   <- belowCmp
+depAboveCmp   <- aboveCmp
 
-funcsA <- ssubset(funcsAll, indep, ">=", annotationThresh)
-funcsU <- ssubset(funcsAll, indep, "<",  annotationThresh)
+doTheFisher <- function(indep,dep,indepThresh=NULL) {
+    ##indep <- "FL"
+    ##indepThresh <- 0
+    indepNameFmt <- "%s%-2s%d"
+    
+    ##indep <- "LOC"
+    if (is.null(indepThresh)) {
+        indepThresh <- median(funcsAll[,indep])
+    }
+    ##indepNameFmt <- "%s%-2s%.1f"
+    
+    funcsIndepBelow <- ssubset(funcsAll, indep, indepBelowCmp, indepThresh)
+    indepBelowName  <- sprintf(          indep, indepBelowCmp, indepThresh, fmt=indepNameFmt)
+    
+    funcsIndepAbove <- ssubset(funcsAll, indep, indepAboveCmp, indepThresh)
+    indepAboveName  <- sprintf(          indep, indepAboveCmp, indepThresh, fmt=indepNameFmt)
+    
+    ##dep <- "LCHratio"
+    ##depThresh <- quantile(funcsChanged[,dep], c(.5))[1]
+    depThresh <- median(funcsChanged[,dep])
+    
+    depNameFmt <- "%s%-2s%.3f"
+    depAboveName <- sprintf(dep, ">" , depThresh, fmt=depNameFmt)
+    depBelowName <- sprintf(dep, "<=", depThresh, fmt=depNameFmt)
+    
+    grpAProne   <- mkGrp(indepAboveName, funcsIndepAbove, dep, depAboveCmp, depThresh)
+    grpUProne   <- mkGrp(indepBelowName, funcsIndepBelow, dep, depAboveCmp, depThresh)
+    grpAUnprone <- mkGrp(indepAboveName, funcsIndepAbove, dep, depBelowCmp, depThresh)
+    grpUUnprone <- mkGrp(indepBelowName, funcsIndepBelow, dep, depBelowCmp, depThresh)
+    
+    counts <- c(grpAProne$nrow, grpUProne$nrow,
+                grpAUnprone$nrow, grpUUnprone$nrow)
 
-dep <- "HUNKSratio"
-depQuantiles <- quantile(eval(parse(text=paste("funcsChanged", dep,
-                                               sep="$"))),
-                         c(.5, .75))
-depThresh <- depQuantiles[2]
+    fisherTable <- matrix(counts, nrow=2,
+                          dimnames=list(c(indepAboveName, indepBelowName),
+                                        c(depAboveName,   depBelowName)))
 
-formulaStringDepHigher <- paste(dep, depThresh, sep=" >= ")
-formulaStringDepLower  <- paste(dep, depThresh, sep=" < ")
-
-grpAC  <- mkGrp("annotated, change-prone functions", funcsA,
-                dep, " >= ", depThresh)
-grpUC  <- mkGrp("unannotated, change-prone functions", funcsU,
-                dep, " >= ", depThresh)
-grpAU  <- mkGrp("annotated, un-change-prone functions", funcsA,
-                dep, " < ", depThresh)
-grpUU  <- mkGrp("unannotated, un-change-prone functions", funcsU,
-                dep, " < ", depThresh)
-
-if ( opts$normalize ) {
-    stop("Normalization is currently broken.")
-    averageLoc <- function(setOfFunctions) {
-        return (mean(setOfFunctions$LOC))
+    if (opts$debug) {
+        printGrp(grpAProne)
+        printGrp(grpUProne)
+        printGrp(grpAUnprone)
+        printGrp(grpUUnprone)
+        
+        write(sprintf(indepAboveName, nrow(funcsIndepAbove), fmt="DEBUG: #f/%s: %10d"),
+              stderr())
+        write(sprintf(indepBelowName, nrow(funcsIndepBelow), fmt="DEBUG: #f/%s: %10d"),
+              stderr())
+        write(sprintf(nrow(funcsAll), fmt="DEBUG:       #f: %10d"), stderr())
+        print(fisherTable)
     }
 
-    avgLoc  <- averageLoc(allData)
+    fisherResults <- fisher.test(fisherTable, alternative = "greater")
 
-    grpScale <- function(grp) {
-        return (avgLoc / averageLoc(grp$funcs))
-    }
-
-    grpAC$scale <- grpScale(grpAC)
-    grpUC$scale <- grpScale(grpUC)
-    grpAU$scale <- grpScale(grpAU)
-    grpUU$scale <- grpScale(grpUU)
-}
-
-grpVal <- function(grp) {
-    r <- round(grp$nrow * grp$scale)
-    ##cat(grp$name, ":", grp$nrow, grp$scale, r, "\n")
-    return (r)
-}
-
-normalizedCounts <- c(grpVal(grpAC), grpVal(grpUC),
-                      grpVal(grpAU), grpVal(grpUU))
-
-fisherTable <- matrix(normalizedCounts, nrow=2,
-                      dimnames=list(c("Annotated", "Unannotated"),
-                                    c("Change-Prone", "Not Change-Prone")))
-fisherTable
-fisherResults <- fisher.test(fisherTable, alternative = "greater")
-
-OR <- fisherResults$estimate
-p.value  <- fisherResults$p.value
-
-if ( OR > 1 ) {
-    if ( p.value < 0.05 ) {
-        rating <- "++"
+    OR <- fisherResults$estimate
+    p.value  <- fisherResults$p.value
+    
+    if ( OR > 1 ) {
+        if ( p.value < 0.05 ) {
+            rating <- "++"
+        } else {
+            rating <- "+~"
+        }
     } else {
-        rating <- "+~"
+        if ( p.value < 0.05 ) {
+            rating <- "--"
+        } else {
+            rating <- "-~"
+        }
     }
-} else {
-    if ( p.value < 0.05 ) {
-        rating <- "--"
-    } else {
-        rating <- "-~"
-    }
+    
+    ##sysname <- basename(dirname(inputFn))
+    ##cat(sprintf(opts$smell,rating,OR,p.value,opts$project,fmt="% 3s;%s;%.2f;%.3f;%s\n"))
+    ##fisherResults$estimate
+    ##fisherResults$p.value
+
+    row <- sprintf(rating,OR,p.value,opts$project
+                  ,indep,indepThresh
+                  ,dep,depThresh
+                  ,fmt="%s,%.2f,%.3f,%s,%s,%.3f,%s,%.3f\n")
+
+    return (row)
 }
 
-##if ( !opts$no_header ) {
-    cat("Rating","OR","p-value","System\n",sep=",")
-##}
+if ( !opts$no_header ) {
+    cat(sprintf(
+        indepBelowCmp,indepAboveCmp,
+        depBelowCmp,depAboveCmp,
+        fmt="Rating,OR,p-value,System,I,%s/%sIthresh,D,%s/%sDthresh\n"))
+}
 
-##sysname <- basename(dirname(inputFn))
-##cat(sprintf(opts$smell,rating,OR,p.value,opts$project,fmt="% 3s;%s;%.2f;%.3f;%s\n"))
-cat(sprintf(rating,OR,p.value,opts$project,fmt="%s,%.2f,%.3f,%s\n"))
-
-#fisherResults$estimate
-#fisherResults$p.value
+r <- doTheFisher(indep=opts$independent, dep=opts$dependent, indepThresh=opts$ithresh)
+cat(r, "\n", sep="")
