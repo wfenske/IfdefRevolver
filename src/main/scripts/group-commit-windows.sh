@@ -211,7 +211,7 @@ do
     
     for (( iwin=1; $iwin <= $num_joint_windows; iwin++ ))
     do
-	group=$(printf '%s' "$dates"|head -n+$o_windows)
+	group=$(printf '%s' "$dates"|head -n $o_windows)
 	dates=$(printf '%s' "$dates"|tail -n+${skip_lines})
 	pgroup=$(printf '%s' "$group"|tr '\n' ' '|sed 's/[[:space:]]\{2,\}/ /g')
 	log_debug "Branch $branch_name merged window $iwin/$num_joint_windows: $pgroup"
