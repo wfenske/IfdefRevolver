@@ -26,6 +26,7 @@ SCALES+=" LOC"
 SYSTEMS=
 SYSTEMS+=" Apache"
 #SYSTEMS+=" BusyBox"
+SYSTEMS+=" GLibC"
 SYSTEMS+=" OpenLDAP"
 SYSTEMS+=" OpenVPN"
 #SYSTEMS+=" Pidgin"
