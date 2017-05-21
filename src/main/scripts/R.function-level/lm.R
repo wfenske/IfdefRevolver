@@ -406,10 +406,10 @@ cat(sprintf(changedPercent, fmt="Amount of changed functions among all functions
 ##nrow(subset(allData, is.na(FC) || !is.finite(FC)))
 ##nrow(subset(allData, is.na(ND) || !is.finite(ND)))
 
-sampleChangedSize <- 10000
-sampleChangedData <- sampleDf(changedData, sampleChangedSize)
+##sampleChangedSize <- 10000
+##sampleChangedData <- sampleDf(changedData, sampleChangedSize)
 ##sampleChangedData <- allData
-##sampleChangedData <- changedData
+sampleChangedData <- changedData
 
 ## last variable is the independent control variable
 ##indeps <- c(
@@ -432,7 +432,10 @@ sampleChangedData <- sampleDf(changedData, sampleChangedSize)
 ##model.poisson.orig <- tryGlmModel2("poisson", indeps=c("FL", "FC", "ND", "LOC"), dep="LINES_CHANGED", data=sampleChangedData)
 ##model.poisson.orig <- tryGlmModel2("poisson", indeps=c("LOC"), dep="LINES_CHANGED", data=sampleChangedData)
 ##model.poisson.log <- tryGlmModel2("poisson", indeps=c("logFL", "logFC", "logND", "logLOC"), dep="logLINES_CHANGED", data=sampleChangedData)
-##model.nb.orig <- tryNbModel(indeps=c("FL", "FC", "ND", "LOC"), dep="LINES_CHANGED", data=sampleChangedData)
+model.nb.COMMITS <- tryNbModel(indeps=c("FL", "FC", "ND", "LOC"), dep="COMMITS", data=sampleChangedData)
+model.nb.HUNKS <- tryNbModel(indeps=c("FL", "FC", "ND", "LOC"), dep="HUNKS", data=sampleChangedData)
+model.nb.LCHG <- tryNbModel(indeps=c("FL", "FC", "ND", "LOC"), dep="LINES_CHANGED", data=sampleChangedData)
+##model.nb.LCHGratio <- tryNbModel(indeps=c("FL", "FC", "ND", "LOC"), dep="LCHratio", data=sampleChangedData)
 ##model.nb.orig <- tryNbModel(indeps=c("LOC"), dep="LINES_CHANGED", data=sampleChangedData)
 
 ziSampleSize <- 10000

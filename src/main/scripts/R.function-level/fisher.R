@@ -63,7 +63,7 @@ options <- list(
               , dest="depAvg"
               , default="median",
               , metavar="CHOICE"
-              , help="How to compute the threshold for the dependent variable. Allowed values: `median', `mean'. [default: %default]")
+              , help="How to compute the threshold for the dependent variable. Allowed values: `median', `mean', `total'. [default: %default]")
   , make_option(c("-H", "--no-header")
               , dest="no_header"
               , default=FALSE
@@ -177,12 +177,31 @@ doTheFisher <- function(indep,dep,indepThresh=NULL) {
     } else {
         stop(paste("Invalid value for option `--dependent-base': ", opts$depBase))
     }
+
+    totalAllLoc <- sum(funcsAll$LOC) * 1.0
+    totalAllHunks <- sum(funcsAll$HUNKS) * 1.0
+    totalAllCommits <- sum(funcsAll$COMMITS) * 1.0
+    totalAllLchg <- sum(funcsAll$LINES_CHANGED) * 1.0
+    if (opts$debug) {
+        write(sprintf(totalAllLoc, (totalAllCommits/totalAllLoc), (totalAllHunks/totalAllLoc), (totalAllLchg/totalAllLoc),
+                      fmt="DEBUG: total LOC: %.0f.  Total averages (COMMITS/LOC, HUNKS/LOC, LCHG/LOC): %.4f, %.4f, %.4f"), stderr())
+    }
     
     depFunc <- NULL
     if (opts$depAvg == "median") {
         depFunc <- median
     } else if (opts$depAvg == "mean") {
         depFunc <- mean
+    } else if (opts$depAvg == "total") {
+        depFunc <- function(values) {
+            if (dep == "COMMITSratio")
+                return (totalAllCommits/totalAllLoc)
+            else if (dep == "HUNKSratio")
+                return (totalAllHunks/totalAllLoc)
+            else if (dep == "LCHratio")
+                return (totalAllLchg/totalAllLoc)
+            else stop(paste("Cannot use --dependent-average=total with -d", dep))
+        }
     } else {
         stop(paste("Invalid value for option `--dependent-average': ", opts$depAvg))
     }
@@ -193,13 +212,6 @@ doTheFisher <- function(indep,dep,indepThresh=NULL) {
         write(sprintf(dep, median(funcsAll[,dep]), mean(funcsAll[,dep]),
                       median(funcsChanged[,dep]), mean(funcsChanged[,dep]),
                       fmt="DEBUG: %s averages: median(all), mean(all), median(changed), mean(changed): %.3f, %.3f, %.3f, %.3f"), stderr())
-
-        dAllLoc <- sum(funcsAll$LOC)
-        dAllHunks <- sum(funcsAll$HUNKS) * 1.0
-        dAllCommits <- sum(funcsAll$COMMITS) * 1.0
-        dAllLchg <- sum(funcsAll$LINES_CHANGED) * 1.0
-        write(sprintf(dAllLoc, (dAllCommits/dAllLoc), (dAllHunks/dAllLoc), (dAllLchg/dAllLoc),
-                      fmt="DEBUG: total LOC: %d.  Total averages (COMMITS/LOC, HUNKS/LOC, LCHG/LOC): %.3f, %.3f, %.3f"), stderr())
     }
     
     depNameFmt <- "%s%-2s%.3f"
@@ -211,12 +223,21 @@ doTheFisher <- function(indep,dep,indepThresh=NULL) {
     grpAUnprone <- mkGrp(indepAboveName, funcsIndepAbove, dep, depBelowCmp, depThresh)
     grpUUnprone <- mkGrp(indepBelowName, funcsIndepBelow, dep, depBelowCmp, depThresh)
     
-    counts <- c(grpAProne$nrow, grpUProne$nrow,
-                grpAUnprone$nrow, grpUUnprone$nrow)
+###    counts <- c(grpAProne$nrow, grpUProne$nrow,
+###                grpAUnprone$nrow, grpUUnprone$nrow)
+###
+###    fisherTable <- matrix(counts, nrow=2,
+###                          dimnames=list(c(indepAboveName, indepBelowName),
+###                                        c(depAboveName,   depBelowName)))
+    counts <- c(grpAProne$nrow, grpAUnprone$nrow, # col. 1
+                grpUProne$nrow, grpUUnprone$nrow  # col. 2
+                )
 
     fisherTable <- matrix(counts, nrow=2,
-                          dimnames=list(c(indepAboveName, indepBelowName),
-                                        c(depAboveName,   depBelowName)))
+                          dimnames=list(c(depAboveName,   depBelowName), # row names
+                                        c(indepAboveName, indepBelowName) # column names
+                                        ))
+ 
 
     if (opts$debug) {
         numChangedIndepAbove <- nrow(subset(funcsIndepAbove, COMMITS > 0))
@@ -253,6 +274,28 @@ doTheFisher <- function(indep,dep,indepThresh=NULL) {
             rating <- "-~"
         }
     }
+
+    print(chisq.test(fisherTable))
+    library(lsr)
+    write(sprintf(cramersV(fisherTable), fmt="Cramer's V (0.1-0.3=weak,0.4-0.5=medium,>0.5=strong): %.2f"), stderr())
+    tGroup <- c(grpAProne$funcs[,dep], grpAUnprone$funcs[,dep])
+    cGroup <- c(grpUProne$funcs[,dep], grpUUnprone$funcs[,dep])
+###    write(sprintf(cohensD(tGroup,  cGroup), # treatment group
+###                                        # control group
+###                , fmt="Cohen's D (lsr): %.2f"), stderr())
+    library(effsize)
+    print(cohen.d(tGroup, # treatment group
+                  cGroup # control group
+                  ))
+
+###    toyByGender <- matrix(c(2,1,7,2,5,3), nrow=3,
+###                          dimnames=list(c("Lego", "Puppen", "PCGames"),
+###                                        c("Jungen",   "Maedchen"))
+###                          )
+###    print(toyByGender)
+###    print(chisq.test(toyByGender))
+###    write(sprintf(cramersV(toyByGender), fmt="DEBUG: Cramer's V (0.1-0.3=weak,0.4-0.5=medium,>0.5=strong): %.2f"), stderr())
+
     
     ##sysname <- basename(dirname(inputFn))
     ##cat(sprintf(opts$smell,rating,OR,p.value,opts$project,fmt="% 3s;%s;%.2f;%.3f;%s\n"))
@@ -276,3 +319,5 @@ if ( !opts$no_header ) {
 
 r <- doTheFisher(indep=opts$independent, dep=opts$dependent, indepThresh=opts$ithresh)
 cat(r, "\n", sep="")
+
+stop("How can we compute risk ratios or something?  The odds ratios look huge, but Cramer's V says that there's almost no effect.  Who's right?")
