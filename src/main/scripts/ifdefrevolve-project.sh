@@ -12,7 +12,7 @@ echo_as_me()
 usage()
 {
     echo "Usage:"
-    echo " $me -p PROJECT_NAME [-w WINDOW_SIZE] [-n]"
+    echo " $me -p PROJECT_NAME [-s WINDOW_SIZE] [-n]"
     echo " $me -h"
 }
 
