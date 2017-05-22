@@ -104,6 +104,14 @@ readData <- function(commandLineArgs) {
     return (result)
 }
 
+significanceCode <- function(p) {
+    if (p < 0.0001) { return ("***"); }
+    else if (p < 0.001) { return ("**"); }
+    else if (p < 0.01) { return ("*"); }
+    else if (p < 0.05) { return ("."); }
+    else { return (""); }
+}
+
 ssubset <- function(superset, fieldName, cmp, threshold) {
     pfn <- parse(text=fieldName)
     if (cmp == "<") {
@@ -259,34 +267,33 @@ doTheFisher <- function(indep,dep,indepThresh=NULL) {
     fisherResults <- fisher.test(fisherTable, alternative = "greater")
 
     OR <- fisherResults$estimate
-    p.value  <- fisherResults$p.value
+    fisher.p.value  <- fisherResults$p.value
+
+    chisqRes <- chisq.test(fisherTable)
     
     if ( OR > 1 ) {
-        if ( p.value < 0.05 ) {
-            rating <- "++"
-        } else {
-            rating <- "+~"
-        }
+        fisherPRating <- significanceCode(fisher.p.value)
+        chisqPRating <- significanceCode(chisqRes$p.value)
     } else {
-        if ( p.value < 0.05 ) {
-            rating <- "--"
-        } else {
-            rating <- "-~"
-        }
+        fisherPRating <- "x"
+        chisqPRating <- "x"
     }
 
-    print(chisq.test(fisherTable))
-    library(lsr)
-    write(sprintf(cramersV(fisherTable), fmt="Cramer's V (0.1-0.3=weak,0.4-0.5=medium,>0.5=strong): %.2f"), stderr())
+    
+    ##print(str(chisq.test(fisherTable)))
+    ##library(lsr)
+    ##write(sprintf(cramersV(fisherTable), fmt="Cramer's V (0.1-0.3=weak,0.4-0.5=medium,>0.5=strong): %.2f"), stderr())
     tGroup <- c(grpAProne$funcs[,dep], grpAUnprone$funcs[,dep])
     cGroup <- c(grpUProne$funcs[,dep], grpUUnprone$funcs[,dep])
 ###    write(sprintf(cohensD(tGroup,  cGroup), # treatment group
 ###                                        # control group
 ###                , fmt="Cohen's D (lsr): %.2f"), stderr())
     library(effsize)
-    print(cohen.d(tGroup, # treatment group
-                  cGroup # control group
-                  ))
+    cohenRes <- cohen.d(tGroup, # treatment group
+                        cGroup # control group
+                        )
+    ##print(cohenRes)
+    ##print(str(cohenRes))
 
 ###    toyByGender <- matrix(c(2,1,7,2,5,3), nrow=3,
 ###                          dimnames=list(c("Lego", "Puppen", "PCGames"),
@@ -302,10 +309,12 @@ doTheFisher <- function(indep,dep,indepThresh=NULL) {
     ##fisherResults$estimate
     ##fisherResults$p.value
 
-    row <- sprintf(rating,OR,p.value,opts$project
+    row <- sprintf(opts$project,OR
+                  ,fisher.p.value,fisherPRating
+                  ,chisqRes$p.value,chisqPRating
                   ,indep,indepThresh
                   ,dep,depThresh
-                  ,fmt="%s,%.2f,%.3f,%s,%s,%.3f,%s,%.3f\n")
+                  ,fmt="%s,%.2f,%9.3g,%3s,%9.3g,%3s,%s,%.0f,%s,%.4f\n")
 
     return (row)
 }
@@ -314,10 +323,21 @@ if ( !opts$no_header ) {
     cat(sprintf(
         indepBelowCmp,indepAboveCmp,
         depBelowCmp,depAboveCmp,
-        fmt="Rating,OR,p-value,System,I,%s/%sIthresh,D,%s/%sDthresh\n"))
+        fmt="OR,FisherP,FisherPRating,ChisqP,ChisqPRating,System,I,%s/%sIthresh,D,%s/%sDthresh\n"))
 }
 
-r <- doTheFisher(indep=opts$independent, dep=opts$dependent, indepThresh=opts$ithresh)
-cat(r, "\n", sep="")
+##r <- doTheFisher(indep=opts$independent, dep=opts$dependent, indepThresh=opts$ithresh)
+##cat(r, "\n", sep="")
+cat(doTheFisher(indep="FL", dep="COMMITSratio", indepThresh=0))
+cat(doTheFisher(indep="FL", dep="HUNKSratio", indepThresh=0))
+cat(doTheFisher(indep="FL", dep="LCHratio", indepThresh=0))
 
-stop("How can we compute risk ratios or something?  The odds ratios look huge, but Cramer's V says that there's almost no effect.  Who's right?")
+cat(doTheFisher(indep="FC", dep="COMMITSratio", indepThresh=0))
+cat(doTheFisher(indep="FC", dep="HUNKSratio", indepThresh=0))
+cat(doTheFisher(indep="FC", dep="LCHratio", indepThresh=0))
+
+cat(doTheFisher(indep="ND", dep="COMMITSratio", indepThresh=1))
+cat(doTheFisher(indep="ND", dep="HUNKSratio", indepThresh=1))
+cat(doTheFisher(indep="ND", dep="LCHratio", indepThresh=1))
+
+##stop("How can we compute risk ratios or something?  The odds ratios look huge, but Cramer's V says that there's almost no effect.  Who's right?")
