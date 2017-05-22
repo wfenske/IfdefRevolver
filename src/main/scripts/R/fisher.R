@@ -36,84 +36,288 @@
 library(optparse)
 
 options <- list(
-##    make_option(c("-o", "--output"),
-##                help="Name of output file.  Default is name of input file without filetype extension and with \".pdf\" added."),
-    make_option(c("-s", "--smell"),
-                default="ANY",
-                help="Name of smell.  Valid values are  \"ANY\" (any smell), \"AB\" (Annotation Bundle), \"AF\" (Annotation File), \"LF\" (Large Feature). Furthermore, the combinations \"ABorAF\", \"ABandAF\", \"ABorLF\", \"ABandLF\", \"AForLF\", \"AFandLF\" are supported, as well as \"ANY2\" (at least two smells, possibly of the same kind), \"ANY2Distinct\" (at least two different smells), \"AB2\" (at least two Annotation Bundles), \"LF2\" (at least two Large Features) . [default: %default]")
-    , make_option(c("-n", "--normalize"),
-                default=FALSE,
-                action="store_true",
-                help="Normalize file counts for each window to the average (mean) number of files")
-    , make_option(c("-H", "--no_header"),
-                default=FALSE,
-                action="store_true",
-                help="Omit header row")
-    , make_option(c("-d", "--delimiter"),
-                default=",",
-                help="Column delimiter, e.g. `,' or `;'. [default: %default]")
+    make_option(c("-p", "--project")
+              , help="Name of the project whose data to load.  We expect the input R data to reside in `results/<projec-name>/allData.rdata' below the current working directory."
+              , default = NULL
+                )
+  , make_option(c("-i", "--independent")
+              , help="Name of the independent variable (e.g., FL, LOC)."
+              , default = NULL
+                )
+  , make_option(c("--ithresh")
+              , help="Absolute threshold value for the independent variable. If a function's metric value for the independent variable is <= than this threshold, the function is considered to not have the marker. If the value is above the threshold, the function has the marker. If not specified, the median value of the independent variable is chosen as the threshold."
+              , metavar = "NUMBER"
+              , type = "numeric"
+              , default = NULL
+                )
+  , make_option(c("-d", "--dependent")
+              , help="Name of the dependent variable (e.g., COMMITS, COMMITSratio, LCHratio)."
+              , default = NULL
+                )
+  , make_option(c("--dependent-base"),
+              , dest="depBase"
+              , default="changed",
+              , metavar="CHOICE"
+              , help="Consider all functions or just the changed ones to calculate the threshold for the dependent variable. Allowed values: `all', `changed'. [default: %default]")
+  , make_option(c("--dependent-average"),
+              , dest="depAvg"
+              , default="median",
+              , metavar="CHOICE"
+              , help="How to compute the threshold for the dependent variable. Allowed values: `median', `mean', `total'. [default: %default]")
+  , make_option(c("-H", "--no-header")
+              , dest="no_header"
+              , default=FALSE
+              , action="store_true"
+              , help="Omit header row. [default: %default]")
+  , make_option(c("--debug")
+              , help="Print some diagnostic messages. [default: %default]"
+              , default = FALSE
+              , action="store_true"
+                )
 )
 
-args <- parse_args(OptionParser(usage = "%prog [options] file", option_list=options), positional_arguments = 1)
+args <- parse_args(OptionParser(
+    description = "Perform Fisher's exact test to determine which independent variables have a significant effect on functions being (or not) change-prone. If no input R data set is given, the project must be specified via the `--project' (`-p') option."
+  , usage = "%prog [options] [file]"
+  , option_list=options)
+  , positional_arguments = c(0, 1))
 opts <- args$options
-inputFn <- args$args
 
-smellName <- opts$smell
-
-data <- read.csv(file=inputFn, head=TRUE, sep=opts$delimiter)
-
-# number of smelly, fixed files
-colIxSF  <- which( colnames(data)==paste(smellName,"FSB"  ,sep="_"))
-# number of clean (non-smelly), fixed files
-colIxCF  <- which( colnames(data)==paste(smellName,"FNSB" ,sep="_"))
-# number of smelly, non-fixed files
-colIxSNF <- which( colnames(data)==paste(smellName,"FSNB" ,sep="_"))
-# number of clean (non-smelly), non-fixed files
-colIxCNF <- which( colnames(data)==paste(smellName,"FNSNB",sep="_"))
-
-counts <- data[c(colIxSF,colIxCF,colIxSNF,colIxCNF)]
-
-if ( opts$normalize ) {
-    meanSampleSize <- mean(rowSums(counts))
-    normalize <- function(row) {
-        factor <- meanSampleSize / sum(row)
-        scaledRow <- row * factor
-        return (round(scaledRow))
+readData <- function(commandLineArgs) {
+    fns <- commandLineArgs$args
+    if ( length(fns) == 1 ) {
+        dataFn <- fns[1]
+    } else {
+        opts <- commandLineArgs$options
+        if ( is.null(opts$project) ) {
+            stop("Missing input files.  Either specify explicit input files or specify the name of the project the `--project' option (`-p' for short).")
+        }
+        dataFn <-  file.path("results", opts$project, "allData.rdata")
     }
-    normalizedCounts <- t(apply(counts,1,normalize))
-} else {
-    normalizedCounts <- counts
+    if (opts$debug) {
+        write(sprintf(dataFn, fmt="DEBUG: Reading data from %s"), stderr())
+    }
+    result <- readRDS(dataFn)
+    if (opts$debug) {
+        write("DEBUG: Sucessfully read data.", stderr())
+    }
+    return (result)
 }
 
-sums <- colSums(normalizedCounts)
-fisherTable <- matrix(sums, nrow=2,
-                      dimnames=list(c("Smelly", "Clean"),
-                                    c("Fixed", "Not Fixed")))
-fisherResults <- fisher.test(fisherTable, alternative = "greater")
-
-OR <- fisherResults$estimate
-p.value  <- fisherResults$p.value
-
-if ( OR > 1 ) {
-    if ( p.value < 0.05 ) {
-        rating <- "++"
-    } else {
-        rating <- "+~"
+ssubset <- function(superset, fieldName, cmp, threshold) {
+    pfn <- parse(text=fieldName)
+    if (cmp == "<") {
+        return (subset(superset, eval(pfn) < threshold))
     }
-} else {
-    if ( p.value < 0.05 ) {
-        rating <- "--"
-    } else {
-        rating <- "-~"
+    if (cmp == "<=") {
+        return (subset(superset, eval(pfn) <= threshold))
     }
+    if (cmp == ">") {
+        return (subset(superset, eval(pfn) > threshold))
+    }
+    if (cmp == ">=") {
+        return (subset(superset, eval(pfn) >= threshold))
+    }
+    stop(paste("Invalid comparison operator:", cmp))
+}
+
+mkGrp <- function(subsetBaseName, funcsToSubset, fieldName, cmp, threshold) {
+    funcs <- ssubset(funcsToSubset, fieldName, cmp, threshold)
+    depName <- sprintf(fieldName,cmp,threshold,fmt="%s%-2s%.3f")
+    grp <- c() # dummy to create a fresh object
+    grp$name <- paste("f/(", subsetBaseName, " & ", depName, ")", sep="")
+    grp$funcs <- funcs
+    grp$nrow <- nrow(funcs)
+    return (grp)
+}
+
+printGrp <- function(grp, numAllChanged=NULL) {
+    percentage <- ""
+    if (!is.null(numAllChanged)) {
+        percentage <- sprintf((grp$nrow * 100.0 / numAllChanged),
+                              fmt=" (%02.2f%% of changed functions fulfilling the first criterion)")
+    }
+    write(sprintf(grp$name, grp$nrow, percentage, fmt="DEBUG: %s: %6d%s"), stderr())
+}
+
+funcsAll <- readData(args)
+funcsChanged <- subset(funcsAll, COMMITS > 0)
+
+belowCmp <- "<="
+aboveCmp <- ">"
+indepBelowCmp <- belowCmp
+indepAboveCmp <- aboveCmp
+depBelowCmp   <- belowCmp
+depAboveCmp   <- aboveCmp
+
+doTheFisher <- function(indep,dep,indepThresh=NULL) {
+    ##indep <- "FL"
+    ##indepThresh <- 0
+    indepNameFmt <- "%s%-2s%d"
+    
+    ##indep <- "LOC"
+    if (is.null(indepThresh)) {
+        indepThresh <- median(funcsAll[,indep])
+    }
+    ##indepNameFmt <- "%s%-2s%.1f"
+    
+    funcsIndepBelow <- ssubset(funcsAll, indep, indepBelowCmp, indepThresh)
+    indepBelowName  <- sprintf(          indep, indepBelowCmp, indepThresh, fmt=indepNameFmt)
+    
+    funcsIndepAbove <- ssubset(funcsAll, indep, indepAboveCmp, indepThresh)
+    indepAboveName  <- sprintf(          indep, indepAboveCmp, indepThresh, fmt=indepNameFmt)
+
+    depBase <- NULL
+    if (opts$depBase == "changed") {
+        ##write("INFO: dependent variable threshold is computed over just the CHANGED functions, not over all functions.", stderr())
+        depBase <- funcsChanged
+    } else if (opts$depBase == "all") {
+        ##write("INFO: dependent variable threshold is computed over ALL functions, not just the changed ones.", stderr())
+        depBase <- funcsAll
+    } else {
+        stop(paste("Invalid value for option `--dependent-base': ", opts$depBase))
+    }
+
+    totalAllLoc <- sum(funcsAll$LOC) * 1.0
+    totalAllHunks <- sum(funcsAll$HUNKS) * 1.0
+    totalAllCommits <- sum(funcsAll$COMMITS) * 1.0
+    totalAllLchg <- sum(funcsAll$LINES_CHANGED) * 1.0
+    if (opts$debug) {
+        write(sprintf(totalAllLoc, (totalAllCommits/totalAllLoc), (totalAllHunks/totalAllLoc), (totalAllLchg/totalAllLoc),
+                      fmt="DEBUG: total LOC: %.0f.  Total averages (COMMITS/LOC, HUNKS/LOC, LCHG/LOC): %.4f, %.4f, %.4f"), stderr())
+    }
+    
+    depFunc <- NULL
+    if (opts$depAvg == "median") {
+        depFunc <- median
+    } else if (opts$depAvg == "mean") {
+        depFunc <- mean
+    } else if (opts$depAvg == "total") {
+        depFunc <- function(values) {
+            if (dep == "COMMITSratio")
+                return (totalAllCommits/totalAllLoc)
+            else if (dep == "HUNKSratio")
+                return (totalAllHunks/totalAllLoc)
+            else if (dep == "LCHratio")
+                return (totalAllLchg/totalAllLoc)
+            else stop(paste("Cannot use --dependent-average=total with -d", dep))
+        }
+    } else {
+        stop(paste("Invalid value for option `--dependent-average': ", opts$depAvg))
+    }
+    
+    depThresh <- depFunc(depBase[,dep])
+    
+    if (opts$debug) {
+        write(sprintf(dep, median(funcsAll[,dep]), mean(funcsAll[,dep]),
+                      median(funcsChanged[,dep]), mean(funcsChanged[,dep]),
+                      fmt="DEBUG: %s averages: median(all), mean(all), median(changed), mean(changed): %.3f, %.3f, %.3f, %.3f"), stderr())
+    }
+    
+    depNameFmt <- "%s%-2s%.3f"
+    depAboveName <- sprintf(dep, ">" , depThresh, fmt=depNameFmt)
+    depBelowName <- sprintf(dep, "<=", depThresh, fmt=depNameFmt)
+    
+    grpAProne   <- mkGrp(indepAboveName, funcsIndepAbove, dep, depAboveCmp, depThresh)
+    grpUProne   <- mkGrp(indepBelowName, funcsIndepBelow, dep, depAboveCmp, depThresh)
+    grpAUnprone <- mkGrp(indepAboveName, funcsIndepAbove, dep, depBelowCmp, depThresh)
+    grpUUnprone <- mkGrp(indepBelowName, funcsIndepBelow, dep, depBelowCmp, depThresh)
+    
+###    counts <- c(grpAProne$nrow, grpUProne$nrow,
+###                grpAUnprone$nrow, grpUUnprone$nrow)
+###
+###    fisherTable <- matrix(counts, nrow=2,
+###                          dimnames=list(c(indepAboveName, indepBelowName),
+###                                        c(depAboveName,   depBelowName)))
+    counts <- c(grpAProne$nrow, grpAUnprone$nrow, # col. 1
+                grpUProne$nrow, grpUUnprone$nrow  # col. 2
+                )
+
+    fisherTable <- matrix(counts, nrow=2,
+                          dimnames=list(c(depAboveName,   depBelowName), # row names
+                                        c(indepAboveName, indepBelowName) # column names
+                                        ))
+ 
+
+    if (opts$debug) {
+        numChangedIndepAbove <- nrow(subset(funcsIndepAbove, COMMITS > 0))
+        numChangedIndepBelow <- nrow(subset(funcsIndepBelow, COMMITS > 0))
+
+        printGrp(grpAProne, numAllChanged=numChangedIndepAbove)
+        printGrp(grpUProne, numAllChanged=numChangedIndepBelow)
+        printGrp(grpAUnprone)
+        printGrp(grpUUnprone)
+        
+        write(sprintf(indepAboveName, nrow(funcsIndepAbove), fmt="DEBUG: #f/%s: %10d"),
+              stderr())
+        write(sprintf(indepBelowName, nrow(funcsIndepBelow), fmt="DEBUG: #f/%s: %10d"),
+              stderr())
+        write(sprintf(nrow(funcsAll), fmt="DEBUG:       #f: %10d"), stderr())
+        print(fisherTable)
+    }
+
+    fisherResults <- fisher.test(fisherTable, alternative = "greater")
+
+    OR <- fisherResults$estimate
+    p.value  <- fisherResults$p.value
+    
+    if ( OR > 1 ) {
+        if ( p.value < 0.05 ) {
+            rating <- "++"
+        } else {
+            rating <- "+~"
+        }
+    } else {
+        if ( p.value < 0.05 ) {
+            rating <- "--"
+        } else {
+            rating <- "-~"
+        }
+    }
+
+    print(chisq.test(fisherTable))
+    library(lsr)
+    write(sprintf(cramersV(fisherTable), fmt="Cramer's V (0.1-0.3=weak,0.4-0.5=medium,>0.5=strong): %.2f"), stderr())
+    tGroup <- c(grpAProne$funcs[,dep], grpAUnprone$funcs[,dep])
+    cGroup <- c(grpUProne$funcs[,dep], grpUUnprone$funcs[,dep])
+###    write(sprintf(cohensD(tGroup,  cGroup), # treatment group
+###                                        # control group
+###                , fmt="Cohen's D (lsr): %.2f"), stderr())
+    library(effsize)
+    print(cohen.d(tGroup, # treatment group
+                  cGroup # control group
+                  ))
+
+###    toyByGender <- matrix(c(2,1,7,2,5,3), nrow=3,
+###                          dimnames=list(c("Lego", "Puppen", "PCGames"),
+###                                        c("Jungen",   "Maedchen"))
+###                          )
+###    print(toyByGender)
+###    print(chisq.test(toyByGender))
+###    write(sprintf(cramersV(toyByGender), fmt="DEBUG: Cramer's V (0.1-0.3=weak,0.4-0.5=medium,>0.5=strong): %.2f"), stderr())
+
+    
+    ##sysname <- basename(dirname(inputFn))
+    ##cat(sprintf(opts$smell,rating,OR,p.value,opts$project,fmt="% 3s;%s;%.2f;%.3f;%s\n"))
+    ##fisherResults$estimate
+    ##fisherResults$p.value
+
+    row <- sprintf(rating,OR,p.value,opts$project
+                  ,indep,indepThresh
+                  ,dep,depThresh
+                  ,fmt="%s,%.2f,%.3f,%s,%s,%.3f,%s,%.3f\n")
+
+    return (row)
 }
 
 if ( !opts$no_header ) {
-    cat("Smell","Rating","OR","p-value","System\n",sep=";")
+    cat(sprintf(
+        indepBelowCmp,indepAboveCmp,
+        depBelowCmp,depAboveCmp,
+        fmt="Rating,OR,p-value,System,I,%s/%sIthresh,D,%s/%sDthresh\n"))
 }
 
-sysname <- basename(dirname(inputFn))
-cat(sprintf(opts$smell,rating,OR,p.value,sysname,fmt="% 3s;%s;%.2f;%.3f;%s\n"))
+r <- doTheFisher(indep=opts$independent, dep=opts$dependent, indepThresh=opts$ithresh)
+cat(r, "\n", sep="")
 
-#fisherResults$estimate
-#fisherResults$p.value
+stop("How can we compute risk ratios or something?  The odds ratios look huge, but Cramer's V says that there's almost no effect.  Who's right?")
