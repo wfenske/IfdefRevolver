@@ -22,21 +22,21 @@ options <- list(
               , help="Name of output file."
               , default = NULL
                 )
-  , make_option(c("-s", "--snapshotresultsdir")
-              , help="Name of the directory where the snaphsot results are located.  This folder is expected to contain folder named, e.g., `1996-07-01', which, in turn, contain CSV files named `joint_function_ab_smell_snapshot.csv'."
+  , make_option(c("-p", "--project")
+              , help="Name of the project whose data to load.  We expect the input R data to reside in `results/<projec-name>/allData.rdata' below the current working directory."
               , default = NULL
                 )
   , make_option("--independent"
-              , help="Name of independent variable.  Valid values are: ABSmell, LocationSmell, ConstantsSmell, NestingSmell, NOFL, NOFC_Dup, NOFC_NonDup, NONEST. [default: %default]"
+              , help="Name of independent variable.  Valid values are: ABSmell, LocationSmell, ConstantsSmell, NestingSmell, FL (a.k.a. NOFL), FC (a.k.a. NOFC_NonDup), ND (a.k.a. NONEST). [default: %default]"
                 ## NOTE, 2017-03-18, wf: We also have LOAC, LOFC
-              , default="ABSmell"
+              , default="FL"
                 )
   , make_option("--dependent"
-                , help="Name of independent variable.  Valid values are: HUNKS, COMMITS, BUGFIXES, LINE_DELTA, LINES_DELETED, LINES_ADDED. [default: %default]"
-                , default="BUGFIXES"
+                , help="Name of independent variable.  Valid values are, e.g.: HUNKS, COMMITS, LINES_CHANGED. [default: %default]"
+                , default="COMMITS"
                 )
   , make_option("--scale"
-                , help="Factor by which the dependent variable should be scaled.  For instance, if --dependent=BUGFIXES and --scale=LOC, then the dependent variable will be BUGFIXES/LOC, i.e., the frequency of bug-fixes per lines of code.  Valid values are: LOC (lines per code in the function), COUNT (number of functions), none (take the value of the dependent variable as is). [default: %default]"
+              , help="Factor by which the dependent variable should be scaled.  For instance, if --dependent=COMMITS and --scale=LOC, then the dependent variable will be COMMITS/LOC, i.e., the frequency of bug-fixes per lines of code.  Valid values are: LOC (lines per code in the function), COUNT (number of functions), none (take the value of the dependent variable as is). [default: %default]"
                 , default="LOC"
                 )
   , make_option(c("-n", "--systemname")
@@ -53,6 +53,11 @@ options <- list(
               , type="double"
               , help="Upper limit for values on the Y-axis.  Limits be determined automatically if not supplied."
                 )
+  , make_option(c("--debug")
+              , help="Print some diagnostic messages. [default: %default]"
+              , default = FALSE
+              , action="store_true"
+                )
 )
 
 args <- parse_args(OptionParser(
@@ -63,30 +68,24 @@ args <- parse_args(OptionParser(
 
 opts <- args$options
 
-getInputFilenames <- function(commandLineArgs) {
-    result <- commandLineArgs$args
-    if ( length(result) > 0 ) {
-        return (result)
-    }
-
+readData <- function(commandLineArgs) {
     opts <- commandLineArgs$options
-    if ( is.null(opts$snapshotresultsdir) ) {
-            stop("Missing input files.  Either specify explicit input files or specify the directory containing the snapshot results via the `--snapshotresultsdir' option (`-s' for short).")
+    if ( is.null(opts$project) ) {
+        stop("Specify the name of the project the `--project' option (`-p' for short).")
     }
-
-    baseDir <- opts$snapshotresultsdir
-    snapshotDirs <- list.files(baseDir, pattern="[0-9][0-9][0-9][0-9]-[0-9][0-9]-[0-9][0-9]")
-    if (length(snapshotDirs) == 0) {
-        stop(paste("No snapshot directories found in `", baseDir, "'", sep=""))
+    dataFn <-  file.path("results", opts$project, "allData.rdata")
+    if (opts$debug) {
+        write(sprintf(dataFn, fmt="DEBUG: Reading data from %s"), stderr())
     }
-    return (lapply(snapshotDirs, function(snapshotDir) { file.path(baseDir, snapshotDir, "joint_function_ab_smell_snapshot.csv") }))
+    result <- readRDS(dataFn)
+    if (opts$debug) {
+        write("DEBUG: Sucessfully read data.", stderr())
+    }
+    return (result)
 }
 
-inputFns <- getInputFilenames(args)
-
 if ( is.null(opts$systemname) ) {
-    systemdir <- dirname(dirname(inputFns[[1]]))
-    systemname <- basename(systemdir)
+    systemname <- opts$project
 } else {
     systemname <- opts$systemname
 }
@@ -143,35 +142,6 @@ if ( opts$noyaxislabels ) {
 } else {
     yAxisName <- paste(opts$dependent, yAxisScaleSuffix, sep="")
     yAxisLabels <- sprintf(round(100*yLabels), fmt="%2d%%")
-}
-
-snapshotIx <- 1
-
-readSnapshotFile <- function(inputFn) {
-    snapshotData <- read.csv(inputFn, header=TRUE, sep=",",
-                             colClasses=c(
-                                 "SNAPSHOT_DATE"="character"
-                               , "FUNCTION_SIGNATURE"="character"
-                               , "FUNCTION_LOC"="numeric"
-                               , "HUNKS"="numeric"
-                               , "COMMITS"="numeric"
-                               , "BUGFIXES"="numeric"
-                               , "LINE_DELTA"="numeric"
-                               , "LINES_DELETED"="numeric"
-                               #, "LINES_ADDED"="numeric"
-                               #, "LOAC"="numeric"
-                               , "LOFC"="numeric"
-                               , "NOFL"="numeric"
-                               , "NOFC_Dup"="numeric"
-                               , "NOFC_NonDup"="numeric"
-                               , "NONEST"="numeric"))
-    cat("INFO: Reading snapshot ", snapshotData$SNAPSHOT_DATE[1], "\n", sep="")
-    snapshotData["SNAPSHOT"] <- snapshotIx
-    ## Change the value of the global variable using <<-
-    ##cat(str(max(as.numeric(snapshotData$FUNCTION_LOC), na.rm=T)))
-    ##cat(str(max(snapshotData$FUNCTION_LOC), na.rm=T))
-    snapshotIx <<- snapshotIx + 1
-    return (snapshotData)
 }
 
 computeIndepValue <- function(df, valIndep, includeBiggerP=FALSE) {
@@ -240,12 +210,15 @@ processSnapshot <- function(df) {
     return (r)
 }
 
-listOfSnapshotData <- lapply(inputFns, readSnapshotFile)
+##listOfSnapshotData <- lapply(inputFns, readSnapshotFile)
 
 ##warnings()
 
+allData <- readData(args)
+
 ## returns a list of cleanRatio, dirtyRatio pairs
-listOfValueFrames <- lapply(listOfSnapshotData, processSnapshot)
+listOfValueFrames <- lapply(split(allData, factor(allData$SNAPSHOT)),
+                            processSnapshot)
 combinedValueFrame <- Reduce(rbind, listOfValueFrames)
 
 ## Default width and height of PDFs is 7 inches
