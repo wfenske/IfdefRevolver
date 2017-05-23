@@ -91,6 +91,8 @@ allData <- do.call("rbind", lapply(inputFns, readSnapshotFile))
 ## FUNCTION_LOC,LOAC,LOFC,NOFL,NOFC_Dup,NOFC_NonDup,NONEST
 
 ## Some renaming
+allData$LCH <- allData$LINES_CHANGED
+
 allData$LOC <- allData$FUNCTION_LOC
 allData$logLOC <- log(allData$LOC)
 
@@ -114,6 +116,7 @@ allData$NDratio <- allData$ND / allData$LOC
 ## HUNKS,COMMITS,LINES_CHANGED,LINE_DELTA,LINES_DELETED,LINES_ADDED
 allData$HUNKSratio <- allData$HUNKS / allData$LOC
 allData$COMMITSratio <- allData$COMMITS / allData$LOC
+
 allData$LCHratio <- allData$LINES_CHANGED / allData$LOC
 
 ### Compute some more independent variables from the data
