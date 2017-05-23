@@ -292,6 +292,8 @@ doTheFisher <- function(indep,dep,indepThresh=NULL) {
     cohenRes <- cohen.d(tGroup, # treatment group
                         cGroup # control group
                         )
+    cohenEff <- cohenRes$estimate
+    cohenDescr <- sprintf("%s",cohenRes$magnitude)
     ##print(cohenRes)
     ##print(str(cohenRes))
 
@@ -312,32 +314,57 @@ doTheFisher <- function(indep,dep,indepThresh=NULL) {
     row <- sprintf(opts$project,OR
                   ,fisher.p.value,fisherPRating
                   ,chisqRes$p.value,chisqPRating
+                  ,cohenEff,cohenDescr
                   ,indep,indepThresh
                   ,dep,depThresh
-                  ,fmt="%s,%.2f,%9.3g,%3s,%9.3g,%3s,%s,%.0f,%s,%.4f\n")
+                  ,fmt="%8s,%5.2f,%9.3g,%3s,%9.3g,%3s,% 2.4f,%10s,%s,%.0f,%s,%.4f\n")
 
     return (row)
 }
 
 if ( !opts$no_header ) {
     cat(sprintf(
-        indepBelowCmp,indepAboveCmp,
-        depBelowCmp,depAboveCmp,
-        fmt="OR,FisherP,FisherPRating,ChisqP,ChisqPRating,System,I,%s/%sIthresh,D,%s/%sDthresh\n"))
+        ##indepBelowCmp,indepAboveCmp,
+        ##depBelowCmp,depAboveCmp,
+        fmt="System,OR,FisherP,FisherPRating,ChisqP,ChisqPRating,CohenD,CohenDMagnitude,I,Ithresh,D,Dthresh\n"))
 }
 
 ##r <- doTheFisher(indep=opts$independent, dep=opts$dependent, indepThresh=opts$ithresh)
 ##cat(r, "\n", sep="")
-cat(doTheFisher(indep="FL", dep="COMMITSratio", indepThresh=0))
-cat(doTheFisher(indep="FL", dep="HUNKSratio", indepThresh=0))
-cat(doTheFisher(indep="FL", dep="LCHratio", indepThresh=0))
+pf <- function(...) cat(doTheFisher(...))
 
-cat(doTheFisher(indep="FC", dep="COMMITSratio", indepThresh=0))
-cat(doTheFisher(indep="FC", dep="HUNKSratio", indepThresh=0))
-cat(doTheFisher(indep="FC", dep="LCHratio", indepThresh=0))
+## Without LOC adjustment
+pf(indep="FL", dep="COMMITS", indepThresh=0)
+pf(indep="FL", dep="HUNKS", indepThresh=0)
+pf(indep="FL", dep="LINES_CHANGED", indepThresh=0)
 
-cat(doTheFisher(indep="ND", dep="COMMITSratio", indepThresh=1))
-cat(doTheFisher(indep="ND", dep="HUNKSratio", indepThresh=1))
-cat(doTheFisher(indep="ND", dep="LCHratio", indepThresh=1))
+pf(indep="FC", dep="COMMITS", indepThresh=0)
+pf(indep="FC", dep="HUNKS", indepThresh=0)
+pf(indep="FC", dep="LINES_CHANGED", indepThresh=0)
+
+pf(indep="ND", dep="COMMITS", indepThresh=1)
+pf(indep="ND", dep="HUNKS", indepThresh=1)
+pf(indep="ND", dep="LINES_CHANGED", indepThresh=1)
+
+pf(indep="LOC", dep="COMMITS")
+pf(indep="LOC", dep="HUNKS")
+pf(indep="LOC", dep="LINES_CHANGED")
+
+## Scaled to LOC
+pf(indep="FL", dep="COMMITSratio", indepThresh=0)
+pf(indep="FL", dep="HUNKSratio", indepThresh=0)
+pf(indep="FL", dep="LCHratio", indepThresh=0)
+
+pf(indep="FC", dep="COMMITSratio", indepThresh=0)
+pf(indep="FC", dep="HUNKSratio", indepThresh=0)
+pf(indep="FC", dep="LCHratio", indepThresh=0)
+
+pf(indep="ND", dep="COMMITSratio", indepThresh=1)
+pf(indep="ND", dep="HUNKSratio", indepThresh=1)
+pf(indep="ND", dep="LCHratio", indepThresh=1)
+
+pf(indep="LOC", dep="COMMITSratio")
+pf(indep="LOC", dep="HUNKSratio")
+pf(indep="LOC", dep="LCHratio")
 
 ##stop("How can we compute risk ratios or something?  The odds ratios look huge, but Cramer's V says that there's almost no effect.  Who's right?")
