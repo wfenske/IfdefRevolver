@@ -26,16 +26,16 @@ options <- list(
               , help="Name of the project whose data to load.  We expect the input R data to reside in `results/<projec-name>/allData.rdata' below the current working directory."
               , default = NULL
                 )
-  , make_option("--independent"
+  , make_option(c("-i", "--independent")
               , help="Name of independent variable.  Valid values are: ABSmell, LocationSmell, ConstantsSmell, NestingSmell, FL (a.k.a. NOFL), FC (a.k.a. NOFC_NonDup), ND (a.k.a. NONEST). [default: %default]"
                 ## NOTE, 2017-03-18, wf: We also have LOAC, LOFC
               , default="FL"
                 )
-  , make_option("--dependent"
+  , make_option(c("-d", "--dependent")
                 , help="Name of independent variable.  Valid values are, e.g.: HUNKS, COMMITS, LINES_CHANGED. [default: %default]"
                 , default="COMMITS"
                 )
-  , make_option("--scale"
+  , make_option(c("-s", "--scale")
               , help="Factor by which the dependent variable should be scaled.  For instance, if --dependent=COMMITS and --scale=LOC, then the dependent variable will be COMMITS/LOC, i.e., the frequency of bug-fixes per lines of code.  Valid values are: LOC (lines per code in the function), COUNT (number of functions), none (take the value of the dependent variable as is). [default: %default]"
                 , default="LOC"
                 )
@@ -122,7 +122,7 @@ parseScaleOptValue <- function(value) {
             }
         }
         
-        yAxisScaleSuffix <<- "/FUNCTION"
+        yAxisScaleSuffix <<- "/Function"
     } else if ( value == "none" ) {
         computeScaleBy <<- function(df, indepValue, includeBiggerP) {
             return (1)
@@ -140,7 +140,16 @@ if ( opts$noyaxislabels ) {
     yAxisName <- ""
     yAxisLabels <- sprintf(yLabels, fmt="")
 } else {
-    yAxisName <- paste(opts$dependent, yAxisScaleSuffix, sep="")
+    if ((opts$dependent == "LCH") || (opts$dependent == "LINES_CHANGED")) {
+        yAxisPrefix <- "Lines changed"
+    } else if (opts$dependent == "HUNKS") {
+        yAxisPrefix <- "Hunks"
+    } else if (opts$dependent == "COMMITS") {
+        yAxisPrefix <- "Commits"
+    } else {
+        yAxisPrefix <- opts$dependent
+    }
+    yAxisName <- paste(yAxisPrefix, yAxisScaleSuffix, sep="")
     yAxisLabels <- sprintf(round(100*yLabels), fmt="%2d%%")
 }
 
