@@ -1,4 +1,4 @@
-#!/usr/bin/env sh
+#!/usr/bin/env bash
 
 me=$(basename -- "$0") || exit $?
 real_me=$(realpath -- "$0") || exit $?
@@ -209,7 +209,7 @@ do
 	log_debug "Skipping ${skipped_windows} window(s) of branch $branch_name"
     fi
     
-    for (( iwin=1; $iwin <= $num_joint_windows; iwin++ ))
+    for (( iwin=1 ; $iwin <= $num_joint_windows ; iwin++ ))
     do
 	group=$(printf '%s' "$dates"|head -n $o_windows)
 	dates=$(printf '%s' "$dates"|tail -n+${skip_lines})
