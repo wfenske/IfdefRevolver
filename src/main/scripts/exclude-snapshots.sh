@@ -12,7 +12,7 @@ LOG_LEVEL_DEBUG=4
 
 o_log_level=$LOG_LEVEL_WARN
 o_log_level=$LOG_LEVEL_INFO
-o_log_level=$LOG_LEVEL_DEBUG
+#o_log_level=$LOG_LEVEL_DEBUG
 
 echo_as_me()
 {
@@ -149,6 +149,28 @@ move_snapshot()
     return $ms_errors
 }
 
+## Usage: update_exclusion_finished_marker $successes $errors
+update_exclusion_finished_marker()
+{
+    
+    uefm_file=${src_results_dir:?}/.last_window_exclusion
+    if [ -e "$uefm_file" -a $1 -eq 0 -a $2 -eq 0 ]
+    then
+	# Marker exists and the current program run didn't change anything
+	return 0
+    fi
+    ${o_dry_run_cmd} touch -- "$uefm_file"
+    uefm_err=$?
+    if [ $uefm_err -ne 0 ]
+    then
+	log_warn "Error updating/creating exclusion marker ${uefm_file}"
+    else
+	log_info "Successfully created/updated ${uefm_file}"
+    fi
+    
+    return $uefm_err
+}
+
 help()
 {
     usage
@@ -202,12 +224,6 @@ then
     usage_and_die
 fi
 
-if [ $# -eq 0 ]
-then
-    log_info "Nothing to do."
-    exit 0
-fi
-
 init_project_dirs_or_die
 
 ### Move the snapshots, which are given as positional arguments
@@ -227,10 +243,16 @@ do
     fi
 done
 
+update_exclusion_finished_marker $successes $errors
+exclusion_marker_err=$?
+
 ### Report how many snapshots worked or didn't
 if [ $successes -gt 0 ]
 then
-   log_info "Successfully excluded $successes snapshot(s)."
+    log_info "Successfully excluded $successes snapshot(s)."
+elif [ $errors -eq 0 ]
+then
+    log_info "Nothing to do."
 fi
 
 if [ $errors -gt 0 ]
@@ -251,4 +273,4 @@ then
     exit $errors
 fi
 
-true
+exit $exclusion_marker_err
