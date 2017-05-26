@@ -254,7 +254,8 @@ tryZeroInflModel <- function(indeps, dep, data) {
     ## A simple inflation model where all zero counts have the same
     ## probability of belonging to the zero component can by specified
     ## by the formula y ~ x1 + x2 | 1.
-    
+
+    if (FALSE) {
     modelName1 <- paste("zero-inflated:", formulaString1)
     cat("\n\n")
     cat("***************************\n")
@@ -269,6 +270,8 @@ tryZeroInflModel <- function(indeps, dep, data) {
     cat("*** "); cat(modelName2); cat(" ***\n")
     model.poisson2 <- zeroinfl(formula2, data = data)
     print(summary(model.poisson2))
+    }
+    
     ## If the estimated theta parameter is **not** significant, this
     ## indicates that the zero-inflated Poisson model is more
     ## appropriate than the neg-bin model.
@@ -280,14 +283,16 @@ tryZeroInflModel <- function(indeps, dep, data) {
     model.negbin1 <- zeroinfl(formula1, data = data, dist = "negbin")
     print(summary(model.negbin1))
 
+    if (FALSE) {
     modelName2negbin <- paste("zero-inflated negative binomial:", formulaString2)
     cat("\n\n")
     cat("***************************\n")
     cat("*** "); cat(modelName2negbin); cat(" ***\n")
     model.negbin2 <- zeroinfl(formula2, data = data, dist = "negbin")
     print(summary(model.negbin2))
+    }
     
-    return (model.negbin2)
+    return (model.negbin1)
 }
 
 plotResiduals <- function(model) {
@@ -407,9 +412,13 @@ cat(sprintf(changedPercent, fmt="Amount of changed functions among all functions
 ##nrow(subset(allData, is.na(ND) || !is.finite(ND)))
 
 ##sampleChangedSize <- 10000
-##sampleChangedData <- sampleDf(changedData, sampleChangedSize)
-##sampleChangedData <- allData
-sampleChangedData <- changedData
+##negBinData <- sampleDf(changedData, sampleChangedSize)
+##negBinData <- allData
+negBinData <- changedData
+
+##ziSampleSize <- 10000
+##ziData <- sampleDf(allData, ziSampleSize)
+ziData <- allData
 
 ## last variable is the independent control variable
 ##indeps <- c(
@@ -432,16 +441,36 @@ sampleChangedData <- changedData
 ##model.poisson.orig <- tryGlmModel2("poisson", indeps=c("FL", "FC", "ND", "LOC"), dep="LINES_CHANGED", data=sampleChangedData)
 ##model.poisson.orig <- tryGlmModel2("poisson", indeps=c("LOC"), dep="LINES_CHANGED", data=sampleChangedData)
 ##model.poisson.log <- tryGlmModel2("poisson", indeps=c("logFL", "logFC", "logND", "logLOC"), dep="logLINES_CHANGED", data=sampleChangedData)
-model.nb.COMMITS <- tryNbModel(indeps=c("FL", "FC", "ND", "LOC"), dep="COMMITS", data=sampleChangedData)
-model.nb.HUNKS <- tryNbModel(indeps=c("FL", "FC", "ND", "LOC"), dep="HUNKS", data=sampleChangedData)
-model.nb.LCHG <- tryNbModel(indeps=c("FL", "FC", "ND", "LOC"), dep="LINES_CHANGED", data=sampleChangedData)
-##model.nb.LCHGratio <- tryNbModel(indeps=c("FL", "FC", "ND", "LOC"), dep="LCHratio", data=sampleChangedData)
-##model.nb.orig <- tryNbModel(indeps=c("LOC"), dep="LINES_CHANGED", data=sampleChangedData)
+nbIndeps <- c("FL", "FC",
+              "ND"
+            , "LOFC"
+            , "LOC"
+              )
+ziIndeps <- c("FL", "FC",
+              "ND"
+            , "LOFC"
+            , "LOC"
+              )
 
-ziSampleSize <- 10000
-ziSampleData <- sampleDf(allData, ziSampleSize)
-##model.LCH.zip = tryZeroInflModel(indeps=c("FL", "FC", "ND", "LOC"), dep="LINES_CHANGED", data=ziSampleData)
-##model.HUNKS.zip = tryZeroInflModel(indeps=c("FL", "FC", "ND", "LOC"), dep="HUNKS", data=ziSampleData)
+model.nb.COMMITS  <- tryNbModel(indeps=nbIndeps,       dep="COMMITS", data=negBinData)
+model.zip.COMMITS <- tryZeroInflModel(indeps=ziIndeps, dep="COMMITS", data=ziData)
+
+model.nb.HUNKS    <- tryNbModel(indeps=nbIndeps,       dep="HUNKS",   data=negBinData)
+model.zip.HUNKS   <- tryZeroInflModel(indeps=ziIndeps, dep="HUNKS",   data=ziData)
+
+##model.nb.LCHG <- tryNbModel(indeps=c(#"FL", "FC",
+##                                "ND"
+##                                        #, "LOFC", "LOC"
+##                            ), dep="LINES_CHANGED", data=negBinData)
+##model.nb.LCHGratio <- tryNbModel(indeps=c("FL", "FC", "ND", "LOC"), dep="LCHratio", data=negBinData)
+##model.nb.orig <- tryNbModel(indeps=c("LOC"), dep="LINES_CHANGED", data=negBinData)
+
+
+##model.zip.LCH = tryZeroInflModel(indeps=c(
+##                                     ##"FL", "FC",
+##                                     "ND"
+##                                        #, "LOC"
+##                                 ), dep="LINES_CHANGED", data=ziSampleData)
 
 ##nd <- sampleDf(changedData, 100)
 ##ndMeanSE <- cbind(nd,
