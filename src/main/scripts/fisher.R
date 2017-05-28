@@ -264,20 +264,22 @@ doTheFisher <- function(indep,dep,indepThresh=NULL) {
         print(fisherTable)
     }
 
-    fisherResults <- fisher.test(fisherTable, alternative = "greater")
+    fisherResults <- fisher.test(fisherTable
+                                 ##, alternative = "greater"
+                                 )
 
     OR <- fisherResults$estimate
     fisher.p.value  <- fisherResults$p.value
 
     chisqRes <- chisq.test(fisherTable)
     
-    if ( OR > 1 ) {
+##    if ( OR > 1 ) {
         fisherPRating <- significanceCode(fisher.p.value)
         chisqPRating <- significanceCode(chisqRes$p.value)
-    } else {
-        fisherPRating <- "x"
-        chisqPRating <- "x"
-    }
+##    } else {
+##        fisherPRating <- "x"
+##        chisqPRating <- "x"
+##    }
 
     
     ##print(str(chisq.test(fisherTable)))

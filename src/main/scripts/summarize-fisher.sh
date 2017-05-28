@@ -144,9 +144,9 @@ from (select
 	     end LOCP
      from
 	(SELECT *
-		,case when abs(ChisqP) < 0.01 then 1 else 0 end P001
-		,case when abs(ChisqP) >= 0.01 and abs(ChisqP) < 0.05 then 1 else 0 end P005
-		,case when abs(ChisqP) >= 0.05 then 1 else 0 end PINS
+		,case when abs(FisherP) < 0.01 then 1 else 0 end P001
+		,case when abs(FisherP) >= 0.01 and abs(FisherP) < 0.05 then 1 else 0 end P005
+		,case when abs(FisherP) >= 0.05 then 1 else 0 end PINS
 	FROM fisher) p
      group by D,I) as agg
 JOIN mins ON mins.i=agg.i and mins.d=agg.d
