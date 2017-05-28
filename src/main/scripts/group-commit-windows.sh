@@ -68,7 +68,7 @@ edie()
 usage()
 {
     echo "Usage:"
-    echo " $me -p PROJECT -o DIR [-w WINDOWS]"
+    echo " $me -p PROJECT -o DIR [-w WINDOWS] [-s SLIDE] [-vq]"
     echo " $me -h"
 }
 
@@ -80,6 +80,7 @@ usage_and_die()
 }
 
 O_WINDOWS_DEFAULT=10
+O_SLIDE_DEFAULT=0
 
 help()
 {
@@ -90,11 +91,14 @@ help()
     echo "            located in folders named results/<PROJECT>/<YYYY-MM-DD> below the"
     echo "            current working directory."
     echo " -w WINDOWS Number of windows to combine. [default: $O_WINDOWS_DEFAULT]"
+    echo " -s SLIDE   Sliding windows technique: number of windows that overlap. [default: $O_SLIDE_DEFAULT]"
     echo " -o DIR     Directory where the results should be stored."
     echo " -h         Print this help screen and exit."
+    echo " -v         Be more verbose. Can be given multiple times."
+    echo " -q         Be less verbose. Can be given multiple times."
     echo
     echo "Example:"
-    echo " $me -p openldap -o ../grouped-4 -w 4"
+    echo " $me -p openldap -o ../grouped-4 -w 4 -s 1"
 }
 
 strip_csv_header()
@@ -102,11 +106,24 @@ strip_csv_header()
     printf '%s' "$@"|tail -n+2
 }
 
+# exits 0 if the argument is a positive integer, non-zero otherwise
+positive_int_p()
+{
+    printf '%s' "$1"|grep '^[1-9][0-9]*$' > /dev/null 2>&1
+}
+
+# exits 0 if the argument is 0 or a positive integer, non-zero otherwise
+non_negative_int_p()
+{
+    printf '%s' "$1"|grep -e '^0$' -e '^[1-9][0-9]*$' > /dev/null 2>&1
+}
+
 unset o_project
 unset o_windows
 unset o_output_dir
+unset o_slide
 
-while getopts "p:w:o:h" o
+while getopts "p:w:s:o:hvq" o
 do
     case "$o" in
 	p) if [ -z "$OPTARG" ]
@@ -123,6 +140,13 @@ do
 	   fi
 	   o_windows="$OPTARG"
 	   ;;
+	s) if [ -z "$OPTARG" ]
+	   then
+	       log_error "Number of sliding windows must not be empty." >&2
+	       usage_and_die
+	   fi
+	   o_slide="$OPTARG"
+	   ;;
 	o) if [ -z "$OPTARG" ]
 	   then
 	       log_error "Output directory must not be empty." >&2
@@ -130,6 +154,8 @@ do
 	   fi
 	   o_output_dir="$OPTARG"
 	   ;;
+	v) o_log_level=$(( ++o_log_level ));;
+	q) o_log_level=$(( --o_log_level ));;
 	h) help
 	   exit 0
 	   ;;
@@ -148,13 +174,30 @@ fi
 if [ -z ${o_windows+x} ]
 then
     o_windows=$O_WINDOWS_DEFAULT
-    log_debug "No number of windows to combine specified. Defaulting to $o_windows." >&2
+    log_debug "No number of windows to combine specified. Defaulting to ${o_windows}." >&2
 fi
 
-printf '%s' "$o_windows"|grep -q -e '^[1-9][0-9]*$' > /dev/null 2>&1
-if [ $? -ne 0 ]
+if ! positive_int_p "$o_windows"
 then
     log_error "Window number is not a positive integer: $o_windows" >&2
+    usage_and_die
+fi
+
+if [ -z ${o_slide+x} ]
+then
+    o_slide=$O_SLIDE_DEFAULT
+    log_debug "No number of sliding windows specified. Defaulting to ${o_slide}." >&2
+fi
+
+if ! non_negative_int_p "$o_slide"
+then
+    log_error "Number of sliding windows is not a non-negative integer: $o_slide" >&2
+    usage_and_die
+fi
+
+if [ $o_slide -ge $o_windows ]
+then
+    log_error "Number of sliding windows is larger or equal to windows: $o_slide vs. $o_windows" >&2
     usage_and_die
 fi
 
@@ -185,36 +228,43 @@ csvsql -d ',' -q '"' --tables bo --query 'select STARTDATE,BRANCH,NUM_WINDOWS fr
 
 log_debug "Grouping window data by branch."
 branch_names=$(csvcut -d ',' -q '"' -c BRANCH $fBranchesOrdered)
+log_debug "Branch names: $branch_names"
 branch_names=$(strip_csv_header "$branch_names")
 
 count_all_windows=0
 count_skipped_windows=0
+skip_lines=$(( $o_windows + 1 - $o_slide ))
+
 for branch_name in $branch_names
 do
-    dates=$(csvsql -d ',' -q '"' --query "select DATE from branches where branch = $branch_name" --tables branches $fBranches) || exit $?
+    log_debug "Grouping snapshots in branch $branch_name"
+    dates=$(csvsql -d ',' -q '"' --query "select DATE from branches where branch = $branch_name" --tables branches $fBranches) || edie "Failed to determine branch dates for branch $branch_name"
     dates=$(strip_csv_header "$dates")
     num_windows=$(csvsql -d ',' -q '"' --query "select NUM_WINDOWS from branches_ordered where branch = $branch_name" --tables branches_ordered $fBranchesOrdered) || edie "Calculating number of windows for branch $branch_name failed."
     num_windows=$(strip_csv_header "$num_windows")
-    count_all_windows=$(( $count_all_windows + $num_windows ))
+    count_all_windows=$(( $count_all_windows + $num_windows )) || edie "Arithmetic error"
     
-    skip_lines=$(( $o_windows  + 1 ))
-    num_joint_windows=$(( $num_windows / $o_windows ))
-    skipped_windows=$(( $num_windows - ${num_joint_windows} * $o_windows ))
-    count_skipped_windows=$(( $count_skipped_windows + $skipped_windows ))
-    
-    if [ $skipped_windows -eq $num_windows ]
-    then
-	log_debug "Skipping branch $branch_name entirely. Need at least $o_windows windows, only got $num_windows."
-    else
-	log_debug "Skipping ${skipped_windows} window(s) of branch $branch_name"
-    fi
-    
-    for (( iwin=1 ; $iwin <= $num_joint_windows ; iwin++ ))
+    iwin=0
+    while true
     do
+	iwin=$(( $iwin + 1))
 	group=$(printf '%s' "$dates"|head -n $o_windows)
+	group_sz=$(printf '%s\n' "$group"|wc -l)
+	if [ $group_sz -ne $o_windows ]
+	then
+	    count_skipped_windows=$(( $count_skipped_windows + $group_sz ))
+	    if [ $group_sz -eq $num_windows ]
+	    then
+		log_debug "Skipping branch $branch_name entirely. Need at least $o_windows windows, only got $num_windows."
+	    else
+		log_debug "Skipping ${group_sz} window(s) of branch $branch_name"
+	    fi
+	    break
+	fi
 	dates=$(printf '%s' "$dates"|tail -n+${skip_lines})
 	pgroup=$(printf '%s' "$group"|tr '\n' ' '|sed 's/[[:space:]]\{2,\}/ /g')
-	log_debug "Branch $branch_name merged window $iwin/$num_joint_windows: $pgroup"
+	
+	log_debug "Branch $branch_name merged window ${iwin}: $pgroup"
 
 	## Check whether all files exist
 	for d in $group

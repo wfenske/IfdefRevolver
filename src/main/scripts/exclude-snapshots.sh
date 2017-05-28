@@ -53,6 +53,28 @@ usage()
     echo " $me -h"
 }
 
+help()
+{
+    usage
+    echo 
+    echo "Manually exclude snapshots of IfdevRevolver projects. The snapshots are not"
+    echo "physically removed, only moved to subdirectories so that further processing"
+    echo "steps will ignore them."
+    echo
+    echo "Example:"
+    echo " $me -p openldap 2011-06-29 2012-03-09"
+    echo 
+    echo "Options:"
+    echo " -p PROJECT Name of the project. The input data is assumed to be"
+    echo "            located in folders named results/<PROJECT>/<YYYY-MM-DD> below the"
+    echo "            current working directory."
+    echo " -n         Show the commands that would be executed but do not actually execute them."
+    echo " -h         Print this help screen and exit."
+    echo 
+    echo "Exit code is 0 in case of complete success. If the project source directories are missing, the exit code is Otherwise, the number of snapshots"
+    echo "for which problems occurred is used as the exit code."
+}
+
 usage_and_die()
 {
     usage >&2
@@ -171,31 +193,9 @@ update_exclusion_finished_marker()
     return $uefm_err
 }
 
-help()
-{
-    usage
-    echo 
-    echo "Manually exclude snapshots of IfdevRevolver projects. The snapshots are not"
-    echo "physically removed, only moved to subdirectories so that further processing"
-    echo "steps will ignore them."
-    echo
-    echo "Example:"
-    echo " $me -p openldap 2011-06-29 2012-03-09"
-    echo 
-    echo "Options:"
-    echo " -p PROJECT Name of the project. The input data is assumed to be"
-    echo "            located in folders named results/<PROJECT>/<YYYY-MM-DD> below the"
-    echo "            current working directory."
-    echo " -n         Show the commands that would be executed but do not actually execute them."
-    echo " -h         Print this help screen and exit."
-    echo 
-    echo "Exit code is 0 in case of complete success. If the project source directories are missing, the exit code is Otherwise, the number of snapshots"
-    echo "for which problems occurred is used as the exit code."
-}
-
 unset o_project
 o_mv_opts=-i
-unset o_dry_run_cmd=
+unset o_dry_run_cmd
 
 while getopts "p:nh" o
 do
