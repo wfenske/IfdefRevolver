@@ -75,38 +75,31 @@ help()
     echo "Exit code is 0 on success, non-zero otherwise."
 }
 
-group_min_abs_cohned()
+group_cohned_averages()
 {
     ##file="${1:?}"
     ##indep="${2:?}"
     ##dep="${3:?}"
-    csvsql -d ',' -q '"' --query "select I,D,COHEND, case when abs(CohenD) < 0.2 then 'negligible' when abs(CohenD) < 0.5 then 'small' when abs(CohenD) < 0.8 then 'medium' else 'large' end MAGNITUDE from fisher where i='${2:indep}' and d='${3:?dep}' order by abs(CohenD) asc limit 1" --tables fisher "${1:?file}"|tail -n+2
-}
-
-group_max_abs_cohned()
-{
-    ##file="${1:?}"
-    ##indep="${2:?}"
-    ##dep="${3:?}"
-    csvsql -d ',' -q '"' --query "select I,D,COHEND, case when abs(CohenD) < 0.2 then 'negligible' when abs(CohenD) < 0.5 then 'small' when abs(CohenD) < 0.8 then 'medium' else 'large' end MAGNITUDE from fisher where i='${2:indep}' and d='${3:?dep}' order by abs(CohenD) desc limit 1" --tables fisher "${1:?file}"|tail -n+2
+    csvsql -d ',' -q '"' --query "select COHEND
+from fisher
+where i='${2:indep}' and d='${3:?dep}'" \
+	   --tables fisher "${1:?file}"|averages.R -c CohenD --digits 2 --min=absmin --func=median --max=absmax -H
 }
 
 summarize_as_csv()
 {
     indeps=$(csvsql -d ',' -q '"' --query "select distinct i from fisher" --tables fisher "$1"|tail -n +2)
     deps=$(csvsql -d ',' -q '"' --query "select distinct d from fisher" --tables fisher "$1"|tail -n +2)
-    min_out_tmp=$(mktemp -- fisher_min.XXXXXXXX) || exit $?
-    max_out_tmp=$(mktemp -- fisher_max.XXXXXXXX) || exit $?
-    echo "I,D,COHEND,MAGNITUDE" > "$min_out_tmp"
-    echo "I,D,COHEND,MAGNITUDE" > "$max_out_tmp"
-    log_info "Gathering minimum/maximum effect sizes ..."
+    cohend_averages_tmp=$(mktemp -- fisher_cohend_averages.XXXXXXXX) || exit $?
+    echo "I,D,DMIN,DAVG,DMAX" > "$cohend_averages_tmp"
+    log_info "Gathering minimum/average/maximum effect sizes ..."
     for i in $indeps
     do
-	log_info "Gathering min/max effect sizes for $i ..."
+	log_info "Gathering min/avg/max effect sizes for $i ..."
 	for d in $deps
 	do
-	    group_min_abs_cohned "$1" "$i" "$d" >> "$min_out_tmp"
-	    group_max_abs_cohned "$1" "$i" "$d" >> "$max_out_tmp"
+	    printf '%s,%s,' "$i" "$d" >> "$cohend_averages_tmp"
+	    group_cohned_averages "$1" "$i" "$d" >> "$cohend_averages_tmp"
 	done
     done
 
@@ -117,17 +110,27 @@ agg.I
 ,agg.N001
 ,agg.N005
 ,agg.NINS
-,mins.COHEND
-,MEAN_COHEND
-,maxs.COHEND
-,mins.MAGNITUDE
+,cohens.dmin
+,cohens.davg
+,cohens.dmax
 ,case
-	when abs(agg.mean_cohend) < 0.2 then 'negligible'
-	when abs(agg.mean_cohend) < 0.5 then 'small'
-	when abs(agg.mean_cohend) < 0.8 then 'medium'
+	when abs(cohens.dmin) < 0.2 then 'negligible'
+	when abs(cohens.dmin) < 0.5 then 'small'
+	when abs(cohens.dmin) < 0.8 then 'medium'
 	else 'large'
-end MEAN_MAGNITUDE
-,maxs.MAGNITUDE
+end MIN_MAGNITUDE
+,case
+	when abs(cohens.davg) < 0.2 then 'negligible'
+	when abs(cohens.davg) < 0.5 then 'small'
+	when abs(cohens.davg) < 0.8 then 'medium'
+	else 'large'
+end AVG_MAGNITUDE
+,case
+	when abs(cohens.dmax) < 0.2 then 'negligible'
+	when abs(cohens.dmax) < 0.5 then 'small'
+	when abs(cohens.dmax) < 0.8 then 'medium'
+	else 'large'
+end MAX_MAGNITUDE
 from (select 
      	     p.D,p.I
 	     ,avg(p.CohenD) MEAN_COHEND
@@ -149,11 +152,10 @@ from (select
 		,case when abs(FisherP) >= 0.05 then 1 else 0 end PINS
 	FROM fisher) p
      group by D,I) as agg
-JOIN mins ON mins.i=agg.i and mins.d=agg.d
-JOIN maxs ON maxs.i=agg.i and maxs.d=agg.d
+JOIN cohens ON cohens.i=agg.i and cohens.d=agg.d
 order by agg.ratiop,agg.locp,agg.I,agg.D" \
-	   --tables fisher,mins,maxs "$1" "$min_out_tmp" "$max_out_tmp"
-    rm -f -- "$min_out_tmp" "$max_out_tmp"
+	   --tables fisher,cohens "$1" "$cohend_averages_tmp"
+    rm -f -- "$cohend_averages_tmp"
 }
 
 line_to_tex()
