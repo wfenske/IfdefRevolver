@@ -115,3 +115,16 @@ ratios-plots/$(PROJECT)/ratios-FC-LCH.LOC.pdf: $(ALL_R_DATA)
 ratios-plots/$(PROJECT)/ratios-ND-LCH.LOC.pdf: $(ALL_R_DATA)
 	mkdir -p `dirname $@` 
 	ratioscmp.R -p $(PROJECT) -n $(NAME) -i ND -d LCH -s LOC -o $@
+
+## LOC plots
+loc-plots/$(PROJECT)/LOC-FC.pdf: $(ALL_R_DATA)
+	mkdir -p `dirname $@` 
+	compare-locs.R -p $(PROJECT) -n $(NAME) -i FC -d 3 -o $@
+
+loc-plots/$(PROJECT)/LOC-FL.pdf: $(ALL_R_DATA)
+	mkdir -p `dirname $@` 
+	compare-locs.R -p $(PROJECT) -n $(NAME) -i FL -d 3 -o $@
+
+loc-plots/$(PROJECT)/LOC-ND.pdf: $(ALL_R_DATA)
+	mkdir -p `dirname $@` 
+	compare-locs.R -p $(PROJECT) -n $(NAME) -i ND -d 3 -o $@

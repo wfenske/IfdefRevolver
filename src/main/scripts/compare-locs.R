@@ -14,14 +14,22 @@ options <- list(
               , default = NULL
                 )
     
-    , make_option(c("-n", "--name")
+  , make_option(c("-n", "--name")
               , help="Pretty name of project, to be added to the plot."
               , default = NULL
                 )
     
-    , make_option(c("-d", "--divisions")
+  , make_option(c("-d", "--divisions")
               , help="Number of divisions to make."
               , default = 3
+                )
+  , make_option(c("-o", "--output")
+              , help="Output filename."
+                , default = NULL
+                )
+  , make_option(c("-i", "--independent")
+              , help="Name of the independent variable. [default=%default]"
+              , default = "FL"
                 )
 )
 
@@ -67,10 +75,13 @@ valGroup <- function(v) {
     }
 }
 
-##allData$FLbool <- allData$FL > 0
-allData$grouped <- mapply(valGroup, allData$FL)
+allData$grouped <- mapply(valGroup, eval(parse(text=paste("allData", opts$independent, sep="$"))))
 
-outputFn <- paste("LOC_", opts$name, ".pdf", sep="")
+if (is.null(opts$output)) {
+    outputFn <- paste("LOC_", opts$name, ".pdf", sep="")
+} else {
+    outputFn <- opts$output
+}
 
 ### Begin plot creation
 
@@ -79,10 +90,20 @@ pdf(file=outputFn,width=6,height=4)
 ##x <- allData$FLgrouped
 ##y <- allData$LOC
 
+if (opts$independent == "FC") {
+    xlab <- "Number of feature constants (FC)"
+} else if (opts$independent == "FL") {
+    xlab <- "Number of #ifdefs (FL)"
+} else if (opts$independent == "ND") {
+    xlab <- "Aggregated nesting depth (ND)"
+} else {
+    stop(paste("Invalid independent variable name: ", opts$independent))
+}
+
 bp <- invisible(boxplot(LOC ~ grouped
             , data=allData
             , cex=1, cex.axis=1.1, cex.main=1, cex.sub=1
-            , xlab="Number of #ifdefs in function body"
+            , xlab=xlab
             , ylab="LOC"
             , main=opts$name
             , outline=FALSE
