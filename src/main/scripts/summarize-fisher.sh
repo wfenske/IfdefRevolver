@@ -1,3 +1,5 @@
+#!/usr/bin/env bash
+
 me=$(basename -- "$0") || exit $?
 real_me=$(realpath -- "$0") || exit $?
 real_me_dir=$(dirname -- "$real_me") || exit $?
@@ -160,7 +162,7 @@ order by agg.ratiop,agg.locp,agg.I,agg.D" \
 
 line_to_tex()
 {
-    printf "$line"|sed -e 's|,| |g' -e 's,ratio,\\\\textsubscript{/LOC},g' -e 's,LCH,LCHG,g' -e 's,LINES_CHANGED,LCHG,g'|xargs printf '\\metric{%s} & \\metric{%s} & \$%d\$ & \$%d\$ & \$%d\$ & \$%.2f\$ & \$%.2f\$ & \$%.2f\$ & \\e%s{} & \\e%s{} & \\e%s{}\\\\\n'
+    printf "$line"|sed -e 's|,| |g' -e 's,ratio,\\\\textsubscript{/LOC},g' -e 's,LCH,LCHG,g' -e 's,LINES_CHANGED,LCHG,g'|xargs printf '\\metric{%s} & \\metric{%s} & $%d$ & $%d$ & $%d$ & $%.2f$ & $%.2f$ & $%.2f$ & \\e%s{} & \\e%s{} & \\e%s{}\\\\\n'
 }
 
 csv_table_to_tex()

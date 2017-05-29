@@ -335,35 +335,39 @@ if ( !opts$no_header ) {
 ##cat(r, "\n", sep="")
 pf <- function(...) cat(doTheFisher(...))
 
+fcThresh <- 1
+flThresh <- 0
+ndThresh <- 1
+
 ## Without LOC adjustment
-pf(indep="FL", dep="COMMITS", indepThresh=0)
-pf(indep="FL", dep="HUNKS", indepThresh=0)
-pf(indep="FL", dep="LINES_CHANGED", indepThresh=0)
+pf(indep="FC", dep="COMMITS",       indepThresh=fcThresh)
+pf(indep="FC", dep="HUNKS",         indepThresh=fcThresh)
+pf(indep="FC", dep="LINES_CHANGED", indepThresh=fcThresh)
 
-pf(indep="FC", dep="COMMITS", indepThresh=0)
-pf(indep="FC", dep="HUNKS", indepThresh=0)
-pf(indep="FC", dep="LINES_CHANGED", indepThresh=0)
+pf(indep="FL", dep="COMMITS",       indepThresh=flThresh)
+pf(indep="FL", dep="HUNKS",         indepThresh=flThresh)
+pf(indep="FL", dep="LINES_CHANGED", indepThresh=flThresh)
 
-pf(indep="ND", dep="COMMITS", indepThresh=1)
-pf(indep="ND", dep="HUNKS", indepThresh=1)
-pf(indep="ND", dep="LINES_CHANGED", indepThresh=1)
+pf(indep="ND", dep="COMMITS",       indepThresh=ndThresh)
+pf(indep="ND", dep="HUNKS",         indepThresh=ndThresh)
+pf(indep="ND", dep="LINES_CHANGED", indepThresh=ndThresh)
 
 pf(indep="LOC", dep="COMMITS")
 pf(indep="LOC", dep="HUNKS")
 pf(indep="LOC", dep="LINES_CHANGED")
 
 ## Scaled to LOC
-pf(indep="FL", dep="COMMITSratio", indepThresh=0)
-pf(indep="FL", dep="HUNKSratio", indepThresh=0)
-pf(indep="FL", dep="LCHratio", indepThresh=0)
+pf(indep="FC", dep="COMMITSratio",       indepThresh=fcThresh)
+pf(indep="FC", dep="HUNKSratio",         indepThresh=fcThresh)
+pf(indep="FC", dep="LCHratio",           indepThresh=fcThresh)
 
-pf(indep="FC", dep="COMMITSratio", indepThresh=0)
-pf(indep="FC", dep="HUNKSratio", indepThresh=0)
-pf(indep="FC", dep="LCHratio", indepThresh=0)
+pf(indep="FL", dep="COMMITSratio",       indepThresh=flThresh)
+pf(indep="FL", dep="HUNKSratio",         indepThresh=flThresh)
+pf(indep="FL", dep="LCHratio",           indepThresh=flThresh)
 
-pf(indep="ND", dep="COMMITSratio", indepThresh=1)
-pf(indep="ND", dep="HUNKSratio", indepThresh=1)
-pf(indep="ND", dep="LCHratio", indepThresh=1)
+pf(indep="ND", dep="COMMITSratio",       indepThresh=ndThresh)
+pf(indep="ND", dep="HUNKSratio",         indepThresh=ndThresh)
+pf(indep="ND", dep="LCHratio",           indepThresh=ndThresh)
 
 pf(indep="LOC", dep="COMMITSratio")
 pf(indep="LOC", dep="HUNKSratio")
