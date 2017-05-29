@@ -22,11 +22,13 @@ PLOTS = \
 
 WINDOW_EXCLUSION_MARKER = results/$(PROJECT)/.last_window_exclusion
 
-all: fisher ratiosplots
+all: fisher ratiosplots locplots
 
 fisher: $(FISHER_CSV)
 
 ratiosplots: $(PLOTS)
+
+locplots: loc-plots/$(PROJECT)/LOC-FC.pdf loc-plots/$(PROJECT)/LOC-FL.pdf loc-plots/$(PROJECT)/LOC-ND.pdf
 
 $(FISHER_CSV): $(ALL_R_DATA)
 	if ! fisher.R -p $(PROJECT) > $(FISHER_CSV); \
