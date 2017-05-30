@@ -31,6 +31,17 @@ options <- list(
               , help="Name of the independent variable. [default=%default]"
               , default = "FL"
                 )
+  , make_option(c("--ymax")
+              , help="Maximum value on y-axis.  Default is determined dynamically by R depending on the data."
+              , default = NULL
+              , type = "numeric"
+                )
+  , make_option(c("-Y", "--no-y-labels")
+              , dest="noYLabels"
+              , action="store_true"
+              , default=FALSE
+              , help="Omit name and labels of y axis [default %default]"
+                )
 )
 
 args <- parse_args(OptionParser(
@@ -85,38 +96,64 @@ if (is.null(opts$output)) {
 
 ### Begin plot creation
 
-pdf(file=outputFn,width=6,height=4)
+pdf(file=outputFn,width=5,height=5)
 
 ##x <- allData$FLgrouped
 ##y <- allData$LOC
 
 if (opts$independent == "FC") {
-    xlab <- "Number of feature constants (FC)"
+    xlab <- "Number of Feature Constants (FC)"
 } else if (opts$independent == "FL") {
     xlab <- "Number of #ifdefs (FL)"
 } else if (opts$independent == "ND") {
-    xlab <- "Aggregated nesting depth (ND)"
+    xlab <- "Aggregated Nesting Depth (ND)"
 } else {
     stop(paste("Invalid independent variable name: ", opts$independent))
 }
 
+if (is.null(opts$ymax)) {
+    yLims <- c()
+} else {
+    yLims <- c(0,as.integer(round(opts$ymax)))
+}
+
+# Decrease `horizontalScale' to move boxes in boxplot closer together
+horizontalScale <- 0.75
+xAxisPositions <- seq(1,by=horizontalScale,length.out=opts$divisions)
+xLims <- c(xAxisPositions[1]-0.5,xAxisPositions[opts$divisions] + 0.3 * horizontalScale)
+
+if (opts$noYLabels) {
+    yLab <- ""
+    yAxt <- "n"
+} else {
+    yLab <- "LOC"
+    yAxt <- NULL # default value
+}
+
 bp <- invisible(boxplot(LOC ~ grouped
             , data=allData
-            , cex=1, cex.axis=1.1, cex.main=1, cex.sub=1
+            #, cex=1
+            , cex.axis=1.0 # size of value labels on x & y axis
+            #, cex.main=1
+            #, cex.sub=1
             , xlab=xlab
-            , ylab="LOC"
+            , ylab=yLab
+            , yaxt=yAxt
             , main=opts$name
             , outline=FALSE
             , varwidth=T
+            , at=xAxisPositions
+            , xlim=xLims
+            , ylim=yLims
               ))
 ##text(1:5,rep(min(y),5),paste("n=",tapply(y,x,length)) )
 
 ## Add number of observations per box plot.  Taken from
 ## https://stat.ethz.ch/pipermail/r-help/2008-January/152994.html
-mtext(paste("(n=", bp$n, ")", sep = ""), at = seq_along(bp$n), line = 2, side = 1
-     , cex = 0.75 # scale text size
+mtext(paste("(n=", bp$n, ")", sep = ""), at = xAxisPositions, line = 1.9, side = 1
+     , cex = 0.8 # scale text size
       )
 
-##invisible(dev.off())
+invisible(dev.off())
 
 cat(outputFn,"\n",sep="")
