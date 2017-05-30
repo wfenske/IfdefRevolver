@@ -36,11 +36,17 @@ options <- list(
               , default = NULL
               , type = "numeric"
                 )
-  , make_option(c("-Y", "--no-y-labels")
-              , dest="noYLabels"
+  , make_option(c("-X", "--no-x-labels")
+              , dest="noXLabels"
               , action="store_true"
               , default=FALSE
               , help="Omit name and labels of y axis [default %default]"
+                )
+  , make_option(c("-T", "--no-title")
+              , dest="noTitle"
+              , action="store_true"
+              , default=FALSE
+              , help="Omit putting system name as the title of the plot [default %default]"
                 )
 )
 
@@ -96,20 +102,21 @@ if (is.null(opts$output)) {
 
 ### Begin plot creation
 
-pdf(file=outputFn,width=5,height=5)
+pdf(file=outputFn,width=5.3,height=3.5)
 
 ##x <- allData$FLgrouped
 ##y <- allData$LOC
 
-if (opts$independent == "FC") {
-    xlab <- "Number of Feature Constants (FC)"
-} else if (opts$independent == "FL") {
-    xlab <- "Number of #ifdefs (FL)"
-} else if (opts$independent == "ND") {
-    xlab <- "Aggregated Nesting Depth (ND)"
-} else {
-    stop(paste("Invalid independent variable name: ", opts$independent))
-}
+##if (opts$independent == "FC") {
+##    yLab <- "Feature Constants (FC)"
+##} else if (opts$independent == "FL") {
+##    yLab <- "Feature Locations (FL)"
+##} else if (opts$independent == "ND") {
+##    yLab <- "Nesting Depth (ND)"
+##} else {
+##    stop(paste("Invalid independent variable name: ", opts$independent))
+##}
+yLab <- opts$independent
 
 if (is.null(opts$ymax)) {
     yLims <- c()
@@ -120,15 +127,17 @@ if (is.null(opts$ymax)) {
 # Decrease `horizontalScale' to move boxes in boxplot closer together
 horizontalScale <- 0.75
 xAxisPositions <- seq(1,by=horizontalScale,length.out=opts$divisions)
-xLims <- c(xAxisPositions[1]-0.5,xAxisPositions[opts$divisions] + 0.3 * horizontalScale)
+##xLims <- c(xAxisPositions[1]-0.5,xAxisPositions[opts$divisions] + 0.3 * horizontalScale)
 
-if (opts$noYLabels) {
-    yLab <- ""
-    yAxt <- "n"
+if (opts$noXLabels) {
+    xLab <- ""
+    xAxt <- "n"
 } else {
-    yLab <- "LOC"
-    yAxt <- NULL # default value
+    xLab <- "LOC"
+    xAxt <- NULL # default value
 }
+
+colors <- topo.colors(opts$divisions)
 
 bp <- invisible(boxplot(LOC ~ grouped
             , data=allData
@@ -136,23 +145,32 @@ bp <- invisible(boxplot(LOC ~ grouped
             , cex.axis=1.0 # size of value labels on x & y axis
             #, cex.main=1
             #, cex.sub=1
-            , xlab=xlab
+            , xaxt=xAxt
+            , xlab=xLab
+            #, yaxt=yAxt
             , ylab=yLab
-            , yaxt=yAxt
-            , main=opts$name
+            , main=(if (opts$noTitle) NULL else opts$name)
             , outline=FALSE
             , varwidth=T
             , at=xAxisPositions
-            , xlim=xLims
+            ##, xlim=xLims
             , ylim=yLims
+            , horizontal = TRUE
+            , col = colors
               ))
 ##text(1:5,rep(min(y),5),paste("n=",tapply(y,x,length)) )
 
 ## Add number of observations per box plot.  Taken from
 ## https://stat.ethz.ch/pipermail/r-help/2008-January/152994.html
-mtext(paste("(n=", bp$n, ")", sep = ""), at = xAxisPositions, line = 1.9, side = 1
-     , cex = 0.8 # scale text size
-      )
+##mtext(paste("(n=", bp$n, ")", sep = ""), at = xAxisPositions, line = 1.9,
+##      side = 2
+##    , cex = 0.8 # scale text size
+##      )
+
+legend("bottomright", inset=.02
+     , title="Number of functions"
+     , c(paste("", bp$n, sep = ""))
+     , fill=colors, horiz=TRUE, cex=0.9)
 
 invisible(dev.off())
 

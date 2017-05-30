@@ -130,12 +130,12 @@ ratios-plots/$(PROJECT)/ratios-ND-LCH.LOC.pdf: $(ALL_R_DATA) $(RATIOSCMP_PROG)
 ## LOC plots
 loc-plots/$(PROJECT)/LOC-FC.pdf: $(ALL_R_DATA) $(COMPARE_LOCS_PROG)
 	mkdir -p `dirname $@` 
-	 $(COMPARE_LOCS_PROG) -p $(PROJECT) -n $(NAME) -i FC $(COMPARE_LOC_OPTS) -o $@
+	 $(COMPARE_LOCS_PROG) -p $(PROJECT) -n $(NAME) -i FC $(COMPARE_LOC_OPTS) -o $@ -X --no-title
 
 loc-plots/$(PROJECT)/LOC-FL.pdf: $(ALL_R_DATA) $(COMPARE_LOCS_PROG)
 	mkdir -p `dirname $@` 
-	 $(COMPARE_LOCS_PROG) -p $(PROJECT) -n $(NAME) -i FL -Y $(COMPARE_LOC_OPTS) -o $@
+	 $(COMPARE_LOCS_PROG) -p $(PROJECT) -n $(NAME) -i FL $(COMPARE_LOC_OPTS) -o $@ -X --no-title
 
 loc-plots/$(PROJECT)/LOC-ND.pdf: $(ALL_R_DATA) $(COMPARE_LOCS_PROG)
 	mkdir -p `dirname $@` 
-	 $(COMPARE_LOCS_PROG) -p $(PROJECT) -n $(NAME) -i ND -Y $(COMPARE_LOC_OPTS) -o $@
+	 $(COMPARE_LOCS_PROG) -p $(PROJECT) -n $(NAME) -i ND $(COMPARE_LOC_OPTS) -o $@ --no-title

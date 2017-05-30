@@ -231,7 +231,7 @@ listOfValueFrames <- lapply(split(allData, factor(allData$SNAPSHOT)),
 combinedValueFrame <- Reduce(rbind, listOfValueFrames)
 
 ## Default width and height of PDFs is 7 inches
-pdf(file=outputFn,width=7,height=4)
+pdf(file=outputFn,width=5.5,height=2.5)
 
 ## See http://www.sthda.com/english/wiki/ggplot2-point-shapes for more
 ## shapes for geom_point
