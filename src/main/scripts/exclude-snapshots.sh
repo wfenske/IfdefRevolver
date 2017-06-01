@@ -48,7 +48,7 @@ edie()
 usage()
 {
     echo "Usage:"
-    echo " $me -p PROJECT [-n] [SNAPSHOT_DATE]..."
+    echo " $me -p PROJECT [-nc] [SNAPSHOT_DATE]..."
     echo "Get help by executing:"
     echo " $me -h"
 }
@@ -68,6 +68,7 @@ help()
     echo " -p PROJECT Name of the project. The input data is assumed to be"
     echo "            located in folders named results/<PROJECT>/<YYYY-MM-DD> below the"
     echo "            current working directory."
+    echo " -c         Create missing directories instead of exiting with an error code."
     echo " -n         Show the commands that would be executed but do not actually execute them."
     echo " -h         Print this help screen and exit."
     echo 
@@ -81,6 +82,24 @@ usage_and_die()
     exit 1
 }
 
+handle_missing_project_dir()
+{
+    if $o_create_missing_dirs
+    then
+	if $o_dry_run_cmd mkdir -p -- "$1"
+	then
+	    log_debug "Successfully created directory $1"
+	    true
+	else
+	    log_error "Failed to create directory $1"
+	    false
+	fi
+    else
+	log_error "Missing directory: $1"
+	false
+    fi
+}
+
 src_results_dir=
 src_snapshots_csv_dir=
 src_snapshots_dir=
@@ -92,18 +111,15 @@ init_project_dirs_or_die()
     err=false
     if [ ! -d "$src_results_dir" ]
     then
-	log_error "Missing directory: $src_results_dir"
-	err=true
+	handle_missing_project_dir "$src_results_dir" || err=true
     fi
     if [ ! -d "$src_snapshots_csv_dir" ]
     then
-	log_error "Missing directory: $src_snapshots_csv_dir"
-	err=true
+	handle_missing_project_dir "$src_snapshots_csv_dir" || err=true
     fi
     if [ ! -d "$src_snapshots_dir" ]
     then
-	log_error "Missing directory: $src_snapshots_dir"
-	err=true
+	handle_missing_project_dir "$src_snapshots_dir" || err=true
     fi
 
     if $err
@@ -196,8 +212,9 @@ update_exclusion_finished_marker()
 unset o_project
 o_mv_opts=-i
 unset o_dry_run_cmd
+o_create_missing_dirs=false
 
-while getopts "p:nh" o
+while getopts "p:nhc" o
 do
     case "$o" in
 	p) if [ -z "$OPTARG" ]
@@ -208,6 +225,8 @@ do
 	   o_project="$OPTARG"
 	   ;;
 	n) o_dry_run_cmd=echo
+	   ;;
+	c) o_create_missing_dirs=true
 	   ;;
 	h) help
 	   exit 0
