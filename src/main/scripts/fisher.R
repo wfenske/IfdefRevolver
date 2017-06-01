@@ -161,13 +161,13 @@ depAboveCmp   <- aboveCmp
 doTheFisher <- function(indep,dep,indepThresh=NULL) {
     ##indep <- "FL"
     ##indepThresh <- 0
-    indepNameFmt <- "%s%-2s%d"
+    #indepNameFmt <- "%s%-2s%d"
     
     ##indep <- "LOC"
     if (is.null(indepThresh)) {
         indepThresh <- median(funcsAll[,indep])
     }
-    ##indepNameFmt <- "%s%-2s%.1f"
+    indepNameFmt <- "%s%-2s%.1f"
     
     funcsIndepBelow <- ssubset(funcsAll, indep, indepBelowCmp, indepThresh)
     indepBelowName  <- sprintf(          indep, indepBelowCmp, indepThresh, fmt=indepNameFmt)
