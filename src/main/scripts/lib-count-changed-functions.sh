@@ -60,14 +60,25 @@ die_if_file_missing()
     fi
 }
 
-get_count_2()
+get_count_1()
 {
-    csvsql -d ',' -q '"' --tables old,new --query "${1:?query missing}" "$old_file" "$new_file"|tail -n +2
+    csvsql -d ',' -q '"' --tables old,new --query "${1:?query missing}" "$old_file" "$new_file"
     if [ $? -ne 0 ]
     then
 	echo_as_me "Error for query $query on files $old_file $new_file."  >&2
 	exit 1
     fi
+}
+
+get_count_2()
+{
+    _gc2_gc1_output=$(get_count_1 "$@")
+    if [ $? -ne 0 ]
+    then
+	echo_as_me "Error for query $query on files $old_file $new_file."  >&2
+	exit 1
+    fi
+    printf '%s\n' "${_gc2_gc1_output}"|tail -n +2
 }
 
 die_if_arg_missing "$PROJECT" "Project name"

@@ -49,6 +49,12 @@ PROJECT=${1:?missing system name}
 echo "# Fetching dates of longest branch of $PROJECT..." >&2
 dates=$(show-snapshot-branches.sh "$PROJECT"|csvsql -d ',' -q '"' --table branches --query 'select date from branches where branch = (select branch from branches where position = (select max(position) from branches) limit 1)'|tail -n +2) || exit $?
 
+if [ -z "$dates" ]
+then
+    echo_as_me "Failed to determine dates of longest branch." >&2
+    exit 1
+fi
+
 count_changed_ab_smells()
 {
     echo "# Determining changed annotated functions of $PROJECT ..." >&2
