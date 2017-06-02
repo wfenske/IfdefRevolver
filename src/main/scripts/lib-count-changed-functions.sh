@@ -62,10 +62,24 @@ die_if_file_missing()
 
 get_count_1()
 {
-    csvsql -d ',' -q '"' --tables old,new --query "${1:?query missing}" "$old_file" "$new_file"
+    _gc1_old_file="$old_file"
+    _gc1_new_file="$new_file"
+    case "$1" in
+	--changed)
+	    _gc1_old_file="$old_ch_file"
+	    _gc1_new_file="$new_ch_file"
+	    shift
+	    ;;
+	-*)
+	    echo_as_me "Invalid flag in arguments \`$@'. Quitting." >&2
+	    exit 1
+	    ;;
+    esac
+
+    csvsql -d ',' -q '"' --tables old,new --query "${1:?query missing}" "${_gc1_old_file}" "${_gc1_new_file}"
     if [ $? -ne 0 ]
     then
-	echo_as_me "Error for query $query on files $old_file $new_file."  >&2
+	echo_as_me "Error for query $query on files ${_gc1_old_file}, ${_gc1_new_file}."  >&2
 	exit 1
     fi
 }
@@ -75,7 +89,7 @@ get_count_2()
     _gc2_gc1_output=$(get_count_1 "$@")
     if [ $? -ne 0 ]
     then
-	echo_as_me "Error for query $query on files $old_file $new_file."  >&2
+	echo_as_me "Error for arguments $@."  >&2
 	exit 1
     fi
     printf '%s\n' "${_gc2_gc1_output}"|tail -n +2

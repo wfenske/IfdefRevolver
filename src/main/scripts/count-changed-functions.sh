@@ -8,12 +8,16 @@ real_me_dir=$(dirname -- "$real_me") || exit $?
 old_file=results/$PROJECT/$OLD/all_functions.csv
 new_file=results/$PROJECT/$NEW/all_functions.csv
 
-old_ch_file=results/$PROJECT/$OLD/joint_function_ab_smell_snapshot.csv
-new_ch_file=results/$PROJECT/$NEW/joint_function_ab_smell_snapshot.csv
-
 die_if_file_missing "$old_file"
 die_if_file_missing "$new_file"
 die_if_file_identical "$old_file" "$new_file"
+
+old_ch_file=results/$PROJECT/$OLD/joint_function_ab_smell_snapshot.csv
+new_ch_file=results/$PROJECT/$NEW/joint_function_ab_smell_snapshot.csv
+
+die_if_file_missing "$old_ch_file"
+die_if_file_missing "$new_ch_file"
+die_if_file_identical "$old_ch_file" "$new_ch_file"
 
 oldc=$(csvsql -d ',' -q '"' --tables old --query \
        'select count(*) from old' "$old_file"|tail -n +2)

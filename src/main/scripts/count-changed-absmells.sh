@@ -12,6 +12,13 @@ die_if_file_missing "$old_file"
 die_if_file_missing "$new_file"
 die_if_file_identical "$old_file" "$new_file"
 
+old_ch_file=results/$PROJECT/$OLD/joint_function_ab_smell_snapshot.csv
+new_ch_file=results/$PROJECT/$NEW/joint_function_ab_smell_snapshot.csv
+
+die_if_file_missing "$old_ch_file"
+die_if_file_missing "$new_ch_file"
+die_if_file_identical "$old_ch_file" "$new_ch_file"
+
 oldc=$(csvsql -d ',' -q '"' --tables old --query \
        'select count(*) from old' "$old_file"|tail -n +2)
 
@@ -27,17 +34,21 @@ removedc=$(get_count_2 'select count(*) from old left join new on old.function_s
 # Percent of annotation bundles added/removed
 percent_add_rem=$(expr '(' ${addedc:?} '+' ${removedc:?} ')' '*' 100 / ${oldc:?})
 
+# Number of functions with annotations existing in both snapshots and
+# having received commit in the first snaphsot
+changed_annotated_func_c=$(get_count_2 --changed 'select count(*) from new join old on old.function_signature = new.function_signature and old.file = new.file where old.commits > 0 and (old.nofl > 0 or new.nofl > 0)')
+
 # Changed feature location values: NOFL
-ch_nofl_c=$(get_count_2 'select count(*) from new join old on old.function_signature = new.function_signature and old.file = new.file and old.nofl != new.nofl')
-percent_ch_nofl=$(expr ${ch_nofl_c:?} '*' 100 / ${identicalc:?})
+ch_nofl_c=$(get_count_2 --changed 'select count(*) from new join old on old.function_signature = new.function_signature and old.file = new.file and old.nofl != new.nofl where old.commits > 0')
+percent_ch_nofl=$(expr ${ch_nofl_c:?} '*' 100 / ${changed_annotated_func_c:?})
 
 # Changed feature constants values: NOFC_NonDup
-ch_nofc_nondup_c=$(get_count_2 'select count(*) from new join old on old.function_signature = new.function_signature and old.file = new.file and old.nofc_nondup != new.nofc_nondup')
-percent_ch_nofc_nondup=$(expr ${ch_nofc_nondup_c:?} '*' 100 / ${identicalc:?})
+ch_nofc_nondup_c=$(get_count_2 --changed 'select count(*) from new join old on old.function_signature = new.function_signature and old.file = new.file and old.nofc_nondup != new.nofc_nondup where old.commits > 0')
+percent_ch_nofc_nondup=$(expr ${ch_nofc_nondup_c:?} '*' 100 / ${changed_annotated_func_c:?})
 
 # Changed nesting value: NONEST
-ch_nonest_c=$(get_count_2 'select count(*) from new join old on old.function_signature = new.function_signature and old.file = new.file and old.nonest != new.nonest')
-percent_ch_nonest=$(expr ${ch_nonest_c:?} '*' 100 / ${identicalc:?})
+ch_nonest_c=$(get_count_2 --changed 'select count(*) from new join old on old.function_signature = new.function_signature and old.file = new.file and old.nonest != new.nonest where old.commits > 0')
+percent_ch_nonest=$(expr ${ch_nonest_c:?} '*' 100 / ${changed_annotated_func_c:?})
 
 if $PRINT_HEADER
 then
