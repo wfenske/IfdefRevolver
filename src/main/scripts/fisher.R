@@ -35,6 +35,9 @@
 
 library(optparse)
 
+printf  <- function(...) cat(sprintf(...), sep='', file=stdout())
+eprintf <- function(...) cat(sprintf(...), sep='', file=stderr())
+
 options <- list(
     make_option(c("-p", "--project")
               , help="Name of the project whose data to load.  We expect the input R data to reside in `results/<projec-name>/allData.rdata' below the current working directory."
@@ -130,7 +133,18 @@ ssubset <- function(superset, fieldName, cmp, threshold) {
 }
 
 mkGrp <- function(subsetBaseName, funcsToSubset, fieldName, cmp, threshold) {
-    funcs <- ssubset(funcsToSubset, fieldName, cmp, threshold)
+    if ((fieldName == "COMMITS") |
+        (fieldName == "COMMITSratio") |
+        (fieldName == "HUNKS") |
+        (fieldName == "HUNKSratio") |
+        (fieldName == "LCH") |
+        (fieldName == "LCHratio")) {
+        thresholdFieldName <- sprintf(fmt="MEDIAN_SNAPSHOT_CH_%s", fieldName)
+        funcs <- subset(funcsToSubset, eval(parse(text=sprintf(fmt="%s %s %s",
+                                                               fieldName, cmp, thresholdFieldName))))
+    } #else {
+    ##funcs <- ssubset(funcsToSubset, fieldName, cmp, threshold)
+    #}
     depName <- sprintf(fieldName,cmp,threshold,fmt="%s%-2s%.3f")
     grp <- c() # dummy to create a fresh object
     grp$name <- paste("f/(", subsetBaseName, " & ", depName, ")", sep="")
@@ -342,19 +356,19 @@ ndThresh <- 1
 ## Without LOC adjustment
 pf(indep="FC", dep="COMMITS",       indepThresh=fcThresh)
 pf(indep="FC", dep="HUNKS",         indepThresh=fcThresh)
-pf(indep="FC", dep="LINES_CHANGED", indepThresh=fcThresh)
+pf(indep="FC", dep="LCH", indepThresh=fcThresh)
 
 pf(indep="FL", dep="COMMITS",       indepThresh=flThresh)
 pf(indep="FL", dep="HUNKS",         indepThresh=flThresh)
-pf(indep="FL", dep="LINES_CHANGED", indepThresh=flThresh)
+pf(indep="FL", dep="LCH", indepThresh=flThresh)
 
 pf(indep="ND", dep="COMMITS",       indepThresh=ndThresh)
 pf(indep="ND", dep="HUNKS",         indepThresh=ndThresh)
-pf(indep="ND", dep="LINES_CHANGED", indepThresh=ndThresh)
+pf(indep="ND", dep="LCH", indepThresh=ndThresh)
 
 pf(indep="LOC", dep="COMMITS")
 pf(indep="LOC", dep="HUNKS")
-pf(indep="LOC", dep="LINES_CHANGED")
+pf(indep="LOC", dep="LCH")
 
 ## Scaled to LOC
 pf(indep="FC", dep="COMMITSratio",       indepThresh=fcThresh)

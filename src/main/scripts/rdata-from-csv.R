@@ -4,9 +4,10 @@
 ###
 ### Input files are the snapshot files under Correlated/
 
-## Example by Fisher:
-
 library(optparse)
+
+printf  <- function(...) cat(sprintf(...), sep='', file=stdout())
+eprintf <- function(...) cat(sprintf(...), sep='', file=stderr())
 
 options <- list(
     make_option(c("-p", "--project")
@@ -67,12 +68,56 @@ readSnapshotFile <- function(inputFn) {
                                , "NOFC_Dup"="numeric"
                                , "NOFC_NonDup"="numeric"
                                , "NONEST"="numeric"))
-    cat("INFO: Reading snapshot ", snapshotData$SNAPSHOT_DATE[1], "\n", sep="")
+    snapshotDate <- snapshotData$SNAPSHOT_DATE[1]
+    eprintf("INFO: Reading snapshot %s\n", snapshotDate)
     snapshotData["SNAPSHOT"] <- snapshotIx
     snapshotData[is.na(snapshotData)] = 0
-    ## Change the value of the global variable using <<-
+
+    changedFuncs <- subset(snapshotData, COMMITS > 0)
+
+    ## Compute snashot-specific averages for dependent variables
+
+    ## COMMITS
+    medianChangedFuncsCommits <- median(changedFuncs$COMMITS)
+    eprintf("DEBUG: median commits of changed functions: %.3f\n", medianChangedFuncsCommits)
+    snapshotData["MEDIAN_SNAPSHOT_CH_COMMITS"] <- medianChangedFuncsCommits
+
+    changedFuncs$COMMITSratio <- changedFuncs$COMMITS / changedFuncs$FUNCTION_LOC
+    medianChangedFuncsCommitsRatio <- median(changedFuncs$COMMITSratio)
+    eprintf("DEBUG: median commit ratio of changed functions: %.3f\n", medianChangedFuncsCommitsRatio)
+    snapshotData["MEDIAN_SNAPSHOT_CH_COMMITSratio"] <- medianChangedFuncsCommitsRatio
+
+    ## HUNKS
+    medianChangedFuncsHunks <- median(changedFuncs$HUNKS)
+    eprintf("DEBUG: median hunks of changed functions: %.3f\n", medianChangedFuncsHunks)
+    snapshotData["MEDIAN_SNAPSHOT_CH_HUNKS"] <- medianChangedFuncsHunks
+
+    changedFuncs$HUNKSratio <- changedFuncs$HUNKS / changedFuncs$FUNCTION_LOC
+    medianChangedFuncsHunksRatio <- median(changedFuncs$HUNKSratio)
+    eprintf("DEBUG: median hunk ratio of changed functions: %.3f\n", medianChangedFuncsHunksRatio)
+    snapshotData["MEDIAN_SNAPSHOT_CH_HUNKSratio"] <- medianChangedFuncsHunksRatio
+
+    ## LCH
+    medianChangedFuncsLch <- median(changedFuncs$LINES_CHANGED)
+    eprintf("DEBUG: median lines changed of changed functions: %.3f\n", medianChangedFuncsLch)
+    snapshotData["MEDIAN_SNAPSHOT_CH_LCH"] <- medianChangedFuncsLch
+
+    changedFuncs$LCHratio <- changedFuncs$LINES_CHANGED / changedFuncs$FUNCTION_LOC
+    medianChangedFuncsLchRatio <- median(changedFuncs$LCHratio)
+    eprintf("DEBUG: median lines changed ratio of changed functions: %.3f\n", medianChangedFuncsLchRatio)
+    snapshotData["MEDIAN_SNAPSHOT_CH_LCHratio"] <- medianChangedFuncsLchRatio
+    
+    ##meanChangedFuncsCommitsRatio <- mean(changedFuncs$COMMITSratio)
+    ##totalMeanChangedFuncsCommitsRatio <- sum(changedFuncs$COMMITS) / sum(changedFuncs$FUNCTION_LOC)
+    ##eprintf("DEBUG: mean commit ratio of changed functions: %.3f\n", meanChangedFuncsCommitsRatio)
+    ##eprintf("DEBUG: total mean of commit ratio (all commits / all LOC) of changed functions: %.3f\n",
+    ##        totalMeanChangedFuncsCommitsRatio)
+    ##snapshotData["MEAN_SNAPSHOT_CH_COMMITSratio"] <- meanChangedFuncsCommitsRatio
+    ##snapshotData["TOTAL_MEAN_SNAPSHOT_CH_COMMITSratio"] <- totalMeanChangedFuncsCommitsRatio
+    
     ##cat(str(max(as.numeric(snapshotData$FUNCTION_LOC), na.rm=T)))
     ##cat(str(max(snapshotData$FUNCTION_LOC), na.rm=T))
+    ## Change the value of the global variable using <<-
     snapshotIx <<- snapshotIx + 1
     return (snapshotData)
 }
