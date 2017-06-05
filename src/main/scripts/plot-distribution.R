@@ -131,7 +131,7 @@ ggplotHistDiscrete <- function(df, varName, titleExtra="") {
             + geom_histogram(color="black"
                              ##, fill="lightblue"
                              ## , linetype="dashed"
-                             , bins=length(limits)
+                           , bins=length(limits)
                              )
             ##+ geom_bar() # use this for NUM_WINDOWS, scale_x for other variables
             + scale_x_discrete(limits=limits,name=varName)
