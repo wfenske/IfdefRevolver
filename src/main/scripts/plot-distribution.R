@@ -20,7 +20,7 @@ options <- list(
                 )
     
     , make_option(c("--min")
-                , help="Lower limit to the frequency of occurrence of the values specified via `-v' to be included in the histogram.  Given as a percentage.  This optoin basically controls the lenght of the tail in case the distribution of the variable has a long tail.  [default: %default]"
+                , help="Lower limit to the frequency of occurrence of the values specified via `-v' to be included in the histogram.  Given as a percentage.  This option basically controls the lenght of the tail in case the distribution of the variable has a long tail.  [default: %default]"
                 , type = "numeric",
                 , default = 1.0
                 )
@@ -131,8 +131,9 @@ ggplotHistDiscrete <- function(df, varName, titleExtra="") {
             + geom_histogram(color="black"
                              ##, fill="lightblue"
                              ## , linetype="dashed"
-                           , bins=length(limits)
+                             , bins=length(limits)
                              )
+            ##+ geom_bar() # use this for NUM_WINDOWS, scale_x for other variables
             + scale_x_discrete(limits=limits,name=varName)
             ##+ scale_y_log10()
             + ggtitle(mkTitle(titleExtra))
@@ -253,7 +254,7 @@ if (opts$min > 0.0) {
 plotFunc <- NULL
 if (varName %in% c('FC', 'FL', 'ND', 'COMMITS', 'HUNKS',
                    'LINES_CHANGED', 'LINES_ADDED', 'LINES_DELETED',
-                   'LOC', 'LOAC', 'LOFC')) {
+                   'LOC', 'LOAC', 'LOFC', 'NUM_WINDOWS')) {
     plotFunc <- ggplotHistDiscrete
 } else if (varName %in% c('FCratio', 'FLratio', 'NDratio',
                           'LOACratio', 'LOFCratio',
