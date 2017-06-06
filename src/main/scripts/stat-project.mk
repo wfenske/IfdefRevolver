@@ -7,12 +7,15 @@
 NAME ?= $(PROJECT)
 
 FISHER_CSV = results/$(PROJECT)/fisher.csv
+SPEARMAN_CSV = results/$(PROJECT)/spearman.csv
 ALL_R_DATA = results/$(PROJECT)/allData.rdata
 
 SKUNK_HOME ?= $(HOME)/src/skunk/IfdefRevolver/src/main/scripts
 
 COMPARE_LOCS_PROG = $(SKUNK_HOME)/compare-locs.R
 RATIOSCMP_PROG = $(SKUNK_HOME)/ratioscmp.R
+FISHER_PROG = $(SKUNK_HOME)/fisher.R
+SPEARMAN_PROG = $(SKUNK_HOME)/spearman.R
 
 COMPARE_LOC_OPTS ?= -d 3 --ymax 400
 
@@ -31,18 +34,27 @@ LOC_PLOTS = $(addprefix loc-plots/$(PROJECT)/LOC-,$(addsuffix .pdf,$(INDEPS)))
 
 WINDOW_EXCLUSION_MARKER = results/$(PROJECT)/.last_window_exclusion
 
-all: fisher ratiosplots locplots
+all: fisher ratiosplots locplots spearman
 
 fisher: $(FISHER_CSV)
+
+spearman: $(SPEARMAN_CSV)
 
 ratiosplots: $(RATIOS_PLOTS)
 
 locplots: $(LOC_PLOTS)
 
-$(FISHER_CSV): $(ALL_R_DATA)
-	if ! fisher.R -p $(PROJECT) > $(FISHER_CSV); \
+$(FISHER_CSV): $(ALL_R_DATA) $(FISHER_PROG)
+	if ! $(FISHER_PROG) -p $(PROJECT) > $(FISHER_CSV); \
 	then \
 		rm -f $(FISHER_CSV); \
+		false; \
+	fi
+
+$(SPEARMAN_CSV): $(ALL_R_DATA) $(SPEARMAN_PROG)
+	if !  $(SPEARMAN_PROG) -p $(PROJECT) > $(SPEARMAN_CSV); \
+	then \
+		rm -f $(SPEARMAN_CSV); \
 		false; \
 	fi
 
