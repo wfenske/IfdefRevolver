@@ -351,7 +351,7 @@ pf <- function(...) cat(doTheFisher(...))
 
 fcThresh <- 1
 flThresh <- 0
-ndThresh <- 1
+ndThresh <- 0
 
 ## Without LOC adjustment
 pf(indep="FC", dep="COMMITS",       indepThresh=fcThresh)
