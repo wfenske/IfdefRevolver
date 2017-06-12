@@ -1,10 +1,6 @@
 #!/usr/bin/env Rscript
 
-### Performs linear regression the totals over all snapshots of a system
-###
-### Input files are the snapshot files under Correlated/
-
-## Example by Fisher:
+### Performs regression over all snapshots of a system
 
 library(optparse)
 ##library(methods)
@@ -25,6 +21,9 @@ args <- parse_args(OptionParser(
   , option_list=options)
   , positional_arguments = c(0, 1))
 opts <- args$options
+
+printf  <- function(...) cat(sprintf(...), sep='', file=stdout())
+eprintf <- function(...) cat(sprintf(...), sep='', file=stderr())
 
 readData <- function(commandLineArgs) {
     fns <- commandLineArgs$args
@@ -386,7 +385,12 @@ allData$sqrtLINES_CHANGED <- sqrt(allData$LINES_CHANGED)
 changedData0 <- subset(allData, COMMITS > 0)
 medianLCHratio <- median(changedData0$LCHratio)
 
-cat("Median changed lines/LOC for all changed functions: ", medianLCHratio, "\n", sep="")
+##cat("Median changed lines/LOC for all changed functions: ", medianLCHratio, "\n", sep="")
+
+eprintf("Median COMMITS/HUNKS/LCHG of changed functions:\n%.2g,%.2g,%.2g\n"
+      , median(changedData0$COMMITS)
+      , median(changedData0$HUNKS)
+      , median(changedData0$LCH))
 
 allData$CHURN_PRONE <- allData$LCHratio > medianLCHratio
 
@@ -441,8 +445,10 @@ ziData <- allData
 ##model.poisson.orig <- tryGlmModel2("poisson", indeps=c("FL", "FC", "ND", "LOC"), dep="LINES_CHANGED", data=sampleChangedData)
 ##model.poisson.orig <- tryGlmModel2("poisson", indeps=c("LOC"), dep="LINES_CHANGED", data=sampleChangedData)
 ##model.poisson.log <- tryGlmModel2("poisson", indeps=c("logFL", "logFC", "logND", "logLOC"), dep="logLINES_CHANGED", data=sampleChangedData)
-nbIndeps <- c("FL", "FC",
-              "ND"
+nbIndeps <- c("FL"
+            , "FC"
+            , "ND"
+            , "LOAC"
             , "LOFC"
             , "LOC"
               )
@@ -453,10 +459,13 @@ ziIndeps <- c("FL", "FC",
               )
 
 model.nb.COMMITS  <- tryNbModel(indeps=nbIndeps,       dep="COMMITS", data=negBinData)
-model.zip.COMMITS <- tryZeroInflModel(indeps=ziIndeps, dep="COMMITS", data=ziData)
+##model.zip.COMMITS <- tryZeroInflModel(indeps=ziIndeps, dep="COMMITS", data=ziData)
 
 model.nb.HUNKS    <- tryNbModel(indeps=nbIndeps,       dep="HUNKS",   data=negBinData)
-model.zip.HUNKS   <- tryZeroInflModel(indeps=ziIndeps, dep="HUNKS",   data=ziData)
+
+model.nb.LCH    <- tryNbModel(indeps=nbIndeps,       dep="LCH",   data=negBinData)
+
+##model.zip.HUNKS   <- tryZeroInflModel(indeps=ziIndeps, dep="HUNKS",   data=ziData)
 
 ##model.nb.LCHG <- tryNbModel(indeps=c(#"FL", "FC",
 ##                                "ND"
