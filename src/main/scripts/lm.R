@@ -25,6 +25,7 @@ opts <- args$options
 printf  <- function(...) cat(sprintf(...), sep='', file=stdout())
 eprintf <- function(...) cat(sprintf(...), sep='', file=stderr())
 
+sysname <- "<unknown>"
 readData <- function(commandLineArgs) {
     fns <- commandLineArgs$args
     if ( length(fns) == 1 ) {
@@ -35,10 +36,11 @@ readData <- function(commandLineArgs) {
             stop("Missing input files.  Either specify explicit input files or specify the name of the project the `--project' option (`-p' for short).")
         }
         dataFn <-  file.path("results", opts$project, "allData.rdata")
+        sysname <<- opts$project
     }
-    cat("DEBUG: Reading data from ", dataFn, "\n", sep="")
+    eprintf("DEBUG: Reading data from %s\n", dataFn)
     result <- readRDS(dataFn)
-    cat("DEBUG: Sucessfully read data.\n")
+    eprintf("DEBUG: Sucessfully read data.\n")
     return (result)
 }
 
@@ -59,10 +61,10 @@ significanceCode <- function(p) {
     else { return (""); }
 }
 
-catWaldP <- function(smellName, testRes) {
+catWaldP <- function(predictorName, testRes) {
     p <- waldP(testRes)
     pCode <- significanceCode(p)
-    cat(sprintf(smellName, p, pCode, fmt="\n\t% 10s = %.3f %s"))
+    printf("\n\t% 10s = %.3f %s", predictorName, p, pCode)
 }
 
 checkSignificanceOfIndividualPredictors <- function(model, modelName) {
@@ -107,110 +109,122 @@ reportModel <- function(model, modelName) {
     }
 }
 
-tryGlmModel <- function (family, dataFrame, formula, modelName) {
-    cat("\n\n")
-    cat("***************************\n")
-    cat("*** "); cat(modelName); cat(" ***\n")
+##tryGlmModel <- function (family, dataFrame, formula, modelName) {
+##    cat("\n\n")
+##    cat("***************************\n")
+##    cat("*** "); cat(modelName); cat(" ***\n")
+##
+##    model <- glm(formula, data = dataFrame, family = family)
+##    reportModel(model, modelName)
+##    return(model)
+##}
+##
+##tryLinearModel <- function (dataFrame, formula, modelName) {
+##    cat("\n\n")
+##    cat("***************************\n")
+##    cat("*** "); cat(modelName); cat(" ***\n")
+##
+##    model <- lm(formula, data = dataFrame)
+##    reportModel(model, modelName)
+##    return(model)
+##}
+##
+##computeOrTable <- function(dep, indep) {
+##    truePos  <- sum(dep    & indep)
+##    falseNeg <- sum(dep    & (!indep))
+##    falsePos <- sum((!dep) & indep)
+##    trueNeg  <- sum((!dep) & (!indep))
+##    return(c(truePos, falseNeg, falsePos, trueNeg))
+##}
+##
+#### Taken/adapted from http://stackoverflow.com/questions/12572357/precision-recall-and-f-measure-in-r
+##calcPrecisionRecallFmeasure <- function(predict, actual_labels) {
+##    precision <- sum(predict & actual_labels) / sum(predict)
+##    recall <- sum(predict & actual_labels) / sum(actual_labels)
+##    fmeasure <- 2 * precision * recall / (precision + recall)
+##    return(c(precision, recall, fmeasure))
+##}
+##
+#### TODO: Fix or delete
+##printOrTable <- function(ort, nameDep, nameIndep) {
+##    Fsmelly  <- ort[1]
+##    Fclean   <- ort[2]
+##    NFsmelly <- ort[3]
+##    NFclean  <- ort[4]
+##    cat(sprintf("", nameDep, paste("Not", nameDep, sep=" ")      , fmt="%21s|%13s|%16s\n"))
+##    cat(sprintf(nameIndep,   Fsmelly, NFsmelly                   , fmt="%21s|%13d|%16d\n"))
+##    cat(sprintf(paste("Not", nameIndep, sep=" "), Fclean, NFclean, fmt="%21s|%13d|%16d\n"))
+##}
+##
+##tryOrs <- function(dep, nameDep, indep, nameIndep) {
+##    ort <- computeOrTable(dep, indep)
+##    printOrTable(ort, nameDep, nameIndep)
+##
+##    orSmelly <- (ort[1]/ort[3]) / (ort[2]/ort[4])
+##    prf <- calcPrecisionRecallFmeasure(indep, dep)
+##
+##    cat(sprintf(orSmelly,     fmt="Odds ratio: %5.2f\t"))
+##    cat(sprintf(prf[1] * 100, fmt="Precision: %5.2f%%\t"))
+##    cat(sprintf(prf[2] * 100, fmt="Recall: %5.2f%%\t"))
+##    cat(sprintf(prf[3] * 100, fmt="F-Measure: %5.2f%%\n"))
+##
+##    cat(sprintf(nameIndep, prf[1], prf[2], prf[3], fmt="%s;%.3f;%.3f;%.3f\n"))
+##}
 
-    model <- glm(formula, data = dataFrame, family = family)
-    reportModel(model, modelName)
-    return(model)
-}
+##tryLinearModel2 <- function(indeps, dep, data) {
+##    formulaString <- paste(dep, paste(indeps, collapse=" + "), sep=" ~ ")
+##    formula <- as.formula(formulaString)
+##    modelName <- paste("linear:", formulaString)
+##    model <- tryLinearModel(data, formula, modelName)
+##    ##cat("\n")
+##    ##cat(paste("*** ANOVA of model '", modelName, "' ***\n", sep=""))
+##    ##print(anova(model, test ="Chisq"))
+##    ##print(summary(model))
+##    return (model)
+##}
 
-tryLinearModel <- function (dataFrame, formula, modelName) {
-    cat("\n\n")
-    cat("***************************\n")
-    cat("*** "); cat(modelName); cat(" ***\n")
-
-    model <- lm(formula, data = dataFrame)
-    reportModel(model, modelName)
-    return(model)
-}
-
-computeOrTable <- function(dep, indep) {
-    truePos  <- sum(dep    & indep)
-    falseNeg <- sum(dep    & (!indep))
-    falsePos <- sum((!dep) & indep)
-    trueNeg  <- sum((!dep) & (!indep))
-    return(c(truePos, falseNeg, falsePos, trueNeg))
-}
-
-## Taken/adapted from http://stackoverflow.com/questions/12572357/precision-recall-and-f-measure-in-r
-calcPrecisionRecallFmeasure <- function(predict, actual_labels) {
-    precision <- sum(predict & actual_labels) / sum(predict)
-    recall <- sum(predict & actual_labels) / sum(actual_labels)
-    fmeasure <- 2 * precision * recall / (precision + recall)
-    return(c(precision, recall, fmeasure))
-}
-
-## TODO: Fix or delete
-printOrTable <- function(ort, nameDep, nameIndep) {
-    Fsmelly  <- ort[1]
-    Fclean   <- ort[2]
-    NFsmelly <- ort[3]
-    NFclean  <- ort[4]
-    cat(sprintf("", nameDep, paste("Not", nameDep, sep=" ")      , fmt="%21s|%13s|%16s\n"))
-    cat(sprintf(nameIndep,   Fsmelly, NFsmelly                   , fmt="%21s|%13d|%16d\n"))
-    cat(sprintf(paste("Not", nameIndep, sep=" "), Fclean, NFclean, fmt="%21s|%13d|%16d\n"))
-}
-
-tryOrs <- function(dep, nameDep, indep, nameIndep) {
-    ort <- computeOrTable(dep, indep)
-    printOrTable(ort, nameDep, nameIndep)
-
-    orSmelly <- (ort[1]/ort[3]) / (ort[2]/ort[4])
-    prf <- calcPrecisionRecallFmeasure(indep, dep)
-
-    cat(sprintf(orSmelly,     fmt="Odds ratio: %5.2f\t"))
-    cat(sprintf(prf[1] * 100, fmt="Precision: %5.2f%%\t"))
-    cat(sprintf(prf[2] * 100, fmt="Recall: %5.2f%%\t"))
-    cat(sprintf(prf[3] * 100, fmt="F-Measure: %5.2f%%\n"))
-
-    cat(sprintf(nameIndep, prf[1], prf[2], prf[3], fmt="%s;%.3f;%.3f;%.3f\n"))
-}
-
-tryLinearModel2 <- function(indeps, dep, data) {
-    formulaString <- paste(dep, paste(indeps, collapse=" + "), sep=" ~ ")
-    formula <- as.formula(formulaString)
-    modelName <- paste("linear:", formulaString)
-    model <- tryLinearModel(data, formula, modelName)
-    ##cat("\n")
-    ##cat(paste("*** ANOVA of model '", modelName, "' ***\n", sep=""))
-    ##print(anova(model, test ="Chisq"))
-    ##print(summary(model))
-    return (model)
-}
-
-tryNbModel <- function(indeps, dep, data) {
-    formulaString <- paste(dep, paste(indeps, collapse=" + "), sep=" ~ ")
+tryNbModel <- function(indeps, dep, data, csvOut=FALSE, csvHeader=FALSE) {
+    indepsFormula <- paste(indeps, collapse=" + ")
+    formulaString <- paste(dep, indepsFormula, sep=" ~ ")
     formula <- as.formula(formulaString)
     modelName <- paste("negbin:", formulaString)
 
-    cat("\n\n")
-    cat("***************************\n")
-    cat("*** "); cat(modelName); cat(" ***\n")
+    if (!csvOut) {
+        cat("\n\n")
+        cat("***************************\n")
+        cat("*** "); cat(modelName); cat(" ***\n")
+    }
 
     model <- glm.nb(formula, data = data)
-    reportModel(model, modelName)
+    if (csvOut) {
+        if (csvHeader) {
+            printf("SYSTEM,AIC,DEPENDENT,TERM_COUNT,TERMS\n")
+        }
+        ##numTerms <- length(labels(terms(model)))
+        printf("%7s,%7.0f,%s,%d,%s\n", sysname, model$aic, dep, length(indeps), indepsFormula)
+        ##NOTE: Smaller values of AIC are better.  (Cf. https://ncss-wpengine.netdna-ssl.com/wp-content/themes/ncss/pdf/Procedures/NCSS/Negative_Binomial_Regression.pdf)
+    } else {
+        print(summary(model))
+        reportModel(model, modelName)
+    }
     
     ##cat("\n")
     ##cat(paste("*** ANOVA of model '", modelName, "' ***\n", sep=""))
     ##print(anova(model, test ="Chisq"))
-    ##print(summary(model))
     return (model)
 }
 
-tryGlmModel2 <- function(family, indeps, dep, data) {
-    formulaString <- paste(dep, paste(indeps, collapse=" + "), sep=" ~ ")
-    formula <- as.formula(formulaString)
-    modelName <- paste("glm('", family, "'): ", formulaString, sep="")
-    model <- tryGlmModel(family, data, formula, modelName)
-    ##cat("\n")
-    ##cat(paste("*** ANOVA of model '", modelName, "' ***\n", sep=""))
-    ##print(anova(model, test ="Chisq"))
-    ##print(summary(model))
-    return (model)
-}
+##tryGlmModel2 <- function(family, indeps, dep, data) {
+##    formulaString <- paste(dep, paste(indeps, collapse=" + "), sep=" ~ ")
+##    formula <- as.formula(formulaString)
+##    modelName <- paste("glm('", family, "'): ", formulaString, sep="")
+##    model <- tryGlmModel(family, data, formula, modelName)
+##    ##cat("\n")
+##    ##cat(paste("*** ANOVA of model '", modelName, "' ***\n", sep=""))
+##    ##print(anova(model, test ="Chisq"))
+##    ##print(summary(model))
+##    return (model)
+##}
 
 tryZeroInflModel <- function(indeps, dep, data) {
     ## See for more information on how to interpret these models:
@@ -399,15 +413,15 @@ changedData <- subset(allData, COMMITS > 0)
 allNRow <- nrow(allData)
 allChurnProneNRow <- nrow(subset(allData, CHURN_PRONE))
 allChurnPronePercent <- allChurnProneNRow * 100.0 / allNRow
-cat(sprintf(allChurnPronePercent, fmt="Amount of churn-prone rows among all rows: %.1f%%\n"))
+##eprintf("Amount of churn-prone rows among all rows: %.1f%%\n", allChurnPronePercent)
 
 changedNRow <- nrow(changedData)
 changedChurnProneNRow <- nrow(subset(changedData, CHURN_PRONE))
 changedChurnPronePercent <- changedChurnProneNRow * 100.0 / changedNRow
-cat(sprintf(changedChurnPronePercent, fmt="Amount of churn-prone rows among rows with changes: %.1f%%\n"))
+##eprintf("Amount of churn-prone rows among rows with changes: %.1f%%\n", changedChurnPronePercent)
 
 changedPercent <- nrow(changedData0) * 100 / allNRow
-cat(sprintf(changedPercent, fmt="Amount of changed functions among all functions: %.1f%%\n"))
+##eprintf("Amount of changed functions among all functions: %.1f%%\n", changedPercent)
 
 ##nrow(subset(allData, is.na(LINES_CHANGED) || !is.finite(LINES_CHANGED)))
 ##nrow(subset(allData, is.na(LOC) || !is.finite(LOC)))
@@ -452,18 +466,44 @@ nbIndeps <- c("FL"
             , "LOFC"
             , "LOC"
               )
-ziIndeps <- c("FL", "FC",
-              "ND"
+ziIndeps <- c("FL"
+            , "FC"
+            , "ND"
             , "LOFC"
             , "LOC"
               )
 
-model.nb.COMMITS  <- tryNbModel(indeps=nbIndeps,       dep="COMMITS", data=negBinData)
+##model.nb.COMMITS  <- tryNbModel(indeps=nbIndeps,       dep="COMMITS", data=negBinData)
+##model.nb.HUNKS    <- tryNbModel(indeps=nbIndeps,       dep="HUNKS",   data=negBinData)
+##model.nb.LCH    <- tryNbModel(indeps=nbIndeps,       dep="LCH",   data=negBinData)
+
+negbinCsvModel <- function(dep, indeps, header=FALSE) {
+    model <- tryNbModel(indeps=indeps,dep=dep, data=negBinData, csvOut=TRUE, csvHeader=header)
+    return (model)
+}
+
+header <- TRUE
+for (dep in c("COMMITS", "HUNKS", "LCH")) {
+    dummy <- negbinCsvModel(dep, c("LOC"), header=header)
+    header <<- FALSE
+
+    dummy <- negbinCsvModel(dep, c("FL"))
+    dummy <- negbinCsvModel(dep, c("FC"))
+    dummy <- negbinCsvModel(dep, c("ND"))
+    
+    dummy <- negbinCsvModel(dep, c("LOAC"))
+    dummy <- negbinCsvModel(dep, c("LOFC"))
+    dummy <- negbinCsvModel(dep, c("LOACratio"))
+    dummy <- negbinCsvModel(dep, c("LOFCratio"))
+    
+    dummy <- negbinCsvModel(dep, c("FL", "FC", "ND","LOC"))
+    dummy <- negbinCsvModel(dep, c("FL", "FC", "ND", "LOAC", "LOC"))
+    dummy <- negbinCsvModel(dep, c("FL", "FC", "ND", "LOFC", "LOC"))
+    dummy <- negbinCsvModel(dep, c("FL", "FC", "ND", "LOACratio", "LOC"))
+    dummy <- negbinCsvModel(dep, c("FL", "FC", "ND", "LOFCratio", "LOC"))
+}
+
 ##model.zip.COMMITS <- tryZeroInflModel(indeps=ziIndeps, dep="COMMITS", data=ziData)
-
-model.nb.HUNKS    <- tryNbModel(indeps=nbIndeps,       dep="HUNKS",   data=negBinData)
-
-model.nb.LCH    <- tryNbModel(indeps=nbIndeps,       dep="LCH",   data=negBinData)
 
 ##model.zip.HUNKS   <- tryZeroInflModel(indeps=ziIndeps, dep="HUNKS",   data=ziData)
 
