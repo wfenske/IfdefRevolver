@@ -67,7 +67,8 @@ readSnapshotFile <- function(inputFn) {
                                , "NOFL"="numeric"
                                , "NOFC_Dup"="numeric"
                                , "NOFC_NonDup"="numeric"
-                               , "NONEST"="numeric"))
+                               , "NONEST"="numeric"
+                               , "NONEG"="numeric"))
     snapshotDate <- snapshotData$SNAPSHOT_DATE[1]
     eprintf("INFO: Reading snapshot %s\n", snapshotDate)
     snapshotData["SNAPSHOT"] <- snapshotIx
@@ -156,6 +157,9 @@ allData$FCratio <- allData$FC / allData$LOC
 
 allData$ND <- allData$NONEST
 allData$NDratio <- allData$ND / allData$LOC
+
+allData$NEG <- allData$NONEG
+allData$NEGratio <- allData$NEG / allData$LOC
 
 ### Dependent variables
 ## HUNKS,COMMITS,LINES_CHANGED,LINE_DELTA,LINES_DELETED,LINES_ADDED

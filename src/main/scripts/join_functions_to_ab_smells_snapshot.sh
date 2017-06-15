@@ -17,9 +17,9 @@ aggregate()
 {
     ## Unprocessed header of the joint table
     ##
-    ## SNAPSHOT_DATE,FUNCTION_SIGNATURE,FILE,FUNCTION_LOC,HUNKS,COMMITS,BUGFIXES,LINE_DELTA,LINES_DELETED,LINES_ADDED,FILE,Start,FUNCTION_SIGNATURE,ABSmell,LocationSmell,ConstantsSmell,NestingSmell,LOC,LOAC,LOFC,NOFL,NOFC_Dup,NOFC_NonDup,NONEST
+    ## SNAPSHOT_DATE,FUNCTION_SIGNATURE,FILE,FUNCTION_LOC,HUNKS,COMMITS,BUGFIXES,LINE_DELTA,LINES_DELETED,LINES_ADDED,FILE,Start,FUNCTION_SIGNATURE,ABSmell,LocationSmell,ConstantsSmell,NestingSmell,LOC,LOAC,LOFC,NOFL,NOFC_Dup,NOFC_NonDup,NONEST,NONEG
     
-    csvsql -d, -q '"' -y 10000 --query \
+    csvsql -d, -q '"' -y 0 --query \
            "SELECT
                 SNAPSHOT_DATE,
                 f.FUNCTION_SIGNATURE,
@@ -41,15 +41,14 @@ aggregate()
 		NOFL,
 		NOFC_Dup,
 		NOFC_NonDup,
-		NONEST
+		NONEST,
+		NONEG
             FROM
-                     ${FUNCTIONS_NO_EXT:?} f
-                LEFT JOIN
-                     ${SMELLS_NO_EXT:?} s
-                     ON
-                        f.function_signature = s.function_signature
-                        AND f.file = s.file" \
-   "${1:?functions file missing}" "${2:?smells file missing}"
+		functions f LEFT JOIN smells s
+             	ON f.function_signature = s.function_signature
+                   AND f.file = s.file" \
+	   --tables functions,smells \
+           "${1:?functions file missing}" "${2:?smells file missing}"
 }
 
 process_dirs()

@@ -80,6 +80,14 @@ checkSignificanceOfIndividualPredictors <- function(model, modelName) {
     cat("Signif. codes:  < 0.0001 '***' 0.001 '**' 0.01 '*' 0.05 '.'\n")
 }
 
+mcfaddensPseudoRSquared <- function(model, nullmodel) {
+    ## NOTE: Values between 0.2 and 0.4 already indicate a
+    ## substantially better model.
+    
+    ## Value : [0,1)
+    return (1-logLik(model)/logLik(nullmodel))
+}
+
 reportModel <- function(model, modelName) {
     ##print(summary(model))
     print(exp(cbind(OR = coef(model), suppressMessages(confint(model)))))
@@ -196,12 +204,16 @@ tryNbModel <- function(indeps, dep, data, csvOut=FALSE, csvHeader=FALSE) {
     }
 
     model <- glm.nb(formula, data = data)
+    nullModel <- glm.nb(as.formula(paste(dep, "1", sep="~")),data=data)
+
+    mcfadden <- mcfaddensPseudoRSquared(model, nullModel)
+    
     if (csvOut) {
         if (csvHeader) {
-            printf("SYSTEM,AIC,DEPENDENT,TERM_COUNT,TERMS\n")
+            printf("SYSTEM,AIC,MCFADDEN,DEPENDENT,TERM_COUNT,TERMS\n")
         }
         ##numTerms <- length(labels(terms(model)))
-        printf("%7s,%7.0f,%s,%d,%s\n", sysname, model$aic, dep, length(indeps), indepsFormula)
+        printf("%7s,%7.0f,%.4f,%s,%d,%s\n", sysname, model$aic, mcfadden, dep, length(indeps), indepsFormula)
         ##NOTE: Smaller values of AIC are better.  (Cf. https://ncss-wpengine.netdna-ssl.com/wp-content/themes/ncss/pdf/Procedures/NCSS/Negative_Binomial_Regression.pdf)
     } else {
         print(summary(model))
@@ -490,17 +502,19 @@ for (dep in c("COMMITS", "HUNKS", "LCH")) {
     dummy <- negbinCsvModel(dep, c("FL"))
     dummy <- negbinCsvModel(dep, c("FC"))
     dummy <- negbinCsvModel(dep, c("ND"))
+    dummy <- negbinCsvModel(dep, c("NEG"))
     
-    dummy <- negbinCsvModel(dep, c("LOAC"))
-    dummy <- negbinCsvModel(dep, c("LOFC"))
+    ##dummy <- negbinCsvModel(dep, c("LOAC"))
+    ##dummy <- negbinCsvModel(dep, c("LOFC"))
     dummy <- negbinCsvModel(dep, c("LOACratio"))
-    dummy <- negbinCsvModel(dep, c("LOFCratio"))
+    ##dummy <- negbinCsvModel(dep, c("LOFCratio"))
     
-    dummy <- negbinCsvModel(dep, c("FL", "FC", "ND","LOC"))
-    dummy <- negbinCsvModel(dep, c("FL", "FC", "ND", "LOAC", "LOC"))
-    dummy <- negbinCsvModel(dep, c("FL", "FC", "ND", "LOFC", "LOC"))
-    dummy <- negbinCsvModel(dep, c("FL", "FC", "ND", "LOACratio", "LOC"))
-    dummy <- negbinCsvModel(dep, c("FL", "FC", "ND", "LOFCratio", "LOC"))
+    dummy <- negbinCsvModel(dep, c("FL", "FC", "ND", "LOC"))
+    dummy <- negbinCsvModel(dep, c("FL", "FC", "ND", "NEG", "LOC"))
+    
+    ##dummy <- negbinCsvModel(dep, c("FL", "FC", "ND", "LOAC", "LOC"))
+    ##dummy <- negbinCsvModel(dep, c("FL", "FC", "ND", "LOFC", "LOC"))
+    dummy <- negbinCsvModel(dep, c("FL", "FC", "ND", "NEG", "LOACratio", "LOC"))
 }
 
 ##model.zip.COMMITS <- tryZeroInflModel(indeps=ziIndeps, dep="COMMITS", data=ziData)

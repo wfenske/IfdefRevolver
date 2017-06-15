@@ -297,7 +297,7 @@ do
 	fi
 	
 	log_info "Grouping windows $pgroup into $fStackedGrouped"
-	csvsql --query 'select min(SNAPSHOT_DATE) as SNAPSHOT_DATE, FUNCTION_SIGNATURE, FILE, avg(FUNCTION_LOC) as FUNCTION_LOC, sum(HUNKS) as HUNKS, sum(COMMITS) as COMMITS, sum(LINES_CHANGED) as LINES_CHANGED, sum(LINE_DELTA) as LINE_DELTA, sum(LINES_DELETED) as LINES_DELETED, sum(LINES_ADDED) as LINES_ADDED, avg(ifnull(LOAC,0)) as LOAC, avg(ifnull(LOFC,0)) as LOFC, avg(ifnull(NOFL,0)) as NOFL, avg(ifnull(NOFC_Dup,0)) as NOFC_Dup, avg(ifnull(NOFC_NonDup,0)) as NOFC_NonDup, avg(ifnull(NONEST,0)) as NONEST, count(*) as NUM_WINDOWS from stacked group by FUNCTION_SIGNATURE, FILE' --tables stacked $fStacked > "$fStackedGrouped"
+	csvsql --query 'select min(SNAPSHOT_DATE) as SNAPSHOT_DATE, FUNCTION_SIGNATURE, FILE, avg(FUNCTION_LOC) as FUNCTION_LOC, sum(HUNKS) as HUNKS, sum(COMMITS) as COMMITS, sum(LINES_CHANGED) as LINES_CHANGED, sum(LINE_DELTA) as LINE_DELTA, sum(LINES_DELETED) as LINES_DELETED, sum(LINES_ADDED) as LINES_ADDED, avg(ifnull(LOAC,0)) as LOAC, avg(ifnull(LOFC,0)) as LOFC, avg(ifnull(NOFL,0)) as NOFL, avg(ifnull(NOFC_Dup,0)) as NOFC_Dup, avg(ifnull(NOFC_NonDup,0)) as NOFC_NonDup, avg(ifnull(NONEST,0)) as NONEST, avg(ifnull(NONEG,0)) as NONEG, count(*) as NUM_WINDOWS from stacked group by FUNCTION_SIGNATURE, FILE' --tables stacked $fStacked > "$fStackedGrouped"
 	if [ $? -ne 0 ]
 	then
 	    rm -f "$fStackedGrouped"
