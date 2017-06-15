@@ -162,6 +162,51 @@ move_to_dir()
     ${o_dry_run_cmd} mv $o_mv_opts -- "$mtd_src" "${mtd_target_dir}/"
 }
 
+# Purpose: remove the specified date from the project's projectInfo.csv file
+# Usage: remove_from_project_info <YYYY-MM-DD>
+# exit code is 0 on success, non-zero otherwise
+remove_from_project_info()
+{
+    rfpi_project_info_csv=${src_results_dir:?}/projectInfo.csv
+    rfpi_project_info_csv_bak=${rfpi_project_info_csv}.orig
+    if [ ! -e "${rfpi_project_info_csv}" ]
+    then
+	log_warn "Cannot exclude snapshot from projectInfo.csv: No such file or directory: ${rfpi_project_info_csv}"
+	return 1
+    fi
+    if [ ! -f "${rfpi_project_info_csv}" ]
+    then
+	log_warn "Cannot exclude snapshot from projectInfo.csv: Not a proper file: ${rfpi_project_info_csv}"
+	return 1
+    fi
+    if [ ! -r "${rfpi_project_info_csv}" ]
+    then
+	log_warn "Cannot exclude snapshot from projectInfo.csv: Cannot read: ${rfpi_project_info_csv}"
+	return 1
+    fi
+    if [ ! -e "${rfpi_project_info_csv_bak}" ]
+    then
+	if ! ${o_dry_run_cmd} cp -- "${rfpi_project_info_csv}" "${rfpi_project_info_csv_bak}"
+	then
+	    log_warn "Cannot exclude snapshot from projectInfo.csv: Backing up ${rfpi_project_info_csv} failed."
+	    return 1
+	fi
+    fi
+    rfpi_new_contents=$(grep -v -- "$1" "${rfpi_project_info_csv}")
+    if [ -n "${o_dry_run_cmd}" ]
+    then
+	log_info "Removing lines matching $1 from ${rfpi_project_info_csv}"
+    else
+	printf '%s\n' "$rfpi_new_contents" > "${rfpi_project_info_csv}"
+	if [ $? -ne 0 ]
+	then
+	    log_warn "Failed to update ${rfpi_project_info_csv}.  File may be corrupted."
+	    return 1
+	fi
+    fi
+    true
+}
+
 # Usage move_snapshot <YYYY-MM-DD>
 # exit code is 0 on success, non-zero otherwise
 move_snapshot()
@@ -182,6 +227,11 @@ move_snapshot()
     then
        # Errors are already logged by `move_to_dir'
        ms_errors=$(( $ms_errors + 1 ))
+    fi
+    if ! remove_from_project_info "$1"
+    then
+       # Errors are already logged by `remove_from_project_info'
+	ms_errors=$(( $ms_errors + 1 ))
     fi
 
     return $ms_errors
