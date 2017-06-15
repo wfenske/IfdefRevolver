@@ -197,11 +197,9 @@ tryNbModel <- function(indeps, dep, data, csvOut=FALSE, csvHeader=FALSE) {
     formula <- as.formula(formulaString)
     modelName <- paste("negbin:", formulaString)
 
-    if (!csvOut) {
-        cat("\n\n")
-        cat("***************************\n")
-        cat("*** "); cat(modelName); cat(" ***\n")
-    }
+    eprintf("DEBUG: \n\n")
+    eprintf("DEBUG: ***************************\n")
+    eprintf("DEBUG: *** %s ***\n", modelName)
 
     model <- glm.nb(formula, data = data)
     nullModel <- glm.nb(as.formula(paste(dep, "1", sep="~")),data=data)
@@ -212,9 +210,27 @@ tryNbModel <- function(indeps, dep, data, csvOut=FALSE, csvHeader=FALSE) {
         if (csvHeader) {
             printf("SYSTEM,AIC,MCFADDEN,DEPENDENT,TERM_COUNT,TERMS\n")
         }
-        ##numTerms <- length(labels(terms(model)))
+        coefficients <- model$coefficients
+        ## Names, such as '(Intercept)', 'FL', etc.
+        ##coefficientNames <- labels(coefficients)
+        ## Coefficient values can be accessed via `coefficients[i]',
+        ## with coefficients[1] being the intercept. `i' can be either
+        ## an 1-based index or a names, such as '(Intercept)' or 'FL'.
+
+        ## p-Values for each coefficient. The first one is the
+        ## intercept. The values can be accessed via `pValues[i]',
+        ## where `i' is either a 1-based index or a name, such as
+        ## '(Intercept)' or 'FL'.
+        pValues <- summary(model)$coefficients[,"Pr(>|z|)"]
+
+        ## Other interesting attributes of nb-models:
+        ## > model$converged
+        ## [1] TRUE
+        ## > model$th.warn
+        ## [1] "Grenze der Alternierungen erreicht"
+        
         printf("%7s,%7.0f,%.4f,%s,%d,%s\n", sysname, model$aic, mcfadden, dep, length(indeps), indepsFormula)
-        ##NOTE: Smaller values of AIC are better.  (Cf. https://ncss-wpengine.netdna-ssl.com/wp-content/themes/ncss/pdf/Procedures/NCSS/Negative_Binomial_Regression.pdf)
+        ## NOTE: Smaller values of AIC are better.  (Cf. https://ncss-wpengine.netdna-ssl.com/wp-content/themes/ncss/pdf/Procedures/NCSS/Negative_Binomial_Regression.pdf)
     } else {
         print(summary(model))
         reportModel(model, modelName)
@@ -238,7 +254,7 @@ tryNbModel <- function(indeps, dep, data, csvOut=FALSE, csvHeader=FALSE) {
 ##    return (model)
 ##}
 
-tryZeroInflModel <- function(indeps, dep, data) {
+tryZeroInflModel <- function(indeps, dep, data, csvOut=FALSE,csvHeader=FALSE) {
     ## See for more information on how to interpret these models:
     ##
     ## http://datavoreconsulting.com/programming-tips/count-data-glms-choosing-poisson-negative-binomial-zero-inflated-poisson/
@@ -252,8 +268,8 @@ tryZeroInflModel <- function(indeps, dep, data) {
     ##
     ## Probably, the intercept of the zero model is significant if
     ## there are mode zeros than expected for a Poisson distribution.
-    formulaString1 <- paste(dep, " ~ ", indepsStr, "|1", sep="")
-    formula1 <- as.formula(formulaString1)
+    formulaStringIntercept <- paste(dep, " ~ ", indepsStr, "|1", sep="")
+    formulaIntercept <- as.formula(formulaStringIntercept)
 
     ## Step 2: Fit a zero-inflated model to test a treatment effect
     ## for both the counts and the zeros (with '~ x|x') and check
@@ -263,8 +279,8 @@ tryZeroInflModel <- function(indeps, dep, data) {
     ## Formula: y ~ x|x
     ##
     ## I don't know how to find that out. :-(
-    formulaString2 <- paste(dep, " ~ ", indepsStr, "|", indepsStr, sep="")
-    formula2 <- as.formula(formulaString2)
+    ##formulaString2 <- paste(dep, " ~ ", indepsStr, "|", indepsStr, sep="")
+    ##formula2 <- as.formula(formulaString2)
 
     ## Step 3: Test for overdispersion in the count part of the
     ## zero-inflated model by specifying a negative binomial
@@ -280,44 +296,71 @@ tryZeroInflModel <- function(indeps, dep, data) {
     ## probability of belonging to the zero component can by specified
     ## by the formula y ~ x1 + x2 | 1.
 
-    if (FALSE) {
-    modelName1 <- paste("zero-inflated:", formulaString1)
-    cat("\n\n")
-    cat("***************************\n")
-    cat("*** "); cat(modelName1); cat(" ***\n")
-
-    model.poisson1 <- zeroinfl(formula1, data = data)
-    print(summary(model.poisson1))
-
-    modelName2 <- paste("zero-inflated:", formulaString2)
-    cat("\n\n")
-    cat("***************************\n")
-    cat("*** "); cat(modelName2); cat(" ***\n")
-    model.poisson2 <- zeroinfl(formula2, data = data)
-    print(summary(model.poisson2))
-    }
+##    if (FALSE) {
+##        modelName1 <- paste("zero-inflated:", formulaStringIntercept)
+##        cat("\n\n")
+##        cat("***************************\n")
+##        cat("*** "); cat(modelName1); cat(" ***\n")
+##        
+##        model.poisson1 <- zeroinfl(formulaIntercept, data = data)
+##        print(summary(model.poisson1))
+##        
+##        modelName2 <- paste("zero-inflated:", formulaString2)
+##        cat("\n\n")
+##        cat("***************************\n")
+##        cat("*** "); cat(modelName2); cat(" ***\n")
+##        model.poisson2 <- zeroinfl(formula2, data = data)
+##        print(summary(model.poisson2))
+##    }
     
     ## If the estimated theta parameter is **not** significant, this
     ## indicates that the zero-inflated Poisson model is more
     ## appropriate than the neg-bin model.
 
-    modelName1negbin <- paste("zero-inflated negative binomial:", formulaString1)
-    cat("\n\n")
-    cat("***************************\n")
-    cat("*** "); cat(modelName1negbin); cat(" ***\n")
-    model.negbin1 <- zeroinfl(formula1, data = data, dist = "negbin")
-    print(summary(model.negbin1))
+    modelNameInterceptnegbin <- paste("zero-inflated negative binomial:", formulaStringIntercept)
+    eprintf("\n\n")
+    eprintf("***************************\n")
+    eprintf("*** %s ***\n", modelNameInterceptnegbin)
+    model.negbinIntercept <- zeroinfl(formulaIntercept, data = data, dist = "negbin")
+    m <- model.negbinIntercept
+    mName <- modelNameInterceptnegbin
+    ##print(summary(model.negbinIntercept))
+    if (csvOut) {
+        if (csvHeader) {
+            printf("SYSTEM,AIC,DEPENDENT,TERM_COUNT,TERMS\n")
+        }
 
-    if (FALSE) {
-    modelName2negbin <- paste("zero-inflated negative binomial:", formulaString2)
-    cat("\n\n")
-    cat("***************************\n")
-    cat("*** "); cat(modelName2negbin); cat(" ***\n")
-    model.negbin2 <- zeroinfl(formula2, data = data, dist = "negbin")
-    print(summary(model.negbin2))
+        ## p-Values for each coefficient of the count model. The first
+        ## one is the intercept. The values can be accessed via
+        ## `pValues[i]', where `i' is either a 1-based index or a
+        ## name, such as '(Intercept)' or 'FL'.  The last pValue is
+        ## for Log(theta).
+        pValues <- summary(m)$coefficients$count[,"Pr(>|z|)"]
+
+        ## Other interesting attributes of nb-models:
+        ## > nb.model$converged
+        ## [1] TRUE
+        ## > nb.model$th.warn
+        ## [1] "Grenze der Alternierungen erreicht"
+        
+        printf("%7s,%7.0f,%s,%d,%s\n", sysname, AIC(logLik(m)), dep, length(indeps), indepsStr)
+        ## NOTE: Smaller values of AIC are better.  (Cf. https://ncss-wpengine.netdna-ssl.com/wp-content/themes/ncss/pdf/Procedures/NCSS/Negative_Binomial_Regression.pdf)
+    } else {
+        print(summary(m))
+        reportModel(m, mName)
     }
+
+
+##    if (FALSE) {
+##    modelName2negbin <- paste("zero-inflated negative binomial:", formulaString2)
+##    cat("\n\n")
+##    cat("***************************\n")
+##    cat("*** "); cat(modelName2negbin); cat(" ***\n")
+##    model.negbin2 <- zeroinfl(formula2, data = data, dist = "negbin")
+##    print(summary(model.negbin2))
+##    }
     
-    return (model.negbin1)
+    return (model.negbinIntercept)
 }
 
 plotResiduals <- function(model) {
@@ -443,8 +486,8 @@ changedPercent <- nrow(changedData0) * 100 / allNRow
 
 ##sampleChangedSize <- 10000
 ##negBinData <- sampleDf(changedData, sampleChangedSize)
-##negBinData <- allData
-negBinData <- changedData
+negBinData <- allData
+##negBinData <- changedData
 
 ##ziSampleSize <- 10000
 ##ziData <- sampleDf(allData, ziSampleSize)
@@ -490,31 +533,41 @@ ziIndeps <- c("FL"
 ##model.nb.LCH    <- tryNbModel(indeps=nbIndeps,       dep="LCH",   data=negBinData)
 
 negbinCsvModel <- function(dep, indeps, header=FALSE) {
-    model <- tryNbModel(indeps=indeps,dep=dep, data=negBinData, csvOut=TRUE, csvHeader=header)
+    model <- tryNbModel(indeps=indeps, dep=dep, data=negBinData, csvOut=TRUE, csvHeader=header)
+    return (model)
+}
+
+zeroinflNegbinCsvModel <- function(dep, indeps, header=FALSE) {
+    model <- tryZeroInflModel(indeps=indeps, dep=dep, data=ziData, csvOut=TRUE, csvHeader=header)
     return (model)
 }
 
 header <- TRUE
+
+##csvModel <- zeroinflNegbinCsvModel
+csvModel <- negbinCsvModel
+
 for (dep in c("COMMITS", "HUNKS", "LCH")) {
-    dummy <- negbinCsvModel(dep, c("LOC"), header=header)
+    dummy <- csvModel(dep, c("LOC"), header=header)
     header <<- FALSE
 
-    dummy <- negbinCsvModel(dep, c("FL"))
-    dummy <- negbinCsvModel(dep, c("FC"))
-    dummy <- negbinCsvModel(dep, c("ND"))
-    dummy <- negbinCsvModel(dep, c("NEG"))
+    dummy <- csvModel(dep, c("FL"))
+    dummy <- csvModel(dep, c("FC"))
+    dummy <- csvModel(dep, c("ND"))
+    dummy <- csvModel(dep, c("NEG"))
     
-    ##dummy <- negbinCsvModel(dep, c("LOAC"))
-    ##dummy <- negbinCsvModel(dep, c("LOFC"))
-    dummy <- negbinCsvModel(dep, c("LOACratio"))
-    ##dummy <- negbinCsvModel(dep, c("LOFCratio"))
+    ##dummy <- csvModel(dep, c("LOAC"))
+    ##dummy <- csvModel(dep, c("LOFC"))
+    dummy <- csvModel(dep, c("LOACratio"))
+    ##dummy <- csvModel(dep, c("LOFCratio"))
+
+    dummy <- csvModel(dep, c("FL", "FC", "ND", "LOC"))
+    dummy <- csvModel(dep, c("FL", "FC", "ND", "NEG", "LOC"))
     
-    dummy <- negbinCsvModel(dep, c("FL", "FC", "ND", "LOC"))
-    dummy <- negbinCsvModel(dep, c("FL", "FC", "ND", "NEG", "LOC"))
-    
-    ##dummy <- negbinCsvModel(dep, c("FL", "FC", "ND", "LOAC", "LOC"))
-    ##dummy <- negbinCsvModel(dep, c("FL", "FC", "ND", "LOFC", "LOC"))
-    dummy <- negbinCsvModel(dep, c("FL", "FC", "ND", "NEG", "LOACratio", "LOC"))
+    ##dummy <- csvModel(dep, c("FL", "FC", "ND", "LOAC", "LOC"))
+    ##dummy <- csvModel(dep, c("FL", "FC", "ND", "LOFC", "LOC"))
+    dummy <- csvModel(dep, c("FL", "FC", "ND", "NEG", "LOACratio", "LOC"))
+    ##dummy <- csvModel(dep, c("FL", "FC", "ND", "LOFCratio", "LOC"))
 }
 
 ##model.zip.COMMITS <- tryZeroInflModel(indeps=ziIndeps, dep="COMMITS", data=ziData)
