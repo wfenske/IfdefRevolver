@@ -88,20 +88,69 @@ mcfaddensPseudoRSquared <- function(model, nullmodel) {
     return (1-logLik(model)/logLik(nullmodel))
 }
 
-reportModel <- function(model, modelName) {
-    ##print(summary(model))
-    print(exp(cbind(OR = coef(model), suppressMessages(confint(model)))))
-    cat("Coefficients:\n")
-    print(coef(model))
-    checkSignificanceOfIndividualPredictors(model, modelName)
+reportModel <- function(model, modelName, mcfadden, csvOut=TRUE, csvHeader=TRUE) {
     modelSummary <- summary(model)
+    ##print(summary(model))
+    ##print(exp(cbind(OR = coef(model), suppressMessages(confint(model)))))
+    ##checkSignificanceOfIndividualPredictors(model, modelName)
+
+    if (!csvOut) {
+        cat("Coefficients:\n"); print(coef(model))
+        coefValues <- modelSummary$coefficients[,"Estimate"]
+        pValues <- modelSummary$coefficients[,"Pr(>|z|)"]
+        printFirstCol <- function(what) {
+            printf("% 10s ", what)
+        }
+        printFirstCol("IV Name")
+        for (l in labels(pValues)) {
+            printf("%13s", l)
+        }
+        printf("\n")
+        printFirstCol("Coeff")
+        for (c in coefValues) {
+            printf(" % 12.9f", c)
+        }
+        printf("\n")
+        printFirstCol("p")
+        for (p in pValues) {
+            printf(" % 12.9f", p)
+        }
+        printf("\n")
+        printFirstCol("sign. code")
+        for (p in pValues) {
+            printf("% 13s", significanceCode(p))
+        }
+        printf("\n")
+    } else {
+        if (csvHeader) {
+            printf("SYSTEM,D,FORMULA,AIC,MCFADDEN,I,COEF,PCODE,P\n")
+        }
+        msCoefs <- modelSummary$coefficients
+        ## Name of dependent variable
+        terms <- modelSummary$terms
+        dName <- as.character(terms[[2]])
+        ## Formula of independent variables
+        iLabels <- labels(msCoefs)[[1]]
+        iFormula <- paste(iLabels[2:length(iLabels)], collapse="+")
+        for (i in 1:nrow(msCoefs)) {
+            cName <- iLabels[i]
+            c <-  msCoefs[i, "Estimate"]
+            p <- msCoefs[i, "Pr(>|z|)"]
+            printf("%s,%7s,% 27s,%7.0f,%.4f,%11s,%- 6.4f,%3s,%.4f\n",
+                   sysname
+                 , dName, iFormula
+                 , model$aic, mcfadden
+                 , cName, c, significanceCode(p), p)
+        }
+    }
+
     chisqp <- TRUE
     if (is.null(modelSummary$deviance)) {
-        cat("WARN: Cannot determine model fitness: modelSummary$deviance is missing.\n")
+        eprintf("WARN: Cannot determine model fitness: modelSummary$deviance is missing.\n")
         chisqp <- FALSE
     }
     if (is.null(modelSummary$df.residual)) {
-        cat("WARN: Cannot determine model fitness: modelSummary$df.residual is missing.\n")
+        eprintf("WARN: Cannot determine model fitness: modelSummary$df.residual is missing.\n")
         chisqp <- FALSE
     }
     if (chisqp) {
@@ -112,8 +161,7 @@ reportModel <- function(model, modelName) {
         } else {
             judgement <- "does *not* fit the data"
         }
-        cat(sprintf(judgement, chiSqStat, chiSqStatThreshold,
-                    fmt="Model %s.\nChi-square-test statistic: %.3f (should be > %.3f).\n"))
+        eprintf("Model %s.\nChi-square-test statistic: %.3f (should be > %.3f).\n", judgement, chiSqStat, chiSqStatThreshold)
     }
 }
 
@@ -197,8 +245,7 @@ tryNbModel <- function(indeps, dep, data, csvOut=FALSE, csvHeader=FALSE) {
     formula <- as.formula(formulaString)
     modelName <- paste("negbin:", formulaString)
 
-    eprintf("DEBUG: \n\n")
-    eprintf("DEBUG: ***************************\n")
+    eprintf("\nDEBUG: ***************************\n")
     eprintf("DEBUG: *** %s ***\n", modelName)
 
     model <- glm.nb(formula, data = data)
@@ -206,35 +253,35 @@ tryNbModel <- function(indeps, dep, data, csvOut=FALSE, csvHeader=FALSE) {
 
     mcfadden <- mcfaddensPseudoRSquared(model, nullModel)
     
-    if (csvOut) {
-        if (csvHeader) {
-            printf("SYSTEM,AIC,MCFADDEN,DEPENDENT,TERM_COUNT,TERMS\n")
-        }
-        coefficients <- model$coefficients
-        ## Names, such as '(Intercept)', 'FL', etc.
-        ##coefficientNames <- labels(coefficients)
-        ## Coefficient values can be accessed via `coefficients[i]',
-        ## with coefficients[1] being the intercept. `i' can be either
-        ## an 1-based index or a names, such as '(Intercept)' or 'FL'.
-
-        ## p-Values for each coefficient. The first one is the
-        ## intercept. The values can be accessed via `pValues[i]',
-        ## where `i' is either a 1-based index or a name, such as
-        ## '(Intercept)' or 'FL'.
-        pValues <- summary(model)$coefficients[,"Pr(>|z|)"]
-
-        ## Other interesting attributes of nb-models:
-        ## > model$converged
-        ## [1] TRUE
-        ## > model$th.warn
-        ## [1] "Grenze der Alternierungen erreicht"
-        
-        printf("%7s,%7.0f,%.4f,%s,%d,%s\n", sysname, model$aic, mcfadden, dep, length(indeps), indepsFormula)
-        ## NOTE: Smaller values of AIC are better.  (Cf. https://ncss-wpengine.netdna-ssl.com/wp-content/themes/ncss/pdf/Procedures/NCSS/Negative_Binomial_Regression.pdf)
-    } else {
-        print(summary(model))
-        reportModel(model, modelName)
-    }
+##    if (csvOut) {
+##        if (csvHeader) {
+##            printf("SYSTEM,AIC,MCFADDEN,DEPENDENT,TERM_COUNT,TERMS\n")
+##        }
+##        coefficients <- model$coefficients
+##        ## Names, such as '(Intercept)', 'FL', etc.
+##        ##coefficientNames <- labels(coefficients)
+##        ## Coefficient values can be accessed via `coefficients[i]',
+##        ## with coefficients[1] being the intercept. `i' can be either
+##        ## an 1-based index or a names, such as '(Intercept)' or 'FL'.
+##
+##        ## p-Values for each coefficient. The first one is the
+##        ## intercept. The values can be accessed via `pValues[i]',
+##        ## where `i' is either a 1-based index or a name, such as
+##        ## '(Intercept)' or 'FL'.
+##        pValues <- summary(model)$coefficients[,"Pr(>|z|)"]
+##
+##        ## Other interesting attributes of nb-models:
+##        ## > model$converged
+##        ## [1] TRUE
+##        ## > model$th.warn
+##        ## [1] "Grenze der Alternierungen erreicht"
+##        
+##        printf("%7s,%7.0f,%.4f,%s,%d,%s\n", sysname, model$aic, mcfadden, dep, length(indeps), indepsFormula)
+##        ## NOTE: Smaller values of AIC are better.  (Cf. https://ncss-wpengine.netdna-ssl.com/wp-content/themes/ncss/pdf/Procedures/NCSS/Negative_Binomial_Regression.pdf)
+##    } else {
+##        ##print(summary(model))
+##    }
+    reportModel(model, modelName, mcfadden, csvOut=csvOut,csvHeader=csvHeader)
     
     ##cat("\n")
     ##cat(paste("*** ANOVA of model '", modelName, "' ***\n", sep=""))
@@ -488,6 +535,7 @@ changedPercent <- nrow(changedData0) * 100 / allNRow
 ##negBinData <- sampleDf(changedData, sampleChangedSize)
 negBinData <- allData
 ##negBinData <- changedData
+##negBinData <- subset(allData, FL > 0)
 
 ##ziSampleSize <- 10000
 ##ziData <- sampleDf(allData, ziSampleSize)
@@ -547,7 +595,10 @@ header <- TRUE
 ##csvModel <- zeroinflNegbinCsvModel
 csvModel <- negbinCsvModel
 
-for (dep in c("COMMITS", "HUNKS", "LCH")) {
+for (dep in c("COMMITS"
+              ##, "HUNKS"
+            , "LCH"
+              )) {
     dummy <- csvModel(dep, c("LOC"), header=header)
     header <<- FALSE
 
@@ -568,6 +619,9 @@ for (dep in c("COMMITS", "HUNKS", "LCH")) {
     ##dummy <- csvModel(dep, c("FL", "FC", "ND", "LOFC", "LOC"))
     dummy <- csvModel(dep, c("FL", "FC", "ND", "NEG", "LOACratio", "LOC"))
     ##dummy <- csvModel(dep, c("FL", "FC", "ND", "LOFCratio", "LOC"))
+
+    ##tryNbModel(indeps=c("FL", "FC", "ND", "NEG", "LOACratio", "LOC"),
+    ##           dep=dep, data=negBinData)
 }
 
 ##model.zip.COMMITS <- tryZeroInflModel(indeps=ziIndeps, dep="COMMITS", data=ziData)
