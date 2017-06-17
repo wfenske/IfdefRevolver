@@ -599,29 +599,34 @@ for (dep in c("COMMITS"
               ##, "HUNKS"
             , "LCH"
               )) {
-    dummy <- csvModel(dep, c("LOC"), header=header)
-    header <<- FALSE
-
-    dummy <- csvModel(dep, c("FL"))
-    dummy <- csvModel(dep, c("FC"))
-    dummy <- csvModel(dep, c("ND"))
-    dummy <- csvModel(dep, c("NEG"))
-    
-    ##dummy <- csvModel(dep, c("LOAC"))
-    ##dummy <- csvModel(dep, c("LOFC"))
-    dummy <- csvModel(dep, c("LOACratio"))
-    ##dummy <- csvModel(dep, c("LOFCratio"))
-
-    dummy <- csvModel(dep, c("FL", "FC", "ND", "LOC"))
-    dummy <- csvModel(dep, c("FL", "FC", "ND", "NEG", "LOC"))
-    
-    ##dummy <- csvModel(dep, c("FL", "FC", "ND", "LOAC", "LOC"))
-    ##dummy <- csvModel(dep, c("FL", "FC", "ND", "LOFC", "LOC"))
-    dummy <- csvModel(dep, c("FL", "FC", "ND", "NEG", "LOACratio", "LOC"))
+##    dummy <- csvModel(dep, c("LOC"), header=header)
+##    header <<- FALSE
+##
+##    dummy <- csvModel(dep, c("FL"))
+##    dummy <- csvModel(dep, c("FC"))
+##    dummy <- csvModel(dep, c("ND"))
+##    dummy <- csvModel(dep, c("NEG"))
+##    
+##    ##dummy <- csvModel(dep, c("LOAC"))
+##    ##dummy <- csvModel(dep, c("LOFC"))
+##    dummy <- csvModel(dep, c("LOACratio"))
+##    ##dummy <- csvModel(dep, c("LOFCratio"))
+##
+##    dummy <- csvModel(dep, c("FL", "FC", "ND", "LOC"))
+##    dummy <- csvModel(dep, c("FL", "FC", "ND", "NEG", "LOC"))
+##    
+##    ##dummy <- csvModel(dep, c("FL", "FC", "ND", "LOAC", "LOC"))
+##    ##dummy <- csvModel(dep, c("FL", "FC", "ND", "LOFC", "LOC"))
+    dummy <- csvModel(dep, c("FL", "FC", "ND", "NEG", "LOACratio", "LOC"), header=header)
+    dummy <- csvModel(dep, c("FC", "ND", "NEG", "LOACratio", "LOC"))
+    dummy <- csvModel(dep, c("FL", "ND", "NEG", "LOACratio", "LOC"))
+    dummy <- csvModel(dep, c("FC", "NEG", "LOACratio", "LOC"))
+    dummy <- csvModel(dep, c("FL", "NEG", "LOACratio", "LOC"))
     ##dummy <- csvModel(dep, c("FL", "FC", "ND", "LOFCratio", "LOC"))
 
     ##tryNbModel(indeps=c("FL", "FC", "ND", "NEG", "LOACratio", "LOC"),
     ##           dep=dep, data=negBinData)
+    header <<- FALSE
 }
 
 ##model.zip.COMMITS <- tryZeroInflModel(indeps=ziIndeps, dep="COMMITS", data=ziData)
