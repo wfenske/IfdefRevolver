@@ -229,6 +229,6 @@ out_end_date=$( reformat_date "$end_snapshot" )
 ### Final output
 export LC_NUMERIC=C
 log_info "Statistics for project $o_project"
-log_info "Format: <name> & start-date & end-date & files & funcs & (%annotated funcs) & fkloc & floac% & commits"
-printf '%9s & %7s & %7s & %5d & %6d & (%.1f\\,\\%%) & %5.1f & (%.1f\\,\\%%) & %d\n' \
-       "${o_name}" "$out_start_date" "$out_end_date" "$num_files" "$num_funcs" "$feature_funcs_ratio" "$fkloc" "$flocratio" "$num_commits"
+log_info "Format: <name> & start-date & end-date & commits & files & funcs & (%annotated funcs) & fkloc & floac%"
+printf '%9s & %7s & %7s & %d & %5d & %6d & (%.1f\\,\\%%) & %5.1f & (%.1f\\,\\%%)\n' \
+       "${o_name}" "$out_start_date" "$out_end_date" "$num_commits" "$num_files" "$num_funcs" "$feature_funcs_ratio" "$fkloc" "$flocratio"
