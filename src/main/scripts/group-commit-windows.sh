@@ -220,7 +220,7 @@ fBranchesOrdered=$(mktemp branchesOrdered.csv.XXXXXX) || edie "Failed to create 
 fStacked=$(mktemp stacked.csv.XXXXXX) || edie "Failed to create temporary file."
 
 log_debug "Listing window branches in $o_project"
-$real_me_dir/show-snapshot-branches.sh "$o_project" > $fBranches || edie "Listing branches in $o_project failed."
+$real_me_dir/show-snapshot-branches.sh -p "$o_project" > $fBranches || edie "Listing branches in $o_project failed."
 log_debug "Found" $(wc -l $fBranches) "lines of window/branch info."
 
 log_debug "Calculating branch lengths"

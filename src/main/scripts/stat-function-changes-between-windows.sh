@@ -47,7 +47,7 @@ PROJECT=${1:?missing system name}
 
 # Determine the dates of the longest branch in the system
 echo "# Fetching dates of longest branch of $PROJECT..." >&2
-dates=$(show-snapshot-branches.sh "$PROJECT"|csvsql -d ',' -q '"' --table branches --query 'select date from branches where branch = (select branch from branches where position = (select max(position) from branches) limit 1)'|tail -n +2) || exit $?
+dates=$(show-snapshot-branches.sh -p "$PROJECT"|csvsql -d ',' -q '"' --table branches --query 'select date from branches where branch = (select branch from branches where position = (select max(position) from branches) limit 1)'|tail -n +2) || exit $?
 
 if [ -z "$dates" ]
 then
