@@ -82,11 +82,21 @@ help()
     echo "Exit code is 0 on success, non-zero otherwise."
 }
 
-## Purpose: reformate a date from format YYYY-MM-DD to MM/YYYY
+## Purpose: Get the value of a field from a simple CSV-like output (quoting and escaped are not supported!)
+##
+## Usage get_csv_field CSV_STRING FIELD_NUM
+get_csv_field()
+{
+    printf '%s\n' "$1"|cut -d ',' -f $2
+}
+
+## Purpose: reformat a date from format YYYY-MM-DD (possibly with
+## some garbage following) to MM/YYYY
+## 
 ## Usage: reformat_date <date>
 reformat_date()
 {
-    printf '%s\n' "${1:?}"|sed 's,\([0-9][0-9][0-9][0-9]\)-\([0-9][0-9]\)-\([0-9][0-9]\),\2/\1,'|sed 's/^0//'
+    printf '%s\n' "${1:?}"|sed 's,\([0-9][0-9][0-9][0-9]\)-\([0-9][0-9]\)-\([0-9][0-9]\).*,\2/\1,'|sed 's/^0//'
 }
 
 unset o_project
@@ -155,12 +165,12 @@ fi
 
 ## NOTE, 2017-06-17, wf: There's some warning about a missing header
 ## row. That's why we redirect stderr to /dev/null
-start_end_files=$(csvsql -q '"' -d ',' -H --tables info --query 'select mm.start_date,mm.end_date,info.c as end_files from info join (select min(b) start_date, max(b) end_date from info) as mm on info.b = mm.end_date' "${proj_info_file:?}" 2>/dev/null)
+endsnapshot_files=$(csvsql -q '"' -d ',' -H --tables info --query 'select mm.end_date,info.c as end_files from info join (select max(b) end_date from info) as mm on info.b = mm.end_date' "${proj_info_file:?}" 2>/dev/null)
 if [ $? -ne 0 ]
 then
     edie "Failed to gather start and end date and number of files from ${proj_info_file:?}"
 fi
-log_debug "$start_end_files"
+log_debug "$endsnapshot_files"
 
 ## Result will look sth. like this:
 ##
@@ -168,11 +178,10 @@ log_debug "$start_end_files"
 ## 1996-01-14,2017-01-27,320
 
 ## Remove header
-start_end_files=$( printf '%s\n' "$start_end_files"|tail -n +2 )
+endsnapshot_files=$( printf '%s\n' "$endsnapshot_files"|tail -n +2 )
 
-start_snapshot=$( printf '%s\n' "$start_end_files"|cut -d ',' -f 1 )
-end_snapshot=$( printf '%s\n' "$start_end_files"|cut -d ',' -f 2 )
-num_files=$( printf '%s\n' "$start_end_files"|cut -d ',' -f 3 )
+end_snapshot=$(get_csv_field "$endsnapshot_files" 1)
+num_files=$(get_csv_field "$endsnapshot_files" 2)
 
 ### Get #funcs etc. of last snapshot
 end_snapshot_file="results/${o_project:?}/${end_snapshot:?}/joint_function_ab_smell_snapshot.csv"
@@ -188,9 +197,9 @@ log_debug "$funcs_fkloc_floacratio"
 ## Remove header
 funcs_fkloc_floacratio=$( printf '%s\n' "$funcs_fkloc_floacratio"|tail -n +2 )
 
-num_funcs=$( printf '%s\n' "$funcs_fkloc_floacratio"|cut -d ',' -f 1 )
-fkloc=$(     printf '%s\n' "$funcs_fkloc_floacratio"|cut -d ',' -f 2 )
-flocratio=$( printf '%s\n' "$funcs_fkloc_floacratio"|cut -d ',' -f 3 )
+num_funcs=$(get_csv_field "$funcs_fkloc_floacratio" 1)
+fkloc=$(get_csv_field     "$funcs_fkloc_floacratio" 2)
+flocratio=$(get_csv_field "$funcs_fkloc_floacratio" 3)
 
 ### Get % of annotated funcs of last snapshot
 log_info "Getting percentage of annotated functions of last snapsnot from ${end_snapshot_file:?}"
@@ -219,21 +228,25 @@ fi
 
 ### Determine number of relevant commits (non-merge, .c-modifying commits)
 commits_file="results/${o_project:?}/revisionsFull.csv"
-log_info "Determining number of relevant commits from ${commits_file:?}"
+log_info "Determining oldest and newest commit and number of relevant commits from ${commits_file:?}"
 
-num_relevant_commits=$(wc -l "${commits_file:?}")
+mint_maxt_relcomms=$(csvsql -q '"' -d ',' --tables revs --query 'select min(` timestamp`), max(` timestamp`), count(*) from revs' "${commits_file:?}")
 if [ $? -ne 0 ]
 then
     edie "Failed to count commits in ${commit_file:?}"
 fi
-# The output also contains the file name, which we dont need.
-num_relevant_commits=$(printf '%s\n' "${num_relevant_commits:?}"|sed 's/[[:space:]]*\([[:digit:]]\{1,\}\).*/\1/')
-# The file has a header row, so we need to subtract 1
-num_relevant_commits=$(( $num_relevant_commits - 1 ))
+log_debug "$mint_maxt_relcomms"
+mint_maxt_relcomms=$( printf '%s\n' "$mint_maxt_relcomms"|tail -n +2 )
+first_commit_datetime=$(get_csv_field "$mint_maxt_relcomms" 1)
+last_commit_datetime=$(get_csv_field "$mint_maxt_relcomms" 2)
+num_relevant_commits=$(get_csv_field "$mint_maxt_relcomms" 3)
+log_debug "first_commit_datetime: $first_commit_datetime"
+log_debug "last_commit_datetime: $last_commit_datetime"
+log_debug "num_relevant_commits: $num_relevant_commits"
 
 ### Reformat the dates
-out_start_date=$( reformat_date "$start_snapshot" )
-out_end_date=$( reformat_date "$end_snapshot" )
+out_start_date=$( reformat_date "$first_commit_datetime" )
+out_end_date=$( reformat_date   "$last_commit_datetime" )
 
 ### Final output
 export LC_NUMERIC=C
