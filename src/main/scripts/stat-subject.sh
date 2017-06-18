@@ -136,8 +136,7 @@ fi
 
 if [ $# -ne 0 ]
 then
-    log_error "Expected no positional arguments, got $#." >&2
-    usage_and_die
+    log_warn "Ignoring positional arguments (none were expected): \`$@'"
 fi
 
 ### Get start and end date and number of .c files
@@ -208,19 +207,29 @@ log_debug "$feature_funcs_ratio"
 ## Remove header
 feature_funcs_ratio=$( printf '%s\n' "$feature_funcs_ratio"|tail -n +2 )
 
-### Determine number of commits
-commits_file="results/${o_project:?}/revisionsFull.csv"
-log_info "Determining number of commits from ${commits_file:?}"
 
-num_commits=$(wc -l "${commits_file:?}")
+### Determine number of all commits, irrespective of whether they are
+### merges or modify .c files
+repo_dir=repos/"${o_project:?}"
+num_all_commits=$(cd "${repo_dir:?}" && git rev-list --all --count)
+if [ $? -ne 0 ]
+then
+    edie "Failed to count commits in repository ${repo_dir:?}"
+fi
+
+### Determine number of relevant commits (non-merge, .c-modifying commits)
+commits_file="results/${o_project:?}/revisionsFull.csv"
+log_info "Determining number of relevant commits from ${commits_file:?}"
+
+num_relevant_commits=$(wc -l "${commits_file:?}")
 if [ $? -ne 0 ]
 then
     edie "Failed to count commits in ${commit_file:?}"
 fi
 # The output also contains the file name, which we dont need.
-num_commits=$(printf '%s\n' "${num_commits:?}"|sed 's/[[:space:]]*\([[:digit:]]\{1,\}\).*/\1/')
+num_relevant_commits=$(printf '%s\n' "${num_relevant_commits:?}"|sed 's/[[:space:]]*\([[:digit:]]\{1,\}\).*/\1/')
 # The file has a header row, so we need to subtract 1
-num_commits=$(( $num_commits - 1 ))
+num_relevant_commits=$(( $num_relevant_commits - 1 ))
 
 ### Reformat the dates
 out_start_date=$( reformat_date "$start_snapshot" )
@@ -231,4 +240,4 @@ export LC_NUMERIC=C
 log_info "Statistics for project $o_project"
 log_info "Format: <name> & start-date & end-date & commits & files & funcs & (%annotated funcs) & fkloc & floac%"
 printf '%9s & %7s & %7s & %d & %5d & %6d & (%.1f\\,\\%%) & %5.1f & (%.1f\\,\\%%)\n' \
-       "${o_name}" "$out_start_date" "$out_end_date" "$num_commits" "$num_files" "$num_funcs" "$feature_funcs_ratio" "$fkloc" "$flocratio"
+       "${o_name}" "$out_start_date" "$out_end_date" $num_all_commits $num_files $num_funcs "$feature_funcs_ratio" "$fkloc" "$flocratio"
