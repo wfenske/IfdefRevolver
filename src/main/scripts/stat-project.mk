@@ -21,12 +21,10 @@ COMPARE_LOC_OPTS ?= -d 3 --ymax 400
 
 INPUT_CSVS = $(wildcard results/$(PROJECT)/[0-9][0-9][0-9][0-9]-[0-9][0-9]-[0-9][0-9]/joint_function_ab_smell_snapshot.csv)
 
-INDEPS = FL FC ND
+INDEPS = FL FC ND NEG
 RATIOS_PLOTS = \
 	$(addprefix ratios-plots/$(PROJECT)/ratios-,$(addsuffix -COMMITS.COUNT.pdf,$(INDEPS))) \
 	$(addprefix ratios-plots/$(PROJECT)/ratios-,$(addsuffix -COMMITS.LOC.pdf,$(INDEPS)))   \
-	$(addprefix ratios-plots/$(PROJECT)/ratios-,$(addsuffix -HUNKS.COUNT.pdf,$(INDEPS)))   \
-	$(addprefix ratios-plots/$(PROJECT)/ratios-,$(addsuffix -HUNKS.LOC.pdf,$(INDEPS)))     \
 	$(addprefix ratios-plots/$(PROJECT)/ratios-,$(addsuffix -LCH.COUNT.pdf,$(INDEPS)))     \
 	$(addprefix ratios-plots/$(PROJECT)/ratios-,$(addsuffix -LCH.LOC.pdf,$(INDEPS)))
 
@@ -75,6 +73,10 @@ ratios-plots/$(PROJECT)/ratios-ND-COMMITS.COUNT.pdf: $(ALL_R_DATA) $(RATIOSCMP_P
 	mkdir -p `dirname $@` 
 	$(RATIOSCMP_PROG) -p $(PROJECT) -n $(NAME) -i ND -d COMMITS -s COUNT -o $@
 
+ratios-plots/$(PROJECT)/ratios-NEG-COMMITS.COUNT.pdf: $(ALL_R_DATA) $(RATIOSCMP_PROG)
+	mkdir -p `dirname $@` 
+	$(RATIOSCMP_PROG) -p $(PROJECT) -n $(NAME) -i NEG -d COMMITS -s COUNT -o $@
+
 ratios-plots/$(PROJECT)/ratios-FL-COMMITS.LOC.pdf: $(ALL_R_DATA) $(RATIOSCMP_PROG)
 	mkdir -p `dirname $@` 
 	$(RATIOSCMP_PROG) -p $(PROJECT) -n $(NAME) -i FL -d COMMITS -s LOC -o $@
@@ -87,31 +89,9 @@ ratios-plots/$(PROJECT)/ratios-ND-COMMITS.LOC.pdf: $(ALL_R_DATA) $(RATIOSCMP_PRO
 	mkdir -p `dirname $@` 
 	$(RATIOSCMP_PROG) -p $(PROJECT) -n $(NAME) -i ND -d COMMITS -s LOC -o $@
 
-## INDEPS vs. HUNKS
-
-ratios-plots/$(PROJECT)/ratios-FL-HUNKS.COUNT.pdf: $(ALL_R_DATA) $(RATIOSCMP_PROG)
+ratios-plots/$(PROJECT)/ratios-NEG-COMMITS.LOC.pdf: $(ALL_R_DATA) $(RATIOSCMP_PROG)
 	mkdir -p `dirname $@` 
-	$(RATIOSCMP_PROG) -p $(PROJECT) -n $(NAME) -i FL -d HUNKS -s COUNT -o $@
-
-ratios-plots/$(PROJECT)/ratios-FC-HUNKS.COUNT.pdf: $(ALL_R_DATA $(RATIOSCMP_PROG)
-	mkdir -p `dirname $@` 
-	$(RATIOSCMP_PROG) -p $(PROJECT) -n $(NAME) -i FC -d HUNKS -s COUNT -o $@
-
-ratios-plots/$(PROJECT)/ratios-ND-HUNKS.COUNT.pdf: $(ALL_R_DATA) $(RATIOSCMP_PROG)
-	mkdir -p `dirname $@` 
-	$(RATIOSCMP_PROG) -p $(PROJECT) -n $(NAME) -i ND -d HUNKS -s COUNT -o $@
-
-ratios-plots/$(PROJECT)/ratios-FL-HUNKS.LOC.pdf: $(ALL_R_DATA) $(RATIOSCMP_PROG)
-	mkdir -p `dirname $@` 
-	$(RATIOSCMP_PROG) -p $(PROJECT) -n $(NAME) -i FL -d HUNKS -s LOC -o $@
-
-ratios-plots/$(PROJECT)/ratios-FC-HUNKS.LOC.pdf: $(ALL_R_DATA) $(RATIOSCMP_PROG)
-	mkdir -p `dirname $@` 
-	$(RATIOSCMP_PROG) -p $(PROJECT) -n $(NAME) -i FC -d HUNKS -s LOC -o $@
-
-ratios-plots/$(PROJECT)/ratios-ND-HUNKS.LOC.pdf: $(ALL_R_DATA) $(RATIOSCMP_PROG)
-	mkdir -p `dirname $@` 
-	$(RATIOSCMP_PROG) -p $(PROJECT) -n $(NAME) -i ND -d HUNKS -s LOC -o $@
+	$(RATIOSCMP_PROG) -p $(PROJECT) -n $(NAME) -i NEG -d COMMITS -s LOC -o $@
 
 ## INDEPS vs. LCH
 
@@ -127,6 +107,10 @@ ratios-plots/$(PROJECT)/ratios-ND-LCH.COUNT.pdf: $(ALL_R_DATA) $(RATIOSCMP_PROG)
 	mkdir -p `dirname $@` 
 	$(RATIOSCMP_PROG) -p $(PROJECT) -n $(NAME) -i ND -d LCH -s COUNT -o $@
 
+ratios-plots/$(PROJECT)/ratios-NEG-LCH.COUNT.pdf: $(ALL_R_DATA) $(RATIOSCMP_PROG)
+	mkdir -p `dirname $@` 
+	$(RATIOSCMP_PROG) -p $(PROJECT) -n $(NAME) -i NEG -d LCH -s COUNT -o $@
+
 ratios-plots/$(PROJECT)/ratios-FL-LCH.LOC.pdf: $(ALL_R_DATA) $(RATIOSCMP_PROG)
 	mkdir -p `dirname $@` 
 	$(RATIOSCMP_PROG) -p $(PROJECT) -n $(NAME) -i FL -d LCH -s LOC -o $@
@@ -139,6 +123,10 @@ ratios-plots/$(PROJECT)/ratios-ND-LCH.LOC.pdf: $(ALL_R_DATA) $(RATIOSCMP_PROG)
 	mkdir -p `dirname $@` 
 	$(RATIOSCMP_PROG) -p $(PROJECT) -n $(NAME) -i ND -d LCH -s LOC -o $@
 
+ratios-plots/$(PROJECT)/ratios-NEG-LCH.LOC.pdf: $(ALL_R_DATA) $(RATIOSCMP_PROG)
+	mkdir -p `dirname $@` 
+	$(RATIOSCMP_PROG) -p $(PROJECT) -n $(NAME) -i NEG -d LCH -s LOC -o $@
+
 ## LOC plots
 loc-plots/$(PROJECT)/LOC-FC.pdf: $(ALL_R_DATA) $(COMPARE_LOCS_PROG)
 	mkdir -p `dirname $@` 
@@ -150,4 +138,8 @@ loc-plots/$(PROJECT)/LOC-FL.pdf: $(ALL_R_DATA) $(COMPARE_LOCS_PROG)
 
 loc-plots/$(PROJECT)/LOC-ND.pdf: $(ALL_R_DATA) $(COMPARE_LOCS_PROG)
 	mkdir -p `dirname $@` 
-	 $(COMPARE_LOCS_PROG) -p $(PROJECT) -n $(NAME) -i ND $(COMPARE_LOC_OPTS) -o $@ --no-title
+	 $(COMPARE_LOCS_PROG) -p $(PROJECT) -n $(NAME) -i ND $(COMPARE_LOC_OPTS) -o $@ -X --no-title
+
+loc-plots/$(PROJECT)/LOC-NEG.pdf: $(ALL_R_DATA) $(COMPARE_LOCS_PROG)
+	mkdir -p `dirname $@` 
+	 $(COMPARE_LOCS_PROG) -p $(PROJECT) -n $(NAME) -i NEG $(COMPARE_LOC_OPTS) -o $@ --no-title

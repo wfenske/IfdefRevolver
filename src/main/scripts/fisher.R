@@ -349,42 +349,42 @@ if ( !opts$no_header ) {
 ##cat(r, "\n", sep="")
 pf <- function(...) cat(doTheFisher(...))
 
-fcThresh <- 1
-flThresh <- 0
-ndThresh <- 0
+flThresh  <- 0
+fcThresh  <- 1
+ndThresh  <- 0
+negThresh <- 0
 
 ## Without LOC adjustment
-pf(indep="FC", dep="COMMITS",       indepThresh=fcThresh)
-pf(indep="FC", dep="HUNKS",         indepThresh=fcThresh)
-pf(indep="FC", dep="LCH", indepThresh=fcThresh)
+pf(indep="FL",  dep="COMMITS",      indepThresh=flThresh)
+pf(indep="FL",  dep="LCH",          indepThresh=flThresh)
 
-pf(indep="FL", dep="COMMITS",       indepThresh=flThresh)
-pf(indep="FL", dep="HUNKS",         indepThresh=flThresh)
-pf(indep="FL", dep="LCH", indepThresh=flThresh)
+pf(indep="FC",  dep="COMMITS",      indepThresh=fcThresh)
+pf(indep="FC",  dep="LCH",          indepThresh=fcThresh)
 
-pf(indep="ND", dep="COMMITS",       indepThresh=ndThresh)
-pf(indep="ND", dep="HUNKS",         indepThresh=ndThresh)
-pf(indep="ND", dep="LCH", indepThresh=ndThresh)
+pf(indep="ND",  dep="COMMITS",      indepThresh=ndThresh)
+pf(indep="ND",  dep="LCH",          indepThresh=ndThresh)
+
+pf(indep="NEG", dep="COMMITS",      indepThresh=negThresh)
+pf(indep="NEG", dep="LCH",          indepThresh=negThresh)
 
 pf(indep="LOC", dep="COMMITS")
-pf(indep="LOC", dep="HUNKS")
 pf(indep="LOC", dep="LCH")
 
 ## Scaled to LOC
-pf(indep="FC", dep="COMMITSratio",       indepThresh=fcThresh)
-pf(indep="FC", dep="HUNKSratio",         indepThresh=fcThresh)
-pf(indep="FC", dep="LCHratio",           indepThresh=fcThresh)
+pf(indep="FL",  dep="COMMITSratio", indepThresh=flThresh)
+pf(indep="FL",  dep="LCHratio",     indepThresh=flThresh)
 
-pf(indep="FL", dep="COMMITSratio",       indepThresh=flThresh)
-pf(indep="FL", dep="HUNKSratio",         indepThresh=flThresh)
-pf(indep="FL", dep="LCHratio",           indepThresh=flThresh)
+pf(indep="FC",  dep="COMMITSratio", indepThresh=fcThresh)
+pf(indep="FC",  dep="LCHratio",     indepThresh=fcThresh)
 
-pf(indep="ND", dep="COMMITSratio",       indepThresh=ndThresh)
-pf(indep="ND", dep="HUNKSratio",         indepThresh=ndThresh)
-pf(indep="ND", dep="LCHratio",           indepThresh=ndThresh)
+pf(indep="ND",  dep="COMMITSratio", indepThresh=ndThresh)
+pf(indep="ND",  dep="LCHratio",     indepThresh=ndThresh)
+
+pf(indep="NEG", dep="COMMITSratio", indepThresh=negThresh)
+pf(indep="NEG", dep="LCHratio",     indepThresh=negThresh)
 
 pf(indep="LOC", dep="COMMITSratio")
-pf(indep="LOC", dep="HUNKSratio")
 pf(indep="LOC", dep="LCHratio")
 
-##stop("How can we compute risk ratios or something?  The odds ratios look huge, but Cramer's V says that there's almost no effect.  Who's right?")
+## Hmm ..., the odds ratios somtimes look huge, but Cramer's V says
+## that there's almost no effect.

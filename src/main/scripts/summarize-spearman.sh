@@ -172,6 +172,7 @@ end AVG_MAGNITUDE
 end MAX_MAGNITUDE
 FROM spearman
 JOIN averages ON spearman.i=averages.i and spearman.d=averages.d
+WHERE spearman.p < 0.01
 GROUP BY spearman.i,spearman.d
 ORDER BY spearman.i,spearman.d" \
 	   --tables spearman,averages "$1" "$averages_tmp"
