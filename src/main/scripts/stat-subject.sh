@@ -187,7 +187,7 @@ num_files=$(get_csv_field "$endsnapshot_files" 2)
 end_snapshot_file="results/${o_project:?}/${end_snapshot:?}/joint_function_ab_smell_snapshot.csv"
 log_info "Getting number functions and so on of last snapshot from ${end_snapshot_file:?}"
 
-funcs_fkloc_floacratio=$(csvsql -q '"' -d ',' --tables subject --query 'select count(*) functions, sum(FUNCTION_LOC) / 1000.0 as kloc, sum(LOAC) * 100 / sum(FUNCTION_LOC) as loacratio from subject' "$end_snapshot_file")
+funcs_fkloc_floacratio=$(csvsql -q '"' -d ',' --tables subject --query 'select count(*) functions, sum(FUNCTION_LOC) / 1000.0 as kloc, sum(LOAC) * 100.0 / sum(FUNCTION_LOC) as loacratio from subject' "$end_snapshot_file")
 if [ $? -ne 0 ]
 then
     edie "Failed to get statistics of last snapshot from ${end_snapshot_file:?}"
