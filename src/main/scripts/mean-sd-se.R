@@ -22,7 +22,7 @@ options <- list(
                 help="Omit the CSV header.")
 )
 
-args <- parse_args(OptionParser(description = "Compute the mean and standard error of the values in a named column of a CSV file. If no file is given, input is read from stdin.",
+args <- parse_args(OptionParser(description = "Report number of samples, mean, standard deviation, and standard error of the values in a named column of a CSV file. If no file is given, input is read from stdin.",
                                 usage = "%prog [options] [file]",
                                 option_list=options),
                    positional_arguments = c(0,1))
@@ -59,16 +59,23 @@ stdErr <- function(x) sd(x)/sqrt(length(x))
 values <- data[[opts$column]]
 
 avgVal <- mean(values)
-se <- stdErr(values)
+sdVal <- sd(values)
+seVal <- stdErr(values)
+
 rAvgVal <- customRound(avgVal)
-rSe <- customRound(se)
+rSdVal <- customRound(sdVal)
+rSeVal <- customRound(seVal)
 
 ##eprintf("DEBUG %s\n", paste(values, collapse=", "))
 
 ### Print the header
 if (!opts$noHeader) {
-    printf("mean(%s)%sse(%s)\n", opts$column, opts$delimiter, opts$column)
+    printf("N,M(%s),SD(%s),SE(%s)\n" , opts$column, opts$column, opts$column)
 }
 
 ### Print the actual values
-printf("%.*f,%.*f\n", opts$digits, rAvgVal, opts$digits, rSe)
+printf("%d,%.*f,%.*f,%.*f\n",
+       length(values)
+      ,opts$digits, rAvgVal
+     , opts$digits, rSdVal
+     , opts$digits, rSeVal)
