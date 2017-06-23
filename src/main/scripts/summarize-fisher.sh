@@ -82,10 +82,11 @@ group_cohned_averages()
     ##file="${1:?}"
     ##indep="${2:?}"
     ##dep="${3:?}"
+
     csvsql -d ',' -q '"' --query "select COHEND
 from fisher
 where i='${2:indep}' and d='${3:?dep}'" \
-	   --tables fisher "${1:?file}"|averages.R -c CohenD --digits 2 --min=absmin --func=median --max=absmax -H
+	   --tables fisher "${1:?file}"|mean-sd-se.R -c CohenD --digits 5 -H
 }
 
 summarize_as_csv()
@@ -93,11 +94,21 @@ summarize_as_csv()
     indeps=$(csvsql -d ',' -q '"' --query "select distinct i from fisher" --tables fisher "$1"|tail -n +2)
     deps=$(csvsql -d ',' -q '"' --query "select distinct d from fisher" --tables fisher "$1"|tail -n +2)
     cohend_averages_tmp=$(mktemp -- fisher_cohend_averages.XXXXXXXX) || exit $?
-    echo "I,D,DMIN,DAVG,DMAX" > "$cohend_averages_tmp"
-    log_info "Gathering minimum/average/maximum effect sizes ..."
+
+    ## The header produced by mean-sd-se.R looks like this:
+    ##
+    ## N,M(CohenD),SD(CohenD),SE(CohenD)
+    ##
+    ## This is not very handy in SQL, so we rename it a bit. We also
+    ## add the independent and dependent variable names in front,
+    ## making it look like this:
+    ##
+    ## I,D,N,M_D,SD_D,SE_D
+    echo "I,D,N,M_D,SD_D,SE_D" > "$cohend_averages_tmp"
+    log_info "Gathering average effect sizes ..."
     for i in $indeps
     do
-	log_info "Gathering min/avg/max effect sizes for $i ..."
+	log_info "Gathering average effect sizes for $i ..."
 	for d in $deps
 	do
 	    printf '%s,%s,' "$i" "$d" >> "$cohend_averages_tmp"
@@ -105,22 +116,21 @@ summarize_as_csv()
 	done
     done
 
-    log_info "Combining min/max effect sizes with the rest of the information."
-    csvsql -d ',' -q '"' --query "select
+    log_info "Combining average effect sizes with the rest of the information."
+    csvsql -d ',' -q '"' --query "SELECT
 agg.I
 ,agg.D
 ,agg.N001
 ,agg.N005
 ,agg.NINS
-,cohens.dmin
-,cohens.davg
-,cohens.dmax
+,cohens.m_d MEAN_D
+,cohens.sd_d SD_D
 ,case
-	when abs(cohens.dmin) < 0.2 then 'negligible'
-	when abs(cohens.dmin) < 0.5 then 'small'
-	when abs(cohens.dmin) < 0.8 then 'medium'
+	when abs(cohens.dlow) < 0.2 then 'negligible'
+	when abs(cohens.dlow) < 0.5 then 'small'
+	when abs(cohens.dlow) < 0.8 then 'medium'
 	else 'large'
-end MIN_MAGNITUDE
+end LOW_MAGNITUDE
 ,case
 	when abs(cohens.davg) < 0.2 then 'negligible'
 	when abs(cohens.davg) < 0.5 then 'small'
@@ -128,14 +138,13 @@ end MIN_MAGNITUDE
 	else 'large'
 end AVG_MAGNITUDE
 ,case
-	when abs(cohens.dmax) < 0.2 then 'negligible'
-	when abs(cohens.dmax) < 0.5 then 'small'
-	when abs(cohens.dmax) < 0.8 then 'medium'
+	when abs(cohens.dhigh) < 0.2 then 'negligible'
+	when abs(cohens.dhigh) < 0.5 then 'small'
+	when abs(cohens.dhigh) < 0.8 then 'medium'
 	else 'large'
-end MAX_MAGNITUDE
-from (select 
+end HIGH_MAGNITUDE
+FROM (select 
      	     p.D,p.I
-	     ,avg(p.CohenD) MEAN_COHEND
 	     ,sum(p.P001) N001
 	     ,sum(p.P005) N005
 	     ,sum(p.PINS) NINS
@@ -147,6 +156,13 @@ from (select
 		when I = 'LOC' then 1
 		else 0
 	     end LOCP
+	     ,case
+		when I = 'FL'  then 1
+		when I = 'FC'  then 2
+		when I = 'ND'  then 3
+		when I = 'NEG' then 4
+		else 5 /* should never happen */
+	     end I_SORT_KEY
      from
 	(SELECT *
 		,case when abs(FisherP) < 0.01 then 1 else 0 end P001
@@ -154,15 +170,26 @@ from (select
 		,case when abs(FisherP) >= 0.05 then 1 else 0 end PINS
 	FROM fisher) p
      group by D,I) as agg
-JOIN cohens ON cohens.i=agg.i and cohens.d=agg.d
-order by agg.ratiop,agg.locp,agg.I,agg.D" \
-	   --tables fisher,cohens "$1" "$cohend_averages_tmp"
+JOIN (select *,(m_d - sd_d) as dlow, m_d as davg, (m_d + sd_d) as dhigh
+      from cohens0) cohens
+     ON cohens.i=agg.i and cohens.d=agg.d
+ORDER by agg.ratiop,agg.locp,agg.D,agg.I_SORT_KEY" \
+	   --tables fisher,cohens0 "$1" "$cohend_averages_tmp"
     rm -f -- "$cohend_averages_tmp"
 }
 
 line_to_tex()
 {
-    printf "$line"|sed -e 's|,| |g' -e 's,ratio,\\\\textsubscript{/LOC},g' -e 's,LCH,LCHG,g' -e 's,LINES_CHANGED,LCHG,g'|xargs printf '\\metric{%s} & \\metric{%s} & $%d$ & $%d$ & $%d$ & $%.2f$ & $%.2f$ & $%.2f$ & \\e%s{} & \\e%s{} & \\e%s{}\\\\\n'
+    printf "$line"|sed -e 's|,| |g' \
+		       -e 's,COMMITS,cf^+,g' \
+		       -e 's,LCH,cp^+,g' \
+		       -e 's,ratio,_{/LOC},g' \
+		       -e 's,FL,fl_{>0},g' \
+		       -e 's,FC,fc_{>1},g' \
+		       -e 's,ND,nd_{>0},g' \
+		       -e 's,NEG,neg_{>0},g' \
+		       -e 's,LOC,log^+,g' \
+	|xargs printf '$%s$ & $%s$ & $%d$ & $%d$ & $%d$ & $%.2f$ & $%.2f$ & \\e%s{} & \\e%s{} & \\e%s{}\\\\\n'
 }
 
 csv_table_to_tex()
