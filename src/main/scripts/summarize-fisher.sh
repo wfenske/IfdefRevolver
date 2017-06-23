@@ -181,14 +181,14 @@ ORDER by agg.ratiop,agg.locp,agg.D,agg.I_SORT_KEY" \
 line_to_tex()
 {
     printf "$line"|sed -e 's|,| |g' \
-		       -e 's,COMMITS,cf^+,g' \
-		       -e 's,LCH,cp^+,g' \
-		       -e 's,ratio,_{/LOC},g' \
 		       -e 's,FL,fl_{>0},g' \
 		       -e 's,FC,fc_{>1},g' \
 		       -e 's,ND,nd_{>0},g' \
 		       -e 's,NEG,neg_{>0},g' \
-		       -e 's,LOC,log^+,g' \
+		       -e 's,LOC,loc^+,g' \
+		       -e 's,COMMITS,cf^+,g' \
+		       -e 's,LCH,cp^+,g' \
+		       -e 's,ratio,_{/loc},g' \
 	|xargs printf '$%s$ & $%s$ & $%d$ & $%d$ & $%d$ & $%.2f$ & $%.2f$ & \\e%s{} & \\e%s{} & \\e%s{}\\\\\n'
 }
 
