@@ -16,6 +16,7 @@ COMPARE_LOCS_PROG = $(SKUNK_HOME)/compare-locs.R
 RATIOSCMP_PROG = $(SKUNK_HOME)/ratioscmp.R
 FISHER_PROG = $(SKUNK_HOME)/fisher.R
 SPEARMAN_PROG = $(SKUNK_HOME)/spearman.R
+REGRESSION_PROG = $(SKUNK_HOME)/lm.R
 
 COMPARE_LOC_OPTS ?= -d 3 --ymax 400
 
@@ -30,9 +31,12 @@ RATIOS_PLOTS = \
 
 LOC_PLOTS = $(addprefix loc-plots/$(PROJECT)/LOC-,$(addsuffix .pdf,$(INDEPS)))
 
+REGRESSION_CSV = results/$(PROJECT)/regression.csv
+REGRESSION_LOG = results/$(PROJECT)/regression.log
+
 WINDOW_EXCLUSION_MARKER = results/$(PROJECT)/.last_window_exclusion
 
-all: fisher ratiosplots locplots spearman
+all: fisher ratiosplots locplots spearman regressionmodels
 
 fisher: $(FISHER_CSV)
 
@@ -41,6 +45,8 @@ spearman: $(SPEARMAN_CSV)
 ratiosplots: $(RATIOS_PLOTS)
 
 locplots: $(LOC_PLOTS)
+
+regressionmodels: $(REGRESSION_CSV)
 
 $(FISHER_CSV): $(ALL_R_DATA) $(FISHER_PROG)
 	if ! $(FISHER_PROG) -p $(PROJECT) > $(FISHER_CSV); \
@@ -53,6 +59,13 @@ $(SPEARMAN_CSV): $(ALL_R_DATA) $(SPEARMAN_PROG)
 	if !  $(SPEARMAN_PROG) -p $(PROJECT) > $(SPEARMAN_CSV); \
 	then \
 		rm -f $(SPEARMAN_CSV); \
+		false; \
+	fi
+
+$(REGRESSION_CSV): $(ALL_R_DATA) $(REGRESSION_PROG)
+	if ! $(REGRESSION_PROG) -p $(PROJECT) > $(REGRESSION_CSV) 2> $(REGRESSION_LOG); \
+	then \
+		rm -f $(REGRESSION_CSV) $(REGRESSION_LOG); \
 		false; \
 	fi
 
