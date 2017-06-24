@@ -31,8 +31,11 @@ RATIOS_PLOTS = \
 
 LOC_PLOTS = $(addprefix loc-plots/$(PROJECT)/LOC-,$(addsuffix .pdf,$(INDEPS)))
 
-REGRESSION_CSV = results/$(PROJECT)/regression.csv
-REGRESSION_LOG = results/$(PROJECT)/regression.log
+REGRESSION_FULL_CSV = results/$(PROJECT)/regression-full.csv
+REGRESSION_FULL_LOG = results/$(PROJECT)/regression-full.log
+
+REGRESSION_ANNOTATED_CSV = results/$(PROJECT)/regression-annotated.csv
+REGRESSION_ANNOTATED_LOG = results/$(PROJECT)/regression-annotated.log
 
 WINDOW_EXCLUSION_MARKER = results/$(PROJECT)/.last_window_exclusion
 
@@ -46,7 +49,7 @@ ratiosplots: $(RATIOS_PLOTS)
 
 locplots: $(LOC_PLOTS)
 
-regressionmodels: $(REGRESSION_CSV)
+regressionmodels: $(REGRESSION_FULL_CSV) $(REGRESSION_ANNOTATED_CSV)
 
 $(FISHER_CSV): $(ALL_R_DATA) $(FISHER_PROG)
 	if ! $(FISHER_PROG) -p $(PROJECT) > $(FISHER_CSV); \
@@ -62,10 +65,17 @@ $(SPEARMAN_CSV): $(ALL_R_DATA) $(SPEARMAN_PROG)
 		false; \
 	fi
 
-$(REGRESSION_CSV): $(ALL_R_DATA) $(REGRESSION_PROG)
-	if ! $(REGRESSION_PROG) -p $(PROJECT) > $(REGRESSION_CSV) 2> $(REGRESSION_LOG); \
+$(REGRESSION_FULL_CSV): $(ALL_R_DATA) $(REGRESSION_PROG)
+	if ! $(REGRESSION_PROG) -p $(PROJECT) > $(REGRESSION_FULL_CSV) 2> $(REGRESSION_FULL_LOG); \
 	then \
-		rm -f $(REGRESSION_CSV) $(REGRESSION_LOG); \
+		rm -f $(REGRESSION_FULL_CSV) $(REGRESSION_FULL_LOG); \
+		false; \
+	fi
+
+$(REGRESSION_ANNOTATED_CSV): $(ALL_R_DATA) $(REGRESSION_PROG)
+	if ! $(REGRESSION_PROG) -p $(PROJECT) --annotated > $(REGRESSION_ANNOTATED_CSV) 2> $(REGRESSION_ANNOTATED_LOG); \
+	then \
+		rm -f $(REGRESSION_ANNOTATED_CSV) $(REGRESSION_ANNOTATED_LOG); \
 		false; \
 	fi
 

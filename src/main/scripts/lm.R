@@ -13,10 +13,14 @@ options <- list(
               , help="Name of the project whose data to load.  We expect the input R data to reside in `results/<projec-name>/allData.rdata' below the current working directory."
               , default = NULL
                 )
+  , make_option(c("-a", "--annotated"),
+                default=FALSE,
+                action="store_true",
+                help="Create the models only for functions containing feature code. The default is to consider all functions, i.e., including function without any feature code.")
 )
 
 args <- parse_args(OptionParser(
-    description = "Build a linear regression model to determine which independent variables have a significant effect on functions being (or not) change-prone. If no input R data set is given, the project must be specified via the `--project' (`-p') option."
+    description = "Build a negative binomial regression model to determine which independent variables have a significant effect on functions being (or not) change-prone. If no input R data set is given, the project must be specified via the `--project' (`-p') option."
   , usage = "%prog [options] [file]"
   , option_list=options)
   , positional_arguments = c(0, 1))
@@ -566,8 +570,11 @@ changedPercent <- nrow(changedData0) * 100 / allNRow
 ##sampleChangedSize <- 10000
 ##negBinData <- sampleDf(changedData, sampleChangedSize)
 negBinData <- allData
+if (opts$annotated) {
+    eprintf("DEBUG: Creating models for just the annotated functions.\n")
+    negBinData <- subset(negBinData, FL > 0)
+}
 ##negBinData <- changedData
-##negBinData <- subset(allData, FL > 0)
 
 ##ziSampleSize <- 10000
 ##ziData <- sampleDf(allData, ziSampleSize)
