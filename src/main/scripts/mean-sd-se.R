@@ -8,10 +8,13 @@ eprintf <- function(...) cat(sprintf(...), sep='', file=stderr())
 options <- list(
     make_option(c("-d", "--delimiter"),
                 default=",",
-                help="Column delimiter, e.g. `,' or `;'. [default: %default]")
+                help="Column delimiter of the input data, e.g. `,' or `;'. [default: %default]. (The output will always use `,' as the delimiter.)")
   , make_option(c("-c", "--column"),
                 default=NULL,
                 help="Name of the column to consider.")
+  , make_option(c("-i", "--identifier"),
+                default=NULL,
+                help="Optional identifier of the summarized data. If present, it will be appended as the last column.")
   , make_option("--digits",
                 default=2,
                 help="Number of decimal digits to round to. [default: %default]")
@@ -70,12 +73,23 @@ rSeVal <- customRound(seVal)
 
 ### Print the header
 if (!opts$noHeader) {
-    printf("N,M(%s),SD(%s),SE(%s)\n" , opts$column, opts$column, opts$column)
+    identHead <- ""
+    if (!is.null(opts$identifier)) {
+        identHead <- ",Identifier"
+    }
+    printf("N,M(%s),SD(%s),SE(%s)%s\n" , opts$column, opts$column, opts$column,
+           identHead)
 }
 
 ### Print the actual values
-printf("%d,%.*f,%.*f,%.*f\n",
+identVal <- ""
+if (!is.null(opts$identifier)) {
+    identVal <- paste(',', opts$identifier, sep='')
+}
+
+printf("%d,%.*f,%.*f,%.*f%s\n",
        length(values)
       ,opts$digits, rAvgVal
      , opts$digits, rSdVal
-     , opts$digits, rSeVal)
+     , opts$digits, rSeVal
+     , identVal)
