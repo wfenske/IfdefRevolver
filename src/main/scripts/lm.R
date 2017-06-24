@@ -307,6 +307,10 @@ tryNbModel <- function(indeps, dep, data, csvOut=FALSE, csvHeader=FALSE) {
 
     if (is.null(warnMsg)) {
         warnMsg <- ""
+    } else {
+        warnMsg <- gsub("[\r\n]", " ", warnMsg)
+        warnMsg <- gsub("  *", " ", warnMsg)
+        warnMsg <- gsub(" $", "", warnMsg)
     }
     
     reportModel(model, modelName, mcfadden, csvOut=csvOut,csvHeader=csvHeader, warnings=warnMsg)
