@@ -88,7 +88,32 @@ mcfaddensPseudoRSquared <- function(model, nullmodel) {
     return (1-logLik(model)/logLik(nullmodel))
 }
 
-reportModel <- function(model, modelName, mcfadden, csvOut=TRUE, csvHeader=TRUE) {
+calculateChiSqStat <- function(modelSummary) {
+    chisqp <- TRUE
+    if (is.null(modelSummary$deviance)) {
+        eprintf("WARN: Cannot determine model fitness: modelSummary$deviance is missing.\n")
+        chisqp <- FALSE
+    }
+    if (is.null(modelSummary$df.residual)) {
+        eprintf("WARN: Cannot determine model fitness: modelSummary$df.residual is missing.\n")
+        chisqp <- FALSE
+    }
+    if (chisqp) {
+        chiSqStat <- 1 - pchisq(modelSummary$deviance, modelSummary$df.residual)
+        chiSqStatThreshold <- 0.05
+        if (chiSqStat > chiSqStatThreshold) {
+            judgement <- "fits the data"
+        } else {
+            judgement <- "does *not* fit the data"
+        }
+        eprintf("INFO: Model %s: Chi-square-test statistic: %.3f (should be > %.3f).\n", judgement, chiSqStat, chiSqStatThreshold)
+        return (chiSqStat)
+    } else {
+        return (NA)
+    }
+}
+
+reportModel <- function(model, modelName, mcfadden, csvOut=TRUE, csvHeader=TRUE, warnings="") {
     modelSummary <- summary(model)
     ##print(summary(model))
     ##print(exp(cbind(OR = coef(model), suppressMessages(confint(model)))))
@@ -121,10 +146,12 @@ reportModel <- function(model, modelName, mcfadden, csvOut=TRUE, csvHeader=TRUE)
             printf("% 13s", significanceCode(p))
         }
         printf("\n")
+        dummy <- calculateChiSqStat(modelSummary)
     } else {
         if (csvHeader) {
-            printf("SYSTEM,D,FORMULA,AIC,MCFADDEN,I,COEF,PCODE,P\n")
+            printf("SYSTEM,D,FORMULA,AIC,MCFADDEN,CHISQ,I,COEF,PCODE,P,WARNINGS\n")
         }
+        chisq <- calculateChiSqStat(modelSummary)
         msCoefs <- modelSummary$coefficients
         ## Name of dependent variable
         terms <- modelSummary$terms
@@ -136,33 +163,15 @@ reportModel <- function(model, modelName, mcfadden, csvOut=TRUE, csvHeader=TRUE)
             cName <- iLabels[i]
             c <-  msCoefs[i, "Estimate"]
             p <- msCoefs[i, "Pr(>|z|)"]
-            printf("%s,%7s,% 27s,%7.0f,%.4f,%11s,%- 6.4f,%3s,%.4f\n",
+            printf("%s,%7s,% 27s,%7.0f,%.4f,%.2f,%11s,%- 6.4f,%3s,%.4f,%s\n",
                    sysname
                  , dName, iFormula
-                 , model$aic, mcfadden
-                 , cName, c, significanceCode(p), p)
+                 , model$aic, mcfadden, chisq
+                 , cName, c, significanceCode(p), p, warnings)
         }
     }
 
-    chisqp <- TRUE
-    if (is.null(modelSummary$deviance)) {
-        eprintf("WARN: Cannot determine model fitness: modelSummary$deviance is missing.\n")
-        chisqp <- FALSE
-    }
-    if (is.null(modelSummary$df.residual)) {
-        eprintf("WARN: Cannot determine model fitness: modelSummary$df.residual is missing.\n")
-        chisqp <- FALSE
-    }
-    if (chisqp) {
-        chiSqStat <- 1 - pchisq(modelSummary$deviance, modelSummary$df.residual)
-        chiSqStatThreshold <- 0.05
-        if (chiSqStat > chiSqStatThreshold) {
-            judgement <- "fits the data"
-        } else {
-            judgement <- "does *not* fit the data"
-        }
-        eprintf("Model %s.\nChi-square-test statistic: %.3f (should be > %.3f).\n", judgement, chiSqStat, chiSqStatThreshold)
-    }
+    
 }
 
 ##tryGlmModel <- function (family, dataFrame, formula, modelName) {
@@ -248,8 +257,18 @@ tryNbModel <- function(indeps, dep, data, csvOut=FALSE, csvHeader=FALSE) {
     eprintf("\nDEBUG: ***************************\n")
     eprintf("DEBUG: *** %s ***\n", modelName)
 
-    model <- glm.nb(formula, data = data)
-    nullModel <- glm.nb(as.formula(paste(dep, "1", sep="~")),data=data)
+    warnMsg <- ""
+    wHandler <- function(w) {
+        eprintf("WARN: %s\n", w)
+        warnMsg <<- w
+        invokeRestart("muffleWarning")
+    }
+
+    model <- withCallingHandlers(glm.nb(formula, data = data), warning=wHandler)
+    nullModel <- glm.nb(as.formula(paste(dep, "1", sep="~"))
+                      , data=data
+                      ##, control=glm.control(maxit=100)
+                        )
 
     mcfadden <- mcfaddensPseudoRSquared(model, nullModel)
     
@@ -281,7 +300,7 @@ tryNbModel <- function(indeps, dep, data, csvOut=FALSE, csvHeader=FALSE) {
 ##    } else {
 ##        ##print(summary(model))
 ##    }
-    reportModel(model, modelName, mcfadden, csvOut=csvOut,csvHeader=csvHeader)
+    reportModel(model, modelName, mcfadden, csvOut=csvOut,csvHeader=csvHeader, warnings=warnMsg)
     
     ##cat("\n")
     ##cat(paste("*** ANOVA of model '", modelName, "' ***\n", sep=""))
@@ -580,17 +599,25 @@ ziIndeps <- c("FL"
 ##model.nb.HUNKS    <- tryNbModel(indeps=nbIndeps,       dep="HUNKS",   data=negBinData)
 ##model.nb.LCH    <- tryNbModel(indeps=nbIndeps,       dep="LCH",   data=negBinData)
 
+haveHeader <- FALSE
+header <- function() {
+    if (haveHeader) {
+        return (FALSE)
+    } else {
+        haveHeader <<- TRUE
+        return (TRUE)
+    }
+}
+
 negbinCsvModel <- function(dep, indeps, header=FALSE) {
-    model <- tryNbModel(indeps=indeps, dep=dep, data=negBinData, csvOut=TRUE, csvHeader=header)
+    model <- tryNbModel(indeps=indeps, dep=dep, data=negBinData, csvOut=TRUE, csvHeader=header())
     return (model)
 }
 
 zeroinflNegbinCsvModel <- function(dep, indeps, header=FALSE) {
-    model <- tryZeroInflModel(indeps=indeps, dep=dep, data=ziData, csvOut=TRUE, csvHeader=header)
+    model <- tryZeroInflModel(indeps=indeps, dep=dep, data=ziData, csvOut=TRUE, csvHeader=header())
     return (model)
 }
-
-header <- TRUE
 
 ##csvModel <- zeroinflNegbinCsvModel
 csvModel <- negbinCsvModel
@@ -616,17 +643,9 @@ for (dep in c("COMMITS"
 ##    dummy <- csvModel(dep, c("FL", "FC", "ND", "NEG", "LOC"))
 ##    
 ##    ##dummy <- csvModel(dep, c("FL", "FC", "ND", "LOAC", "LOC"))
-##    ##dummy <- csvModel(dep, c("FL", "FC", "ND", "LOFC", "LOC"))
-    dummy <- csvModel(dep, c("FL", "FC", "ND", "NEG", "LOACratio", "LOC"), header=header)
-    dummy <- csvModel(dep, c("FC", "ND", "NEG", "LOACratio", "LOC"))
-    dummy <- csvModel(dep, c("FL", "ND", "NEG", "LOACratio", "LOC"))
-    dummy <- csvModel(dep, c("FC", "NEG", "LOACratio", "LOC"))
-    dummy <- csvModel(dep, c("FL", "NEG", "LOACratio", "LOC"))
-    ##dummy <- csvModel(dep, c("FL", "FC", "ND", "LOFCratio", "LOC"))
-
-    ##tryNbModel(indeps=c("FL", "FC", "ND", "NEG", "LOACratio", "LOC"),
-    ##           dep=dep, data=negBinData)
-    header <<- FALSE
+    ##    ##dummy <- csvModel(dep, c("FL", "FC", "ND", "LOFC", "LOC"))
+    dummy <- csvModel(dep, c("LOC"))
+    dummy <- csvModel(dep, c("FL", "FC", "ND", "NEG", "LOACratio", "LOC"))
 }
 
 ##model.zip.COMMITS <- tryZeroInflModel(indeps=ziIndeps, dep="COMMITS", data=ziData)
