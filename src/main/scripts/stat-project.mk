@@ -34,8 +34,14 @@ LOC_PLOTS = $(addprefix loc-plots/$(PROJECT)/LOC-,$(addsuffix .pdf,$(INDEPS)))
 REGRESSION_FULL_CSV = results/$(PROJECT)/regression-full.csv
 REGRESSION_FULL_LOG = results/$(PROJECT)/regression-full.log
 
+REGRESSION_CHANGED_CSV = results/$(PROJECT)/regression-changed.csv
+REGRESSION_CHANGED_LOG = results/$(PROJECT)/regression-changed.log
+
 REGRESSION_ANNOTATED_CSV = results/$(PROJECT)/regression-annotated.csv
 REGRESSION_ANNOTATED_LOG = results/$(PROJECT)/regression-annotated.log
+
+REGRESSION_ANNOTATED_CHANGED_CSV = results/$(PROJECT)/regression-annotated-changed.csv
+REGRESSION_ANNOTATED_CHANGED_LOG = results/$(PROJECT)/regression-annotated-changed.log
 
 WINDOW_EXCLUSION_MARKER = results/$(PROJECT)/.last_window_exclusion
 
@@ -49,7 +55,7 @@ ratiosplots: $(RATIOS_PLOTS)
 
 locplots: $(LOC_PLOTS)
 
-regressionmodels: $(REGRESSION_FULL_CSV) $(REGRESSION_ANNOTATED_CSV)
+regressionmodels: $(REGRESSION_FULL_CSV) $(REGRESSION_CHANGED_CSV) $(REGRESSION_ANNOTATED_CSV) $(REGRESSION_ANNOTATED_CHANGED_CSV)
 
 $(FISHER_CSV): $(ALL_R_DATA) $(FISHER_PROG)
 	if ! $(FISHER_PROG) -p $(PROJECT) > $(FISHER_CSV); \
@@ -72,10 +78,24 @@ $(REGRESSION_FULL_CSV): $(ALL_R_DATA) $(REGRESSION_PROG)
 		false; \
 	fi
 
+$(REGRESSION_CHANGED_CSV): $(ALL_R_DATA) $(REGRESSION_PROG)
+	if ! $(REGRESSION_PROG) -p $(PROJECT) --changed > $(REGRESSION_CHANGED_CSV) 2> $(REGRESSION_CHANGED_LOG); \
+	then \
+		rm -f $(REGRESSION_CHANGED_CSV) $(REGRESSION_CHANGED_LOG); \
+		false; \
+	fi
+
 $(REGRESSION_ANNOTATED_CSV): $(ALL_R_DATA) $(REGRESSION_PROG)
 	if ! $(REGRESSION_PROG) -p $(PROJECT) --annotated > $(REGRESSION_ANNOTATED_CSV) 2> $(REGRESSION_ANNOTATED_LOG); \
 	then \
 		rm -f $(REGRESSION_ANNOTATED_CSV) $(REGRESSION_ANNOTATED_LOG); \
+		false; \
+	fi
+
+$(REGRESSION_ANNOTATED_CHANGED_CSV): $(ALL_R_DATA) $(REGRESSION_PROG)
+	if ! $(REGRESSION_PROG) -p $(PROJECT) --annotated --changed > $(REGRESSION_ANNOTATED_CHANGED_CSV) 2> $(REGRESSION_ANNOTATED_CHANGED_LOG); \
+	then \
+		rm -f $(REGRESSION_ANNOTATED_CHANGED_CSV) $(REGRESSION_ANNOTATED_CHANGED_LOG); \
 		false; \
 	fi
 

@@ -16,7 +16,11 @@ options <- list(
   , make_option(c("-a", "--annotated"),
                 default=FALSE,
                 action="store_true",
-                help="Create the models only for functions containing feature code. The default is to consider all functions, i.e., including function without any feature code.")
+                help="Restrict data to only annotated functions. [default: %default]")
+  , make_option(c("-c", "--changed"),
+                default=FALSE,
+                action="store_true",
+                help="Restrict data to only changed functions functions. [default: %default]")
 )
 
 args <- parse_args(OptionParser(
@@ -117,7 +121,7 @@ calculateChiSqStat <- function(modelSummary) {
     }
 }
 
-reportModel <- function(model, modelName, mcfadden, csvOut=TRUE, csvHeader=TRUE, warnings="") {
+reportModel <- function(model, modelName, mcfadden, csvOut=TRUE, csvHeader=TRUE, warnings=0, warningMessages="") {
     modelSummary <- summary(model)
     ##print(summary(model))
     ##print(exp(cbind(OR = coef(model), suppressMessages(confint(model)))))
@@ -153,7 +157,7 @@ reportModel <- function(model, modelName, mcfadden, csvOut=TRUE, csvHeader=TRUE,
         dummy <- calculateChiSqStat(modelSummary)
     } else {
         if (csvHeader) {
-            printf("SYSTEM,D,FORMULA,AIC,MCFADDEN,CHISQ,I,COEF,PCODE,P,WARNINGS\n")
+            printf("SYSTEM,D,FORMULA,AIC,MCFADDEN,CHISQ,I,COEF,PCODE,P,WARNINGS,WARNING_MESSAGES\n")
         }
         chisq <- calculateChiSqStat(modelSummary)
         msCoefs <- modelSummary$coefficients
@@ -167,11 +171,12 @@ reportModel <- function(model, modelName, mcfadden, csvOut=TRUE, csvHeader=TRUE,
             cName <- iLabels[i]
             c <-  msCoefs[i, "Estimate"]
             p <- msCoefs[i, "Pr(>|z|)"]
-            printf("%s,%7s,% 27s,%7.0f,%.4f,%.2f,%11s,%- 6.4f,%3s,%.4f,%s\n",
+            printf("%s,%7s,% 27s,%7.0f,%.4f,%.2f,%11s,%- 6.4f,%3s,%.4f,%d,\"%s\"\n",
                    sysname
                  , dName, iFormula
                  , model$aic, mcfadden, chisq
-                 , cName, c, significanceCode(p), p, warnings)
+                 , cName, c, significanceCode(p), p
+                 , warnings, warningMessages)
         }
     }
 
@@ -261,9 +266,11 @@ tryNbModel <- function(indeps, dep, data, csvOut=FALSE, csvHeader=FALSE) {
     eprintf("\nDEBUG: ***************************\n")
     eprintf("DEBUG: *** %s ***\n", modelName)
 
+    numWarnings <- 0
     warnMsg <- NULL
     wHandler <- function(w) {
         eprintf("WARN: %s\n", w)
+        numWarnings <<- numWarnings + 1
         if (is.null(warnMsg)) {
             warnMsg <<- w
         } else {
@@ -312,12 +319,12 @@ tryNbModel <- function(indeps, dep, data, csvOut=FALSE, csvHeader=FALSE) {
     if (is.null(warnMsg)) {
         warnMsg <- ""
     } else {
-        warnMsg <- gsub("[\r\n]", " ", warnMsg)
+        warnMsg <- gsub("[\r\n\t]", " ", warnMsg)
         warnMsg <- gsub("  *", " ", warnMsg)
         warnMsg <- gsub(" $", "", warnMsg)
     }
     
-    reportModel(model, modelName, mcfadden, csvOut=csvOut,csvHeader=csvHeader, warnings=warnMsg)
+    reportModel(model, modelName, mcfadden, csvOut=csvOut,csvHeader=csvHeader, warnings=numWarnings, warningMessages=warnMsg)
     
     ##cat("\n")
     ##cat(paste("*** ANOVA of model '", modelName, "' ***\n", sep=""))
@@ -573,6 +580,10 @@ negBinData <- allData
 if (opts$annotated) {
     eprintf("DEBUG: Creating models for just the annotated functions.\n")
     negBinData <- subset(negBinData, FL > 0)
+}
+if (opts$changed) {
+    eprintf("DEBUG: Creating models for just the changed functions.\n")
+    negBinData <- subset(negBinData, COMMITS > 0)
 }
 ##negBinData <- changedData
 
