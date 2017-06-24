@@ -261,7 +261,7 @@ tryNbModel <- function(indeps, dep, data, csvOut=FALSE, csvHeader=FALSE) {
     wHandler <- function(w) {
         eprintf("WARN: %s\n", w)
         if (is.null(warnMsg)) {
-            warnMsg <- w
+            warnMsg <<- w
         } else {
             warnMsg <<- paste(warnMsg, w, sep=";")
         }
