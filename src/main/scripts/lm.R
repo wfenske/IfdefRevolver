@@ -257,10 +257,14 @@ tryNbModel <- function(indeps, dep, data, csvOut=FALSE, csvHeader=FALSE) {
     eprintf("\nDEBUG: ***************************\n")
     eprintf("DEBUG: *** %s ***\n", modelName)
 
-    warnMsg <- ""
+    warnMsg <- NULL
     wHandler <- function(w) {
         eprintf("WARN: %s\n", w)
-        warnMsg <<- w
+        if (is.null(warnMsg)) {
+            warnMsg <- w
+        } else {
+            warnMsg <<- paste(warnMsg, w, sep=";")
+        }
         invokeRestart("muffleWarning")
     }
 
@@ -299,7 +303,12 @@ tryNbModel <- function(indeps, dep, data, csvOut=FALSE, csvHeader=FALSE) {
 ##        ## NOTE: Smaller values of AIC are better.  (Cf. https://ncss-wpengine.netdna-ssl.com/wp-content/themes/ncss/pdf/Procedures/NCSS/Negative_Binomial_Regression.pdf)
 ##    } else {
 ##        ##print(summary(model))
-##    }
+    ##    }
+
+    if (is.null(warnMsg)) {
+        warnMsg <- ""
+    }
+    
     reportModel(model, modelName, mcfadden, csvOut=csvOut,csvHeader=csvHeader, warnings=warnMsg)
     
     ##cat("\n")
