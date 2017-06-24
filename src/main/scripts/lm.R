@@ -594,20 +594,20 @@ ziData <- allData
 ##model.poisson.orig <- tryGlmModel2("poisson", indeps=c("FL", "FC", "ND", "LOC"), dep="LINES_CHANGED", data=sampleChangedData)
 ##model.poisson.orig <- tryGlmModel2("poisson", indeps=c("LOC"), dep="LINES_CHANGED", data=sampleChangedData)
 ##model.poisson.log <- tryGlmModel2("poisson", indeps=c("logFL", "logFC", "logND", "logLOC"), dep="logLINES_CHANGED", data=sampleChangedData)
-nbIndeps <- c("FL"
-            , "FC"
-            , "ND"
-            , "LOAC"
-            , "LOFC"
-            , "LOC"
-              )
-ziIndeps <- c("FL"
-            , "FC"
-            , "ND"
-            , "LOFC"
-            , "LOC"
-              )
-
+##nbIndeps <- c("FL"
+##            , "FC"
+##            , "ND"
+##            , "LOAC"
+##            , "LOFC"
+##            , "LOC"
+##              )
+##ziIndeps <- c("FL"
+##            , "FC"
+##            , "ND"
+##            , "LOFC"
+##            , "LOC"
+##              )
+##
 ##model.nb.COMMITS  <- tryNbModel(indeps=nbIndeps,       dep="COMMITS", data=negBinData)
 ##model.nb.HUNKS    <- tryNbModel(indeps=nbIndeps,       dep="HUNKS",   data=negBinData)
 ##model.nb.LCH    <- tryNbModel(indeps=nbIndeps,       dep="LCH",   data=negBinData)
@@ -658,6 +658,7 @@ for (dep in c("COMMITS"
 ##    ##dummy <- csvModel(dep, c("FL", "FC", "ND", "LOAC", "LOC"))
     ##    ##dummy <- csvModel(dep, c("FL", "FC", "ND", "LOFC", "LOC"))
     dummy <- csvModel(dep, c("LOC"))
+    dummy <- csvModel(dep, c("FL", "FC", "ND", "NEG", "LOC"))
     dummy <- csvModel(dep, c("FL", "FC", "ND", "NEG", "LOACratio", "LOC"))
 }
 
