@@ -687,6 +687,7 @@ for (dep in c("COMMITS"
     dummy <- csvModel(dep, c("LOC"))
     ##dummy <- csvModel(dep, c("FL", "FC", "ND", "NEG", "LOC"))
     dummy <- csvModel(dep, c("FL", "FC", "ND", "NEG", "LOACratio", "LOC"))
+    dummy <- csvModel(dep, c("FLratio", "FCratio", "NDratio", "NEGratio", "LOC"))
     dummy <- csvModel(dep, c("FLratio", "FCratio", "NDratio", "NEGratio", "LOACratio", "LOC"))
 }
 
