@@ -171,7 +171,8 @@ reportModel <- function(model, modelName, mcfadden, csvOut=TRUE, csvHeader=TRUE,
             cName <- iLabels[i]
             c <-  msCoefs[i, "Estimate"]
             p <- msCoefs[i, "Pr(>|z|)"]
-            printf("%s,%7s,% 27s,%7.0f,%.4f,%.2f,%11s,%- 6.4f,%3s,%.4f,%d,\"%s\"\n",
+            ##printf("%s,%7s,% 27s,%7.0f,%.4f,%.2f,%11s,%- 6.4f,%3s,%.4f,%d,\"%s\"\n",
+            printf("%s,%s,%s,%.0f,%.4f,%.2f,%s,%6.4f,%s,%.4f,%d,\"%s\"\n",
                    sysname
                  , dName, iFormula
                  , model$aic, mcfadden, chisq
@@ -282,7 +283,7 @@ tryNbModel <- function(indeps, dep, data, csvOut=FALSE, csvHeader=FALSE) {
     model <- withCallingHandlers(glm.nb(formula, data = data), warning=wHandler)
     nullModel <- glm.nb(as.formula(paste(dep, "1", sep="~"))
                       , data=data
-                      ##, control=glm.control(maxit=100)
+                      , control=glm.control(maxit=100)
                         )
 
     mcfadden <- mcfaddensPseudoRSquared(model, nullModel)
@@ -655,7 +656,7 @@ csvModel <- negbinCsvModel
 
 for (dep in c("COMMITS"
               ##, "HUNKS"
-            , "LCH"
+              , "LCH"
               )) {
 ##    dummy <- csvModel(dep, c("LOC"), header=header)
 ##    header <<- FALSE
@@ -676,7 +677,7 @@ for (dep in c("COMMITS"
 ##    ##dummy <- csvModel(dep, c("FL", "FC", "ND", "LOAC", "LOC"))
     ##    ##dummy <- csvModel(dep, c("FL", "FC", "ND", "LOFC", "LOC"))
     dummy <- csvModel(dep, c("LOC"))
-    dummy <- csvModel(dep, c("FL", "FC", "ND", "NEG", "LOC"))
+    ##dummy <- csvModel(dep, c("FL", "FC", "ND", "NEG", "LOC"))
     dummy <- csvModel(dep, c("FL", "FC", "ND", "NEG", "LOACratio", "LOC"))
 }
 
