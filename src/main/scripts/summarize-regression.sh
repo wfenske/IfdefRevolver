@@ -102,7 +102,11 @@ select i from (
 		    when(i)='NEG' then 4
 		    when(i)='LOACratio' then 5
 		    when(i)='LOC' then 6
-		    else 7
+		    when(i)='FLratio' then 7
+		    when(i)='FCratio' then 8
+		    when(i)='NDratio' then 9
+		    when(i)='NEGratio' then 10
+		    else 11
 	        end as sortkey
        from
        (select distinct trim(i) as i from r
