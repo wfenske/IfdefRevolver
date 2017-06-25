@@ -684,9 +684,9 @@ for (dep in c("COMMITS"
 ##    
 ##    ##dummy <- csvModel(dep, c("FL", "FC", "ND", "LOAC", "LOC"))
     ##    ##dummy <- csvModel(dep, c("FL", "FC", "ND", "LOFC", "LOC"))
-    dummy <- csvModel(dep, c("LOC"))
+    dummy <- csvModel(dep, c("logLOC"))
     ##dummy <- csvModel(dep, c("FL", "FC", "ND", "NEG", "LOC"))
-    dummy <- csvModel(dep, c("FL", "FC", "ND", "NEG", "LOACratio", "LOC"))
+    dummy <- csvModel(dep, c("FL", "FC", "ND", "NEG", "LOACratio", "logLOC"))
     ##dummy <- csvModel(dep, c("FLratio", "FCratio", "NDratio", "NEGratio", "LOC"))
     ##dummy <- csvModel(dep, c("FLratio", "FCratio", "NDratio", "NEGratio", "LOACratio", "LOC"))
 }

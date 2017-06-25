@@ -78,8 +78,8 @@ help()
 
 summarize_as_csv()
 {
-    formulae=$(csvsql -d ',' -q '"' --query "select distinct trim(formula) from r" --tables r "$1"|tail -n +2)
-    deps=$(csvsql -d ',' -q '"' --query "select distinct trim(d) from r" --tables r "$1"|tail -n +2)
+    formulae=$(csvsql -d ',' -q '"' --query "select distinct formula from r" --tables r "$1"|tail -n +2)
+    deps=$(csvsql -d ',' -q '"' --query "select distinct d from r" --tables r "$1"|tail -n +2)
     ##averages_tmp=$(mktemp -- regression_averages.XXXXXXXX) || exit $?
 
     log_info "Gathering average coefficients sizes ..."
@@ -95,22 +95,23 @@ summarize_as_csv()
 select i from (
        select i
        	      , case
-		    when(i)='(Intercept)' then 0
-		    when(i)='FL' then 1
-		    when(i)='FC' then 2
-		    when(i)='ND' then 3
-		    when(i)='NEG' then 4
-		    when(i)='LOACratio' then 5
-		    when(i)='LOC' then 6
-		    when(i)='FLratio' then 7
-		    when(i)='FCratio' then 8
-		    when(i)='NDratio' then 9
-		    when(i)='NEGratio' then 10
-		    else 11
+		    when(i)='(Intercept)' then  0
+		    when(i)='FL'          then  1
+		    when(i)='FC'          then  2
+		    when(i)='ND'          then  3
+		    when(i)='NEG'         then  4
+		    when(i)='LOACratio'   then  5
+		    when(i)='LOC'         then  6
+		    when(i)='logLOC'      then  7
+		    when(i)='FLratio'     then  8
+		    when(i)='FCratio'     then  9
+		    when(i)='NDratio'     then 10
+		    when(i)='NEGratio'    then 11
+		    else                       12
 	        end as sortkey
        from
-       (select distinct trim(i) as i from r
-        where trim(formula) = '${formula:?}' and trim(d) = '$dep'))
+       (select distinct i from r
+        where formula = '${formula:?}' and d = '$dep'))
 order by sortkey
 " --tables r "$1"|tail -n +2)
 	    debug_indeps=$(printf '%s\n' "$indeps"|tr '\n' ',')
@@ -119,7 +120,7 @@ order by sortkey
 	    do
 		csvsql -d ',' -q '"' --query "select COEF
 from r
-where trim(i)='${indep:?}' and trim(d)='${dep:?}' and trim(formula)='${formula:?}' and p<0.01" \
+where i='${indep:?}' and d='${dep:?}' and formula='${formula:?}' and p<0.01 and warnings = 0" \
 		       --tables r "${1:?file}"|mean-sd-se.R -c COEF --digits 3 $header -i "${indep},${dep},${formula}"|sed -e 's/(COEF)/_COEF/g' -e 's/Identifier/I,D,FORMULA/'
 		header=-H
 	    ##printf '%s,%s,' "$i" "$d" >> "$averages_tmp"
