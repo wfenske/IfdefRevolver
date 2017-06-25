@@ -260,7 +260,10 @@ reportModel <- function(model, modelName, mcfadden, csvOut=TRUE, csvHeader=TRUE,
 
 tryNbModel <- function(indeps, dep, data, csvOut=FALSE, csvHeader=FALSE) {
     indepsFormula <- paste(indeps, collapse=" + ")
-    formulaString <- paste(dep, indepsFormula, sep=" ~ ")
+    ## This formula also considers 2-way interactions
+    ##formulaString <- sprintf("%s ~ (%s)^2 - 1 ", dep, indepsFormula)
+    ## This model considers no interactions
+    formulaString <- sprintf("%s ~ %s", dep, indepsFormula)
     formula <- as.formula(formulaString)
     modelName <- paste("negbin:", formulaString)
 
@@ -526,6 +529,11 @@ sampleDf <- function(df, sz) {
 
 ##annotationData <- subset(allData, FL > 0)
 
+allData$FLratio  <- allData$FL  / allData$LOC
+allData$FCratio  <- allData$FC  / allData$LOC
+allData$NDratio  <- allData$ND  / allData$LOC
+allData$NEGratio <- allData$NEG / allData$LOC
+
 allData$sqrtLOC <- sqrt(allData$LOC)
 allData$sqrtFL <- sqrt(allData$FL)
 allData$sqrtFC <- sqrt(allData$FC)
@@ -679,6 +687,7 @@ for (dep in c("COMMITS"
     dummy <- csvModel(dep, c("LOC"))
     ##dummy <- csvModel(dep, c("FL", "FC", "ND", "NEG", "LOC"))
     dummy <- csvModel(dep, c("FL", "FC", "ND", "NEG", "LOACratio", "LOC"))
+    dummy <- csvModel(dep, c("FLratio", "FCratio", "NDratio", "NEGratio", "LOACratio", "LOC"))
 }
 
 ##model.zip.COMMITS <- tryZeroInflModel(indeps=ziIndeps, dep="COMMITS", data=ziData)
