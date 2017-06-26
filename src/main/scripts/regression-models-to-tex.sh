@@ -151,16 +151,21 @@ esac
 
 ##output_delimiter=$(printf '\t\\&\t')
 output_delimiter=$(printf ' \\& ')
+
+##               (case when ra.p < 0.001 then '\$\\ll 0.01$'
+##                    else printf(\"   \$%.3f\$\", ra.p) end) as '      EX_P',
+
+
 res=$(csvsql --tables rs,ra \
 	    --query "
-       select printf(\" % .3f\", ra.COEF) as EX_COEF,
-              printf(\"% 7.2f\", ra.Z) as '   EX_Z',
-              (case when ra.p < 0.001 then '\$\\ll 0.01$'
-                    else printf(\"   \$%.3f\$\", ra.p) end) as '      EX_P',
-              printf(\"% .3f\", M_COEF) as M_COEF,
-              printf(\"  %.3f\", SD_COEF) as SD_COEF,
-              printf(\"% 7.2f\", rs.M_Z) as '    M_Z',
-              printf(\"%5.2f\", rs.SD_Z) as ' SD_Z',
+       select printf(\" % .2f\", ra.COEF) as EX_COEF,
+              printf(\"% 7.1f\", ra.Z) as '   EX_Z',
+              (case when ra.p < 0.001 then '$<0.001$'
+                    else printf(\" \$%.3f\$\", ra.p) end) as '      EX_P',
+              printf(\"% .2f\", M_COEF) as M_COEF,
+              printf(\"  %.2f\", SD_COEF) as SD_COEF,
+              printf(\"% 6.1f\", rs.M_Z) as '    M_Z',
+              printf(\"%04.1f\", rs.SD_Z) as ' SD_Z',
               rs.N as N,
               rs.D as D,
               rs.I as I,
