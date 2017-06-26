@@ -157,7 +157,7 @@ reportModel <- function(model, modelName, mcfadden, csvOut=TRUE, csvHeader=TRUE,
         dummy <- calculateChiSqStat(modelSummary)
     } else {
         if (csvHeader) {
-            printf("SYSTEM,D,FORMULA,AIC,MCFADDEN,CHISQ,I,COEF,PCODE,P,WARNINGS,WARNING_MESSAGES\n")
+            printf("SYSTEM,D,FORMULA,AIC,MCFADDEN,CHISQ,I,COEF,Z,P,PCODE,WARNINGS,WARNING_MESSAGES\n")
         }
         chisq <- calculateChiSqStat(modelSummary)
         msCoefs <- modelSummary$coefficients
@@ -170,13 +170,14 @@ reportModel <- function(model, modelName, mcfadden, csvOut=TRUE, csvHeader=TRUE,
         for (i in 1:nrow(msCoefs)) {
             cName <- iLabels[i]
             c <-  msCoefs[i, "Estimate"]
+            z <- msCoefs[i, "z value"]
             p <- msCoefs[i, "Pr(>|z|)"]
             ##printf("%s,%7s,% 27s,%7.0f,%.4f,%.2f,%11s,%- 6.4f,%3s,%.4f,%d,\"%s\"\n",
-            printf("%s,%s,%s,%.0f,%.4f,%.2f,%s,%6.4f,%s,%.4f,%d,\"%s\"\n",
+            printf("%s,%s,%s,%.0f,%.4f,%.2f,%s,% .6f,%.2f,%.4f,%s,%d,\"%s\"\n",
                    sysname
                  , dName, iFormula
                  , model$aic, mcfadden, chisq
-                 , cName, c, significanceCode(p), p
+                 , cName, c, z, p, significanceCode(p)
                  , warnings, warningMessages)
         }
     }
@@ -543,6 +544,8 @@ allData$logFL <- log(allData$FL + 1)
 allData$logFC <- log(allData$FC + 1)
 allData$logND <- log(allData$ND + 1)
 
+allData$log2LOC <- log2(allData$LOC)
+
 ## Some artificial dependent variables
 allData$logLINES_CHANGED <- log(allData$LINES_CHANGED + 1)
 allData$sqrtLINES_CHANGED <- sqrt(allData$LINES_CHANGED)
@@ -684,9 +687,9 @@ for (dep in c("COMMITS"
 ##    
 ##    ##dummy <- csvModel(dep, c("FL", "FC", "ND", "LOAC", "LOC"))
     ##    ##dummy <- csvModel(dep, c("FL", "FC", "ND", "LOFC", "LOC"))
-    dummy <- csvModel(dep, c("logLOC"))
+    dummy <- csvModel(dep, c("log2LOC"))
     ##dummy <- csvModel(dep, c("FL", "FC", "ND", "NEG", "LOC"))
-    dummy <- csvModel(dep, c("FL", "FC", "ND", "NEG", "LOACratio", "logLOC"))
+    dummy <- csvModel(dep, c("FL", "FC", "ND", "NEG", "LOACratio", "log2LOC"))
     ##dummy <- csvModel(dep, c("FLratio", "FCratio", "NDratio", "NEGratio", "LOC"))
     ##dummy <- csvModel(dep, c("FLratio", "FCratio", "NDratio", "NEGratio", "LOACratio", "LOC"))
 }

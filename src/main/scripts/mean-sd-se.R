@@ -77,7 +77,7 @@ if (!opts$noHeader) {
     if (!is.null(opts$identifier)) {
         identHead <- ",Identifier"
     }
-    printf("N,M(%s),SD(%s),SE(%s)%s\n" , opts$column, opts$column, opts$column,
+    printf("N,M_%s,SD_%s,SE_%s%s\n" , opts$column, opts$column, opts$column,
            identHead)
 }
 
@@ -87,9 +87,17 @@ if (!is.null(opts$identifier)) {
     identVal <- paste(',', opts$identifier, sep='')
 }
 
-printf("%d,%.*f,%.*f,%.*f%s\n",
+nanToNullS <- function(v) {
+    if (is.na(v)) {
+        return ("NULL")
+    } else {
+        return (sprintf("%.*f", opts$digits, v))
+    }
+}
+
+printf("%d,%s,%s,%s%s\n",
        length(values)
-      ,opts$digits, rAvgVal
-     , opts$digits, rSdVal
-     , opts$digits, rSeVal
+     , nanToNullS(rAvgVal)
+     , nanToNullS(rSdVal)
+     , nanToNullS(rSeVal)
      , identVal)

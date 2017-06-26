@@ -22,21 +22,25 @@ echo_as_me()
 log_debug()
 {
     [ $o_log_level -ge $LOG_LEVEL_DEBUG ] && echo_as_me "DEBUG" "$@" >&2
+    true
 }
 
 log_info()
 {
     [ $o_log_level -ge $LOG_LEVEL_INFO ] && echo_as_me "INFO" "$@" >&2
+    true
 }
 
 log_warn()
 {
     [ $o_log_level -ge $LOG_LEVEL_WARN ] && echo_as_me "WARN" "$@" >&2
+    true
 }
 
 log_error()
 {
     [ $o_log_level -ge $LOG_LEVEL_ERROR ] && echo_as_me "ERROR" "$@" >&2
+    true
 }
 
 edie()
@@ -79,15 +83,22 @@ help()
 summarize_as_csv()
 {
     formulae=$(csvsql -d ',' -q '"' --query "select distinct formula from r" --tables r "$1"|tail -n +2)
+    test $? -ne 0 && return 1
+    log_debug "formulae: $formulae"
     deps=$(csvsql -d ',' -q '"' --query "select distinct d from r" --tables r "$1"|tail -n +2)
-    ##averages_tmp=$(mktemp -- regression_averages.XXXXXXXX) || exit $?
+    test $? -ne 0 && return 1
+    log_debug "deps: $deps"
+    averag_coefs_tmp=$(mktemp -- regression_avg_coefs.XXXXXXXX) || exit $?
+    averag_zs_tmp=$(mktemp -- regression_avg_zvalues.XXXXXXXX) || exit $?
+    ###averag_mcfaddens_tmp=$(mktemp -- regression_avg_mcfadden.XXXXXXXX) || exit $?
 
     log_info "Gathering average coefficients sizes ..."
 
-    header=''
-    for formula in $formulae
+    skip_header='+1'
+    err=0
+    for dep in $deps
     do
-	for dep in $deps
+	for formula in $formulae
 	do
 	    log_info "$dep ~ $formula"
 	    log_debug "Gathering indeps for $formula and dependent $dep ..."
@@ -113,22 +124,48 @@ select i from (
        (select distinct i from r
         where formula = '${formula:?}' and d = '$dep'))
 order by sortkey
-" --tables r "$1"|tail -n +2)
+" --tables r "$1")
+	    err=$?; test $err -ne 0 && break
+	    indeps=$(printf '%s\n' "$indeps"|tail -n +2)
 	    debug_indeps=$(printf '%s\n' "$indeps"|tr '\n' ',')
 	    log_debug "Indeps are: $debug_indeps"
 	    for indep in $indeps
 	    do
-		csvsql -d ',' -q '"' --query "select COEF
+		coefs_and_zs=$(csvsql -d ',' -q '"' --query "
+select COEF, Z
 from r
-where i='${indep:?}' and d='${dep:?}' and formula='${formula:?}' and p<0.01 and warnings = 0" \
-		       --tables r "${1:?file}"|mean-sd-se.R -c COEF --digits 3 $header -i "${indep},${dep},${formula}"|sed -e 's/(COEF)/_COEF/g' -e 's/Identifier/I,D,FORMULA/'
-		header=-H
-	    ##printf '%s,%s,' "$i" "$d" >> "$averages_tmp"
-		##group_cohned_averages "$1" "$i" "$d" >> "$averages_tmp"
+where
+	i='${indep:?}' and d='${dep:?}' 
+        and formula='${formula:?}'
+        and p<0.01 
+        and (warning_messages is null 
+             or (warning_messages not like '%lgorithm did not converg%'))" \
+				      --tables r "${1:?file}")
+		err=$?; test $err -ne 0 && break
+		log_debug "coefs_and_zs: $coefs_and_zs"
+		printf '%s\n' "$coefs_and_zs" \
+		    |mean-sd-se.R -c COEF --digits 3 --identifier "${indep:?}" \
+				  > "${averag_coefs_tmp:?}"
+		err=$?; test $err -ne 0 && break
+		printf '%s\n' "$coefs_and_zs" \
+		    |mean-sd-se.R -c Z    --digits 3 --identifier "${indep:?}" \
+				  > "${averag_zs_tmp:?}"
+		err=$?; test $err -ne 0 && break
+		joint=$(csvsql -d ',' -q '"' --query "
+select M_COEF, SD_COEF, M_Z, SD_Z, coefs.N as N, '${indep:?}' as I, '${dep:?}' as D, '${formula:?}' as FORMULA
+from coefs join zs on coefs.Identifier = zs.Identifier
+" --tables coefs,zs "${averag_coefs_tmp:?}" "${averag_zs_tmp:?}")
+		err=$?; test $err -ne 0 && break
+		log_debug "joint: $joint"
+		printf '%s\n' "$joint"|tail -n "$skip_header"
+		skip_header='+2'
 	    done
 	done
     done
-    ##rm -f -- "$averages_tmp"
+    rm -f -- "${averag_coefs_tmp:?}"
+    rm -f -- "${averag_zs_tmp:?}"
+    ###rm -f -- "${averag_mcfaddens_tmp:?}"
+    return $err
 }
 
 while getopts "hvq" o
