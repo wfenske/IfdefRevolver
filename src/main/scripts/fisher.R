@@ -305,13 +305,13 @@ doTheFisher <- function(indep,dep,indepThresh=NULL) {
 ###                                        # control group
 ###                , fmt="Cohen's D (lsr): %.2f"), stderr())
     library(effsize)
-    cohenRes <- cohen.d(tGroup, # treatment group
+    cliffRes <- cliff.delta(tGroup, # treatment group
                         cGroup # control group
                         )
-    cohenEff <- cohenRes$estimate
-    cohenDescr <- sprintf("%s",cohenRes$magnitude)
-    ##print(cohenRes)
-    ##print(str(cohenRes))
+    cliffEff <- cliffRes$estimate
+    cliffDescr <- sprintf("%s",cliffRes$magnitude)
+    ##print(cliffRes)
+    ##print(str(cliffRes))
 
 ###    toyByGender <- matrix(c(2,1,7,2,5,3), nrow=3,
 ###                          dimnames=list(c("Lego", "Puppen", "PCGames"),
@@ -330,7 +330,7 @@ doTheFisher <- function(indep,dep,indepThresh=NULL) {
     row <- sprintf(opts$project,OR
                   ,fisher.p.value,fisherPRating
                   ,chisqRes$p.value,chisqPRating
-                  ,cohenEff,cohenDescr
+                  ,cliffEff,cliffDescr
                   ,indep,indepThresh
                   ,dep,depThresh
                   ,fmt="%8s,%5.2f,%9.3g,%3s,%9.3g,%3s,% 2.4f,%10s,%s,%.0f,%s,%.4f\n")
@@ -342,7 +342,7 @@ if ( !opts$no_header ) {
     cat(sprintf(
         ##indepBelowCmp,indepAboveCmp,
         ##depBelowCmp,depAboveCmp,
-        fmt="System,OR,FisherP,FisherPRating,ChisqP,ChisqPRating,CohenD,CohenDMagnitude,I,Ithresh,D,Dthresh\n"))
+        fmt="System,OR,FisherP,FisherPRating,ChisqP,ChisqPRating,CliffD,CliffDMagnitude,I,Ithresh,D,Dthresh\n"))
 }
 
 ##r <- doTheFisher(indep=opts$independent, dep=opts$dependent, indepThresh=opts$ithresh)

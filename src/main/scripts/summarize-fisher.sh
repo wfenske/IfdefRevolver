@@ -83,36 +83,36 @@ group_cohned_averages()
     ##indep="${2:?}"
     ##dep="${3:?}"
 
-    csvsql -d ',' -q '"' --query "select COHEND
+    csvsql -d ',' -q '"' --query "select CLIFFD
 from fisher
 where i='${2:indep}' and d='${3:?dep}'" \
-	   --tables fisher "${1:?file}"|mean-sd-se.R -c CohenD --digits 5 -H
+	   --tables fisher "${1:?file}"|mean-sd-se.R -c CliffD --digits 5 -H
 }
 
 summarize_as_csv()
 {
     indeps=$(csvsql -d ',' -q '"' --query "select distinct i from fisher" --tables fisher "$1"|tail -n +2)
     deps=$(csvsql -d ',' -q '"' --query "select distinct d from fisher" --tables fisher "$1"|tail -n +2)
-    cohend_averages_tmp=$(mktemp -- fisher_cohend_averages.XXXXXXXX) || exit $?
+    cliffd_averages_tmp=$(mktemp -- fisher_cliffd_averages.XXXXXXXX) || exit $?
 
     ## The header produced by mean-sd-se.R looks like this:
     ##
-    ## N,M(CohenD),SD(CohenD),SE(CohenD)
+    ## N,M(CliffD),SD(CliffD),SE(CliffD)
     ##
     ## This is not very handy in SQL, so we rename it a bit. We also
     ## add the independent and dependent variable names in front,
     ## making it look like this:
     ##
     ## I,D,N,M_D,SD_D,SE_D
-    echo "I,D,N,M_D,SD_D,SE_D" > "$cohend_averages_tmp"
+    echo "I,D,N,M_D,SD_D,SE_D" > "$cliffd_averages_tmp"
     log_info "Gathering average effect sizes ..."
     for i in $indeps
     do
 	log_info "Gathering average effect sizes for $i ..."
 	for d in $deps
 	do
-	    printf '%s,%s,' "$i" "$d" >> "$cohend_averages_tmp"
-	    group_cohned_averages "$1" "$i" "$d" >> "$cohend_averages_tmp"
+	    printf '%s,%s,' "$i" "$d" >> "$cliffd_averages_tmp"
+	    group_cohned_averages "$1" "$i" "$d" >> "$cliffd_averages_tmp"
 	done
     done
 
@@ -123,24 +123,24 @@ agg.I
 ,agg.N001
 ,agg.N005
 ,agg.NINS
-,cohens.m_d MEAN_D
-,cohens.sd_d SD_D
+,cliffs.m_d MEAN_D
+,cliffs.sd_d SD_D
 ,case
-	when abs(cohens.dlow) < 0.2 then 'negligible'
-	when abs(cohens.dlow) < 0.5 then 'small'
-	when abs(cohens.dlow) < 0.8 then 'medium'
+	when abs(cliffs.dlow) < 0.147 then 'negligible'
+	when abs(cliffs.dlow) < 0.33  then 'small'
+	when abs(cliffs.dlow) < 0.474 then 'medium'
 	else 'large'
 end LOW_MAGNITUDE
 ,case
-	when abs(cohens.davg) < 0.2 then 'negligible'
-	when abs(cohens.davg) < 0.5 then 'small'
-	when abs(cohens.davg) < 0.8 then 'medium'
+	when abs(cliffs.davg) < 0.147 then 'negligible'
+	when abs(cliffs.davg) < 0.33  then 'small'
+	when abs(cliffs.davg) < 0.474 then 'medium'
 	else 'large'
 end AVG_MAGNITUDE
 ,case
-	when abs(cohens.dhigh) < 0.2 then 'negligible'
-	when abs(cohens.dhigh) < 0.5 then 'small'
-	when abs(cohens.dhigh) < 0.8 then 'medium'
+	when abs(cliffs.dhigh) < 0.147 then 'negligible'
+	when abs(cliffs.dhigh) < 0.33  then 'small'
+	when abs(cliffs.dhigh) < 0.474 then 'medium'
 	else 'large'
 end HIGH_MAGNITUDE
 FROM (select 
@@ -171,11 +171,11 @@ FROM (select
 	FROM fisher) p
      group by D,I) as agg
 JOIN (select *,(m_d - sd_d) as dlow, m_d as davg, (m_d + sd_d) as dhigh
-      from cohens0) cohens
-     ON cohens.i=agg.i and cohens.d=agg.d
+      from cliffs0) cliffs
+     ON cliffs.i=agg.i and cliffs.d=agg.d
 ORDER by agg.ratiop,agg.locp,agg.D,agg.I_SORT_KEY" \
-	   --tables fisher,cohens0 "$1" "$cohend_averages_tmp"
-    rm -f -- "$cohend_averages_tmp"
+	   --tables fisher,cliffs0 "$1" "$cliffd_averages_tmp"
+    rm -f -- "$cliffd_averages_tmp"
 }
 
 line_to_tex()
