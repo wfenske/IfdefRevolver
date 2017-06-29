@@ -165,9 +165,9 @@ FROM (select
 	     end I_SORT_KEY
      from
 	(SELECT *
-		,case when abs(FisherP) < 0.01 then 1 else 0 end P001
-		,case when abs(FisherP) >= 0.01 and abs(FisherP) < 0.05 then 1 else 0 end P005
-		,case when abs(FisherP) >= 0.05 then 1 else 0 end PINS
+		,case when abs(MWUP) < 0.01 then 1 else 0 end P001
+		,case when abs(MWUP) >= 0.01 and abs(MWUP) < 0.05 then 1 else 0 end P005
+		,case when abs(MWUP) >= 0.05 then 1 else 0 end PINS
 	FROM fisher) p
      group by D,I) as agg
 JOIN (select *,(m_d - sd_d) as dlow, m_d as davg, (m_d + sd_d) as dhigh

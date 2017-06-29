@@ -287,20 +287,15 @@ doTheFisher <- function(indep,dep,indepThresh=NULL) {
 
     chisqRes <- chisq.test(fisherTable)
     
-##    if ( OR > 1 ) {
-        fisherPRating <- significanceCode(fisher.p.value)
-        chisqPRating <- significanceCode(chisqRes$p.value)
-##    } else {
-##        fisherPRating <- "x"
-##        chisqPRating <- "x"
-##    }
-
-    
     ##print(str(chisq.test(fisherTable)))
     ##library(lsr)
     ##write(sprintf(cramersV(fisherTable), fmt="Cramer's V (0.1-0.3=weak,0.4-0.5=medium,>0.5=strong): %.2f"), stderr())
     tGroup <- c(grpAProne$funcs[,dep], grpAUnprone$funcs[,dep])
     cGroup <- c(grpUProne$funcs[,dep], grpUUnprone$funcs[,dep])
+
+    mwuResult <- wilcox.test(tGroup, cGroup)
+    mannWhitneyU.p.value <- mwuResult$p.value
+    
 ###    write(sprintf(cohensD(tGroup,  cGroup), # treatment group
 ###                                        # control group
 ###                , fmt="Cohen's D (lsr): %.2f"), stderr())
@@ -310,6 +305,7 @@ doTheFisher <- function(indep,dep,indepThresh=NULL) {
                         )
     cliffEff <- cliffRes$estimate
     cliffDescr <- sprintf("%s",cliffRes$magnitude)
+    
     ##print(cliffRes)
     ##print(str(cliffRes))
 
@@ -328,12 +324,13 @@ doTheFisher <- function(indep,dep,indepThresh=NULL) {
     ##fisherResults$p.value
 
     row <- sprintf(opts$project,OR
-                  ,fisher.p.value,fisherPRating
-                  ,chisqRes$p.value,chisqPRating
+                  ,fisher.p.value,significanceCode(fisher.p.value)
+                  ,chisqRes$p.value,significanceCode(chisqRes$p.value)
+                  ,mannWhitneyU.p.value,significanceCode(mannWhitneyU.p.value)
                   ,cliffEff,cliffDescr
                   ,indep,indepThresh
                   ,dep,depThresh
-                  ,fmt="%8s,%5.2f,%9.3g,%3s,%9.3g,%3s,% 2.4f,%10s,%s,%.0f,%s,%.4f\n")
+                  ,fmt="%8s,%5.2f,%9.3g,%3s,%9.3g,%3s,%9.3g,%3s,% 2.4f,%10s,%s,%.0f,%s,%.4f\n")
 
     return (row)
 }
@@ -342,7 +339,7 @@ if ( !opts$no_header ) {
     cat(sprintf(
         ##indepBelowCmp,indepAboveCmp,
         ##depBelowCmp,depAboveCmp,
-        fmt="System,OR,FisherP,FisherPRating,ChisqP,ChisqPRating,CliffD,CliffDMagnitude,I,Ithresh,D,Dthresh\n"))
+        fmt="System,OR,FisherP,FisherPRating,ChisqP,ChisqPRating,MWUP,MWUPRating,CliffD,CliffDMagnitude,I,Ithresh,D,Dthresh\n"))
 }
 
 ##r <- doTheFisher(indep=opts$independent, dep=opts$dependent, indepThresh=opts$ithresh)
@@ -383,8 +380,8 @@ pf(indep="ND",  dep="LCHratio",     indepThresh=ndThresh)
 pf(indep="NEG", dep="COMMITSratio", indepThresh=negThresh)
 pf(indep="NEG", dep="LCHratio",     indepThresh=negThresh)
 
-pf(indep="LOC", dep="COMMITSratio")
-pf(indep="LOC", dep="LCHratio")
+##pf(indep="LOC", dep="COMMITSratio")
+##pf(indep="LOC", dep="LCHratio")
 
 ## Hmm ..., the odds ratios somtimes look huge, but Cramer's V says
 ## that there's almost no effect.
