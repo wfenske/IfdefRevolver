@@ -102,7 +102,7 @@ if (is.null(opts$output)) {
 
 ### Begin plot creation
 
-pdf(file=outputFn,width=5.3,height=3.5)
+pdf(file=outputFn,width=7.5,height=3.6)
 
 ##x <- allData$FLgrouped
 ##y <- allData$LOC
@@ -139,10 +139,13 @@ if (opts$noXLabels) {
 
 colors <- topo.colors(opts$divisions)
 
+txtScale <- 1.2
+
 bp <- invisible(boxplot(LOC ~ grouped
             , data=allData
-            #, cex=1
-            , cex.axis=1.0 # size of value labels on x & y axis
+            , cex=txtScale
+            , cex.lab=txtScale
+            , cex.axis=txtScale # size of value labels on x & y axis
             #, cex.main=1
             #, cex.sub=1
             , xaxt=xAxt
@@ -167,10 +170,10 @@ bp <- invisible(boxplot(LOC ~ grouped
 ##    , cex = 0.8 # scale text size
 ##      )
 
-legend("bottomright", inset=.02
+legend("bottomright", ##inset=.02
      , title="Number of functions"
      , c(paste("", bp$n, sep = ""))
-     , fill=colors, horiz=TRUE, cex=0.9)
+     , fill=colors, horiz=TRUE, cex=txtScale)
 
 invisible(dev.off())
 

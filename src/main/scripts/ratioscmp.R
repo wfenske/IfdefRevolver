@@ -231,7 +231,7 @@ listOfValueFrames <- lapply(split(allData, factor(allData$SNAPSHOT)),
 combinedValueFrame <- Reduce(rbind, listOfValueFrames)
 
 ## Default width and height of PDFs is 7 inches
-pdf(file=outputFn,width=5.5,height=2.5)
+pdf(file=outputFn,width=7,height=2.25)
 
 ## See http://www.sthda.com/english/wiki/ggplot2-point-shapes for more
 ## shapes for geom_point
@@ -267,8 +267,8 @@ p <- p +
 
 ## Other graph settings
 p <- p +
-    labs(x = "Commit Window", y = yAxisName) +
-    ggtitle(systemname)
+     labs(x = "Commit Window", y = yAxisName)
+     ##+ ggtitle(systemname)
 
 ## Change range of shown values on y-axis
 if (!is.null(opts$ymax)) {
