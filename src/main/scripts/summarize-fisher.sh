@@ -85,7 +85,7 @@ group_cohned_averages()
 
     csvsql -d ',' -q '"' --query "select CLIFFD
 from fisher
-where i='${2:indep}' and d='${3:?dep}'" \
+where i='${2:indep}' and d='${3:?dep}' and abs(MWUP) < 0.01" \
 	   --tables fisher "${1:?file}"|mean-sd-se.R -c CliffD --digits 5 -H
 }
 
