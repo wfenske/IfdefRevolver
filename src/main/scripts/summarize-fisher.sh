@@ -121,7 +121,6 @@ summarize_as_csv()
 agg.I
 ,agg.D
 ,agg.N001
-,agg.N005
 ,agg.NINS
 ,cliffs.m_d MEAN_D
 ,cliffs.sd_d SD_D
@@ -146,7 +145,6 @@ end HIGH_MAGNITUDE
 FROM (select 
      	     p.D,p.I
 	     ,sum(p.P001) N001
-	     ,sum(p.P005) N005
 	     ,sum(p.PINS) NINS
 	     ,case
 		when D LIKE '%ratio' then 1
@@ -166,8 +164,7 @@ FROM (select
      from
 	(SELECT *
 		,case when abs(MWUP) < 0.01 then 1 else 0 end P001
-		,case when abs(MWUP) >= 0.01 and abs(MWUP) < 0.05 then 1 else 0 end P005
-		,case when abs(MWUP) >= 0.05 then 1 else 0 end PINS
+		,case when abs(MWUP) >= 0.01 then 1 else 0 end PINS
 	FROM fisher) p
      group by D,I) as agg
 JOIN (select *,(m_d - sd_d) as dlow, m_d as davg, (m_d + sd_d) as dhigh
@@ -181,15 +178,16 @@ ORDER by agg.ratiop,agg.locp,agg.D,agg.I_SORT_KEY" \
 line_to_tex()
 {
     printf "$line"|sed -e 's|,| |g' \
-		       -e 's,FL,fl_{>0},g' \
-		       -e 's,FC,fc_{>1},g' \
-		       -e 's,ND,nd_{>0},g' \
+		       -e 's,FL, fl_{>0},g' \
+		       -e 's,FC, fc_{>1},g' \
+		       -e 's,ND, nd_{>0},g' \
 		       -e 's,NEG,neg_{>0},g' \
 		       -e 's,LOC,loc^+,g' \
-		       -e 's,COMMITS,cf^+,g' \
-		       -e 's,LCH,cp^+,g' \
-		       -e 's,ratio,_{/loc},g' \
-	|xargs printf '$%s$ & $%s$ & $%d$ & $%d$ & $%d$ & $%.2f$ & $%.2f$ & \\e%s{} & \\e%s{} & \\e%s{}\\\\\n'
+		       -e 's,COMMITSratio,\\\\fcommr,g' \
+		       -e 's,LCHratio,\\\\flchgr,g' \
+		       -e 's,COMMITS,\\\\fcomm,g' \
+		       -e 's,LCH,\\\\flchg,g' \
+	|xargs printf '$%s$ & %s & %d & (%d) & $%.2f$ & $%.2f$ & \\e%s{} & \\e%s{} & \\e%s{}\\\\\n'
 }
 
 csv_table_to_tex()
