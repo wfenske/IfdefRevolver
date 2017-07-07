@@ -6,6 +6,78 @@ title: Online Appendix for &quot;How Preprocessor Annotations (Do Not) Affect Ma
   <h1>Online Appendix for &quot;How Preprocessor Annotations (Do Not) Affect Maintainability: A Case Study on Change-Proneness&quot;</h1>
   
   <h2>Tool Support</h2>
+
+  <p>Data collection for this study was performed by IfdefRevolver,
+  the Github project this page belongs to.
+  The entry point to the analysis is the Bourne shell script
+  <code>ifdefrevolve-project.sh</code>, located in
+  <code>src/main/scripts</code>.
+  (Type <code>ifdefrevolve-project.sh -h</code> at the command line to
+  get a help screen explaining the command line options.)
+  This script relies on a number of helper scripts, which reside in
+  the same directory.
+  To get everything to run, this directory should be in the <code>PATH</code>
+  variable in your environment.</p>
+
+  <h3>Dependencies</h3>
+
+  <p>IfdefRevolver depends on a number of other tools, some of them tools
+  developed by ourselves, some of them customized third-party tools, and
+  some third-party tools, used as is.
+  The binaries to those tools should also be in your
+  <code>PATH</code>.</p>
+
+  <h4>Own tools and customized third-party tools</h4>
+
+  <ul>
+  <li>cppstats: <a href='https://github.com/wfenske/cppstats'>(forked)</a>
+
+  Customized to improve performance for evolutionary analyses.  Also,
+  some bugs were fixed.
+  </li>
+
+  
+  <li>Skunk: <a href='https://github.com/wfenske/Skunk'>(forked)</a>
+
+  Initially developed to detect variability-aware code smells, this
+  version contains enhancements to report more metrics and to produce
+  cleaner output in CSV files.  Function signature parsing was also
+  improved.
+  </li>
+
+  <li>repodriller: <a href='https://github.com/wfenske/repodriller'>(forked)</a>
+
+  Enhanced to improve performance on large repositories with many
+  commits.  Specifically, the time-consuming identification of
+  branches for a commit was made optional.</li>
+  </ul>
+
+  <h4>Other third-party tools</h4>
+
+  <ul>
+  <li><a href='http://www.srcml.org/'>srcML</a>
+
+  Version used: Trunk 19109c, from May 22 2014</li>
+
+  <li><a href='https://github.com/wireservice/csvkit'>CSVKit</a>
+
+  Set of command-line tools to work with CSV files.  Used extensively
+  to aggregate and transform intermediate results.
+
+  Version used: 1.0.2 (2016)</li>
+
+  <li><a href='https://www.r-project.org/'>R</a>
+
+  Used for statistical computations and figure creation.  The R
+  scripts in `src/main/script` (extension `.R`) require it.
+
+  Version used: 3.3.2 (2016-10-31)</li>
+  </ul>
+
+  <h3>Compatibility</h3>
+
+  Ifdevrevolver was sucessfully used under Linux (Ubuntu, kernel
+  4.10.0-26-generic, x86_64), and macOS (kernel 16.6.0, x86_64).
   
   <h2>Data</h2>
   

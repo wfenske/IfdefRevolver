@@ -6,7 +6,7 @@ negative effects, such as an increased proneness to faults or changes.
 ## Dependencies
 
 IfdefRevolver depends on a number of other tools, some of them tools
-developed by oursevles, some of them customized third-party tools, and
+developed by ourselves, some of them customized third-party tools, and
 some third-party tools, used as is.
 
 ### Own tools and customized third-party tools
