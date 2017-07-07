@@ -21,6 +21,11 @@ options <- list(
                 default=FALSE,
                 action="store_true",
                 help="Restrict data to only changed functions functions. [default: %default]")
+  , make_option(c("-T", "--no-test-code"),
+                default=FALSE,
+                action="store_true",
+                dest="noTestCode",
+                help="Exclude functions that likely constitute test code. A simple heuristic based on file name and function name is used to identify such functions. [default: %default]")
 )
 
 args <- parse_args(OptionParser(
@@ -540,9 +545,10 @@ allData$sqrtFL <- sqrt(allData$FL)
 allData$sqrtFC <- sqrt(allData$FC)
 allData$sqrtND <- sqrt(allData$ND)
 
-allData$logFL <- log(allData$FL + 1)
-allData$logFC <- log(allData$FC + 1)
-allData$logND <- log(allData$ND + 1)
+allData$log2FL  <- log2(allData$FL + 1)
+allData$log2FC  <- log2(allData$FC + 1)
+allData$log2ND  <- log2(allData$ND + 1)
+allData$log2NEG <- log2(allData$NEG + 1)
 
 allData$log2LOC <- log2(allData$LOC)
 
@@ -597,6 +603,25 @@ if (opts$changed) {
     eprintf("DEBUG: Creating models for just the changed functions.\n")
     negBinData <- subset(negBinData, COMMITS > 0)
 }
+
+if (opts$noTestCode) {
+    negBinTestData <- subset(negBinData, (grepl(" test", FUNCTION_SIGNATURE) | grepl("Test", FUNCTION_SIGNATURE) | grepl("^test", FILE)))
+    
+    negBinData <- subset(negBinData, ! (grepl(" test", FUNCTION_SIGNATURE) | grepl("Test", FUNCTION_SIGNATURE) | grepl("^test", FILE)))
+
+    library(effsize)
+    
+    tGroup <- negBinTestData # only test code
+    cGroup <- negBinData     # no test code
+
+    for (v in c("COMMITS", "LCH", "FL", "FC", "ND", "NEG", "LOACratio")) {
+        mwuResult <- wilcox.test(tGroup[,v], cGroup[,v])
+        cliffRes <- cliff.delta(tGroup[,v], cGroup[,v])
+        eprintf("DEBUG: Comparing %s of test code and non-test code: delta=%.3f (%s), p=%.3g\n",
+                v, cliffRes$estimate, cliffRes$magnitude, mwuResult$p.value)
+    }
+}
+
 ##negBinData <- changedData
 
 ##ziSampleSize <- 10000
