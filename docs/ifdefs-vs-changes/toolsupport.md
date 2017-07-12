@@ -16,19 +16,19 @@ some third-party tools, used as is.
 
 ### Own tools and customized third-party tools
 
-* cppstats: https://github.com/wfenske/cppstats
+* [cppstats](https://github.com/wfenske/cppstats)
 
   Customized to improve performance for evolutionary analyses.  Also,
   some bugs were fixed.
 
-* Skunk: https://github.com/wfenske/Skunk
+* [Skunk](https://github.com/wfenske/Skunk)
 
   Initially developed to detect variability-aware code smells, this
   version contains enhancements to report more metrics and to produce
   cleaner output in CSV files.  Function signature parsing was also
   improved.
 
-* repodriller: https://github.com/wfenske/repodriller
+* [repodriller](https://github.com/wfenske/repodriller)
 
   Enhanced to improve performance on large repositories with many
   commits.  Specifically, the time-consuming identification of
@@ -36,18 +36,18 @@ some third-party tools, used as is.
 
 ### Other third-party tools
 
-* srcML: http://www.srcml.org/
+* [srcML](http://www.srcml.org/)
 
   Version used: Trunk 19109c, from May 22 2014
 
-* CSVKit: https://github.com/wireservice/csvkit
+* [CSVKit](https://github.com/wireservice/csvkit)
 
   Set of command-line tools to work with CSV files.  Used extensively
   to aggregate and transform intermediate results.
 
   Version used: 1.0.2 (2016)
 
-* R: https://www.r-project.org/
+* [R](https://www.r-project.org/)
 
   Used for statistical computations and figure creation.  The R
   scripts in `src/main/script` (extension `.R`) require it.
