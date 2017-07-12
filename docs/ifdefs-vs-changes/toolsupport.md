@@ -60,5 +60,3 @@ some third-party tools, used as is.
 * macOS (kernel 16.6.0, x86_64)
 
 Other Unix-like systems will probably work. Windows has not been tested. 
-	
-[Home](/IfdefRevolver/)

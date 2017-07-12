@@ -40,5 +40,3 @@ OpenLDAP | `https://github.com/osstech-jp/openldap`
 OpenVPN | `git@github.com:OpenVPN/openvpn.git`
 Pidgin | `git@github.com:tieto/pidgin.git`
 SQLite | `git://repo.or.cz/sqlite.git`
-	
-[Home](/IfdefRevolver/)
