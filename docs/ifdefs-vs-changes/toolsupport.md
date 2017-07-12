@@ -3,15 +3,15 @@ layout: default
 title: Tool Support for "How Preprocessor Annotations (Do Not) Affect Maintainability"
 ---
 
-#Tool Support
+# Tool Support
 
-##Dependencies
+## Dependencies
 
 IfdefRevolver depends on a number of other tools, some of them tools
 developed by ourselves, some of them customized third-party tools, and
 some third-party tools, used as is.
 
-###Own tools and customized third-party tools
+### Own tools and customized third-party tools
 
 * [cppstats](https://github.com/wfenske/cppstats)
 
@@ -31,7 +31,7 @@ some third-party tools, used as is.
   commits.  Specifically, the time-consuming identification of
   branches for a commit was made optional.
 
-###Other Third-Party Tools
+### Other Third-Party Tools
 
 * [srcML](http://www.srcml.org/)
 
@@ -51,7 +51,7 @@ some third-party tools, used as is.
 
   Version used: 3.3.2 (2016-10-31)
 
-###Compatibility
+### Compatibility
 
 `Ifdevrevolver` was sucessfully used under the following systems:
 

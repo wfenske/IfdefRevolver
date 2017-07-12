@@ -4,7 +4,7 @@ title: Online Appendix for "How Preprocessor Annotations (Do Not) Affect Maintai
 ---
 # Online Appendix for "How Preprocessor Annotations (Do Not) Affect Maintainability: A Case Study on Change-Proneness"
   
-##Tool Support
+## Tool Support
 
 Data collection for this study was performed by
 [IfdefRevolver](https://github.com/wfenske/IfdefRevolver/)
@@ -21,10 +21,13 @@ variable in your environment.
 More information can be found on the [tool support page](toolsupport.html)
 
 
-##Data
+## Data
   
-The data (in .csv format) for all eight subject systems used in the
+The data (in `.csv` format) for all eight subject systems used in the
 study is [available here.](data/ifdefs-vs-changes-data.tar.gz)
+
+## Subject Systems
+
 The names and repository URLs of the subject systems are listed below.
 
 Subject Name | Repository URL
