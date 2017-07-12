@@ -18,7 +18,7 @@ the same directory.
 To get everything to run, this directory should be in the `PATH`
 variable in your environment.
 
-More information can be found on the [tool support page](toolsupport.html)
+More information can be found on the [tool support page.](toolsupport.html)
 
 
 ## Data
