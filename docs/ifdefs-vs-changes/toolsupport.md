@@ -3,18 +3,15 @@ layout: default
 title: Tool Support for "How Preprocessor Annotations (Do Not) Affect Maintainability"
 ---
 
-# IfdefRevolver
+#Tool Support
 
-Examines correlations between CPP annotations (a.k.a. #ifdefs) and
-negative effects, such as an increased proneness to faults or changes.
-
-## Dependencies
+##Dependencies
 
 IfdefRevolver depends on a number of other tools, some of them tools
 developed by ourselves, some of them customized third-party tools, and
 some third-party tools, used as is.
 
-### Own tools and customized third-party tools
+###Own tools and customized third-party tools
 
 * [cppstats](https://github.com/wfenske/cppstats)
 
@@ -34,7 +31,7 @@ some third-party tools, used as is.
   commits.  Specifically, the time-consuming identification of
   branches for a commit was made optional.
 
-### Other third-party tools
+###Other Third-Party Tools
 
 * [srcML](http://www.srcml.org/)
 
@@ -53,3 +50,13 @@ some third-party tools, used as is.
   scripts in `src/main/script` (extension `.R`) require it.
 
   Version used: 3.3.2 (2016-10-31)
+
+###Compatibility
+
+`Ifdevrevolver` was sucessfully used under the following systems:
+
+* Linux (Ubuntu, kernel 4.10.0-26-generic, x86\_64)
+
+* macOS (kernel 16.6.0, x86_64)
+
+Other Unix-like systems will probably work. Windows has not been tested.
