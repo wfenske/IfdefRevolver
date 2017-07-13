@@ -20,6 +20,20 @@ variable in your environment.
 
 More information can be found on the [tool support page.](toolsupport.html)
 
+## Snapshot Size Experiments
+
+Functions can change from one snapshot to the next.  For example,
+functions are modified (becoming longer or shorter), and new functions
+are added, existing ones are deleted or moved to new files.  All those
+changes invalidate (to some extent) the static metrics, which we
+collect only once per snapshot.  We also lose some information about
+functions being added later on or moved to new files also.
+
+To estimate how small we need to make our snapshots in order to get
+accurate results and not miss too much information, we conducted an
+initial experiment on `OpenLDAP`.  On a separate page, we list the
+[results of the snapshot size experiment.](estimate-of-changes-to-functions-depending-on-snapshot-size/)
+
 
 ## Data
   
