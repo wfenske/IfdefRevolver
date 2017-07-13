@@ -76,61 +76,61 @@ Percentage of annotated functions that ...
 
 * `AB_BEFORE`
 
-  - Mean: 619.3172413793103
+  - Mean: 619.32
   - Median: 586.0
   
 * `AB_NOW`
 
-  - Mean: 620.903448275862
+  - Mean: 620.90
   - Median: 586.5
   
 * `AB_IDENTICAL`
 
-  - Mean: 608.8827586206896
+  - Mean: 608.88
   - Median: 582.0
 * `AB_ADDED`
 
-  - Mean: 12.020689655172413
+  - Mean: 12.02
   - Median: 7.0
   
 * `AB_REMOVED`
 
-  - Mean: 10.434482758620689
+  - Mean: 10.43
   - Median: 4.0
   
 * `AB_CH_NOFL`
 
-  - Mean: 7.417241379310345
+  - Mean: 7.42
   - Median: 5.0
   
 * `AB_CH_NOFC_NONDUP`
 
-  - Mean: 5.4862068965517246
+  - Mean: 5.49
   - Median: 3.0
   
 * `AB_CH_NONEST`
 
-  - Mean: 1.9310344827586208
+  - Mean: 1.93
   - Median: 1.0
   
 * `AB_PERC_ADD_REM`
 
-  - Mean: 3.7344827586206897
+  - Mean: 3.73
   - Median: 2.0
   
 * `AB_PERC_CH_NOFL`
 
-  - Mean: 13.1931034483
+  - Mean: 13.19
   - Median: 11.0
   
 * `AB_PERC_CH_NOFC_NONDUP`
 
-  - Mean: 9.18620689655
+  - Mean: 9.19
   - Median: 6.0
   
 * `AB_PERC_CH_NONEST`
 
-  - Mean: 2.99310344828
+  - Mean: 2.99
   - Median: 1.0
 
 
@@ -140,62 +140,62 @@ Percentage of annotated functions that ...
 
 * `AB_BEFORE`
 
-  - Mean: 618.6458333333334
+  - Mean: 618.65
   - Median: 585.5
   
 * `AB_NOW`
 
-  - Mean: 621.7569444444445
+  - Mean: 621.76
   - Median: 586.5
   
 * `AB_IDENTICAL`
 
-  - Mean: 598.5555555555555
+  - Mean: 598.56
   - Median: 574.5
   
 * `AB_ADDED`
 
-  - Mean: 23.20138888888889
+  - Mean: 23.20
   - Median: 16.0
   
 * `AB_REMOVED`
 
-  - Mean: 20.09027777777778
+  - Mean: 20.09
   - Median: 9.5
   
 * `AB_CH_NOFL`
 
-  - Mean: 13.347222222222221
+  - Mean: 13.35
   - Median: 10.0
   
 * `AB_CH_NOFC_NONDUP`
 
-  - Mean: 10.07638888888889
+  - Mean: 10.08
   - Median: 7.0
   
 * `AB_CH_NONEST`
 
-  - Mean: 3.5972222222222223
+  - Mean: 3.60
   - Median: 2.0
   
 * `AB_PERC_ADD_REM`
 
-  - Mean: 7.701388888888889
+  - Mean: 7.70
   - Median: 4.5
   
 * `AB_PERC_CH_NOFL`
 
-  - Mean: 14.3194444444
+  - Mean: 14.32
   - Median: 13.0
   
 * `AB_PERC_CH_NOFC_NONDUP`
 
-  - Mean: 10.3194444444
+  - Mean: 10.32
   - Median: 9.0
   
 * `AB_PERC_CH_NONEST`
 
-  - Mean: 3.375
+  - Mean: 3.38
   - Median: 2.0
 
 
@@ -205,61 +205,61 @@ Percentage of annotated functions that ...
 
 * `AB_BEFORE`
 
-  - Mean: 617.8028169014085
+  - Mean: 617.80
   - Median: 586
   
 * `AB_NOW`
 
-  - Mean: 624.0985915492957
+  - Mean: 624.10
   - Median: 588
   
 * `AB_IDENTICAL`
 
-  - Mean: 579.6056338028169
+  - Mean: 579.61
   - Median: 566
   
 * `AB_ADDED`
 
-  - Mean: 44.49295774647887
+  - Mean: 44.49
   - Median: 37
   
 * `AB_REMOVED`
 
-  - Mean: 38.19718309859155
+  - Mean: 38.20
   - Median: 22
   
 * `AB_CH_NOFL`
 
-  - Mean: 22.859154929577464
+  - Mean: 22.86
   - Median: 17
   
 * `AB_CH_NOFC_NONDUP`
 
-  - Mean: 17.619718309859156
+  - Mean: 17.62
   - Median: 13
   
 * `AB_CH_NONEST`
 
-  - Mean: 6.52112676056338
+  - Mean: 6.52
   - Median: 5
 * `AB_PERC_ADD_REM`
 
-  - Mean: 15.140845070422536
+  - Mean: 15.14
   - Median: 10
   
 * `AB_PERC_CH_NOFL`
 
-  - Mean: 15.676056338
+  - Mean: 15.68
   - Median: 15
   
 * `AB_PERC_CH_NOFC_NONDUP`
 
-  - Mean: 11.7464788732
+  - Mean: 11.75
   - Median: 10
   
 * `AB_PERC_CH_NONEST`
 
-  - Mean: 3.98591549296
+  - Mean: 3.99
   - Median: 3
 
 
@@ -269,60 +269,60 @@ Percentage of annotated functions that ...
 
 * `AB_BEFORE`
 
-  - Mean: 613.6571428571428
+  - Mean: 613.66
   - Median: 583
   
 * `AB_NOW`
 
-  - Mean: 625.8857142857142
+  - Mean: 625.89
   - Median: 588
   
 * `AB_IDENTICAL`
 
-  - Mean: 543.5714285714286
+  - Mean: 543.57
   - Median: 548
 * `AB_ADDED`
 
-  - Mean: 82.31428571428572
+  - Mean: 82.31
   - Median: 64
 * `AB_REMOVED`
 
-  - Mean: 70.08571428571429
+  - Mean: 70.09
   - Median: 52
   
 * `AB_CH_NOFL`
 
-  - Mean: 37.285714285714285
+  - Mean: 37.29
   - Median: 27
   
 * `AB_CH_NOFC_NONDUP`
 
-  - Mean: 29.257142857142856
+  - Mean: 29.26
   - Median: 22
   
 * `AB_CH_NONEST`
 
-  - Mean: 10.542857142857143
+  - Mean: 10.54
   - Median: 7
   
 * `AB_PERC_ADD_REM`
 
-  - Mean: 28.714285714285715
+  - Mean: 28.71
   - Median: 20
   
 * `AB_PERC_CH_NOFL`
 
-  - Mean: 17.3714285714
+  - Mean: 17.37
   - Median: 17
   
 * `AB_PERC_CH_NOFC_NONDUP`
 
-  - Mean: 13.2
+  - Mean: 13.20
   - Median: 12
   
 * `AB_PERC_CH_NONEST`
 
-  - Mean: 4.4
+  - Mean: 4.40
   - Median: 4
 
 
@@ -349,37 +349,37 @@ Changes expressed as percentages:
 
 * `FUNC_BEFORE`
 
-  - Mean: 3337.6620689655174
+  - Mean: 3337.66
   - Median: 3099.0
   
 * `FUNC_NOW`
 
-  - Mean: 3353.093103448276
+  - Mean: 3353.09
   - Median: 3104.0
   
 * `FUNC_IDENTICAL`
 
-  - Mean: 3308.7620689655173
+  - Mean: 3308.76
   - Median: 3078.0
   
 * `FUNC_ADDED`
 
-  - Mean: 44.33103448275862
+  - Mean: 44.33
   - Median: 28.0
   
 * `FUNC_REMOVED`
 
-  - Mean: 28.9
+  - Mean: 28.90
   - Median: 12.0
   
 * `FUNC_PERC_ADD_REM`
 
-  - Mean: 2.420689655172414
+  - Mean: 2.42
   - Median: 1.0
   
 * `FUNC_MEDIAN_PERC_LOC_CHG`
 
-  - Mean: 2.17968965517
+  - Mean: 2.18
   - Median: 1.72
 
 
@@ -389,37 +389,37 @@ Changes expressed as percentages:
 
 * `FUNC_BEFORE`
 
-  - Mean: 3313.8333333333335
+  - Mean: 3313.83
   - Median: 3067.0
   
 * `FUNC_NOW`
 
-  - Mean: 3343.972222222222
+  - Mean: 3343.97
   - Median: 3102.0
   
 * `FUNC_IDENTICAL`
 
-  - Mean: 3258.965277777778
+  - Mean: 3258.97
   - Median: 3027.5
   
 * `FUNC_ADDED`
 
-  - Mean: 85.00694444444444
+  - Mean: 85.01
   - Median: 66.0
   
 * `FUNC_REMOVED`
 
-  - Mean: 54.86805555555556
+  - Mean: 54.87
   - Median: 29.5
   
 * `FUNC_PERC_ADD_REM`
 
-  - Mean: 5.131944444444445
+  - Mean: 5.13
   - Median: 3.0
   
 * `FUNC_MEDIAN_PERC_LOC_CHG`
 
-  - Mean: 2.40854166667
+  - Mean: 2.41
   - Median: 2.02
 
 
@@ -429,37 +429,37 @@ Changes expressed as percentages:
 
 * `FUNC_BEFORE`
 
-  - Mean: 3272.0140845070423
+  - Mean: 3272.01
   - Median: 3022
   
 * `FUNC_NOW`
 
-  - Mean: 3332.521126760563
+  - Mean: 3332.52
   - Median: 3097
   
 * `FUNC_IDENTICAL`
 
-  - Mean: 3166.760563380282
+  - Mean: 3166.76
   - Median: 2998
   
 * `FUNC_ADDED`
 
-  - Mean: 165.7605633802817
+  - Mean: 165.76
   - Median: 129
   
 * `FUNC_REMOVED`
 
-  - Mean: 105.25352112676056
+  - Mean: 105.25
   - Median: 69
   
 * `FUNC_PERC_ADD_REM`
 
-  - Mean: 10.338028169014084
+  - Mean: 10.34
   - Median: 6
   
 * `FUNC_MEDIAN_PERC_LOC_CHG`
 
-  - Mean: 3.07605633803
+  - Mean: 3.08
   - Median: 2.41
 
 ### 400 Commits
@@ -468,35 +468,35 @@ Changes expressed as percentages:
 
 * `FUNC_BEFORE`
 
-  - Mean: 3206.6857142857143
+  - Mean: 3206.69
   - Median: 2996
   
 * `FUNC_NOW`
 
-  - Mean: 3326.8571428571427
+  - Mean: 3326.86
   - Median: 3097
   
 * `FUNC_IDENTICAL`
 
-  - Mean: 3012.6857142857143
+  - Mean: 3012.69
   - Median: 2949
   
 * `FUNC_ADDED`
 
-  - Mean: 314.1714285714286
+  - Mean: 314.17
   - Median: 295
   
 * `FUNC_REMOVED`
 
-  - Mean: 194.0
+  - Mean: 194.00
   - Median: 148
   
 * `FUNC_PERC_ADD_REM`
 
-  - Mean: 20.485714285714284
+  - Mean: 20.49
   - Median: 12
   
 * `FUNC_MEDIAN_PERC_LOC_CHG`
 
-  - Mean: 3.60857142857
+  - Mean: 3.61
   - Median: 3.08
