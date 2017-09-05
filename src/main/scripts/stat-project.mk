@@ -181,7 +181,7 @@ loc-plots/$(PROJECT)/LOC-FL.pdf: $(ALL_R_DATA) $(COMPARE_LOCS_PROG)
 
 loc-plots/$(PROJECT)/LOC-ND.pdf: $(ALL_R_DATA) $(COMPARE_LOCS_PROG)
 	mkdir -p `dirname $@` 
-	 $(COMPARE_LOCS_PROG) -p $(PROJECT) -n $(NAME) -i ND $(COMPARE_LOC_OPTS) -o $@ -X --no-title
+	 $(COMPARE_LOCS_PROG) -p $(PROJECT) -n $(NAME) -i CND $(COMPARE_LOC_OPTS) -o $@ -X --no-title
 
 loc-plots/$(PROJECT)/LOC-NEG.pdf: $(ALL_R_DATA) $(COMPARE_LOCS_PROG)
 	mkdir -p `dirname $@` 

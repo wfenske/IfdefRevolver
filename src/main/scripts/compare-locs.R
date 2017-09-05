@@ -79,6 +79,7 @@ if (is.null(opts$name)) {
 }
 
 allData <- readData(args)
+allData$CND <- allData$ND
 
 threshold <- opts$divisions - 1
 aboveThreshold <- paste((threshold), "+", sep="")
