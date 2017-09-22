@@ -36,7 +36,7 @@ options <- list(
                 , default="COMMITS"
                 )
   , make_option(c("-s", "--scale")
-              , help="Factor by which the dependent variable should be scaled.  For instance, if --dependent=COMMITS and --scale=LOC, then the dependent variable will be COMMITS/LOC, i.e., the frequency of bug-fixes per lines of code.  Valid values are: LOC (lines per code in the function), COUNT (number of functions), none (take the value of the dependent variable as is). [default: %default]"
+              , help="Factor by which the dependent variable should be scaled.  For instance, if --dependent=COMMITS and --scale=LOC, then the dependent variable will be COMMITS/LOC, i.e., the frequency of changes per lines of code.  Valid values are: LOC (lines per code in the function), COUNT (number of functions), none (take the value of the dependent variable as is). [default: %default]"
                 , default="LOC"
                 )
   , make_option(c("-n", "--systemname")
@@ -61,7 +61,7 @@ options <- list(
 )
 
 args <- parse_args(OptionParser(
-    description = "Plot ratio of some dependent variable (e.g., bug-fixes) for functions having some property (e.g., ABSmell > 0) vs. those that don't have the property. Inputs are CSV files where each CSV file represent the data for one snapshot. If no input files are named, the directory containing the results for all the snapshots must be specified via the `--snapshotsdir' (`-s') option."
+    description = "Plot ratio of some dependent variable (e.g., number of commits) for functions having some property (e.g., FL > 0) vs. those that don't have the property. Inputs are CSV files where each CSV file represent the data for one snapshot. If no input files are named, the directory containing the results for all the snapshots must be specified via the `--snapshotsdir' (`-s') option."
   , usage = "%prog [options]... [file]..."
   , option_list=options)
   , positional_arguments = c(0, Inf))
