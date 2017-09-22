@@ -15,8 +15,6 @@
 ## * .60-.79 ``strong''
 ## * .80-1.0 ``very strong''
 
-## Example by Fisher:
-
 library(optparse)
 
 printf  <- function(...) cat(sprintf(...), sep='', file=stdout())
@@ -42,14 +40,14 @@ options <- list(
               , action="store_true"
                 )
   , make_option(c("-W", "--warnings")
-              , help='The R function that computes the correlation coefficient constantly complains that it "cannot compute exact p-value with ties.". This option controls whether to show that warning not. [default: %default]'
+              , help='The R function that computes the correlation coefficient constantly complains that it "cannot compute exact p-value with ties.". This option controls whether to show that warning. [default: %default]'
               , default = FALSE
               , action="store_true"
                 )
 )
 
 args <- parse_args(OptionParser(
-    description = "Compute the Spearman rank correlation coefficient between various annotation metrics and LOC. If no input R data set is given, the project must be specified via the `--project' (`-p') option."
+    description = "Compute the Spearman rank correlation coefficient between various annotation metrics and LOC, as well as a selection of other correlations. If no input R data set is given, the project must be specified via the `--project' (`-p') option."
   , usage = "%prog [options] [file]"
   , option_list=options)
   , positional_arguments = c(0, 1))
