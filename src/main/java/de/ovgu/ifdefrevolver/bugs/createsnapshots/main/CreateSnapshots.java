@@ -301,20 +301,6 @@ public class CreateSnapshots {
             processStderr = p.getErrorStream();
             ReaderCoordinator readerCoordinator = new ReaderCoordinator(progBasename, processStdout, processStderr);
             readerCoordinator.start();
-            // scanStdout = new Scanner(processStdout);
-            // scanStderr = new Scanner(processStderr);
-            // boolean hadMoreOutput;
-            // do {
-            // hadMoreOutput = false;
-            // if (scanStdout.hasNextLine()) {
-            // hadMoreOutput = true;
-            // LOG.info("[" + progBasename + " out] " + scanStdout.nextLine());
-            // }
-            // if (scanStderr.hasNextLine()) {
-            // hadMoreOutput = true;
-            // LOG.info("[" + progBasename + " err] " + scanStderr.nextLine());
-            // }
-            // } while (hadMoreOutput);
             try {
                 exitCode = p.waitFor();
                 // Wait for some last output
@@ -345,23 +331,11 @@ public class CreateSnapshots {
         } catch (IOException e) {
             throw new RuntimeException("Error executing " + command, e);
         } finally {
-            // try {
-            // if (scanStdout != null)
-            // scanStdout.close();
-            // } catch (Exception e) {
-            // /* ignored */
-            // }
             try {
                 if (processStdout != null) processStdout.close();
             } catch (Exception e) {
                 /* ignored */
             }
-            // try {
-            // if (scanStderr != null)
-            // scanStderr.close();
-            // } catch (Exception e) {
-            // /* ignored */
-            // }
             try {
                 if (processStderr != null) processStderr.close();
             } catch (Exception e) {
