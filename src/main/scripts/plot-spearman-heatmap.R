@@ -82,7 +82,7 @@ if (opts$annotatedOnly) {
     filteredData <- subset(filteredData, AnnotatedOnly == 0)
 }
 
-if (opts$changed) {
+if (opts$changedOnly) {
     filteredData <- subset(filteredData, ChangedOnly != 0)
     filterName <- appendUnlessEmpty(filterName, "changed", sep=".")
     filterDisplayName <- appendUnlessEmpty(filterDisplayName, "changed", sep=", ")
@@ -143,7 +143,8 @@ hm <- heatmap.2(mat,
                 col=myPalette,       # use on color palette defined earlier
                 breaks=colBreaks,    # enable color transition at specified limits
                 dendrogram="none",    # don't draw a row dendrogram
-                Colv="NA"             # turn off column clustering
+                Colv="NA",             # turn off column clustering
+                Rowv=FALSE		# disable row reordering
 )
 
 invisible(dev.off())
