@@ -110,7 +110,7 @@ if ( !is.null(opts$output) ) {
 pdf(file=outputFn,width=7,height=7)
 
 row.names(filteredData) <- filteredData$Independent
-filteredData <- filteredData[,5:8]
+filteredData <- filteredData[,5:ncol(filteredData)]
 
 library(gplots)
 library(RColorBrewer)
@@ -129,9 +129,10 @@ matRound <- round(mat, 2)
 
 numBreaks <- 16
 
-myPalette <- colorRampPalette(c("blue", "green", "yellow", "red"))(n = numBreaks)
+##myPalette <- colorRampPalette(c("blue", "green", "yellow", "red"))(n = numBreaks)
+myPalette <- colorRampPalette(c("blue", "green", "white", "yellow", "red"))(n = numBreaks)
 
-colBreaks <- seq(-0.7, 0.6, length=numBreaks+1)
+colBreaks <- seq(-0.7, 0.7, length=numBreaks+1)
 
 hm <- heatmap.2(mat,
                 cellnote = matRound,  # data set for cell labels
@@ -144,7 +145,7 @@ hm <- heatmap.2(mat,
                 breaks=colBreaks,    # enable color transition at specified limits
                 dendrogram="none",    # don't draw a row dendrogram
                 Colv="NA",             # turn off column clustering
-                Rowv=FALSE		# disable row reordering
+                Rowv="NA"	# disable row reordering
 )
 
 invisible(dev.off())

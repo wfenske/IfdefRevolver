@@ -114,12 +114,34 @@ printRhoRow <- function(data, indep, systemName, changedOnly, annotatedOnly) {
 }
 
 allData <- readData(args)
+
+allData$log2LOC <- log2(allData$LOC)
+allData$log2log2LOC <- log2(allData$log2LOC)
+allData$sqrtLOC <- sqrt(allData$LOC)
+
+allData$COMMITSlog2Ratio <- allData$COMMITS / allData$log2LOC
+allData$COMMITSsqrtRatio <- allData$COMMITS / allData$sqrtLOC
+
+allData$LCHlog2Ratio <- allData$LCH / allData$log2LOC
+allData$LCHlog2log2Ratio <- allData$LCH / allData$log2log2LOC
+allData$LCHsqrtRatio <- allData$LCH / allData$sqrtLOC
+
 allData$CND <- allData$NONEST
+
 allData[is.na(allData)] <- 0.0
 
 ##indeps <- c("FL", "FC", "CND", "NEG", "LOAC", "LOC")
-indeps <- c("LOC", "LOAC", "NEG", "CND", "FC", "FL")
-deps <- c("COMMITS", "LCH", "COMMITSratio", "LCHratio")
+indeps <- c("CND", "FC", "FL", "LOAC", "LOC", "NEG") # alphabetical order
+## NOTE, 2017-11-29, wf: Including log2LOC as an independent variable
+## doesn't change anything regarding Spearman's rank correlation
+## because Spearman only cares about order (not linearity), which
+## stays the same whether log-transform or not.
+
+deps <- c("COMMITS", "LCH"
+        , "COMMITSratio", "LCHratio"
+        , "COMMITSlog2Ratio", "LCHlog2Ratio"
+        , "COMMITSsqrtRatio", "LCHsqrtRatio"
+          )
 
 for (indep in indeps) {
     eprintf("WARN: rounding independent variable values of `%s'!\n", indep)
