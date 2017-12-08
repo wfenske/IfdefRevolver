@@ -7,7 +7,7 @@ title: Online Appendix for "How Preprocessor Annotations (Do Not) Affect Maintai
 ## Tool Support
 
 Data collection for this study was performed by
-[IfdefRevolver](https://github.com/wfenske/IfdefRevolver/)
+[IfdefRevolver](https://github.com/wfenske/IfdefRevolver/),
 the Github project this page belongs to.
 The entry point to the analysis is the Bourne shell script
 `ifdefrevolve-project.sh`, located in `src/main/scripts`.
@@ -37,8 +37,10 @@ initial experiment on `OpenLDAP`.  On a separate page, we list the
 
 ## Data
   
-The data (in `.csv` format) for all eight subject systems used in the
-study is [available here.](data/ifdefs-vs-changes-data.tar.gz)
+The data for all eight subject systems used in the study is
+[available here.](data/ifdefs-vs-changes-data.tar.gz) The data is
+available both in `.csv` format and as R data sets (files named
+`allData.rdata`).
 
 ## Subject Systems
 
