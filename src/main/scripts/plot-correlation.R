@@ -273,6 +273,18 @@ appendUnlessEmpty <- function(a, b, sep="") {
 allData <- readData(args)
 allData$CND <- allData$NONEST
 
+normLoc <- function(x) {
+    return (log2(x))
+###    return (sqrt(x))
+###    return (1.301374
+###            + 0.0208396 * x
+###            + -1.725208e-05 * x^2
+###            + 5.489012e-09 * x^3)
+}
+
+allData$NORM_LOC <- normLoc(allData$LOC)
+allData$COMMITSratioStable <- allData$COMMITS / allData$NORM_LOC
+
 filteredData <- allData
 filteredData[is.na(filteredData)] <- 0.0
 
@@ -329,6 +341,31 @@ if (opts$dlim > 0.0) {
                          formatf(opts$dlim))
 }
 
+reduced <- filteredData[c('LOC', 'COMMITS')]
+## Group together functions of similar length
+fac <- 12
+reduced$LOC <- round(reduced$LOC / (1.0 * fac)) * fac
+##aggr <- aggregate(COMMITS ~ LOC, data = reduced, mean)
+##aggr <- count(reduced, c('LOC', 'COMMITS'))
+aggr <- subset(as.data.frame(table(reduced)), Freq > 0)
+aggr$radius <- sqrt( aggr$Freq ) / pi
+## Convert my integer variables back from factors (which 'tables()'
+## produced) to numbers.
+aggr$LOC <- as.numeric(as.character(aggr$LOC))
+aggr$COMMITS <- as.numeric(as.character(aggr$COMMITS))
+
+##aggr
+##stop()
+
+## Yields a table like this one:
+##
+##        LOC COMMITS Freq
+## 1        2       1    2
+## 2        3       1   86
+## 3        4       1  465
+## 4        5       1  315
+## 5        6       1  383
+## 6        7       1  441
 filteredData$INDEP <- filteredData[,opts$independent]
 filteredData$DEP <- filteredData[,opts$dependent]
 
@@ -338,7 +375,7 @@ filteredData$DEP <- filteredData[,opts$dependent]
 pdf(file=outputFn,width=7,height=7)
 
 p <- ggplot(data=filteredData, aes(x=INDEP, y=DEP)) +
-    geom_point(shape=16) +
+    ##geom_point(shape=16) +
     geom_smooth(
       #  se=FALSE  # Don't add shaded confidence region
       #, size=0.85 # line thickness
@@ -370,6 +407,24 @@ p <- p + ggtitle(sprintf("%s %s | n=%d | %s", systemname, titleExtra, nrow(filte
 ##}
 
 print(p)
+
+## Bubble chart, inspired by information from
+## http://flowingdata.com/2010/11/23/how-to-make-bubble-charts/
+
+## Remove 0 values due to log-scaled axes
+aggr <- subset(aggr, LOC > 0)
+aggr <- subset(aggr, COMMITS > 0)
+aggr <- subset(aggr, radius > 0)
+
+symbols(
+    ##x = aggr$LOC
+    x = log2(aggr$LOC)
+      , y = log2(aggr$COMMITS)
+      , inches=0.2
+        ##, xlim=c(1, 1200)
+      ##, ylim=c(10, 30)
+      , fg="white", bg="red",
+      , circles=aggr$radius)
 
 invisible(dev.off())
 

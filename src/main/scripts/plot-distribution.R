@@ -201,6 +201,42 @@ appendUnlessEmpty <- function(a, b, sep="") {
 
 allData <- readData(args)
 
+library(polynom)
+## Return a sample of the supplied data frame
+sampleDf <- function(df, sz) {
+    rowCount <- nrow(df)
+    if (rowCount < sz) {
+        return (df)
+    } else {
+        return (df[sample(rowCount, sz), ])
+    }
+}
+
+##polySample <- subset(subset(allData, FL > 0), COMMITS > 0)
+##x <- polySample$LOC
+##m <- lm(polySample$COMMITS ~ x + I(x^2) + I(x^3))
+##c <- m$coefficients
+##c
+##e0 <- c[[1]]
+##e1 <- c[[2]]
+##e2 <- c[[3]]
+##e3 <- c[[4]] ## e3 is too small and varies too much to be useful
+##e0
+##e1
+##e2
+##e3
+
+normLoc <- function(x) {
+    return (log2(x))
+##    return (1.301374
+##            + 0.0208396 * x
+##            + -1.725208e-05 * x^2
+    ##            + 5.489012e-09 * x^3)
+}
+
+allData$NORM_LOC <- normLoc(allData$LOC)
+allData$COMMITSratioStable <- allData$COMMITS / allData$NORM_LOC
+
 varName <- opts$variable
 
 if (is.null(varName)) {
@@ -258,7 +294,8 @@ if (varName %in% c('FC', 'FL', 'ND', 'COMMITS', 'HUNKS',
     plotFunc <- ggplotHistDiscrete
 } else if (varName %in% c('FCratio', 'FLratio', 'NDratio',
                           'LOACratio', 'LOFCratio',
-                          'COMMITSratio', 'HUNKSratio', 'LCHratio')) {
+                          'COMMITSratio', 'HUNKSratio', 'LCHratio',
+                          'COMMITSratioStable')) {
         plotFunc <- ggplotHistContinuous
 } else {
     stop(paste("Don't know whether to plot variable discreetely or continuously:",
