@@ -1,6 +1,6 @@
 # IfdefRevolver
 
-Examines correlations between CPP annotations (a.k.a. #ifdefs) and
+Examines correlations between CPP annotations (a.k.a. `#ifdef`s) and
 negative effects, such as an increased proneness to faults or changes.
 
 ## Dependencies
@@ -14,7 +14,10 @@ some third-party tools, used as is.
 * cppstats: https://github.com/wfenske/cppstats
 
   Customized to improve performance for evolutionary analyses.  Also,
-  some bugs were fixed.
+  some bugs were fixed. 
+
+  Be sure to check out the `skunk` branch!  This branch contains
+  the aforementioned customizations.
 
 * Skunk: https://github.com/wfenske/Skunk
 
@@ -23,11 +26,16 @@ some third-party tools, used as is.
   cleaner output in CSV files.  Function signature parsing was also
   improved.
 
+  Be sure to check out the `skunk` branch!  This branch contains
+  changed and new functionality that IfdefRevolver depends on.
+
 * repodriller: https://github.com/wfenske/repodriller
 
   Enhanced to improve performance on large repositories with many
   commits.  Specifically, the time-consuming identification of
   branches for a commit was made optional.
+
+  Again, use the code in the `skunk` branch!
 
 ### Other third-party tools
 
