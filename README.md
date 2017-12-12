@@ -77,7 +77,7 @@ Other Unix-like systems will probably work. Windows has not been tested.
 
 1. Install cppstats
 
-   Be sure to checkout out the correct form and branch (see above).
+   Be sure to checkout out the correct fork and branch (see above).
 
    I installed cppstats using Python version 2.7.6, a somewhat dated
    Python version, because cppstats does not work with Python 3.
@@ -96,7 +96,7 @@ Other Unix-like systems will probably work. Windows has not been tested.
 
 1. Install Skunk
 
-   Be sure to checkout out the correct form and branch (see above).
+   Be sure to checkout out the correct fork and branch (see above).
 
    Installation works via Maven, i.e., go to the checkout, then change
    to the `Skunk` subdirectory (`cd Skunk`), then do
