@@ -107,7 +107,7 @@ Other Unix-like systems will probably work. Windows has not been tested.
 
 1. Install repodriller
 
-   Be sure to checkout out the correct form and branch (see above).
+   Be sure to checkout out the correct fork and branch (see above).
 
    Installation works via Maven, i.e., go to the checkout, then do
 
