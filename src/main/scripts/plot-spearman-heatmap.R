@@ -115,7 +115,7 @@ filteredData <- filteredData[,5:ncol(filteredData)]
 library(gplots)
 library(RColorBrewer)
 
-mat <- data.matrix(filteredData)
+mat <- t(data.matrix(filteredData))
 
 ##heatmap <- heatmap.2(mat,
 ##                   ,cellnote = mat

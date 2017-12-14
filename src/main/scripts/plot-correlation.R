@@ -375,7 +375,7 @@ filteredData$DEP <- filteredData[,opts$dependent]
 pdf(file=outputFn,width=7,height=7)
 
 p <- ggplot(data=filteredData, aes(x=INDEP, y=DEP)) +
-    ##geom_point(shape=16) +
+    geom_point(shape=16) +
     geom_smooth(
       #  se=FALSE  # Don't add shaded confidence region
       #, size=0.85 # line thickness
