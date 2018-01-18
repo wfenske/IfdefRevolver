@@ -49,6 +49,11 @@ some third-party tools, used as is.
   to aggregate and transform intermediate results.
 
   Version used: 1.0.2 (2016)
+  
+* xsltproc: http://xmlsoft.org/XSLT/xsltproc.html
+
+  A command line xslt processor, used internally by `cppstats`, e.g.,
+  to remove comments.
 
 * R: https://www.r-project.org/
 
@@ -74,6 +79,14 @@ Other Unix-like systems will probably work. Windows has not been tested.
    Make sure it is in your `PATH`, i.e., that `src2srcml` and
    `srcml2src` reside in a directory that is in the list of
    directories in your `PATH` environment variable.
+   
+1. Install xsltproc
+
+   Under the Ubuntu distribution of Linux, the package `xsltproc`
+   provides this program.  Again, make sure that `xsltproc` is in your
+   `PATH`.  Otherwise, `cppstats` will terminate with errno 2 ("No
+   such file or directory"), and the stackstrace will contain a call
+   to `deleteComments`, which in turn calls `runBashCommand`.
 
 1. Install cppstats
 
