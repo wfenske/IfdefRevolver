@@ -109,9 +109,20 @@ Other Unix-like systems will probably work. Windows has not been tested.
    
 1. Install CSVKit
 
-   CSVKit is available from the website mentioned above.
-   Make sure it is in your `PATH` so that the IfdefRevolver
-   scripts find it at runtime.
+   CSVKit is a collection of programs, among them `csvsql`, `csvcut`,
+   `csvjoin`.  If these are missing, the analysis phase of
+   IfdefRevolver will fail with an error along the lines of:
+   
+   `function_change_hunks2function_change_commits.sh: csvsql: not found`
+   
+   Being a Python package, CSVKit can be installed via `pip`:
+   
+   `sudo -H pip install csvkit`
+	
+   Make sure it is in your `PATH` so that the IfdefRevolver scripts
+   find it at runtime.  Check whether it works by typing
+   
+   `csvsql --help`
 
 1. Install Skunk
 
