@@ -106,12 +106,6 @@ Other Unix-like systems will probably work. Windows has not been tested.
    `sudo -H /opt/python-2.7.6/bin/python setup.py install`
 	
    The main program, `cppstats`, also needs to be in your `PATH`.
-
-1. Install xsltproc
-
-   Xsltproc is available from the website mentioned above.
-   Make sure it is in your `PATH` so that `cppstats`
-   finds it at runtime.
    
 1. Install CSVKit
 
