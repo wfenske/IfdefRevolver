@@ -107,6 +107,18 @@ Other Unix-like systems will probably work. Windows has not been tested.
 	
    The main program, `cppstats`, also needs to be in your `PATH`.
 
+1. Install xsltproc
+
+   Xsltproc is available from the website mentioned above.
+   Make sure it is in your `PATH` so that `cppstats`
+   finds it at runtime.
+   
+1. Install CSVKit
+
+   CSVKit is available from the website mentioned above.
+   Make sure it is in your `PATH` so that the IfdefRevolver
+   scripts find it at runtime.
+
 1. Install Skunk
 
    Be sure to checkout out the correct fork and branch (see above).
