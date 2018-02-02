@@ -7,6 +7,7 @@ library(optparse)
 suppressMessages(library(aod))
 suppressMessages(library(MASS)) # for glm.nb
 suppressMessages(library(pscl)) # for Zero-inflated Poisson models
+##library(jtools) # for summ, see https://cran.r-project.org/web/packages/jtools/vignettes/interactions.html
 
 options <- list(
     make_option(c("-p", "--project")
@@ -26,6 +27,15 @@ options <- list(
                 action="store_true",
                 dest="noTestCode",
                 help="Exclude functions that likely constitute test code. A simple heuristic based on file name and function name is used to identify such functions. [default: %default]")
+  , make_option(c("-W", "--exclude-models-with-warnings"),
+                default=FALSE,
+                action="store_true",
+                dest="noModelsWithWarnings",
+                help="Exclude models for which warnings occurred. [default: %default]")
+  , make_option(c("--p-max"),
+                default=0.05,
+                dest="pMax",
+                help="Exclude independent variables whose p-value is above the specified value. [default: %default]")
 )
 
 args <- parse_args(OptionParser(
@@ -162,7 +172,8 @@ reportModel <- function(model, modelName, mcfadden, csvOut=TRUE, csvHeader=TRUE,
         dummy <- calculateChiSqStat(modelSummary)
     } else {
         if (csvHeader) {
-            printf("SYSTEM,D,FORMULA,AIC,MCFADDEN,CHISQ,I,COEF,Z,P,PCODE,WARNINGS,WARNING_MESSAGES\n")
+            ##printf("SYSTEM,D,FORMULA,AIC,MCFADDEN,CHISQ,I,COEF,Z,P,PCODE,WARNINGS,WARNING_MESSAGES\n")
+            printf("SYSTEM,D,FORMULA,MCFADDEN,I,OR,COEF,P,PCODE,WARNINGS,WARNING_MESSAGES\n")
         }
         chisq <- calculateChiSqStat(modelSummary)
         msCoefs <- modelSummary$coefficients
@@ -172,18 +183,35 @@ reportModel <- function(model, modelName, mcfadden, csvOut=TRUE, csvHeader=TRUE,
         ## Formula of independent variables
         iLabels <- labels(msCoefs)[[1]]
         iFormula <- paste(iLabels[2:length(iLabels)], collapse="+")
-        for (i in 1:nrow(msCoefs)) {
-            cName <- iLabels[i]
-            c <-  msCoefs[i, "Estimate"]
-            z <- msCoefs[i, "z value"]
-            p <- msCoefs[i, "Pr(>|z|)"]
-            ##printf("%s,%7s,% 27s,%7.0f,%.4f,%.2f,%11s,%- 6.4f,%3s,%.4f,%d,\"%s\"\n",
-            printf("%s,%s,%s,%.0f,%.4f,%.2f,%s,% .6f,%.2f,%.4f,%s,%d,\"%s\"\n",
-                   sysname
-                 , dName, iFormula
-                 , model$aic, mcfadden, chisq
-                 , cName, c, z, p, significanceCode(p)
-                 , warnings, warningMessages)
+        if (opts$noModelsWithWarnings & (warnings > 0)) {
+            eprintf("INFO: Excluding model `%s': %d warning(s) occurred: %s.\n",
+                    iFormula, warnings, warningMessages)
+        } else {
+            for (i in 1:nrow(msCoefs)) {
+                cName <- iLabels[i]
+                c <-  msCoefs[i, "Estimate"]
+                z <- msCoefs[i, "z value"]
+                p <- msCoefs[i, "Pr(>|z|)"]
+                if (p > opts$pMax) {
+                    eprintf("INFO: Omitting dependent variable `%s': p-value too large (%f > %f).\n",
+                            cName, p, opts$pMax)
+                } else {
+                    ##printf("%s,%7s,% 27s,%7.0f,%.4f,%.2f,%11s,%- 6.4f,%3s,%.4f,%d,\"%s\"\n",
+###            printf("%s,%s,%s,%.0f,%.4f,%.2f,%s,% .6f,%.2f,%.4f,%s,%d,\"%s\"\n",
+###                   sysname
+###                 , dName, iFormula
+###                 , model$aic, mcfadden, chisq
+###                 , cName, c, z, p, significanceCode(p)
+###                 , warnings, warningMessages)
+                    ##printf("%s,%s,%43s,%.4f,%21s,%.3f,% .6f,%.4f,%3s,%d,\"%s\"\n",
+                    printf("%s,%s,%s,%.4f,%s,%.3f,% .6f,%.4f,%3s,%d,\"%s\"\n",
+                           sysname
+                         , dName, iFormula
+                         , mcfadden
+                         , cName, exp(c), c, p, significanceCode(p)
+                         , warnings, warningMessages)
+                }
+            }
         }
     }
 
@@ -191,7 +219,8 @@ reportModel <- function(model, modelName, mcfadden, csvOut=TRUE, csvHeader=TRUE,
 }
 
 tryLogitModel <- function(indeps, dep, data, csvOut=FALSE, csvHeader=FALSE) {
-    indepsFormula <- paste(indeps, collapse=" + ")
+    indepsFormula <- paste(indeps, collapse=" + ") # without interactions
+    ##indepsFormula <- paste(indeps, collapse=" * ") # with interactions
     ## This formula also considers 2-way interactions
     ##formulaString <- sprintf("%s ~ (%s)^2 - 1 ", dep, indepsFormula)
     ## This model considers no interactions
@@ -411,17 +440,23 @@ csvModel <- function(dep, indeps, header=FALSE) {
     return (model)
 }
 
-##indeps <- c("FL", "FC", "ND", "NEG", "LOACratio")
-indeps <- c("log2FL", "log2FC", "log2ND", "log2NEG", "log2LOACratio")
+indeps <- c("FL", "FC", "ND", "NEG", "LOACratio")
+##indeps <- c("log2FL", "log2FC", "log2ND", "log2NEG", "log2LOACratio")
 for (dep in c("COMMITS_PRONE"
               ##, "HUNKS"
               ##, "LCH_PRONE"
               )) {
-    for (indep in indeps) {
-        csvModel(dep, c(indep))
-    }
+    ##for (indep in indeps) {
+    ##    m <- csvModel(dep, c(indep))
+    ##}
     dummy <- csvModel(dep, c("log2LOC"))
     for (indep in indeps) {
-        csvModel(dep, c("log2LOC", indep))
+        m <- csvModel(dep, c("log2LOC", indep))
     }
+    m <- csvModel(dep, c("log2LOC", indeps))
 }
+##dep <- "COMMITS_PRONE"
+##dummy <- csvModel(dep, c("log2LOC"))
+##dummy <- csvModel(dep, c("log2LOC", "FL", "FC", "ND", "NEG", "LOACratio"))
+##dummy <- csvModel(dep, c("log2LOC", "log2FL", "log2FC", "log2ND", "log2NEG", "log2LOACratio"))
+##dummy <- csvModel(dep, c("log2LOC", "log2FL", "log2FC", "log2ND", "log2NEG", "LOACratio"))
