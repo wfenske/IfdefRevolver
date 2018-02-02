@@ -90,6 +90,8 @@
                 <configuration>
                     <source>1.8</source>
                     <target>1.8</target>
+		    <fork>true</fork>
+		    <executable>javac</executable>
                 </configuration>
             </plugin>
             <!-- maven-assembly-plugin is used for creating a single jar containing all dependencies -->
