@@ -1,18 +1,18 @@
 package de.ovgu.ifdefrevolver.bugs.minecommits.main;
 
 import de.ovgu.ifdefrevolver.bugs.minecommits.AbstractSkunkCommitStudy;
+import de.ovgu.ifdefrevolver.bugs.minecommits.CommitParentsStudy;
 import de.ovgu.ifdefrevolver.bugs.minecommits.Config;
-import de.ovgu.ifdefrevolver.bugs.minecommits.OrderingCommitStudy;
 
-public class ListCommits extends AbstractSkunkCommitLister {
+public class ListCommitParents extends AbstractSkunkCommitLister {
     public static void main(String[] args) {
-        ListCommits me = new ListCommits();
+        ListCommitParents me = new ListCommitParents();
         me.doMain(args);
     }
 
     @Override
     protected AbstractSkunkCommitStudy makeNewCommitStudy(Config conf) {
-        return new OrderingCommitStudy(conf);
+        return new CommitParentsStudy(conf);
     }
 
     @Override

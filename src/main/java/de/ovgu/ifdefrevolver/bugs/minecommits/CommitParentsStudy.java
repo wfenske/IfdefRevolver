@@ -4,20 +4,20 @@ import de.ovgu.ifdefrevolver.bugs.minecommits.main.ListCommits;
 
 import java.util.Optional;
 
-public class OrderingCommitStudy extends AbstractSkunkCommitStudy {
+public class CommitParentsStudy extends AbstractSkunkCommitStudy {
 
-    public OrderingCommitStudy(Config conf) {
+    public CommitParentsStudy(Config conf) {
         super(conf);
     }
 
     @Override
     protected Optional<Integer> getMaxDiffSize() {
-        return Optional.of(512 * 1014);
+        return Optional.of(1024 * 1014);
     }
 
     @Override
     protected ICommitVisitorWithOutputFileHeader makeNewVisitor() {
-        return new OrderingCommitVisitor();
+        return new CommitParentsVisitor();
     }
 
     @Override

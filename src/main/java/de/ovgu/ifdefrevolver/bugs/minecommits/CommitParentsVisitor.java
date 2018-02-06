@@ -11,12 +11,15 @@ import java.text.DateFormat;
 import java.text.SimpleDateFormat;
 import java.util.*;
 
-public class OrderingCommitVisitor implements ICommitVisitorWithOutputFileHeader {
-    private static Logger LOG = Logger.getLogger(OrderingCommitVisitor.class);
+public class CommitParentsVisitor implements ICommitVisitorWithOutputFileHeader {
+    private static Logger LOG = Logger.getLogger(CommitParentsVisitor.class);
 
     private final DateFormat dateFormat = new SimpleDateFormat(OrderedRevisionsColumns.TIMESTAMP_FORMAT);
 
-    public OrderingCommitVisitor() {
+    public CommitParentsVisitor() {
+        if (true) {
+            throw new UnsupportedOperationException("Class is just a stub and needs to be reimplemented from scratch.");
+        }
     }
 
     Map<String, OrderedCommit> commitsWithoutParents = new HashMap<>();
