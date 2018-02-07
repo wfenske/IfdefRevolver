@@ -17,7 +17,7 @@ public class ListCommitParents extends AbstractSkunkCommitLister {
 
     @Override
     protected String getOutputFileCommandLineOptionDescription() {
-        return "output file, should be named `revisionsFull.csv' and be located in the project's results directory";
+        return "output file, should be named `commitParents.csv' and be located in the project's results directory";
     }
 
     @Override
