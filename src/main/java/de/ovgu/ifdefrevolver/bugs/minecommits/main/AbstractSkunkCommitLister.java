@@ -87,7 +87,7 @@ public abstract class AbstractSkunkCommitLister {
         // --help= option
         options.addOption(Option.builder(OPT_HELP)
                 .longOpt("help")
-                .desc("print this help sceen and exit")
+                .desc("print this help screen and exit")
                 .build());
         // --repo= option
         options.addOption(Option.builder(OPT_REPO)
