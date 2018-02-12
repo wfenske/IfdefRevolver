@@ -187,6 +187,7 @@ public class CommitsDistanceDb {
         synchronized (knownDistances) {
             knownDistances.put(cacheKey, result);
         }
+
         return result;
     }
 
