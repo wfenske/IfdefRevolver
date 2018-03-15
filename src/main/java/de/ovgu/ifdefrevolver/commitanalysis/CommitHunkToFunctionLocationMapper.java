@@ -45,13 +45,27 @@ class CommitHunkToFunctionLocationMapper implements Consumer<Edit> {
         try {
             final int remBegin = edit.getBeginA();
             final int remEnd = edit.getEndA();
+
+            final boolean logDebug = LOG.isDebugEnabled();
+
             for (Iterator<Method> fIter = functionsInOldPathByOccurrence.iterator(); fIter.hasNext(); ) {
                 Method f = fIter.next();
+                if (logDebug) {
+                    LOG.debug("Checking " + f);
+                }
                 if (editOverlaps(f, remBegin, remEnd)) {
-                    boolean editDeletesFunction = editDeletes(f, remBegin, remEnd);
-                    markFunctionEdit(edit, f, editDeletesFunction);
+                    if (logDebug) {
+                        LOG.debug("Edit " + remBegin + ".." + remEnd + " overlaps " + f);
+                    }
+                    final FunctionChangeHunk.ModificationType modType;
+                    if (editDeletes(f, remBegin, remEnd)) {
+                        modType = FunctionChangeHunk.ModificationType.DEL;
+                    } else {
+                        modType = FunctionChangeHunk.ModificationType.MOD;
+                    }
+                    markFunctionEdit(edit, f, modType);
                 } else if (f.end1 < remBegin) {
-                    if (LOG.isDebugEnabled()) {
+                    if (logDebug) {
                         LOG.debug("No future edits possible for " + f);
                     }
                     fIter.remove();
@@ -65,9 +79,9 @@ class CommitHunkToFunctionLocationMapper implements Consumer<Edit> {
         }
     }
 
-    private void markFunctionEdit(Edit edit, Method f, boolean deletesFunction) {
+    private void markFunctionEdit(Edit edit, Method f, FunctionChangeHunk.ModificationType modType) {
         ChangeHunk hunk = hunkFromEdit(f, edit);
-        FunctionChangeHunk fHunk = new FunctionChangeHunk(f, hunk, deletesFunction);
+        FunctionChangeHunk fHunk = new FunctionChangeHunk(f, hunk, modType);
         changedFunctionConsumer.accept(fHunk);
         //logEdit(f, edit);
     }
@@ -128,17 +142,31 @@ class CommitHunkToFunctionLocationMapper implements Consumer<Edit> {
         // NOTE, 2017-02-04, wf: We subtract 1 from the function's line
         // numbers because function line numbers are 1-based, whereas edit
         // line numbers are 0-based.
+
+        // NOTE, 2018-03-15, wf: The end of an edit is actually the first
+        // line *not* edited.  Thus, we need to compare the end with '>',
+        // not '>='.
         int fBegin = func.start1 - 1;
         int fEnd = func.end1 - 1;
-        return ((editBegin < fEnd) && (editEnd >= fBegin));
+        return ((editBegin < fEnd) && (editEnd > fBegin));
     }
 
     private boolean editDeletes(Method func, final int editBegin, final int editEnd) {
         // NOTE, 2017-02-04, wf: We subtract 1 from the function's line
         // numbers because function line numbers are 1-based, whereas edit
         // line numbers are 0-based.
+
+        // NOTE, 2018-03-15, wf: The end of an edit is actually the first
+        // line *not* edited.  Thus, we need to compare the end with '>',
+        // not '>='.
         int fBegin = func.start1 - 1;
         int fEnd = func.end1 - 1;
-        return ((editBegin <= fBegin) && (editEnd >= fEnd));
+        return ((editBegin <= fBegin) && (editEnd > fEnd));
+//
+//        if (result) {
+//            LOG.debug("Delete detected. Edit end: " + editEnd + "; function end: " + fEnd);
+//        }
+//
+//        return result;
     }
 }

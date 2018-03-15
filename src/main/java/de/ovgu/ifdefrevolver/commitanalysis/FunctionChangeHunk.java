@@ -17,17 +17,29 @@ public class FunctionChangeHunk {
      */
     private ChangeHunk hunk;
 
-    /**
-     * {@code true} if this change deletes the entire function (happens
-     * sometimes if a function is moved to another file or within the
-     * same file)
-     */
-    private boolean deletesFunction;
+    public static enum ModificationType {
+        /**
+         * if this change adds the entire function
+         */
+        ADD,
+        /**
+         * if this change deletes the entire function (happens
+         * sometimes if a function is moved to another file or within the
+         * same file)
+         */
+        DEL,
+        /**
+         * if this change neither adds nor deletes the entire function but simply modifies parts of it
+         */
+        MOD
+    }
 
-    public FunctionChangeHunk(Method function, ChangeHunk hunk, boolean deletesFunction) {
+    private ModificationType modType;
+
+    public FunctionChangeHunk(Method function, ChangeHunk hunk, ModificationType modType) {
         this.function = function;
         this.hunk = hunk;
-        this.deletesFunction = deletesFunction;
+        this.modType = modType;
     }
 
     public Method getFunction() {
@@ -45,7 +57,7 @@ public class FunctionChangeHunk {
      * same file)
      */
     public boolean deletesFunction() {
-        return deletesFunction;
+        return modType == ModificationType.DEL;
     }
 
     @Override
@@ -53,7 +65,7 @@ public class FunctionChangeHunk {
         return this.getClass().getSimpleName() + "{" +
                 "f=" + function +
                 ", hunk=" + hunk +
-                ", deletesFunction=" + deletesFunction +
+                ", modificationType=" + modType +
                 '}';
     }
 }
