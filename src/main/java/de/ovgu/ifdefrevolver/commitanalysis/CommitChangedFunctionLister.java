@@ -144,7 +144,10 @@ class CommitChangedFunctionLister {
             return;
         }
 
-        CommitHunkToFunctionLocationMapper editLocMapper = new CommitHunkToFunctionLocationMapper(commitId, oldPath, functions, changedFunctionConsumer);
+        CommitHunkToFunctionLocationMapper editLocMapper = new CommitHunkToFunctionLocationMapper(commitId,
+                oldPath, functions,
+                newPath, Collections.emptyList(),
+                changedFunctionConsumer);
 
         for (Edit edit : formatter.toFileHeader(diff).toEditList()) {
             LOG.debug("- " + edit.getBeginA() + "," + edit.getEndA() +

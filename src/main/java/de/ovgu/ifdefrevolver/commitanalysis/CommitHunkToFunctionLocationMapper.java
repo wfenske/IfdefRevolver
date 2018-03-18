@@ -15,12 +15,18 @@ import java.util.function.Consumer;
  */
 class CommitHunkToFunctionLocationMapper implements Consumer<Edit> {
     private static final Logger LOG = Logger.getLogger(CommitHunkToFunctionLocationMapper.class);
-
-    final List<Method> functionsInOldPathByOccurrence;
     /**
      * A-side file path of the file being modified
      */
     final String oldPath;
+    final List<Method> functionsInOldPathByOccurrence;
+    /**
+     * B-side file path of the file being modified
+     */
+    final String newPath;
+    final List<Method> functionsInNewPathByOccurrence;
+
+
     private final String commitId;
     private final Consumer<FunctionChangeHunk> changedFunctionConsumer;
     /**
@@ -29,10 +35,15 @@ class CommitHunkToFunctionLocationMapper implements Consumer<Edit> {
      */
     int numHunkInFile = 0;
 
-    public CommitHunkToFunctionLocationMapper(String commitId, String oldPath, Collection<Method> functionsInOldPathByOccurrence, Consumer<FunctionChangeHunk> changedFunctionConsumer) {
+    public CommitHunkToFunctionLocationMapper(String commitId,
+                                              String oldPath, Collection<Method> functionsInOldPathByOccurrence,
+                                              String newPath, Collection<Method> functionsInNewPathByOccurrence,
+                                              Consumer<FunctionChangeHunk> changedFunctionConsumer) {
         this.commitId = commitId;
         this.oldPath = oldPath;
+        this.newPath = newPath;
         this.functionsInOldPathByOccurrence = new LinkedList<>(functionsInOldPathByOccurrence);
+        this.functionsInNewPathByOccurrence = new LinkedList<>(functionsInNewPathByOccurrence);
         this.changedFunctionConsumer = changedFunctionConsumer;
     }
 
@@ -43,39 +54,83 @@ class CommitHunkToFunctionLocationMapper implements Consumer<Edit> {
         // This is good because "A"-side line numbers are much easier to correlate with the
         // function locations we have than the "B"-side offsets.
         try {
-            final int remBegin = edit.getBeginA();
-            final int remEnd = edit.getEndA();
-
-            final boolean logDebug = LOG.isDebugEnabled();
-
-            for (Iterator<Method> fIter = functionsInOldPathByOccurrence.iterator(); fIter.hasNext(); ) {
-                Method f = fIter.next();
-                if (logDebug) {
-                    LOG.debug("Checking " + f);
-                }
-                if (editOverlaps(f, remBegin, remEnd)) {
-                    if (logDebug) {
-                        LOG.debug("Edit " + remBegin + ".." + remEnd + " overlaps " + f);
-                    }
-                    final FunctionChangeHunk.ModificationType modType;
-                    if (editDeletes(f, remBegin, remEnd)) {
-                        modType = FunctionChangeHunk.ModificationType.DEL;
-                    } else {
-                        modType = FunctionChangeHunk.ModificationType.MOD;
-                    }
-                    markFunctionEdit(edit, f, modType);
-                } else if (f.end1 < remBegin) {
-                    if (logDebug) {
-                        LOG.debug("No future edits possible for " + f);
-                    }
-                    fIter.remove();
-                } else if (f.start1 > remEnd) {
-                    LOG.debug("Suspending search for modified functions at " + f);
-                    break;
-                }
-            }
+            analyzeASide(edit);
+            analyzeBSide(edit);
         } finally {
             numHunkInFile++;
+        }
+    }
+
+    private void analyzeASide(Edit edit) {
+        LOG.debug("Analyzing A-side of commit " + commitId);
+
+        final int remBegin = edit.getBeginA();
+        final int remEnd = edit.getEndA();
+
+        final boolean logDebug = LOG.isDebugEnabled();
+
+        for (Iterator<Method> fIter = functionsInOldPathByOccurrence.iterator(); fIter.hasNext(); ) {
+            Method f = fIter.next();
+            if (logDebug) {
+                LOG.debug("Checking " + f);
+            }
+            if (editOverlaps(f, remBegin, remEnd)) {
+                if (logDebug) {
+                    LOG.debug("Edit " + remBegin + ".." + remEnd + " overlaps " + f);
+                }
+                final FunctionChangeHunk.ModificationType modType;
+                if (editCompletelyCovers(f, remBegin, remEnd)) {
+                    modType = FunctionChangeHunk.ModificationType.DEL;
+                } else {
+                    modType = FunctionChangeHunk.ModificationType.MOD;
+                }
+                markFunctionEdit(edit, f, modType);
+            } else if (f.end1 < remBegin) {
+                if (logDebug) {
+                    LOG.debug("No future edits possible for " + f);
+                }
+                fIter.remove();
+            } else if (f.start1 > remEnd) {
+                LOG.debug("Suspending search for modified functions at " + f);
+                break;
+            }
+        }
+    }
+
+    private void analyzeBSide(Edit edit) {
+        LOG.debug("Analyzing B-side of commit " + commitId);
+
+        final int addBegin = edit.getBeginB();
+        final int addEnd = edit.getEndB();
+
+        final boolean logDebug = LOG.isDebugEnabled();
+
+        for (Iterator<Method> fIter = functionsInNewPathByOccurrence.iterator(); fIter.hasNext(); ) {
+            Method f = fIter.next();
+            if (logDebug) {
+                LOG.debug("Checking " + f);
+            }
+            if (editOverlaps(f, addBegin, addEnd)) {
+                if (logDebug) {
+                    LOG.debug("Edit " + addBegin + ".." + addEnd + " overlaps " + f);
+                }
+                final FunctionChangeHunk.ModificationType modType;
+                if (editCompletelyCovers(f, addBegin, addEnd)) {
+                    modType = FunctionChangeHunk.ModificationType.ADD;
+                } else {
+                    modType = FunctionChangeHunk.ModificationType.MOD;
+                }
+                LOG.warn("markFunctionEdit does not work correctly for the B-sides. We need a new function for that.");
+                markFunctionEdit(edit, f, modType);
+            } else if (f.end1 < addBegin) {
+                if (logDebug) {
+                    LOG.debug("No future edits possible for " + f);
+                }
+                fIter.remove();
+            } else if (f.start1 > addEnd) {
+                LOG.debug("Suspending search for modified functions at " + f);
+                break;
+            }
         }
     }
 
@@ -151,7 +206,7 @@ class CommitHunkToFunctionLocationMapper implements Consumer<Edit> {
         return ((editBegin < fEnd) && (editEnd > fBegin));
     }
 
-    private boolean editDeletes(Method func, final int editBegin, final int editEnd) {
+    private boolean editCompletelyCovers(Method func, final int editBegin, final int editEnd) {
         // NOTE, 2017-02-04, wf: We subtract 1 from the function's line
         // numbers because function line numbers are 1-based, whereas edit
         // line numbers are 0-based.

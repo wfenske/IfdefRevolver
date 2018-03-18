@@ -73,13 +73,23 @@ public class CommitMovedFunctionLister {
                 Set<String> aSideCFilePaths = getFilenamesOfCFilesModifiedByDiffsASides(diffs);
                 allASideFunctions = listAllFunctionsInModifiedFiles(parent, aSideCFilePaths);
 
-                //Set<String> bSideCFilePaths = getFilenamesOfCFilesModifiedByDiffsBSides(diffs);
-                //allBSideFunctions = listAllFunctionsInModifiedFiles(parent, bSideCFilePaths);
+                Set<String> bSideCFilePaths = getFilenamesOfCFilesModifiedByDiffsBSides(diffs);
+                allBSideFunctions = listAllFunctionsInModifiedFiles(commit, bSideCFilePaths);
+                if (LOG.isDebugEnabled()) {
+                    for (String fn : bSideCFilePaths) {
+                        LOG.debug("B-side modified file: " + fn);
+                    }
+                    for (List<Method> methods : allBSideFunctions.values()) {
+                        for (Method m : methods) {
+                            LOG.debug("B-side function: " + m);
+                        }
+                    }
+                }
             } catch (RuntimeException re) {
                 LOG.warn("Error analyzing commit " + commitId, re);
                 return;
             }
-            mapEditsToASideFunctionLocations(diffs, allASideFunctions);
+            mapEditsFunctionLocations(diffs);
         } catch (IOException ioe) {
             throw new RuntimeException("I/O exception parsing files changed by commit " + commitId, ioe);
         } finally {
@@ -104,10 +114,10 @@ public class CommitMovedFunctionLister {
         }
     }
 
-    private void mapEditsToASideFunctionLocations(List<DiffEntry> diffs, Map<String, List<Method>> functionsByFilePath) throws IOException {
-        LOG.debug("Mappings edits to A-side function locations");
+    private void mapEditsFunctionLocations(List<DiffEntry> diffs) throws IOException {
+        LOG.debug("Mapping edits to function locations");
         for (DiffEntry diff : diffs) {
-            listChangedFunctions(diff, functionsByFilePath);
+            listFunctionChanges(diff);
         }
     }
 
@@ -140,7 +150,7 @@ public class CommitMovedFunctionLister {
     }
 
     private Map<String, List<Method>> listAllFunctionsInModifiedFiles(RevCommit state, Set<String> modifiedFiles) throws IOException {
-        LOG.debug("Parsing all A-side functions");
+        LOG.debug("Parsing all functions in files touched by " + state.getId());
         if (modifiedFiles.isEmpty()) {
             return Collections.emptyMap();
         }
@@ -149,19 +159,23 @@ public class CommitMovedFunctionLister {
         return functionLocationProvider.listFunctionsInFiles(commitId, state, modifiedFiles);
     }
 
-    private void listChangedFunctions(final DiffEntry diff, Map<String, List<Method>> functionsByFilePath) throws IOException {
+    private void listFunctionChanges(final DiffEntry diff) throws IOException {
         final String oldPath = diff.getOldPath();
         final String newPath = diff.getNewPath();
 
         LOG.debug("--- " + oldPath);
         LOG.debug("+++ " + newPath);
 
-        List<Method> functions = functionsByFilePath.get(oldPath);
-        if (functions == null) {
-            return;
-        }
+        List<Method> oldFunctions = allASideFunctions.get(oldPath);
+        List<Method> newFunctions = allBSideFunctions.get(newPath);
 
-        CommitHunkToFunctionLocationMapper editLocMapper = new CommitHunkToFunctionLocationMapper(commitId, oldPath, functions, changedFunctionConsumer);
+        if (oldFunctions == null) oldFunctions = Collections.emptyList();
+        if (newFunctions == null) newFunctions = Collections.emptyList();
+
+        CommitHunkToFunctionLocationMapper editLocMapper = new CommitHunkToFunctionLocationMapper(commitId,
+                oldPath, oldFunctions,
+                newPath, newFunctions,
+                changedFunctionConsumer);
 
         for (Edit edit : formatter.toFileHeader(diff).toEditList()) {
             LOG.debug("- " + edit.getBeginA() + "," + edit.getEndA() +
@@ -186,7 +200,7 @@ public class CommitMovedFunctionLister {
         Consumer<FunctionChangeHunk> changedFunctionConsumer = new Consumer<FunctionChangeHunk>() {
             @Override
             public void accept(FunctionChangeHunk functionChangeHunk) {
-                System.out.println(functionChangeHunk);
+                LOG.info("ACCEPT: " + functionChangeHunk);
             }
         };
 

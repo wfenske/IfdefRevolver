@@ -55,12 +55,10 @@
 
     <logger name="de.ovgu.ifdefrevolver.commitanalysis.CommitMovedFunctionLister">
         <level value="debug"/>
-        <appender-ref ref="stderr"/>
     </logger>
 
     <logger name="de.ovgu.ifdefrevolver.commitanalysis.CommitHunkToFunctionLocationMapper">
         <level value="debug"/>
-        <appender-ref ref="stderr"/>
     </logger>
 
     <root>
