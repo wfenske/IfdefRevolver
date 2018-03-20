@@ -75,16 +75,19 @@ class CommitHunkToFunctionLocationMapper implements Consumer<Edit> {
                 LOG.debug("Checking " + f);
             }
             if (editOverlaps(f, remBegin, remEnd)) {
-                if (logDebug) {
-                    LOG.debug("Edit " + remBegin + ".." + remEnd + " overlaps " + f);
-                }
                 final FunctionChangeHunk.ModificationType modType;
                 if (editCompletelyCovers(f, remBegin, remEnd)) {
                     modType = FunctionChangeHunk.ModificationType.DEL;
+                    if (logDebug) {
+                        LOG.debug("Edit " + remBegin + ".." + remEnd + " fully deletes " + f);
+                    }
                 } else {
                     modType = FunctionChangeHunk.ModificationType.MOD;
+                    if (logDebug) {
+                        LOG.debug("Edit " + remBegin + ".." + remEnd + " deletes lines from " + f);
+                    }
                 }
-                markFunctionEdit(edit, f, modType);
+                markFunctionASideEdit(edit, f, modType);
             } else if (f.end1 < remBegin) {
                 if (logDebug) {
                     LOG.debug("No future edits possible for " + f);
@@ -111,17 +114,19 @@ class CommitHunkToFunctionLocationMapper implements Consumer<Edit> {
                 LOG.debug("Checking " + f);
             }
             if (editOverlaps(f, addBegin, addEnd)) {
-                if (logDebug) {
-                    LOG.debug("Edit " + addBegin + ".." + addEnd + " overlaps " + f);
-                }
                 final FunctionChangeHunk.ModificationType modType;
                 if (editCompletelyCovers(f, addBegin, addEnd)) {
                     modType = FunctionChangeHunk.ModificationType.ADD;
+                    if (logDebug) {
+                        LOG.debug("Edit " + addBegin + ".." + addEnd + " fully adds " + f);
+                    }
                 } else {
                     modType = FunctionChangeHunk.ModificationType.MOD;
+                    if (logDebug) {
+                        LOG.debug("Edit " + addBegin + ".." + addEnd + " adds lines to " + f);
+                    }
                 }
-                LOG.warn("markFunctionEdit does not work correctly for the B-sides. We need a new function for that.");
-                markFunctionEdit(edit, f, modType);
+                markFunctionBSideEdit(edit, f, modType);
             } else if (f.end1 < addBegin) {
                 if (logDebug) {
                     LOG.debug("No future edits possible for " + f);
@@ -134,45 +139,82 @@ class CommitHunkToFunctionLocationMapper implements Consumer<Edit> {
         }
     }
 
-    private void markFunctionEdit(Edit edit, Method f, FunctionChangeHunk.ModificationType modType) {
-        ChangeHunk hunk = hunkFromEdit(f, edit);
+    private void markFunctionASideEdit(Edit edit, Method f, FunctionChangeHunk.ModificationType modType) {
+        ChangeHunk hunk = hunkFromASideEdit(f, edit);
+        publishHunk(f, modType, hunk);
+    }
+
+    private void markFunctionBSideEdit(Edit edit, Method f, FunctionChangeHunk.ModificationType modType) {
+        ChangeHunk hunk = hunkFromBSideEdit(f, edit);
+        publishHunk(f, modType, hunk);
+    }
+
+    private void publishHunk(Method f, FunctionChangeHunk.ModificationType modType, ChangeHunk hunk) {
+        if ((hunk.getLinesAdded() == 0) && (hunk.getLinesDeleted() == 0)) {
+            LOG.debug("Ignoring hunk.  No lines were added or removed in " + f);
+            return;
+        }
         FunctionChangeHunk fHunk = new FunctionChangeHunk(f, hunk, modType);
         changedFunctionConsumer.accept(fHunk);
         //logEdit(f, edit);
     }
 
-    private ChangeHunk hunkFromEdit(Method f, Edit edit) {
+    private ChangeHunk hunkFromASideEdit(Method f, Edit edit) {
         final int fBegin = f.start1 - 1;
         final int fEnd = f.end1 - 1;
         final int remBegin = edit.getBeginA();
         final int remEnd = edit.getEndA();
         final int linesDeleted;
-        final int linesAdded;
 
         if (remBegin <= fBegin) {
-            if (remEnd >= fEnd) {
-                // Edit deletes the function
-                linesDeleted = f.getGrossLoc();
-                linesAdded = Math.min(f.getGrossLoc(), edit.getLengthB());
+            if (remEnd > fEnd) {
+                // Edit deletes the whole function
+                linesDeleted = Math.min(f.getGrossLoc(), edit.getLengthA());
+                LOG.debug("hunkFromASideEdit: 1 " + linesDeleted);
             } else {
                 // Edit starts before the function, and ends within it.
                 linesDeleted = remEnd - fBegin;
-                // We don't actually know how many lines were added. So we guess.
-                linesAdded = Math.min(linesDeleted, edit.getLengthB());
+                LOG.debug("hunkFromASideEdit: 2 " + linesDeleted);
             }
         } else { // remBegin > fBegin // Edit starts within the function
-            if (remEnd >= fEnd) {
+            if (remEnd > fEnd) {
                 // Edit starts within the function, and ends after it.
                 linesDeleted = fEnd - remBegin;
-                // We don't actually know how many lines were added. So we guess.
-                linesAdded = Math.min(linesDeleted, edit.getLengthB());
+                LOG.debug("hunkFromASideEdit: 3 " + linesDeleted);
             } else { // remEnd < fEnd
                 // Edit is fully contained within the function.
                 linesDeleted = edit.getLengthA();
+                LOG.debug("hunkFromASideEdit: 4 " + linesDeleted);
+            }
+        }
+        return new ChangeHunk(commitId, oldPath, this.numHunkInFile, linesDeleted, 0);
+    }
+
+    private ChangeHunk hunkFromBSideEdit(Method f, Edit edit) {
+        final int fBegin = f.start1 - 1;
+        final int fEnd = f.end1 - 1;
+        final int addBegin = edit.getBeginB();
+        final int addEnd = edit.getEndB();
+        final int linesAdded;
+
+        if (addBegin <= fBegin) {
+            if (addEnd > fEnd) {
+                // Edit adds the whole function
+                linesAdded = Math.min(f.getGrossLoc(), edit.getLengthB());
+            } else {
+                // Edit starts before the function, and ends within it.
+                linesAdded = addEnd - fBegin;
+            }
+        } else { // addBegin > fBegin // Edit starts within the function
+            if (addEnd > fEnd) {
+                // Edit starts within the function, and ends after it.
+                linesAdded = fEnd - addBegin;
+            } else { // addEnd <= fEnd
+                // Edit is fully contained within the function.
                 linesAdded = edit.getLengthB();
             }
         }
-        return new ChangeHunk(commitId, oldPath, this.numHunkInFile, linesDeleted, linesAdded);
+        return new ChangeHunk(commitId, newPath, this.numHunkInFile, 0, linesAdded);
     }
 
     /*
@@ -219,7 +261,7 @@ class CommitHunkToFunctionLocationMapper implements Consumer<Edit> {
         return ((editBegin <= fBegin) && (editEnd > fEnd));
 //
 //        if (result) {
-//            LOG.debug("Delete detected. Edit end: " + editEnd + "; function end: " + fEnd);
+//            LOG.debug("Delete/add detected. Edit end: " + editEnd + "; function end: " + fEnd);
 //        }
 //
 //        return result;

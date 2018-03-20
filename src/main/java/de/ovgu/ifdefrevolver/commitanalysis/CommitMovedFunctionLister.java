@@ -75,13 +75,13 @@ public class CommitMovedFunctionLister {
 
                 Set<String> bSideCFilePaths = getFilenamesOfCFilesModifiedByDiffsBSides(diffs);
                 allBSideFunctions = listAllFunctionsInModifiedFiles(commit, bSideCFilePaths);
-                if (LOG.isDebugEnabled()) {
+                if (LOG.isTraceEnabled()) {
                     for (String fn : bSideCFilePaths) {
-                        LOG.debug("B-side modified file: " + fn);
+                        LOG.trace("B-side modified file: " + fn);
                     }
                     for (List<Method> methods : allBSideFunctions.values()) {
                         for (Method m : methods) {
-                            LOG.debug("B-side function: " + m);
+                            LOG.trace("B-side function: " + m);
                         }
                     }
                 }
@@ -181,6 +181,15 @@ public class CommitMovedFunctionLister {
             LOG.debug("- " + edit.getBeginA() + "," + edit.getEndA() +
                     " + " + edit.getBeginB() + "," + edit.getEndB());
             editLocMapper.accept(edit);
+        }
+    }
+
+    private static class SingleEditConsumer implements Consumer<FunctionChangeHunk> {
+        List<FunctionChangeHunk> hunksForEdit = new ArrayList<>();
+
+        @Override
+        public void accept(FunctionChangeHunk functionChangeHunk) {
+            hunksForEdit.add(functionChangeHunk);
         }
     }
 

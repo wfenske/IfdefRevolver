@@ -31,7 +31,11 @@ public class FunctionChangeHunk {
         /**
          * if this change neither adds nor deletes the entire function but simply modifies parts of it
          */
-        MOD
+        MOD,
+        /**
+         * if this change moved a function to another place
+         */
+        MOVE
     }
 
     private ModificationType modType;
