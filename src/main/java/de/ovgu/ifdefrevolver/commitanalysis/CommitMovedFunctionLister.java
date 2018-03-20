@@ -163,8 +163,12 @@ public class CommitMovedFunctionLister {
         final String oldPath = diff.getOldPath();
         final String newPath = diff.getNewPath();
 
-        LOG.debug("--- " + oldPath);
-        LOG.debug("+++ " + newPath);
+        final boolean logDebug = LOG.isDebugEnabled();
+
+        if (logDebug) {
+            LOG.debug("--- " + oldPath);
+            LOG.debug("+++ " + newPath);
+        }
 
         List<Method> oldFunctions = allASideFunctions.get(oldPath);
         List<Method> newFunctions = allBSideFunctions.get(newPath);
@@ -177,19 +181,68 @@ public class CommitMovedFunctionLister {
                 newPath, newFunctions,
                 changedFunctionConsumer);
 
+        int iEdit = 1;
         for (Edit edit : formatter.toFileHeader(diff).toEditList()) {
-            LOG.debug("- " + edit.getBeginA() + "," + edit.getEndA() +
-                    " + " + edit.getBeginB() + "," + edit.getEndB());
+            if (logDebug) {
+                LOG.debug("Edit " + (iEdit++) + ": - " + edit.getBeginA() + "," + edit.getEndA() +
+                        " + " + edit.getBeginB() + "," + edit.getEndB());
+            }
             editLocMapper.accept(edit);
         }
     }
 
-    private static class SingleEditConsumer implements Consumer<FunctionChangeHunk> {
-        List<FunctionChangeHunk> hunksForEdit = new ArrayList<>();
+    private static class AddDelMergingConsumer implements Consumer<FunctionChangeHunk> {
+        Map<String, List<FunctionChangeHunk>> delsByFunctionSignature = new HashMap<>();
+        Map<String, List<FunctionChangeHunk>> addsByFunctionSignature = new HashMap<>();
+        final Consumer<FunctionChangeHunk> parent;
+
+
+        public AddDelMergingConsumer(Consumer<FunctionChangeHunk> parent) {
+            this.parent = parent;
+        }
 
         @Override
         public void accept(FunctionChangeHunk functionChangeHunk) {
-            hunksForEdit.add(functionChangeHunk);
+            switch (functionChangeHunk.getModType()) {
+                case ADD:
+                    rememberHunk(addsByFunctionSignature, functionChangeHunk);
+                    break;
+                case DEL:
+                    rememberHunk(delsByFunctionSignature, functionChangeHunk);
+                    break;
+                default:
+                    parent.accept(functionChangeHunk);
+            }
+        }
+
+        private void rememberHunk(Map<String, List<FunctionChangeHunk>> map, FunctionChangeHunk fh) {
+            String signature = fh.getFunction().functionSignatureXml;
+            List<FunctionChangeHunk> hunks = map.get(signature);
+            if (hunks == null) {
+                hunks = new ArrayList<>();
+                map.put(signature, hunks);
+            }
+            hunks.add(fh);
+        }
+
+        public void mergeAndPublishRemainingHunks() {
+            if (addsByFunctionSignature.isEmpty()) {
+                publishAll(delsByFunctionSignature);
+            } else if (delsByFunctionSignature.isEmpty()) {
+                publishAll(addsByFunctionSignature);
+            } else {
+                for (Map.Entry<String, List<FunctionChangeHunk>> addEntry : addsByFunctionSignature.entrySet()) {
+                    throw new UnsupportedOperationException("Not yet implemented");
+                }
+            }
+        }
+
+        private void publishAll(Map<String, List<FunctionChangeHunk>> hunkMap) {
+            for (List<FunctionChangeHunk> hs : hunkMap.values()) {
+                for (FunctionChangeHunk h : hs) {
+                    parent.accept(h);
+                }
+            }
         }
     }
 

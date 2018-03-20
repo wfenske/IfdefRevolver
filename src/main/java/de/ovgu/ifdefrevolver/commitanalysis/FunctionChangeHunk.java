@@ -54,11 +54,14 @@ public class FunctionChangeHunk {
         return hunk;
     }
 
+    public ModificationType getModType() {
+        return modType;
+    }
+
 
     /**
-     * @return {@code true} if this change deletes the entire function (happens
-     * sometimes if a function is moved to another file or within the
-     * same file)
+     * @return {@code true} if this change deletes the entire function (happens sometimes if a function is moved to
+     * another file or within the same file)
      */
     public boolean deletesFunction() {
         return modType == ModificationType.DEL;

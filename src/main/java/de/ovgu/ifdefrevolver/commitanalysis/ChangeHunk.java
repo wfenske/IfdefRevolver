@@ -11,7 +11,8 @@ public class ChangeHunk {
      */
     private String commitId;
     /**
-     * File being changed (old file name, in contrast to the new file name in cases where a file is renamed or newly created)
+     * File being changed (old file name, in contrast to the new file name in cases where a file is renamed or newly
+     * created)
      */
     private String oldPath;
     /**
@@ -31,6 +32,18 @@ public class ChangeHunk {
         this.commitId = commitId;
         this.oldPath = oldPath;
         this.hunkNo = hunkNo;
+        this.linesDeleted = linesDeleted;
+        this.linesAdded = linesAdded;
+    }
+
+    private ChangeHunk(ChangeHunk template) {
+        this.commitId = template.commitId;
+        this.oldPath = template.oldPath;
+        this.hunkNo = template.hunkNo;
+    }
+
+    public ChangeHunk(ChangeHunk template, int linesDeleted, int linesAdded) {
+        this(template);
         this.linesDeleted = linesDeleted;
         this.linesAdded = linesAdded;
     }

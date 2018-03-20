@@ -4,10 +4,7 @@ import de.ovgu.skunk.detection.data.Method;
 import org.apache.log4j.Logger;
 import org.eclipse.jgit.diff.Edit;
 
-import java.util.Collection;
-import java.util.Iterator;
-import java.util.LinkedList;
-import java.util.List;
+import java.util.*;
 import java.util.function.Consumer;
 
 /**
@@ -26,7 +23,6 @@ class CommitHunkToFunctionLocationMapper implements Consumer<Edit> {
     final String newPath;
     final List<Method> functionsInNewPathByOccurrence;
 
-
     private final String commitId;
     private final Consumer<FunctionChangeHunk> changedFunctionConsumer;
     /**
@@ -34,6 +30,7 @@ class CommitHunkToFunctionLocationMapper implements Consumer<Edit> {
      * {@link #accept(Edit)} is called.
      */
     int numHunkInFile = 0;
+    private Map<Method, List<FunctionChangeHunk>> hunksForCurrentEdit;
 
     public CommitHunkToFunctionLocationMapper(String commitId,
                                               String oldPath, Collection<Method> functionsInOldPathByOccurrence,
@@ -53,12 +50,51 @@ class CommitHunkToFunctionLocationMapper implements Consumer<Edit> {
         // only need to look at the "A"-side of the edit and can ignore the "B" side.
         // This is good because "A"-side line numbers are much easier to correlate with the
         // function locations we have than the "B"-side offsets.
+        hunksForCurrentEdit = new HashMap<>();
         try {
             analyzeASide(edit);
             analyzeBSide(edit);
+            publishHunksForCurrentEdit();
         } finally {
             numHunkInFile++;
+            hunksForCurrentEdit = null;
         }
+    }
+
+    private void publishHunksForCurrentEdit() {
+        for (Map.Entry<Method, List<FunctionChangeHunk>> entry : hunksForCurrentEdit.entrySet()) {
+            List<FunctionChangeHunk> hunks = entry.getValue();
+            switch (hunks.size()) {
+                case 0: /* Can this even happen? */
+                    break;
+                case 1: /* Expected case */
+                    LOG.debug("Single hunk case");
+                    changedFunctionConsumer.accept(hunks.get(0));
+                    break;
+                default: /* May also happen if a delete and an add are right next to each other */
+                    LOG.debug("Merging two or more hunks");
+                    FunctionChangeHunk mergedHunk = mergeHunks(hunks);
+                    changedFunctionConsumer.accept(mergedHunk);
+            }
+        }
+    }
+
+    /**
+     * Merge a non-empty list of changes to the same function
+     */
+    private FunctionChangeHunk mergeHunks(List<FunctionChangeHunk> hunks) {
+        int linesAdded = 0;
+        int linesDeleted = 0;
+
+        for (FunctionChangeHunk fh : hunks) {
+            ChangeHunk h = fh.getHunk();
+            linesAdded += h.getLinesAdded();
+            linesDeleted += h.getLinesDeleted();
+        }
+
+        final FunctionChangeHunk functionHunk = hunks.get(0);
+        final ChangeHunk aggregatedChangeHunk = new ChangeHunk(functionHunk.getHunk(), linesDeleted, linesAdded);
+        return new FunctionChangeHunk(functionHunk.getFunction(), aggregatedChangeHunk, FunctionChangeHunk.ModificationType.MOD);
     }
 
     private void analyzeASide(Edit edit) {
@@ -141,21 +177,26 @@ class CommitHunkToFunctionLocationMapper implements Consumer<Edit> {
 
     private void markFunctionASideEdit(Edit edit, Method f, FunctionChangeHunk.ModificationType modType) {
         ChangeHunk hunk = hunkFromASideEdit(f, edit);
-        publishHunk(f, modType, hunk);
+        rememberHunk(f, modType, hunk);
     }
 
     private void markFunctionBSideEdit(Edit edit, Method f, FunctionChangeHunk.ModificationType modType) {
         ChangeHunk hunk = hunkFromBSideEdit(f, edit);
-        publishHunk(f, modType, hunk);
+        rememberHunk(f, modType, hunk);
     }
 
-    private void publishHunk(Method f, FunctionChangeHunk.ModificationType modType, ChangeHunk hunk) {
+    private void rememberHunk(Method f, FunctionChangeHunk.ModificationType modType, ChangeHunk hunk) {
         if ((hunk.getLinesAdded() == 0) && (hunk.getLinesDeleted() == 0)) {
             LOG.debug("Ignoring hunk.  No lines were added or removed in " + f);
             return;
         }
         FunctionChangeHunk fHunk = new FunctionChangeHunk(f, hunk, modType);
-        changedFunctionConsumer.accept(fHunk);
+        List<FunctionChangeHunk> hunksForFunction = hunksForCurrentEdit.get(f);
+        if (hunksForFunction == null) {
+            hunksForFunction = new ArrayList<>();
+            hunksForCurrentEdit.put(f, hunksForFunction);
+        }
+        hunksForFunction.add(fHunk);
         //logEdit(f, edit);
     }
 
@@ -170,21 +211,21 @@ class CommitHunkToFunctionLocationMapper implements Consumer<Edit> {
             if (remEnd > fEnd) {
                 // Edit deletes the whole function
                 linesDeleted = Math.min(f.getGrossLoc(), edit.getLengthA());
-                LOG.debug("hunkFromASideEdit: 1 " + linesDeleted);
+                //LOG.debug("hunkFromASideEdit: 1 " + linesDeleted);
             } else {
                 // Edit starts before the function, and ends within it.
                 linesDeleted = remEnd - fBegin;
-                LOG.debug("hunkFromASideEdit: 2 " + linesDeleted);
+                //LOG.debug("hunkFromASideEdit: 2 " + linesDeleted);
             }
         } else { // remBegin > fBegin // Edit starts within the function
             if (remEnd > fEnd) {
                 // Edit starts within the function, and ends after it.
                 linesDeleted = fEnd - remBegin;
-                LOG.debug("hunkFromASideEdit: 3 " + linesDeleted);
+                //LOG.debug("hunkFromASideEdit: 3 " + linesDeleted);
             } else { // remEnd < fEnd
                 // Edit is fully contained within the function.
                 linesDeleted = edit.getLengthA();
-                LOG.debug("hunkFromASideEdit: 4 " + linesDeleted);
+                //LOG.debug("hunkFromASideEdit: 4 " + linesDeleted);
             }
         }
         return new ChangeHunk(commitId, oldPath, this.numHunkInFile, linesDeleted, 0);
