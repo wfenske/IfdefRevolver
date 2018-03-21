@@ -228,7 +228,7 @@ class CommitHunkToFunctionLocationMapper implements Consumer<Edit> {
                 //LOG.debug("hunkFromASideEdit: 4 " + linesDeleted);
             }
         }
-        return new ChangeHunk(commitId, oldPath, this.numHunkInFile, linesDeleted, 0);
+        return new ChangeHunk(commitId, oldPath, newPath, this.numHunkInFile, linesDeleted, 0);
     }
 
     private ChangeHunk hunkFromBSideEdit(Method f, Edit edit) {
@@ -255,7 +255,7 @@ class CommitHunkToFunctionLocationMapper implements Consumer<Edit> {
                 linesAdded = edit.getLengthB();
             }
         }
-        return new ChangeHunk(commitId, newPath, this.numHunkInFile, 0, linesAdded);
+        return new ChangeHunk(commitId, oldPath, newPath, this.numHunkInFile, 0, linesAdded);
     }
 
     /*

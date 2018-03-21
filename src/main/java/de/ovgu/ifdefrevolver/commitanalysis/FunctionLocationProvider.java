@@ -28,29 +28,37 @@ public class FunctionLocationProvider {
     private final Context ctx;
     private final SrcMlFolderReader folderReader;
     private final Repository repository;
+    private final String commitId;
 
-    public FunctionLocationProvider(Repository repository) throws IOException {
+    public FunctionLocationProvider(Repository repository, String commitId) throws IOException {
         this.repository = repository;
+        this.commitId = commitId;
         this.ctx = new Context(null);
         this.folderReader = new SrcMlFolderReader(ctx);
     }
 
-    public Map<String, List<Method>> listFunctionsInFiles(String commitId, RevCommit stateBeforeCommit, Set<String> paths) throws IOException {
-        final Map<String, List<Method>> changedFunctions = new HashMap<>();
+    /**
+     * @param state
+     * @param paths
+     * @return A map from filename to the (ordered list of) functions in that file
+     * @throws IOException
+     */
+    public Map<String, List<Method>> listFunctionsInFiles(RevCommit state, Set<String> paths) throws IOException {
+        final Map<String, List<Method>> functionsByFilename = new HashMap<>();
         Consumer<Method> changedFunctionHandler = method -> {
             String filePath = method.filePath;
-            List<Method> functions = changedFunctions.get(filePath);
+            List<Method> functions = functionsByFilename.get(filePath);
             if (functions == null) {
                 functions = new ArrayList<>();
-                changedFunctions.put(filePath, functions);
+                functionsByFilename.put(filePath, functions);
             }
             functions.add(method);
         };
-        listFunctionsInFiles(commitId, stateBeforeCommit, paths, changedFunctionHandler);
-        return changedFunctions;
+        listFunctionsInFiles(state, paths, changedFunctionHandler);
+        return functionsByFilename;
     }
 
-    private void listFunctionsInFiles(String commitId, RevCommit stateBeforeCommit, Set<String> paths, Consumer<Method> functionHandler) throws IOException {
+    private void listFunctionsInFiles(RevCommit stateBeforeCommit, Set<String> paths, Consumer<Method> functionHandler) throws IOException {
         // a RevWalk allows to walk over commits based on some filtering that is defined
         // and using commit's tree find the path
         RevTree tree = stateBeforeCommit.getTree();

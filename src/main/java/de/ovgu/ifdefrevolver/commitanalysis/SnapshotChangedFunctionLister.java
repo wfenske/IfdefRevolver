@@ -122,6 +122,7 @@ public class SnapshotChangedFunctionLister {
         final List<Throwable> uncaughtWorkerThreadException = new ArrayList<>(workers.length);
 
         Thread.UncaughtExceptionHandler uncaughtExceptionHandler = new Thread.UncaughtExceptionHandler() {
+            @Override
             public void uncaughtException(Thread th, Throwable ex) {
                 increaseErrorCount();
                 for (TerminableThread wt : workers) {
@@ -147,7 +148,9 @@ public class SnapshotChangedFunctionLister {
                         }
                         try {
                             //LOG.info("Processing file " + (ixFile++) + "/" + numFiles);
-                            CommitChangedFunctionLister lister = new CommitChangedFunctionLister(repo, nextCommitId, changedFunctionConsumer);
+                            IFunctionLocationProvider functionLocationProvider = new EagerFunctionLocationProvider(repo);
+                            CommitChangedFunctionLister lister = new CommitChangedFunctionLister(repo, nextCommitId,
+                                    functionLocationProvider, changedFunctionConsumer);
                             lister.listChangedFunctions();
                         } catch (RuntimeException t) {
                             LOG.warn("Error processing commit ID " + nextCommitId + ". Processing will continue with the remaining IDs.", t);

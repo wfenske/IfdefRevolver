@@ -30,11 +30,14 @@ class CommitChangedFunctionLister {
      * All the functions defined in the A-side files of the files that the diffs within this commit modify
      */
     private Map<String, List<Method>> allASideFunctions;
+    private final IFunctionLocationProvider functionLocationProvider;
 
-    public CommitChangedFunctionLister(Repository repo, String commitId, Consumer<FunctionChangeHunk> changedFunctionConsumer) {
+    public CommitChangedFunctionLister(Repository repo, String commitId,
+                                       IFunctionLocationProvider functionLocationProvider, Consumer<FunctionChangeHunk> changedFunctionConsumer) {
         this.repo = repo;
         this.commitId = commitId;
         this.changedFunctionConsumer = changedFunctionConsumer;
+        this.functionLocationProvider = functionLocationProvider;
     }
 
     /**
@@ -128,7 +131,6 @@ class CommitChangedFunctionLister {
             return Collections.emptyMap();
         }
 
-        FunctionLocationProvider functionLocationProvider = new FunctionLocationProvider(repo);
         return functionLocationProvider.listFunctionsInFiles(commitId, stateBeforeCommit, modifiedFiles);
     }
 

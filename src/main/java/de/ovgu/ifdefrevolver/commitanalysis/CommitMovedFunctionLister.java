@@ -26,7 +26,7 @@ public class CommitMovedFunctionLister {
 
     private final Repository repo;
     private final String commitId;
-    private final Consumer<FunctionChangeHunk> changedFunctionConsumer;
+    private final AddDelMergingConsumer changedFunctionConsumer;
     private DiffFormatter formatter = null;
     /**
      * All the functions defined in the A-side files of the files that the diffs within this commit modify
@@ -37,10 +37,15 @@ public class CommitMovedFunctionLister {
      */
     private Map<String, List<Method>> allBSideFunctions;
 
-    public CommitMovedFunctionLister(Repository repo, String commitId, Consumer<FunctionChangeHunk> changedFunctionConsumer) {
+    private IFunctionLocationProvider functionLocationProvider;
+
+    public CommitMovedFunctionLister(Repository repo, String commitId,
+                                     IFunctionLocationProvider functionLocationProvider,
+                                     Consumer<FunctionChangeHunk> changedFunctionConsumer) {
         this.repo = repo;
         this.commitId = commitId;
-        this.changedFunctionConsumer = changedFunctionConsumer;
+        this.functionLocationProvider = functionLocationProvider;
+        this.changedFunctionConsumer = new AddDelMergingConsumer(changedFunctionConsumer);
     }
 
     /**
@@ -61,7 +66,7 @@ public class CommitMovedFunctionLister {
                     return;
                 }
                 if (parentCount > 1) {
-                    LOG.info("Ignoring merge commit " + commitId + ": expected exactly one parent, got " + parentCount);
+                    LOG.info("Ignoring mergeDelAndAddToMove commit " + commitId + ": expected exactly one parent, got " + parentCount);
                     return;
                 }
                 ObjectId parentCommitId = commit.getParent(0).getId();
@@ -90,6 +95,7 @@ public class CommitMovedFunctionLister {
                 return;
             }
             mapEditsFunctionLocations(diffs);
+            changedFunctionConsumer.mergeAndPublishRemainingHunks();
         } catch (IOException ioe) {
             throw new RuntimeException("I/O exception parsing files changed by commit " + commitId, ioe);
         } finally {
@@ -150,12 +156,13 @@ public class CommitMovedFunctionLister {
     }
 
     private Map<String, List<Method>> listAllFunctionsInModifiedFiles(RevCommit state, Set<String> modifiedFiles) throws IOException {
-        LOG.debug("Parsing all functions in files touched by " + state.getId());
-        if (modifiedFiles.isEmpty()) {
-            return Collections.emptyMap();
-        }
-
-        FunctionLocationProvider functionLocationProvider = new FunctionLocationProvider(repo);
+//        LOG.debug("Parsing all functions in files touched by " + state.getId());
+//        if (modifiedFiles.isEmpty()) {
+//            return Collections.emptyMap();
+//        }
+//
+//        FunctionLocationProvider functionLocationProvider = new FunctionLocationProvider(repo);
+//        return functionLocationProvider.listFunctionsInFiles(commitId, state, modifiedFiles);
         return functionLocationProvider.listFunctionsInFiles(commitId, state, modifiedFiles);
     }
 
@@ -181,81 +188,13 @@ public class CommitMovedFunctionLister {
                 newPath, newFunctions,
                 changedFunctionConsumer);
 
-        int iEdit = 1;
+        int iEdit = 0;
         for (Edit edit : formatter.toFileHeader(diff).toEditList()) {
             if (logDebug) {
                 LOG.debug("Edit " + (iEdit++) + ": - " + edit.getBeginA() + "," + edit.getEndA() +
                         " + " + edit.getBeginB() + "," + edit.getEndB());
             }
             editLocMapper.accept(edit);
-        }
-    }
-
-    private static class AddDelMergingConsumer implements Consumer<FunctionChangeHunk> {
-        Map<String, List<FunctionChangeHunk>> delsByFunctionSignature = new HashMap<>();
-        Map<String, List<FunctionChangeHunk>> addsByFunctionSignature = new HashMap<>();
-        final Consumer<FunctionChangeHunk> parent;
-
-
-        public AddDelMergingConsumer(Consumer<FunctionChangeHunk> parent) {
-            this.parent = parent;
-        }
-
-        @Override
-        public void accept(FunctionChangeHunk functionChangeHunk) {
-            switch (functionChangeHunk.getModType()) {
-                case ADD:
-                    rememberHunk(addsByFunctionSignature, functionChangeHunk);
-                    break;
-                case DEL:
-                    rememberHunk(delsByFunctionSignature, functionChangeHunk);
-                    break;
-                default:
-                    parent.accept(functionChangeHunk);
-            }
-        }
-
-        private void rememberHunk(Map<String, List<FunctionChangeHunk>> map, FunctionChangeHunk fh) {
-            String signature = fh.getFunction().functionSignatureXml;
-            List<FunctionChangeHunk> hunks = map.get(signature);
-            if (hunks == null) {
-                hunks = new ArrayList<>();
-                map.put(signature, hunks);
-            }
-            hunks.add(fh);
-        }
-
-        public void mergeAndPublishRemainingHunks() {
-            if (addsByFunctionSignature.isEmpty()) {
-                publishAll(delsByFunctionSignature);
-            } else if (delsByFunctionSignature.isEmpty()) {
-                publishAll(addsByFunctionSignature);
-            } else {
-
-                for (Map.Entry<String, List<FunctionChangeHunk>> addEntry : addsByFunctionSignature.entrySet()) {
-                    final String signature = addEntry.getKey();
-                    final List<FunctionChangeHunk> adds = addEntry.getValue();
-                    final List<FunctionChangeHunk> dels = delsByFunctionSignature.get(signature);
-                    if (dels == null) {
-                        publishAll(adds);
-                    }
-                    throw new UnsupportedOperationException("Not yet implemented");
-                }
-
-                // TODO: Also take care of any dels whose keys are not in the adds map.
-            }
-        }
-
-        private void publishAll(Map<String, List<FunctionChangeHunk>> hunkMap) {
-            for (List<FunctionChangeHunk> hs : hunkMap.values()) {
-                publishAll(hs);
-            }
-        }
-
-        private void publishAll(List<FunctionChangeHunk> hs) {
-            for (FunctionChangeHunk h : hs) {
-                parent.accept(h);
-            }
         }
     }
 
@@ -279,8 +218,13 @@ public class CommitMovedFunctionLister {
             }
         };
 
+
+        IFunctionLocationProvider functionLocationProvider = new CachingFunctionLocationProvider(
+                new EagerFunctionLocationProvider(repo));
+
         for (String commitId : args) {
-            CommitMovedFunctionLister lister = new CommitMovedFunctionLister(repo, commitId, changedFunctionConsumer);
+            CommitMovedFunctionLister lister = new CommitMovedFunctionLister(repo, commitId,
+                    functionLocationProvider, changedFunctionConsumer);
             lister.listChangedFunctions();
         }
 

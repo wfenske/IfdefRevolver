@@ -16,6 +16,10 @@ public class ChangeHunk {
      */
     private String oldPath;
     /**
+     * File being changed (new file name)
+     */
+    private String newPath;
+    /**
      * Number of the change hunk within the file {@link #oldPath}, counted from 0
      */
     private int hunkNo;
@@ -28,9 +32,10 @@ public class ChangeHunk {
      */
     private int linesAdded;
 
-    public ChangeHunk(String commitId, String oldPath, int hunkNo, int linesDeleted, int linesAdded) {
+    public ChangeHunk(String commitId, String oldPath, String newPath, int hunkNo, int linesDeleted, int linesAdded) {
         this.commitId = commitId;
         this.oldPath = oldPath;
+        this.newPath = newPath;
         this.hunkNo = hunkNo;
         this.linesDeleted = linesDeleted;
         this.linesAdded = linesAdded;
@@ -39,6 +44,7 @@ public class ChangeHunk {
     private ChangeHunk(ChangeHunk template) {
         this.commitId = template.commitId;
         this.oldPath = template.oldPath;
+        this.newPath = template.newPath;
         this.hunkNo = template.hunkNo;
     }
 
@@ -54,6 +60,10 @@ public class ChangeHunk {
 
     public String getOldPath() {
         return oldPath;
+    }
+
+    public String getNewPath() {
+        return newPath;
     }
 
     public int getHunkNo() {
@@ -77,13 +87,19 @@ public class ChangeHunk {
 
     @Override
     public String toString() {
+        final String path;
+        if (oldPath.equals(newPath)) {
+            path = oldPath;
+        } else {
+            path = oldPath + " -> " + newPath;
+        }
         return this.getClass().getSimpleName() + '{' +
                 "" + commitId +
-                ", " + oldPath +
+                ", " + path +
                 ", hunkNo=" + hunkNo +
                 ", -" + linesDeleted +
                 ", +" + linesAdded +
-                ", -/+" + getDelta() +
+                ", delta: " + getDelta() +
                 '}';
     }
 }
