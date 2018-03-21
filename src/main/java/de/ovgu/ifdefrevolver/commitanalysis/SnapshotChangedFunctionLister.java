@@ -95,14 +95,17 @@ public class SnapshotChangedFunctionLister {
 
     private Consumer<FunctionChangeHunk> newThreadSafeFunctionToCsvWriter(final CSVPrinter csv, final CsvRowProvider<FunctionChangeHunk, Snapshot, FunctionChangeHunksColumns> csvRowProvider) {
         return functionChange -> {
-            if (functionChange.deletesFunction()) {
-                LOG.debug("Ignoring change " + functionChange + ". The whole function is deleted (probably moved someplace else).");
-                return;
-            }
+//            if (functionChange.deletesFunction()) {
+//                LOG.debug("Ignoring change " + functionChange + ". The whole function is deleted (probably moved someplace else).");
+//                return;
+//            }
             ChangeHunk hunk = functionChange.getHunk();
             if ((hunk.getLinesAdded() == 0) && (hunk.getLinesDeleted() == 0)) {
-                LOG.debug("Ignoring change " + functionChange + ". No lines are added or deleted.");
-                return;
+                if (functionChange.getModType() != FunctionChangeHunk.ModificationType.MOD) {
+                    LOG.warn("Function changes that don't add or delete anything should no longer occur! But they do: " + functionChange);
+                }
+//                LOG.debug("Ignoring change " + functionChange + ". No lines are added or deleted.");
+//                return;
             }
             Object[] rowForFunc = csvRowProvider.dataRow(functionChange);
             try {
@@ -136,25 +139,43 @@ public class SnapshotChangedFunctionLister {
 
         for (int iWorker = 0; iWorker < workers.length; iWorker++) {
             TerminableThread t = new TerminableThread() {
+                final int numConsecutiveCommits = 10;
+                final List<String> nextCommitIds = new ArrayList<>(numConsecutiveCommits);
+
                 @Override
                 public void run() {
                     while (!terminationRequested) {
-                        final String nextCommitId;
-                        synchronized (commitIdIter) {
+                        popNextCommitIds();
+                        if (nextCommitIds.isEmpty()) {
+                            break;
+                        }
+
+                        final IFunctionLocationProvider functionLocationProvider =
+                                new CachingFunctionLocationProvider(new EagerFunctionLocationProvider(repo));
+                        for (String nextCommitId : nextCommitIds) {
+                            if (terminationRequested) {
+                                break;
+                            }
+                            try {
+                                CommitChangedFunctionLister lister = new CommitChangedFunctionLister(repo, nextCommitId,
+                                        functionLocationProvider, changedFunctionConsumer);
+                                lister.listChangedFunctions();
+                            } catch (RuntimeException t) {
+                                LOG.warn("Error processing commit ID " + nextCommitId + ". Processing will continue with the remaining IDs.", t);
+                                increaseErrorCount();
+                            }
+                        }
+                    }
+                }
+
+                private void popNextCommitIds() {
+                    synchronized (commitIdIter) {
+                        nextCommitIds.clear();
+                        for (int i = 0; i < numConsecutiveCommits; i++) {
                             if (!commitIdIter.hasNext()) {
                                 break;
                             }
-                            nextCommitId = commitIdIter.next();
-                        }
-                        try {
-                            //LOG.info("Processing file " + (ixFile++) + "/" + numFiles);
-                            IFunctionLocationProvider functionLocationProvider = new EagerFunctionLocationProvider(repo);
-                            CommitChangedFunctionLister lister = new CommitChangedFunctionLister(repo, nextCommitId,
-                                    functionLocationProvider, changedFunctionConsumer);
-                            lister.listChangedFunctions();
-                        } catch (RuntimeException t) {
-                            LOG.warn("Error processing commit ID " + nextCommitId + ". Processing will continue with the remaining IDs.", t);
-                            increaseErrorCount();
+                            nextCommitIds.add(commitIdIter.next());
                         }
                     }
                 }

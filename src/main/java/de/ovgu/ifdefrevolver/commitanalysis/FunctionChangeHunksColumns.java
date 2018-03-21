@@ -94,6 +94,24 @@ public enum FunctionChangeHunksColumns implements CsvColumnValueProvider<Functio
         public Boolean csvColumnValue(FunctionChangeHunk changedFunc, Snapshot snapshot) {
             return changedFunc.deletesFunction();
         }
+    },
+    /**
+     * Type of function modification. Can be ADD, DEL, MOD or MOVE.
+     */
+    MOD_TYPE {
+        @Override
+        public String csvColumnValue(FunctionChangeHunk changedFunc, Snapshot snapshot) {
+            return changedFunc.getModType().name();
+        }
+    },
+    /**
+     * New file where the function resides. Will be different from FILE in case the function was moved to another file.
+     */
+    NEW_FILE {
+        @Override
+        public String csvColumnValue(FunctionChangeHunk changedFunc, Snapshot snapshot) {
+            return changedFunc.getHunk().getNewPath();
+        }
     };
 
     public static CsvRowProvider<FunctionChangeHunk, Snapshot, FunctionChangeHunksColumns>
