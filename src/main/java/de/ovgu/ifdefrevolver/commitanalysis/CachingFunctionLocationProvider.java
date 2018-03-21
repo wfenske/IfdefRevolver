@@ -42,6 +42,10 @@ public class CachingFunctionLocationProvider implements IFunctionLocationProvide
 
     @Override
     public Map<String, List<Method>> listFunctionsInFiles(String commitId, final RevCommit state, Set<String> paths) throws IOException {
+        if (paths.isEmpty()) {
+            return Collections.emptyMap();
+        }
+
         Map<String, List<Method>> results = new HashMap<>();
         Set<String> missingPaths = new HashSet<>();
 

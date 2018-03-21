@@ -44,8 +44,8 @@ public class CommitMovedFunctionLister {
                                      Consumer<FunctionChangeHunk> changedFunctionConsumer) {
         this.repo = repo;
         this.commitId = commitId;
-        this.functionLocationProvider = functionLocationProvider;
         this.changedFunctionConsumer = new AddDelMergingConsumer(changedFunctionConsumer);
+        this.functionLocationProvider = functionLocationProvider;
     }
 
     /**
@@ -66,7 +66,7 @@ public class CommitMovedFunctionLister {
                     return;
                 }
                 if (parentCount > 1) {
-                    LOG.info("Ignoring mergeDelAndAddToMove commit " + commitId + ": expected exactly one parent, got " + parentCount);
+                    LOG.info("Ignoring merge commit " + commitId + ": expected exactly one parent, got " + parentCount);
                     return;
                 }
                 ObjectId parentCommitId = commit.getParent(0).getId();
@@ -75,21 +75,15 @@ public class CommitMovedFunctionLister {
                 diffs = formatter.scan(parent.getTree(), commit.getTree());
                 LOG.debug(parentCommitId.name() + " ... " + commitId);
 
-                Set<String> aSideCFilePaths = getFilenamesOfCFilesModifiedByDiffsASides(diffs);
+                Set<String> aSideCFilePaths = getFilenamesOfCFilesModifiedByDiffs(diffs, DiffEntry.Side.OLD);
                 allASideFunctions = listAllFunctionsInModifiedFiles(parent, aSideCFilePaths);
 
-                Set<String> bSideCFilePaths = getFilenamesOfCFilesModifiedByDiffsBSides(diffs);
+                Set<String> bSideCFilePaths = getFilenamesOfCFilesModifiedByDiffs(diffs, DiffEntry.Side.NEW);
                 allBSideFunctions = listAllFunctionsInModifiedFiles(commit, bSideCFilePaths);
-                if (LOG.isTraceEnabled()) {
-                    for (String fn : bSideCFilePaths) {
-                        LOG.trace("B-side modified file: " + fn);
-                    }
-                    for (List<Method> methods : allBSideFunctions.values()) {
-                        for (Method m : methods) {
-                            LOG.trace("B-side function: " + m);
-                        }
-                    }
-                }
+
+                logFilesAndFunction("A-side", aSideCFilePaths, allASideFunctions);
+                logFilesAndFunction("B-side", bSideCFilePaths, allBSideFunctions);
+
             } catch (RuntimeException re) {
                 LOG.warn("Error analyzing commit " + commitId, re);
                 return;
@@ -101,6 +95,19 @@ public class CommitMovedFunctionLister {
         } finally {
             releaseFormatter();
             releaseRevisionWalker(rw);
+        }
+    }
+
+    private void logFilesAndFunction(String side, Set<String> cFiles, Map<String, List<Method>> functionsByFile) {
+        if (LOG.isTraceEnabled()) {
+            for (String fn : cFiles) {
+                LOG.trace(side + " modified file: " + fn);
+            }
+            for (List<Method> methods : functionsByFile.values()) {
+                for (Method m : methods) {
+                    LOG.trace(side + " function: " + m);
+                }
+            }
         }
     }
 
@@ -127,20 +134,12 @@ public class CommitMovedFunctionLister {
         }
     }
 
-    private Set<String> getFilenamesOfCFilesModifiedByDiffsASides(List<DiffEntry> diffs) {
-        return getFilenamesOfCFilesModifiedByDiffs(diffs, DiffEntry.Side.OLD);
-    }
-
-    private Set<String> getFilenamesOfCFilesModifiedByDiffsBSides(List<DiffEntry> diffs) {
-        return getFilenamesOfCFilesModifiedByDiffs(diffs, DiffEntry.Side.NEW);
-    }
-
     private Set<String> getFilenamesOfCFilesModifiedByDiffs(List<DiffEntry> diffs, DiffEntry.Side side) {
         Set<String> filePaths = new HashSet<>();
         for (DiffEntry diff : diffs) {
-            String oldPath = diff.getPath(side);
-            if (oldPath.endsWith(".c") || oldPath.endsWith(".C")) {
-                filePaths.add(oldPath);
+            String path = diff.getPath(side);
+            if (path.endsWith(".c") || path.endsWith(".C")) {
+                filePaths.add(path);
             }
         }
         return filePaths;
@@ -156,13 +155,6 @@ public class CommitMovedFunctionLister {
     }
 
     private Map<String, List<Method>> listAllFunctionsInModifiedFiles(RevCommit state, Set<String> modifiedFiles) throws IOException {
-//        LOG.debug("Parsing all functions in files touched by " + state.getId());
-//        if (modifiedFiles.isEmpty()) {
-//            return Collections.emptyMap();
-//        }
-//
-//        FunctionLocationProvider functionLocationProvider = new FunctionLocationProvider(repo);
-//        return functionLocationProvider.listFunctionsInFiles(commitId, state, modifiedFiles);
         return functionLocationProvider.listFunctionsInFiles(commitId, state, modifiedFiles);
     }
 
@@ -170,18 +162,26 @@ public class CommitMovedFunctionLister {
         final String oldPath = diff.getOldPath();
         final String newPath = diff.getNewPath();
 
+        List<Method> oldFunctions = allASideFunctions.get(oldPath);
+        List<Method> newFunctions = allBSideFunctions.get(newPath);
+
+        if (oldFunctions == null) {
+            if (newFunctions == null) {
+                return;
+            }
+            oldFunctions = Collections.emptyList();
+        }
+        // oldFunctions are != null at this point.
+        if (newFunctions == null) {
+            newFunctions = Collections.emptyList();
+        }
+
         final boolean logDebug = LOG.isDebugEnabled();
 
         if (logDebug) {
             LOG.debug("--- " + oldPath);
             LOG.debug("+++ " + newPath);
         }
-
-        List<Method> oldFunctions = allASideFunctions.get(oldPath);
-        List<Method> newFunctions = allBSideFunctions.get(newPath);
-
-        if (oldFunctions == null) oldFunctions = Collections.emptyList();
-        if (newFunctions == null) newFunctions = Collections.emptyList();
 
         CommitHunkToFunctionLocationMapper editLocMapper = new CommitHunkToFunctionLocationMapper(commitId,
                 oldPath, oldFunctions,
