@@ -231,17 +231,30 @@ public class CommitMovedFunctionLister {
             } else if (delsByFunctionSignature.isEmpty()) {
                 publishAll(addsByFunctionSignature);
             } else {
+
                 for (Map.Entry<String, List<FunctionChangeHunk>> addEntry : addsByFunctionSignature.entrySet()) {
+                    final String signature = addEntry.getKey();
+                    final List<FunctionChangeHunk> adds = addEntry.getValue();
+                    final List<FunctionChangeHunk> dels = delsByFunctionSignature.get(signature);
+                    if (dels == null) {
+                        publishAll(adds);
+                    }
                     throw new UnsupportedOperationException("Not yet implemented");
                 }
+
+                // TODO: Also take care of any dels whose keys are not in the adds map.
             }
         }
 
         private void publishAll(Map<String, List<FunctionChangeHunk>> hunkMap) {
             for (List<FunctionChangeHunk> hs : hunkMap.values()) {
-                for (FunctionChangeHunk h : hs) {
-                    parent.accept(h);
-                }
+                publishAll(hs);
+            }
+        }
+
+        private void publishAll(List<FunctionChangeHunk> hs) {
+            for (FunctionChangeHunk h : hs) {
+                parent.accept(h);
             }
         }
     }
