@@ -3,9 +3,11 @@ package de.ovgu.ifdefrevolver.commitanalysis;
 import de.ovgu.ifdefrevolver.bugs.correlate.data.Snapshot;
 import de.ovgu.ifdefrevolver.bugs.correlate.input.ProjectInformationReader;
 import de.ovgu.ifdefrevolver.bugs.correlate.main.ProjectInformationConfig;
+import de.ovgu.ifdefrevolver.bugs.createsnapshots.data.Commit;
+import de.ovgu.ifdefrevolver.bugs.createsnapshots.input.RevisionsCsvReader;
 import de.ovgu.ifdefrevolver.bugs.minecommits.CommitsDistanceDb;
 import de.ovgu.ifdefrevolver.bugs.minecommits.CommitsDistanceDbCsvReader;
-import de.ovgu.skunk.detection.data.Method;
+import de.ovgu.ifdefrevolver.util.SimpleCsvFileReader;
 import org.apache.commons.cli.*;
 import org.apache.log4j.Logger;
 
@@ -19,6 +21,10 @@ public class AddChangeDistances {
     private ListChangedFunctionsConfig config;
     private int errors;
     private CommitsDistanceDb commitsDistanceDb;
+    private Map<FunctionId, FunctionChangeRow> adds;
+    private Map<FunctionId, FunctionChangeRow> dels;
+    private GroupingListMap<String, FunctionChangeRow> changesByCommit;
+    private GroupingListMap<FunctionId, FunctionChangeRow> changesByFunction;
 
     public static void main(String[] args) {
         AddChangeDistances main = new AddChangeDistances();
@@ -35,6 +41,49 @@ public class AddChangeDistances {
         System.exit(main.errors);
     }
 
+    public abstract static class GroupingMap<K, V, C extends Collection<V>> {
+        protected final Map<K, C> map;
+
+        public GroupingMap() {
+            this.map = newMap();
+        }
+
+        protected abstract C newCollection();
+
+        protected Map<K, C> newMap() {
+            return new HashMap<>();
+        }
+
+        public void put(K key, V value) {
+            C valuesForKey = map.get(key);
+            if (valuesForKey == null) {
+                valuesForKey = newCollection();
+                map.put(key, valuesForKey);
+            }
+            valuesForKey.add(value);
+        }
+
+        public C get(K key) {
+            return map.get(key);
+        }
+
+        public boolean containsKey(K key) {
+            return map.containsKey(key);
+        }
+
+        public Map<K, C> getMap() {
+            return this.map;
+        }
+    }
+
+    public static class GroupingListMap<K, V> extends GroupingMap<K, V, List<V>> {
+
+        @Override
+        protected List<V> newCollection() {
+            return new ArrayList<>();
+        }
+    }
+
     private void execute() {
         LOG.debug("Reading information about commit parent-child relationships.");
         this.errors = 0;
@@ -46,34 +95,213 @@ public class AddChangeDistances {
         this.commitsDistanceDb.ensurePreprocessed();
         LOG.debug("Done reading commit parent-child relationships.");
 
+        RevisionsCsvReader revisionsReader = new RevisionsCsvReader(config.revisionCsvFile());
+        revisionsReader.readAllCommits();
+        SortedSet<Commit> allCommits = revisionsReader.getCommits();
+
         ProjectInformationReader<ListChangedFunctionsConfig> projectInfo = new ProjectInformationReader<>(config);
         LOG.debug("Reading project information");
         projectInfo.readSnapshotsAndRevisionsFile();
         LOG.debug("Done reading project information");
 
-        LOG.debug("Reading all function changes.");
         Collection<Snapshot> snapshotsToProcess = projectInfo.getSnapshotsFiltered(config);
-        Map<Method, List<String>> commitsByFunction = new HashMap<>();
-        for (Snapshot s : snapshotsToProcess) {
-            Collection<FunctionChangeHunk> functionChanges = readFunctionsChangedInSnapshot(s);
-            for (FunctionChangeHunk h : functionChanges) {
-                Method func = h.getFunction();
-                List<String> commitsChaningFunction = commitsByFunction.get(func);
-                if (commitsChaningFunction == null) {
-                    commitsChaningFunction = new ArrayList<>();
-                    commitsByFunction.put(func, commitsChaningFunction);
+        changesByCommit = new GroupingListMap<>();
+        changesByFunction = new GroupingListMap<>();
+        adds = new LinkedHashMap<>();
+        dels = new LinkedHashMap<>();
+
+        LOG.debug("Reading all function changes.");
+        readFunctionsChangedInSnapshots(snapshotsToProcess);
+        LOG.debug("Done reading all function changes. Number of distinct changed functions: " + changesByFunction.getMap().size());
+
+        LOG.debug("Extracting function additions and deletions from " + allCommits.size() + " commits.");
+        extractFunctionAdditionsAndDeletions(allCommits);
+        LOG.debug("Done extracting function additions and deletions. Detected " + adds.size() + " additions and " + dels.size() + " corresponding deletions.");
+
+        int successes = 0;
+        int failures = 0;
+        System.out.println("MOD_TYPE,FUNCTION_SIGNATURE,FILE,COMMIT,AGE,DIST");
+        for (Map.Entry<FunctionId, List<FunctionChangeRow>> e : changesByFunction.getMap().entrySet()) {
+            final FunctionId function = e.getKey();
+            List<FunctionChangeRow> changes = new LinkedList<>(e.getValue());
+            List<String> commitsToFunction = new ArrayList<>(changes.size());
+            for (FunctionChangeRow change : changes) {
+                commitsToFunction.add(change.commitId);
+            }
+
+            FunctionChangeRow addition = adds.get(function);
+            if (addition == null) {
+                LOG.warn("Exact addition of function unknown. Assuming first modification instead. Function: " + function);
+                addition = changes.get(0);
+            }
+            final String creatingCommit = addition.commitId;
+            //changes.remove(addition);
+            for (FunctionChangeRow change : changes) {
+                final String currentCommit = change.commitId;
+                int minDist = Integer.MAX_VALUE;
+                for (String otherCommit : commitsToFunction) {
+                    if (currentCommit.equals(otherCommit)) continue;
+                    Optional<Integer> currentDist = commitsDistanceDb.minDistance(currentCommit, otherCommit);
+                    if (currentDist.isPresent()) {
+                        minDist = Math.min(minDist, currentDist.get());
+                    }
                 }
-                commitsChaningFunction.add(h.getHunk().getCommitId());
+                String minDistStr = minDist < Integer.MAX_VALUE ? Integer.toString(minDist) : "";
+                Optional<Integer> age = commitsDistanceDb.minDistance(currentCommit, creatingCommit);
+                final String ageStr;
+                if (age.isPresent()) {
+                    successes++;
+                    ageStr = age.get().toString();
+                } else {
+                    failures++;
+                    ageStr = "";
+                }
+                System.out.println(change.modType + ",\"" + function.signature + "\"," + function.file + "," + currentCommit + "," + ageStr + "," + minDistStr);
             }
         }
-        LOG.debug("Done reading all function changes.");
+        LOG.debug("Found age of a commit " + successes + " time(s). Failed " + failures + " time(s).");
     }
 
-    private Collection<FunctionChangeHunk> readFunctionsChangedInSnapshot(Snapshot s) {
-        if (true) {
-            throw new UnsupportedOperationException("Not done implementing this function");
+    private void extractFunctionAdditionsAndDeletions(SortedSet<Commit> allCommits) {
+        for (Commit c : allCommits) {
+            List<FunctionChangeRow> changes = changesByCommit.get(c.getHash());
+            if (changes == null) continue;
+            //LOG.debug("Commit " + c.getHash() + " changes " + changes.size() + " function(s).");
+            for (FunctionChangeRow ch : changes) {
+                switch (ch.modType) {
+                    case ADD: {
+                        FunctionId key = ch.functionId;
+                        if (adds.containsKey(key)) {
+                            LOG.warn("Function is added a second time. Ignoring addition: " + key);
+                        } else {
+                            //LOG.debug("Function " + key + " is added by change " + ch);
+                            adds.put(key, ch);
+                        }
+                        break;
+                    }
+                    case DEL: {
+                        FunctionId key = ch.functionId;
+                        if (dels.containsKey(key)) {
+                            LOG.warn("Function is deleted a second time. Ignoring deletion: " + key);
+                        } else {
+                            if (!adds.containsKey(key)) {
+                                LOG.warn("Function appears to be deleted before it has been added: " + key);
+                            }
+                            //LOG.debug("Function " + key + " is deleted by change " + ch);
+                            dels.put(key, ch);
+                        }
+                        break;
+                    }
+                }
+            }
         }
-        return null;
+    }
+
+    private void readFunctionsChangedInSnapshots(Collection<Snapshot> snapshotsToProcess) {
+        LOG.debug("Reading function changes for " + snapshotsToProcess.size() + " snapshot(s).");
+        int numChanges = 0;
+        for (Snapshot s : snapshotsToProcess) {
+            Collection<FunctionChangeRow> functionChanges = readFunctionsChangedInSnapshot(s);
+            for (FunctionChangeRow change : functionChanges) {
+                changesByFunction.put(change.functionId, change);
+                changesByCommit.put(change.commitId, change);
+                numChanges++;
+            }
+        }
+        LOG.debug("Read " + numChanges + " function change(s).");
+    }
+
+    public static class FunctionId {
+        public final String signature;
+        public final String file;
+
+
+        public FunctionId(String signature, String file) {
+            this.signature = signature;
+            this.file = file;
+        }
+
+        @Override
+        public boolean equals(Object o) {
+            if (this == o) return true;
+            if (!(o instanceof FunctionId)) return false;
+
+            FunctionId that = (FunctionId) o;
+
+            if (!signature.equals(that.signature)) return false;
+            return file.equals(that.file);
+        }
+
+        @Override
+        public int hashCode() {
+            int result = signature.hashCode();
+            result = 31 * result + file.hashCode();
+            return result;
+        }
+
+        @Override
+        public String toString() {
+            return "FunctionId{" +
+                    "signature='" + signature + '\'' +
+                    ", file='" + file + '\'' +
+                    '}';
+        }
+    }
+
+    public static class FunctionChangeRow {
+        public FunctionId functionId;
+        public String commitId;
+        public FunctionChangeHunk.ModificationType modType;
+        public String newFile;
+    }
+
+    private List<FunctionChangeRow> readFunctionsChangedInSnapshot(Snapshot s) {
+        SimpleCsvFileReader<List<FunctionChangeRow>> r = new SimpleCsvFileReader<List<FunctionChangeRow>>() {
+            List<FunctionChangeRow> results = new ArrayList<>();
+
+            @Override
+            protected boolean hasHeader() {
+                return true;
+            }
+
+            @Override
+            protected void processHeader(String[] headerLine) {
+                final int minCols = FunctionChangeHunksColumns.values().length;
+                if (headerLine.length < minCols) {
+                    throw new RuntimeException("Not enough columns. Expected at least " + minCols + ", got " + headerLine.length);
+                }
+
+                for (int col = 0; col < minCols; col++) {
+                    String expectedColName = FunctionChangeHunksColumns.values()[col].name();
+                    if (!headerLine[col].equalsIgnoreCase(expectedColName)) {
+                        throw new RuntimeException("Column name mismatch. Expected column " + col + " to be " + expectedColName + ", got: " + headerLine[col]);
+                    }
+                }
+            }
+
+            @Override
+            protected void processContentLine(String[] line) {
+                FunctionChangeRow result = new FunctionChangeRow();
+                String signature = line[FunctionChangeHunksColumns.FUNCTION_SIGNATURE.ordinal()];
+                String file = line[FunctionChangeHunksColumns.FILE.ordinal()];
+                FunctionId functionId = new FunctionId(signature, file);
+                result.functionId = functionId;
+                result.commitId = line[FunctionChangeHunksColumns.COMMIT_ID.ordinal()];
+                String modTypeName = line[FunctionChangeHunksColumns.MOD_TYPE.ordinal()];
+                result.modType = FunctionChangeHunk.ModificationType.valueOf(modTypeName);
+                result.newFile = line[FunctionChangeHunksColumns.NEW_FILE.ordinal()];
+                results.add(result);
+            }
+
+            @Override
+            protected List<FunctionChangeRow> finalizeResult() {
+                return results;
+            }
+        };
+
+        File f = new File(config.snapshotResultsDirForDate(s.getSnapshotDate()), FunctionChangeHunksColumns.FILE_BASENAME);
+
+        return r.readFile(f);
     }
 
     private void logSnapshotsToProcess(Collection<Snapshot> snapshotsToProcess) {

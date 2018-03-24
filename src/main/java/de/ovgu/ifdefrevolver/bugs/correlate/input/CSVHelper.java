@@ -45,10 +45,10 @@ public class CSVHelper extends ProjectInformationReader<Config> {
     }
 
     /**
-     * @param smell             The smell in question.  (Depending on the smell, the snapshotsSmellFile has to be processed a little differently.)
+     * @param smell             The smell in question.  (Depending on the smell, the snapshotsSmellFile has to be
+     *                          processed a little differently.)
      * @param snapshotSmellFile A CSV file containing Skunk's smelliness information
-     * @return Names of files that exhibit the smells listed in
-     * <code>snapshotSmellFile</code>
+     * @return Names of files that exhibit the smells listed in <code>snapshotSmellFile</code>
      */
     public Map<String, List<Double>> getSmellyFilesFromSnapshotSmellResFile(Smell smell,
                                                                             final File snapshotSmellFile) {
@@ -276,7 +276,8 @@ public class CSVHelper extends ProjectInformationReader<Config> {
     // @formatter:on
 
     /**
-     * @param skunkFeatureLocationsCsv Skunk-produced CSV file containing information about where feature code resides withing a snapshot
+     * @param skunkFeatureLocationsCsv Skunk-produced CSV file containing information about where feature code resides
+     *                                 withing a snapshot
      * @return Map from feature name to {@link Feature} data structure
      */
     public SortedMap<String, Feature> getFeaturesByName(File skunkFeatureLocationsCsv) {
@@ -365,8 +366,8 @@ public class CSVHelper extends ProjectInformationReader<Config> {
      *
      * @param snapshot
      * @param smell
-     * @return Map from filename of a smelly file to its smelliness scores. Each
-     * smelliness score list will contain at least one entry.
+     * @return Map from filename of a smelly file to its smelliness scores. Each smelliness score list will contain at
+     * least one entry.
      */
     public Map<String, List<Double>> getSmells(Snapshot snapshot, final Smell smell) {
         Map<String, List<Double>> scoresByFilename = new HashMap<>();
@@ -429,6 +430,22 @@ public class CSVHelper extends ProjectInformationReader<Config> {
         }
 
         return scoresByFilename;
+    }
+
+    public static void silentlyCloseReaders(CSVReader reader, FileReader fileReader) {
+        if (reader != null) {
+            try {
+                reader.close();
+            } catch (IOException e) {
+                // We don't care if closing the reader fails.
+            }
+        } else if (fileReader != null) {
+            try {
+                fileReader.close();
+            } catch (IOException e) {
+                // We don't care if closing the reader fails.
+            }
+        }
     }
 
 }

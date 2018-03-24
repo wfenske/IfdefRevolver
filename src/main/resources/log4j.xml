@@ -65,6 +65,10 @@
         <level value="debug"/>
     </logger>
 
+    <logger name="de.ovgu.ifdefrevolver.commitanalysis.AddChangeDistances">
+        <level value="debug"/>
+    </logger>
+
     <root>
         <priority value="info"/>
         <appender-ref ref="stderr"/>

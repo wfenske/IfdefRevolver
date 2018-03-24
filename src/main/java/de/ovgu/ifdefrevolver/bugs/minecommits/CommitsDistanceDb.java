@@ -29,17 +29,17 @@ public class CommitsDistanceDb {
     int[][] intParents;
 
     private static class CacheKey {
-        final String child;
-        final String ancestor;
+        final int child;
+        final int ancestor;
 
-        public CacheKey(String child, String ancestor) {
+        public CacheKey(int child, int ancestor) {
             this.child = child;
             this.ancestor = ancestor;
         }
 
         @Override
         public int hashCode() {
-            return child.hashCode() ^ ancestor.hashCode();
+            return child ^ ancestor;
         }
 
         @Override
@@ -47,11 +47,12 @@ public class CommitsDistanceDb {
             if (obj == null) return false;
             if (!(obj instanceof CacheKey)) return false;
             CacheKey other = (CacheKey) obj;
-            return (other.ancestor.equals(this.ancestor) && other.child.equals(this.child));
+            return (other.ancestor == this.ancestor) && (other.child == this.child);
         }
     }
 
     Map<CacheKey, Optional<Integer>> knownDistances = new HashMap<>();
+    int[][] reachables;
 
     /**
      * Calculate the length of the shortest path from a child commit to its ancestor
@@ -84,7 +85,9 @@ public class CommitsDistanceDb {
         // Recurse
         int winningDist = INFINITE_DISTANCE;
         for (int i = 0; i < currentParents.length; i++) {
-            int nextDist = minDistance1(currentParents[i], ancestor);
+            int currentParent = currentParents[i];
+            if (!isReachable(currentParent, ancestor)) continue;
+            int nextDist = minDistance1(currentParent, ancestor);
             if (nextDist < winningDist) {
                 winningDist = nextDist;
             }
@@ -133,10 +136,58 @@ public class CommitsDistanceDb {
 //        }
     }
 
+    private void populateReachables() {
+        LOG.debug("Computing reachable commits");
+        final int numCommits = intsFromHashes.size();
+        this.reachables = new int[numCommits][];
+        for (int childCommit = 0; childCommit < numCommits; childCommit++) {
+            reachables[childCommit] = computeReachables(childCommit);
+        }
+        LOG.debug("Done computing reachable commits");
+    }
+
+    private int[] computeReachables(int childCommit) {
+        if (reachables[childCommit] != null) {
+            return reachables[childCommit];
+        }
+
+        //LOG.debug("Computing reachable commit " + childCommit);
+
+        Set<Integer> reachableFromHere = new HashSet<>();
+        int[] currentParents = intParents[childCommit];
+        // Common case
+        while (currentParents.length == 1) {
+            int parent = currentParents[0];
+            reachableFromHere.add(parent);
+            currentParents = intParents[parent];
+        }
+        // More than one parent case
+        for (int parent : currentParents) {
+            reachableFromHere.add(parent);
+            int[] parentReachables = reachables[parent];
+            if (parentReachables == null) {
+                parentReachables = computeReachables(parent);
+            }
+            for (int parentReachable : parentReachables) {
+                reachableFromHere.add(parentReachable);
+            }
+        }
+
+        int[] result = new int[reachableFromHere.size()];
+        int ix = 0;
+        for (Integer c : reachableFromHere) {
+            result[ix++] = c;
+        }
+
+        reachables[childCommit] = result;
+        return result;
+    }
+
     public synchronized void ensurePreprocessed() {
         if (!preprocessed) {
             encodeHashesAsInts();
             populateIntParents();
+            populateReachables();
             preprocessed = true;
         }
     }
@@ -146,7 +197,8 @@ public class CommitsDistanceDb {
      *
      * @param child    the child commit
      * @param ancestor a preceding commit
-     * @return Minimum distance in terms of commits from child to ancestor if there is a path; {@link Optional#empty()} otherwise
+     * @return Minimum distance in terms of commits from child to ancestor if there is a path; {@link Optional#empty()}
+     * otherwise
      */
     public Optional<Integer> minDistance(String child, String ancestor) {
         ensurePreprocessed();
@@ -168,7 +220,7 @@ public class CommitsDistanceDb {
             return Optional.empty();
         }
 
-        CacheKey cacheKey = new CacheKey(child, ancestor);
+        CacheKey cacheKey = new CacheKey(childKey, ancestorKey);
         synchronized (knownDistances) {
             Optional<Integer> cachedDist = knownDistances.get(cacheKey);
             if (cachedDist != null) {
@@ -176,7 +228,14 @@ public class CommitsDistanceDb {
             }
         }
 
-        int dist = minDistance1(childKey, ancestorKey);
+        final int dist;
+
+        if (isReachable(childKey, ancestorKey)) {
+            dist = minDistance1(childKey, ancestorKey);
+        } else {
+            dist = INFINITE_DISTANCE;
+        }
+
         Optional result;
         if (dist == INFINITE_DISTANCE) {
             result = Optional.empty();
@@ -189,6 +248,16 @@ public class CommitsDistanceDb {
         }
 
         return result;
+    }
+
+    private boolean isReachable(Integer childKey, int ancestorKey) {
+        int[] allAncestors = reachables[childKey];
+        for (int a : allAncestors) {
+            if (a == ancestorKey) {
+                return true;
+            }
+        }
+        return false;
     }
 
     private static int[] toIntArray(Collection<Integer> integers) {

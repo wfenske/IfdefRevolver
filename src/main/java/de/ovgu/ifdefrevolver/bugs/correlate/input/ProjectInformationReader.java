@@ -10,6 +10,7 @@ import de.ovgu.ifdefrevolver.bugs.correlate.main.IHasSnapshotsDir;
 import de.ovgu.ifdefrevolver.bugs.createsnapshots.input.RevisionsCsvReader;
 import de.ovgu.ifdefrevolver.bugs.minecommits.OrderedRevisionsColumns;
 import de.ovgu.ifdefrevolver.commitanalysis.IHasSnapshotFilter;
+import de.ovgu.ifdefrevolver.util.SimpleCsvFileReader;
 import org.apache.commons.lang3.tuple.Pair;
 import org.apache.log4j.Logger;
 
@@ -182,37 +183,21 @@ public class ProjectInformationReader<TConfig extends IHasProjectInfoFile & IHas
             throw new RuntimeException(
                     "Error reading file " + snapshotFile.getAbsolutePath(), e1);
         } finally {
-            if (reader != null) {
-                try {
-                    reader.close();
-                } catch (IOException e) {
-                    // We don't care if closing the reader fails.
-                }
-            } else if (fileReader != null) {
-                try {
-                    fileReader.close();
-                } catch (IOException e) {
-                    // We don't care if closing the reader fails.
-                }
-            }
+            CSVHelper.silentlyCloseReaders(reader, fileReader);
         }
 
         return Pair.of(snapshotIndex, commitHashes);
     }
 
     private List<Date> getProjectDates() {
-        List<Date> resultList = new ArrayList<>();
-        final SimpleDateFormat formatter = new SimpleDateFormat("yyyy-MM-dd");
+        SimpleCsvFileReader<List<Date>> r = new SimpleCsvFileReader<List<Date>>() {
+            List<Date> resultList = new ArrayList<>();
+            final SimpleDateFormat formatter = new SimpleDateFormat("yyyy-MM-dd");
 
-        CSVReader reader = null;
-        FileReader fileReader = null;
-        try {
-            fileReader = new FileReader(conf.projectInfoFile());
-            reader = new CSVReader(fileReader);
-            String[] nextLine;
-            while ((nextLine = reader.readNext()) != null) {
-                String dateStr = nextLine[1];
-                Date verDate = null;
+            @Override
+            protected void processContentLine(String[] line) {
+                String dateStr = line[1];
+                Date verDate;
                 try {
                     verDate = formatter.parse(dateStr);
                 } catch (ParseException e) {
@@ -222,26 +207,14 @@ public class ProjectInformationReader<TConfig extends IHasProjectInfoFile & IHas
 
                 resultList.add(verDate);
             }
-        } catch (IOException e1) {
-            throw new RuntimeException(
-                    "Error reading file " + conf.projectInfoFile().getAbsolutePath(), e1);
-        } finally {
-            if (reader != null) {
-                try {
-                    reader.close();
-                } catch (IOException e) {
-                    // We don't care if closing the reader fails.
-                }
-            } else if (fileReader != null) {
-                try {
-                    fileReader.close();
-                } catch (IOException e) {
-                    // We don't care if closing the reader fails.
-                }
-            }
-        }
 
-        return resultList;
+            @Override
+            protected List<Date> finalizeResult() {
+                return resultList;
+            }
+        };
+
+        return r.readFile(conf.projectInfoFile());
     }
 
     /**

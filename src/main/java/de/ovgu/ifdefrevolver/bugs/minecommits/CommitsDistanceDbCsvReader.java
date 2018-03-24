@@ -1,6 +1,7 @@
 package de.ovgu.ifdefrevolver.bugs.minecommits;
 
 import com.opencsv.CSVReader;
+import de.ovgu.ifdefrevolver.bugs.correlate.input.CSVHelper;
 import org.apache.log4j.Logger;
 
 import java.io.File;
@@ -64,19 +65,7 @@ public class CommitsDistanceDbCsvReader {
             throw new RuntimeException(
                     "Error reading file " + csvFile.getAbsolutePath(), e1);
         } finally {
-            if (reader != null) {
-                try {
-                    reader.close();
-                } catch (IOException e) {
-                    // We don't care if closing the reader fails.
-                }
-            } else if (fileReader != null) {
-                try {
-                    fileReader.close();
-                } catch (IOException e) {
-                    // We don't care if closing the reader fails.
-                }
-            }
+            CSVHelper.silentlyCloseReaders(reader, fileReader);
         }
 
         return db;

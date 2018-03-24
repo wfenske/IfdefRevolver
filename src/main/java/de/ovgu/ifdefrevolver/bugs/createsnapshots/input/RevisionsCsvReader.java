@@ -373,4 +373,12 @@ public class RevisionsCsvReader {
         result.setStartDate(rawSnapshotInfo.date);
         return result;
     }
+
+    /**
+     * @return All commits in the natural order of the Commits class (first by branch and second by position in branch,
+     * in ascending order)
+     */
+    public SortedSet<Commit> getCommits() {
+        return commits;
+    }
 }
