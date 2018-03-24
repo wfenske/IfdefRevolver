@@ -52,7 +52,7 @@ public class CommitsDistanceDb {
     }
 
     Map<CacheKey, Optional<Integer>> knownDistances = new HashMap<>();
-    int[][] reachables;
+    boolean[][] reachables;
 
     /**
      * Calculate the length of the shortest path from a child commit to its ancestor
@@ -139,48 +139,55 @@ public class CommitsDistanceDb {
     private void populateReachables() {
         LOG.debug("Computing reachable commits");
         final int numCommits = intsFromHashes.size();
-        this.reachables = new int[numCommits][];
+        this.reachables = new boolean[numCommits][];
         for (int childCommit = 0; childCommit < numCommits; childCommit++) {
             reachables[childCommit] = computeReachables(childCommit);
         }
         LOG.debug("Done computing reachable commits");
     }
 
-    private int[] computeReachables(int childCommit) {
+    private boolean[] computeReachables(int childCommit) {
         if (reachables[childCommit] != null) {
             return reachables[childCommit];
         }
 
         //LOG.debug("Computing reachable commit " + childCommit);
 
-        Set<Integer> reachableFromHere = new HashSet<>();
+        //Set<Integer> reachableFromHere = new HashSet<>();
+        boolean[] reachableFromHere = new boolean[intsFromHashes.size()];
         int[] currentParents = intParents[childCommit];
         // Common case
         while (currentParents.length == 1) {
             int parent = currentParents[0];
-            reachableFromHere.add(parent);
+            //reachableFromHere.add(parent);
+            reachableFromHere[parent] = true;
             currentParents = intParents[parent];
         }
         // More than one parent case
         for (int parent : currentParents) {
-            reachableFromHere.add(parent);
-            int[] parentReachables = reachables[parent];
+            reachableFromHere[parent] = true;
+            boolean[] parentReachables = reachables[parent];
             if (parentReachables == null) {
                 parentReachables = computeReachables(parent);
             }
-            for (int parentReachable : parentReachables) {
-                reachableFromHere.add(parentReachable);
+            for (int i = 0; i < parentReachables.length; i++) {
+                //reachableFromHere.addAll(parentReachables);
+                if (parentReachables[i]) {
+                    reachableFromHere[i] = true;
+                }
             }
         }
 
-        int[] result = new int[reachableFromHere.size()];
-        int ix = 0;
-        for (Integer c : reachableFromHere) {
-            result[ix++] = c;
-        }
+        //int[] result = new int[reachableFromHere.size()];
+        //int ix = 0;
+        //for (Integer c : reachableFromHere) {
+        //    result[ix++] = c;
+        //}
 
-        reachables[childCommit] = result;
-        return result;
+        //reachables[childCommit] = result;
+        reachables[childCommit] = reachableFromHere;
+        //return result;
+        return reachableFromHere;
     }
 
     public synchronized void ensurePreprocessed() {
@@ -251,13 +258,14 @@ public class CommitsDistanceDb {
     }
 
     private boolean isReachable(Integer childKey, int ancestorKey) {
-        int[] allAncestors = reachables[childKey];
-        for (int a : allAncestors) {
-            if (a == ancestorKey) {
-                return true;
-            }
-        }
-        return false;
+//        int[] allAncestors = reachables[childKey];
+//        for (int a : allAncestors) {
+//            if (a == ancestorKey) {
+//                return true;
+//            }
+//        }
+//        return false;
+        return reachables[childKey][ancestorKey];
     }
 
     private static int[] toIntArray(Collection<Integer> integers) {
