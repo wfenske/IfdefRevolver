@@ -136,7 +136,7 @@ public class AddChangeDistances {
                 }
             }
 
-            final String creatingCommit;
+            //final String creatingCommit;
             //FunctionChangeRow addition = adds.get(function);
             boolean additionMissing = true;
             //if (addition != null) {
@@ -146,13 +146,14 @@ public class AddChangeDistances {
                 //LOG.warn("Adds not extracted, although there were some. Function: " + function);
                 //addition = addsForFunction.iterator().next();
                 //creatingCommit = guessCreatingCommit(commitsToFunction);
-                creatingCommit = addsForFunction.iterator().next();
+                //creatingCommit = addsForFunction.iterator().next();
             } else {
                 missingAdditions++;
                 LOG.warn("Exact addition of function unknown. Guessing addition instead. Function: " + function);
                 //creatingCommit = guessCreatingCommit(changes);
-                creatingCommit = guessCreatingCommit(commitsToFunction);
-                LOG.warn("Assumed creating commit is " + creatingCommit);
+                //creatingCommit = guessCreatingCommit(commitsToFunction);
+                //LOG.warn("Assumed creating commit is " + creatingCommit);
+                addsForFunction = guessAddsForFunction(commitsToFunction);
             }
             //}
             Set<String> commitsAlreadySeen = new HashSet<>();
@@ -162,7 +163,7 @@ public class AddChangeDistances {
                 else commitsAlreadySeen.add(currentCommit);
 
                 int minDist;
-                if (currentCommit.equals(creatingCommit)) {
+                if (addsForFunction.contains(currentCommit)) {
                     minDist = 0;
                 } else {
                     minDist = Integer.MAX_VALUE;
@@ -175,16 +176,17 @@ public class AddChangeDistances {
                     }
                 }
                 String minDistStr = minDist < Integer.MAX_VALUE ? Integer.toString(minDist) : "";
-                Optional<Integer> age = commitsDistanceDb.minDistance(currentCommit, creatingCommit);
-                if (!age.isPresent()) {
-                    for (String addingCommit : addsForFunction) {
-                        age = commitsDistanceDb.minDistance(currentCommit, addingCommit);
-                        if (age.isPresent()) {
-                            LOG.info("Determined function age by referring to a different adding commit. Yeah!");
-                            break;
-                        }
+                //Optional<Integer> age = commitsDistanceDb.minDistance(currentCommit, creatingCommit);
+                //if (!age.isPresent()) {
+                Optional<Integer> age = Optional.empty();
+                for (String addingCommit : addsForFunction) {
+                    age = commitsDistanceDb.minDistance(currentCommit, addingCommit);
+                    if (age.isPresent()) {
+                        LOG.info("Determined function age by referring to a different adding commit. Yeah!");
+                        break;
                     }
                 }
+                //}
                 final String ageStr;
                 if (age.isPresent()) {
                     successes++;
@@ -218,6 +220,23 @@ public class AddChangeDistances {
                 snapshotDates.add(dummySnapshotDate);
             }
         }
+    }
+
+    private Set<String> guessAddsForFunction(Set<String> allCommits) {
+        // Determine all commits that are not descendants of other commits.
+        Set<String> commitsWithoutAncestors = new HashSet<>(allCommits);
+        for (Iterator<String> it = commitsWithoutAncestors.iterator(); it.hasNext(); ) {
+            final String descendant = it.next();
+            for (String ancestor : allCommits) {
+                if (ancestor.equals(descendant)) continue;
+                if (commitsDistanceDb.isDescendant(descendant, ancestor)) {
+                    it.remove();
+                    break;
+                }
+            }
+        }
+
+        return commitsWithoutAncestors;
     }
 
     private String guessCreatingCommit(Set<String> allCommits) {
