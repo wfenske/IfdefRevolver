@@ -64,7 +64,7 @@ public abstract class AbstractSkunkCommitStudy implements Study {
         ICommitVisitorWithOutputFileHeader visitor = makeNewVisitor();
         CSVFile writer = new CSVFile(conf.outputFileName, visitor.getOutputFileHeader());
         SCMRepository repo = GitRepository.singleProject(conf.repoPathName);
-        repo.getScm().omitBranches();
+        configureRepository(repo);
 
         // Raise limit of GIT diff size.  Property: git.maxdiff; default value in repodriller: 100000
         final Optional<Integer> maxDiffSize = getMaxDiffSize();
@@ -81,6 +81,10 @@ public abstract class AbstractSkunkCommitStudy implements Study {
                 .mine();
         // @formatter:on
         studySuccessful = true;
+    }
+
+    protected void configureRepository(SCMRepository repo) {
+        repo.getScm().omitBranches();
     }
 
     public boolean wasStudySuccessful() {
