@@ -273,6 +273,36 @@ public class CommitsDistanceDb {
         return optionalizeDistance(dist);
     }
 
+    /**
+     * Determine whether one commit is the descendant of another. Note that every commit is its own descendant.
+     *
+     * @param descendant the descendant commit
+     * @param ancestor   a preceding commit
+     * @return <code>true</code> if the descendant commit actually has ancestor among its ancestors. <code>false</code> otherwise.
+     */
+    public boolean isDescendant(String descendant, String ancestor) {
+        ensurePreprocessed();
+        if (descendant == null) {
+            throw new NullPointerException("Descendant commit must not be null");
+        }
+        if (ancestor == null) {
+            throw new NullPointerException("Ancestor commit must not be null");
+        }
+
+        Integer descendantKey = intsFromHashes.get(descendant);
+        if (descendantKey == null) {
+            LOG.warn("Unknown descendant commit: `" + descendant + "'");
+            return false;
+        }
+        Integer ancestorKey = intsFromHashes.get(ancestor);
+        if (ancestorKey == null) {
+            LOG.warn("Unknown ancestor commit: `" + ancestor + "'");
+            return false;
+        }
+
+        return reachables[descendantKey][ancestorKey];
+    }
+
     private void maybeStatPerformance() {
         if (!LOG.isDebugEnabled()) return;
 

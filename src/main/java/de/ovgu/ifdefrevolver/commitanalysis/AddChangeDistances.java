@@ -130,13 +130,15 @@ public class AddChangeDistances {
                 commitsToFunction.add(change.commitId);
             }
 
+            final String creatingCommit;
             FunctionChangeRow addition = adds.get(function);
-            if (addition == null) {
+            if (addition != null) {
+                creatingCommit = addition.commitId;
+            } else {
                 missingAdditions++;
                 LOG.warn("Exact addition of function unknown. Assuming first modification instead. Function: " + function);
-                addition = changes.get(0);
+                creatingCommit = guessCreatingCommit(changes);
             }
-            final String creatingCommit = addition.commitId;
             //changes.remove(addition);
             Set<String> commitsAlreadySeen = new HashSet<>();
             for (FunctionChangeRow change : changes) {
@@ -166,6 +168,38 @@ public class AddChangeDistances {
             }
         }
         LOG.debug("Found age of a commit " + successes + " time(s). Failed " + failures + " time(s). Functions with unknown additions: " + missingAdditions);
+    }
+
+    private String guessCreatingCommit(List<FunctionChangeRow> changes) {
+        Set<String> allCommits = new LinkedHashSet<>();
+        for (FunctionChangeRow row : changes) {
+            allCommits.add(row.commitId);
+        }
+
+        // Determine for each commit how often it is true that is an ancestor of the other commits.
+        //Map<String, Integer> numberOfDescendantsPerCommit = new HashMap<>();
+        int winningNumberOfDescendants = -1;
+        String winningCommit = null;
+        for (String ancestor : allCommits) {
+            int numDescendants = 0;
+            for (String descendant : allCommits) {
+                if (ancestor.equals(descendant)) continue;
+
+                if (commitsDistanceDb.isDescendant(descendant, ancestor)) {
+                    numDescendants++;
+                }
+            }
+
+            //numberOfDescendantsPerCommit.put(ancestor, numDescendants);
+            if (numDescendants > winningNumberOfDescendants) {
+                winningCommit = ancestor;
+                winningNumberOfDescendants = numDescendants;
+            }
+        }
+
+        //FunctionChangeRow firstChange = changes.get(0);
+        //return firstChange.commitId;
+        return winningCommit;
     }
 
     private void extractFunctionAdditionsAndDeletions(SortedSet<Commit> allCommits) {
