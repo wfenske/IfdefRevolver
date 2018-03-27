@@ -120,6 +120,7 @@ public class AddChangeDistances {
 
         int successes = 0;
         int failures = 0;
+        int missingAdditions = 0;
         System.out.println("MOD_TYPE,FUNCTION_SIGNATURE,FILE,COMMIT,AGE,DIST");
         for (Map.Entry<FunctionId, List<FunctionChangeRow>> e : changesByFunction.getMap().entrySet()) {
             final FunctionId function = e.getKey();
@@ -131,13 +132,18 @@ public class AddChangeDistances {
 
             FunctionChangeRow addition = adds.get(function);
             if (addition == null) {
+                missingAdditions++;
                 LOG.warn("Exact addition of function unknown. Assuming first modification instead. Function: " + function);
                 addition = changes.get(0);
             }
             final String creatingCommit = addition.commitId;
             //changes.remove(addition);
+            Set<String> commitsAlreadySeen = new HashSet<>();
             for (FunctionChangeRow change : changes) {
                 final String currentCommit = change.commitId;
+                if (commitsAlreadySeen.contains(currentCommit)) continue;
+                else commitsAlreadySeen.add(currentCommit);
+
                 int minDist = Integer.MAX_VALUE;
                 for (String otherCommit : commitsToFunction) {
                     if (currentCommit.equals(otherCommit)) continue;
@@ -159,7 +165,7 @@ public class AddChangeDistances {
                 System.out.println(change.modType + ",\"" + function.signature + "\"," + function.file + "," + currentCommit + "," + ageStr + "," + minDistStr);
             }
         }
-        LOG.debug("Found age of a commit " + successes + " time(s). Failed " + failures + " time(s).");
+        LOG.debug("Found age of a commit " + successes + " time(s). Failed " + failures + " time(s). Functions with unknown additions: " + missingAdditions);
     }
 
     private void extractFunctionAdditionsAndDeletions(SortedSet<Commit> allCommits) {

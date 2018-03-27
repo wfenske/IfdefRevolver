@@ -10,6 +10,7 @@ import java.util.*;
 public class CommitsDistanceDb {
     private static Logger LOG = Logger.getLogger(CommitsDistanceDb.class);
     private static final int INFINITE_DISTANCE = Integer.MAX_VALUE;
+    private static final Optional<Integer> DIST_ZERO = Optional.of(0);
 
     private boolean preprocessed = false;
 
@@ -51,7 +52,7 @@ public class CommitsDistanceDb {
         }
     }
 
-    Map<CacheKey, Optional<Integer>> knownDistances = new HashMap<>();
+    Map<CacheKey, Integer> knownDistances = new HashMap<>();
     boolean[][] reachables;
 
     /**
@@ -62,7 +63,7 @@ public class CommitsDistanceDb {
      * @return Minimum distance in terms of commits from child to ancestor; {@link #INFINITE_DISTANCE} if no path can be
      * found
      */
-    int minDistance1(int child, int ancestor) {
+    int minDistance1(int child, int ancestor, CacheKey cacheKey) {
         // Test for end of recursion
         if (child == ancestor) {
             return 0;
@@ -86,19 +87,40 @@ public class CommitsDistanceDb {
         int winningDist = INFINITE_DISTANCE;
         for (int i = 0; i < currentParents.length; i++) {
             int currentParent = currentParents[i];
-            if (!isReachable(currentParent, ancestor)) continue;
-            int nextDist = minDistance1(currentParent, ancestor);
+            if (!reachables[currentParent][ancestor]) continue;
+
+            CacheKey localCacheKey = new CacheKey(currentParent, ancestor);
+            Integer cachedDist;
+            synchronized (knownDistances) {
+                cachedDist = knownDistances.get(localCacheKey);
+            }
+
+            int nextDist;
+            if (cachedDist != null) {
+                nextDist = cachedDist;
+            } else {
+                nextDist = minDistance1(currentParent, ancestor, localCacheKey);
+            }
             if (nextDist < winningDist) {
                 winningDist = nextDist;
             }
         }
 
         // Return result
+        int result;
         if (winningDist < INFINITE_DISTANCE) {
-            return winningDist + distanceLocallyTraveled;
+            result = winningDist + distanceLocallyTraveled;
         } else {
-            return INFINITE_DISTANCE;
+            result = INFINITE_DISTANCE;
         }
+
+        if (cacheKey != null) {
+            synchronized (knownDistances) {
+                knownDistances.put(cacheKey, result);
+            }
+        }
+
+        return result;
     }
 
     private void encodeHashesAsInts() {
@@ -153,16 +175,18 @@ public class CommitsDistanceDb {
 
         //LOG.debug("Computing reachable commit " + childCommit);
 
-        //Set<Integer> reachableFromHere = new HashSet<>();
         boolean[] reachableFromHere = new boolean[intsFromHashes.size()];
+        // A commit can always reach itself.
+        reachableFromHere[childCommit] = true;
+
+        // Common case: Just a single parent
         int[] currentParents = intParents[childCommit];
-        // Common case
         while (currentParents.length == 1) {
             int parent = currentParents[0];
-            //reachableFromHere.add(parent);
             reachableFromHere[parent] = true;
             currentParents = intParents[parent];
         }
+
         // More than one parent case
         for (int parent : currentParents) {
             reachableFromHere[parent] = true;
@@ -171,22 +195,13 @@ public class CommitsDistanceDb {
                 parentReachables = computeReachables(parent);
             }
             for (int i = 0; i < parentReachables.length; i++) {
-                //reachableFromHere.addAll(parentReachables);
                 if (parentReachables[i]) {
                     reachableFromHere[i] = true;
                 }
             }
         }
 
-        //int[] result = new int[reachableFromHere.size()];
-        //int ix = 0;
-        //for (Integer c : reachableFromHere) {
-        //    result[ix++] = c;
-        //}
-
-        //reachables[childCommit] = result;
         reachables[childCommit] = reachableFromHere;
-        //return result;
         return reachableFromHere;
     }
 
@@ -199,6 +214,9 @@ public class CommitsDistanceDb {
         }
     }
 
+    int requests = 0;
+    long firstRequestMillis;
+
     /**
      * Calculate the length of the shortest path from a child commit to its ancestor
      *
@@ -209,6 +227,7 @@ public class CommitsDistanceDb {
      */
     public Optional<Integer> minDistance(String child, String ancestor) {
         ensurePreprocessed();
+
         if (child == null) {
             throw new NullPointerException("Child commit must not be null");
         }
@@ -227,45 +246,59 @@ public class CommitsDistanceDb {
             return Optional.empty();
         }
 
+        if (childKey == ancestorKey) {
+            return DIST_ZERO;
+        }
+
+        if (!reachables[childKey][ancestorKey]) {
+            return Optional.empty();
+        }
+
         CacheKey cacheKey = new CacheKey(childKey, ancestorKey);
         synchronized (knownDistances) {
-            Optional<Integer> cachedDist = knownDistances.get(cacheKey);
+            Integer cachedDist = knownDistances.get(cacheKey);
             if (cachedDist != null) {
-                return cachedDist;
+                return optionalizeDistance(cachedDist);
             }
         }
 
         final int dist;
-
-        if (isReachable(childKey, ancestorKey)) {
-            dist = minDistance1(childKey, ancestorKey);
+        if (reachables[childKey][ancestorKey]) {
+            maybeStatPerformance();
+            dist = minDistance1(childKey, ancestorKey, cacheKey);
         } else {
             dist = INFINITE_DISTANCE;
         }
 
-        Optional result;
-        if (dist == INFINITE_DISTANCE) {
-            result = Optional.empty();
-        } else {
-            result = Optional.of(dist);
-        }
-
-        synchronized (knownDistances) {
-            knownDistances.put(cacheKey, result);
-        }
-
-        return result;
+        return optionalizeDistance(dist);
     }
 
-    private boolean isReachable(Integer childKey, int ancestorKey) {
-//        int[] allAncestors = reachables[childKey];
-//        for (int a : allAncestors) {
-//            if (a == ancestorKey) {
-//                return true;
-//            }
-//        }
-//        return false;
-        return reachables[childKey][ancestorKey];
+    private void maybeStatPerformance() {
+        if (!LOG.isDebugEnabled()) return;
+
+        if (requests == 0) {
+            LOG.debug("First request.");
+//                System.out.flush();
+//                System.err.flush();
+            firstRequestMillis = System.currentTimeMillis();
+        } else if ((requests % 40000) == 0) {
+            long timeInMillis = System.currentTimeMillis() - firstRequestMillis;
+            long timeInSeconds = timeInMillis / 1000;
+            LOG.debug("Computation request: " + requests + ". Total time: " + timeInSeconds
+                    + " seconds (" + ((timeInMillis * 1000) / requests) + "ns/request). "
+                    + "Cache size: " + knownDistances.size() + " entries.");
+//                System.out.flush();
+//                System.err.flush();
+        }
+        requests++;
+    }
+
+    private static Optional<Integer> optionalizeDistance(int dist) {
+        if (dist == INFINITE_DISTANCE) {
+            return Optional.empty();
+        } else {
+            return Optional.of(dist);
+        }
     }
 
     private static int[] toIntArray(Collection<Integer> integers) {
