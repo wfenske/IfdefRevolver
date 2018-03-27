@@ -128,21 +128,33 @@ public class AddChangeDistances {
             final FunctionId function = e.getKey();
             List<FunctionChangeRow> changes = new LinkedList<>(e.getValue());
             Set<String> commitsToFunction = new HashSet<>(changes.size());
+            Set<String> addsForFunction = new LinkedHashSet<>();
             for (FunctionChangeRow change : changes) {
                 commitsToFunction.add(change.commitId);
+                if (change.modType == FunctionChangeHunk.ModificationType.ADD) {
+                    addsForFunction.add(change.commitId);
+                }
             }
 
             final String creatingCommit;
-            FunctionChangeRow addition = adds.get(function);
-            if (addition != null) {
-                //creatingCommit = addition.commitId;
+            //FunctionChangeRow addition = adds.get(function);
+            boolean additionMissing = true;
+            //if (addition != null) {
+            //creatingCommit = addition.commitId;
+            //} else {
+            if (!addsForFunction.isEmpty()) {
+                //LOG.warn("Adds not extracted, although there were some. Function: " + function);
+                //addition = addsForFunction.iterator().next();
+                //creatingCommit = guessCreatingCommit(commitsToFunction);
+                creatingCommit = addsForFunction.iterator().next();
             } else {
                 missingAdditions++;
                 LOG.warn("Exact addition of function unknown. Guessing addition instead. Function: " + function);
                 //creatingCommit = guessCreatingCommit(changes);
+                creatingCommit = guessCreatingCommit(commitsToFunction);
+                LOG.warn("Assumed creating commit is " + creatingCommit);
             }
-            creatingCommit = guessCreatingCommit(commitsToFunction);
-
+            //}
             Set<String> commitsAlreadySeen = new HashSet<>();
             for (FunctionChangeRow change : changes) {
                 final String currentCommit = change.commitId;
@@ -164,6 +176,15 @@ public class AddChangeDistances {
                 }
                 String minDistStr = minDist < Integer.MAX_VALUE ? Integer.toString(minDist) : "";
                 Optional<Integer> age = commitsDistanceDb.minDistance(currentCommit, creatingCommit);
+                if (!age.isPresent()) {
+                    for (String addingCommit : addsForFunction) {
+                        age = commitsDistanceDb.minDistance(currentCommit, addingCommit);
+                        if (age.isPresent()) {
+                            LOG.info("Determined function age by referring to a different adding commit. Yeah!");
+                            break;
+                        }
+                    }
+                }
                 final String ageStr;
                 if (age.isPresent()) {
                     successes++;
