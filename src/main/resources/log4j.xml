@@ -62,7 +62,11 @@
     </logger>
 
     <logger name="de.ovgu.ifdefrevolver.commitanalysis.CachingFunctionLocationProvider">
-        <level value="debug"/>
+        <level value="info"/>
+    </logger>
+
+    <logger name="de.ovgu.ifdefrevolver.commitanalysis.ListChangedFunctions">
+        <level value="info"/>
     </logger>
 
     <logger name="de.ovgu.ifdefrevolver.commitanalysis.AddChangeDistances">

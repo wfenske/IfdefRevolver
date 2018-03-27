@@ -54,13 +54,13 @@ public class Correlate {
         final CSVHelper csvHelper = new CSVHelper(conf);
         csvHelper.readSnapshotsAndRevisionsFile();
 
-		/* PREPROCESSING of the Smell Data */
+        /* PREPROCESSING of the Smell Data */
 
         for (Smell smell : Smell.values()) {
             (new Preprocessing(conf, csvHelper)).preprocessDataForSmell(smell);
         }
 
-		/* PREPROCESSING of the Project Data */
+        /* PREPROCESSING of the Project Data */
 
         // List<Date> snapshotDates = csvHelper.getProjectDates();
         final Collection<Snapshot> snapshots = csvHelper.getSnapshots().values();
@@ -77,7 +77,7 @@ public class Correlate {
 
         // Date startDate = versionDates.get(0);
 
-        for (Snapshot snapshot : snapshots) {
+        for (IMinimalSnapshot snapshot : snapshots) {
             log.info("Evaluating snapshot: " + snapshot);
 
             List<MergedFileInfo> outputList = new ArrayList<>();
@@ -213,28 +213,28 @@ public class Correlate {
     // @formatter:off
     /*
      * private Map<Snapshot, SortedMap<ChangedFile, String>>
-	 * groupBySnapshots(SortedMap<ChangedFile, String> changedFiles,
-	 * Collection<Snapshot> snapshots) throws AssertionError { Map<Snapshot,
-	 * SortedMap<ChangedFile, String>> result = new HashMap<>();
-	 * 
-	 * SortedMap<ChangedFile, String> work = new TreeMap<>(changedFiles);
-	 * 
-	 * for (Snapshot snapshot : snapshots) { SortedMap<ChangedFile, String>
-	 * mapForSnapshot = new TreeMap<>(); while (!work.isEmpty()) { ChangedFile
-	 * changedFile = work.firstKey(); Date fileDate =
-	 * changedFile.getCommitDate(); if (fileDate.after(snapshotDate)) { break; }
-	 * String value = work.get(changedFile); mapForSnapshot.put(changedFile,
-	 * value); work.remove(changedFile); } result.put(snapshotDate,
-	 * mapForSnapshot); }
-	 * 
-	 * if (log.isInfoEnabled() && !work.isEmpty()) { Set<String> uniqueHashes =
-	 * new HashSet<>(); for (ChangedFile f : work.keySet()) {
-	 * uniqueHashes.add(f.getCommitHash()); } log.info("After grouping, " +
-	 * work.size() + " file(s), with " + uniqueHashes.size() +
-	 * " hash(es), remain(s):  " + work.keySet()); }
-	 * 
-	 * return result; }
-	 */
+     * groupBySnapshots(SortedMap<ChangedFile, String> changedFiles,
+     * Collection<Snapshot> snapshots) throws AssertionError { Map<Snapshot,
+     * SortedMap<ChangedFile, String>> result = new HashMap<>();
+     *
+     * SortedMap<ChangedFile, String> work = new TreeMap<>(changedFiles);
+     *
+     * for (Snapshot snapshot : snapshots) { SortedMap<ChangedFile, String>
+     * mapForSnapshot = new TreeMap<>(); while (!work.isEmpty()) { ChangedFile
+     * changedFile = work.firstKey(); Date fileDate =
+     * changedFile.getCommitDate(); if (fileDate.after(snapshotDate)) { break; }
+     * String value = work.get(changedFile); mapForSnapshot.put(changedFile,
+     * value); work.remove(changedFile); } result.put(snapshotDate,
+     * mapForSnapshot); }
+     *
+     * if (log.isInfoEnabled() && !work.isEmpty()) { Set<String> uniqueHashes =
+     * new HashSet<>(); for (ChangedFile f : work.keySet()) {
+     * uniqueHashes.add(f.getCommitHash()); } log.info("After grouping, " +
+     * work.size() + " file(s), with " + uniqueHashes.size() +
+     * " hash(es), remain(s):  " + work.keySet()); }
+     *
+     * return result; }
+     */
     // @formatter:on
 
     /**
@@ -265,9 +265,9 @@ public class Correlate {
         return result;
     }
 
-    private void logSnapshotDates(Collection<Snapshot> snapshots) {
+    private void logSnapshotDates(Collection<? extends IMinimalSnapshot> snapshots) {
         StringBuilder snapshotDatesPrettyPrinted = new StringBuilder();
-        for (Snapshot snapshot : snapshots) {
+        for (IMinimalSnapshot snapshot : snapshots) {
             snapshotDatesPrettyPrinted.append("\n\t");
             snapshotDatesPrettyPrinted.append(snapshot.toString());
         }
@@ -281,8 +281,8 @@ public class Correlate {
         String dateStr = formatter.format(startDate);
         /*
          * ------------------------------------------------------------- ----
-		 * ----
-		 */
+         * ----
+         */
         // Aktuelle Commitfile Map in Liste umwandeln
         List<CommitFile> listOfBugcommits = new ArrayList<>();
         for (FileChangeHunk chFile : curBugMap.keySet()) {
@@ -326,10 +326,10 @@ public class Correlate {
             }
         }
 
-		/*
+        /*
          * ------------------------------------------------------------- ----
-		 * ----
-		 */
+         * ----
+         */
 
         try {
             buffW = new BufferedWriter(new FileWriter(corrRatioCsvOut, true));

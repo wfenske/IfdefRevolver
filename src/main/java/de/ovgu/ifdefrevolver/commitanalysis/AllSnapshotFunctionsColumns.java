@@ -1,6 +1,6 @@
 package de.ovgu.ifdefrevolver.commitanalysis;
 
-import de.ovgu.ifdefrevolver.bugs.correlate.data.Snapshot;
+import de.ovgu.ifdefrevolver.bugs.correlate.data.IMinimalSnapshot;
 import de.ovgu.skunk.detection.data.Method;
 import de.ovgu.skunk.detection.output.CsvColumnValueProvider;
 import de.ovgu.skunk.detection.output.CsvRowProvider;
@@ -11,14 +11,14 @@ import java.text.SimpleDateFormat;
  * <p>Describes the columns of the CSV file listing all the functions defined in the C files within an individual
  * snapshot.</p> <p> Created by wfenske on 28.02.17. </p>
  */
-public enum AllSnapshotFunctionsColumns implements CsvColumnValueProvider<Method, Snapshot> {
+public enum AllSnapshotFunctionsColumns implements CsvColumnValueProvider<Method, IMinimalSnapshot> {
 
     /**
      * Date of the snapshot in YYYY-MM-DD format
      */
     SNAPSHOT_DATE {
         @Override
-        public String csvColumnValue(Method func, Snapshot snapshot) {
+        public String csvColumnValue(Method func, IMinimalSnapshot snapshot) {
             synchronized (dateFormatter) {
                 return dateFormatter.format(snapshot.getSnapshotDate());
             }
@@ -29,7 +29,7 @@ public enum AllSnapshotFunctionsColumns implements CsvColumnValueProvider<Method
      */
     FUNCTION_SIGNATURE {
         @Override
-        public String csvColumnValue(Method func, Snapshot snapshot) {
+        public String csvColumnValue(Method func, IMinimalSnapshot snapshot) {
             return func.functionSignatureXml;
         }
     },
@@ -39,7 +39,7 @@ public enum AllSnapshotFunctionsColumns implements CsvColumnValueProvider<Method
      */
     FILE {
         @Override
-        public String csvColumnValue(Method func, Snapshot snapshot) {
+        public String csvColumnValue(Method func, IMinimalSnapshot snapshot) {
             return func.ProjectRelativeFilePath();
         }
 
@@ -49,15 +49,15 @@ public enum AllSnapshotFunctionsColumns implements CsvColumnValueProvider<Method
      */
     FUNCTION_LOC {
         @Override
-        public Integer csvColumnValue(Method func, Snapshot snapshot) {
+        public Integer csvColumnValue(Method func, IMinimalSnapshot snapshot) {
             return func.getNetLoc();
         }
     };
 
     private static final SimpleDateFormat dateFormatter = new SimpleDateFormat("yyyy-MM-dd");
 
-    public static CsvRowProvider<Method, Snapshot, AllSnapshotFunctionsColumns> newCsvRowProviderForSnapshot
-            (Snapshot snapshot) {
+    public static CsvRowProvider<Method, IMinimalSnapshot, AllSnapshotFunctionsColumns> newCsvRowProviderForSnapshot
+            (IMinimalSnapshot snapshot) {
         return new CsvRowProvider<>(AllSnapshotFunctionsColumns.class, snapshot);
     }
 

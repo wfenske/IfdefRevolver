@@ -1,5 +1,6 @@
 package de.ovgu.ifdefrevolver.commitanalysis;
 
+import de.ovgu.ifdefrevolver.bugs.correlate.data.IMinimalSnapshot;
 import de.ovgu.ifdefrevolver.bugs.correlate.data.Snapshot;
 import de.ovgu.ifdefrevolver.bugs.correlate.input.ProjectInformationReader;
 import de.ovgu.ifdefrevolver.bugs.correlate.main.ProjectInformationConfig;
@@ -51,8 +52,8 @@ public class ListAllFunctions {
         LOG.debug("Reading project information");
         projectInfo.readSnapshotsAndRevisionsFile();
         LOG.debug("Done reading project information");
-        Collection<Snapshot> snapshotsToProcess = projectInfo.getSnapshotsFiltered(config);
-        listFunctionsInSnapshots(snapshotsToProcess);
+        Collection<Snapshot> snapshotsToProcesses = projectInfo.getSnapshotsFiltered(config);
+        listFunctionsInSnapshots(snapshotsToProcesses);
     }
 
     private void listFunctionsInSnapshots(Collection<Snapshot> snapshots) {
@@ -72,7 +73,7 @@ public class ListAllFunctions {
         final String uncaughtExceptionErrorMessage = "Uncaught exception while listing all functions in snapshot " + snapshot + ". Deleting output file " + outputFile.getAbsolutePath();
         final String fileDeleteFailedErrorMessage = "Failed to delete output file " + outputFile.getAbsolutePath() + ". Must be deleted manually.";
         return new CsvFileWriterHelper() {
-            CsvRowProvider<Method, Snapshot, AllSnapshotFunctionsColumns> csvRowProvider = AllSnapshotFunctionsColumns.newCsvRowProviderForSnapshot(snapshot);
+            CsvRowProvider<Method, IMinimalSnapshot, AllSnapshotFunctionsColumns> csvRowProvider = AllSnapshotFunctionsColumns.newCsvRowProviderForSnapshot(snapshot);
 
             @Override
             protected void actuallyDoStuff(CSVPrinter csv) throws IOException {
@@ -92,7 +93,7 @@ public class ListAllFunctions {
         };
     }
 
-    private Consumer<Method> newThreadSafeFunctionToCsvWriter(final CSVPrinter csv, final CsvRowProvider<Method, Snapshot, AllSnapshotFunctionsColumns> csvRowProvider) {
+    private Consumer<Method> newThreadSafeFunctionToCsvWriter(final CSVPrinter csv, final CsvRowProvider<Method, IMinimalSnapshot, AllSnapshotFunctionsColumns> csvRowProvider) {
         return new Consumer<Method>() {
             @Override
             public void accept(Method function) {

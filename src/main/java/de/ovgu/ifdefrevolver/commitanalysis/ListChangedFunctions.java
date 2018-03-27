@@ -1,16 +1,17 @@
 package de.ovgu.ifdefrevolver.commitanalysis;
 
-import de.ovgu.ifdefrevolver.bugs.correlate.data.Snapshot;
+import de.ovgu.ifdefrevolver.bugs.correlate.data.IMinimalSnapshot;
 import de.ovgu.ifdefrevolver.bugs.correlate.input.ProjectInformationReader;
 import de.ovgu.ifdefrevolver.bugs.correlate.main.ProjectInformationConfig;
+import de.ovgu.ifdefrevolver.bugs.minecommits.CommitsDistanceDb;
+import de.ovgu.ifdefrevolver.bugs.minecommits.CommitsDistanceDbCsvReader;
 import org.apache.commons.cli.*;
 import org.apache.log4j.Logger;
 
 import java.io.File;
 import java.io.PrintWriter;
 import java.nio.file.Paths;
-import java.util.Collection;
-import java.util.List;
+import java.util.*;
 
 public class ListChangedFunctions {
     private static final Logger LOG = Logger.getLogger(ListChangedFunctions.class);
@@ -39,16 +40,72 @@ public class ListChangedFunctions {
         LOG.debug("Reading project information");
         projectInfo.readSnapshotsAndRevisionsFile();
         LOG.debug("Done reading project information");
-        Collection<Snapshot> snapshotsToProcess = projectInfo.getSnapshotsFiltered(config);
-        listFunctionsInSnapshots(snapshotsToProcess);
+        Collection<IMinimalSnapshot> snapshotsToProcesses = new LinkedHashSet<>();
+        snapshotsToProcesses.addAll(projectInfo.getSnapshotsFiltered(config));
+
+        if (!config.getSnapshotFilter().isPresent()) {
+            LOG.debug("Creating dummy snapshot to cover the remaining commits.");
+            IMinimalSnapshot dummySnapshotToCoverRemainingCommits = createDummySnapshotToCoverRemainingCommits(snapshotsToProcesses);
+            ensureSnapshotDirectoryOrDie(dummySnapshotToCoverRemainingCommits);
+            snapshotsToProcesses.add(dummySnapshotToCoverRemainingCommits);
+        }
+
+        listFunctionsInSnapshots(snapshotsToProcesses);
     }
 
-    private void listFunctionsInSnapshots(Collection<Snapshot> snapshots) {
+    private IMinimalSnapshot createDummySnapshotToCoverRemainingCommits(Collection<? extends IMinimalSnapshot> snapshotsToProcesses) {
+        final Set<String> remainingCommits = new HashSet<>(readAllCommits(config));
+        for (IMinimalSnapshot actualSnapshot : snapshotsToProcesses) {
+            remainingCommits.removeAll(actualSnapshot.getCommitHashes());
+        }
+
+        return new IMinimalSnapshot() {
+            final Date d = new Date(0);
+
+            @Override
+            public Date getSnapshotDate() {
+                return d;
+            }
+
+            @Override
+            public Set<String> getCommitHashes() {
+                return remainingCommits;
+            }
+
+            @Override
+            public boolean isBugfixCommit(String commitHash) {
+                return false;
+            }
+        };
+    }
+
+    private void ensureSnapshotDirectoryOrDie(IMinimalSnapshot snapshot) {
+        File outputFileDir = config.snapshotResultsDirForDate(snapshot.getSnapshotDate());
+        if (!outputFileDir.isDirectory()) {
+            if (outputFileDir.exists()) {
+                throw new RuntimeException("File already exists, but is not a directory: " + outputFileDir);
+            } else {
+                if (!outputFileDir.mkdirs()) {
+                    throw new RuntimeException("Failed to create output directory: " + outputFileDir);
+                }
+            }
+        }
+    }
+
+    private Set<String> readAllCommits(ListChangedFunctionsConfig config) {
+        File commitParentsFile = new File(config.projectResultsDir(), "commitParents.csv");
+        LOG.debug("Reading information about commit parent-child relationships from " + commitParentsFile);
+        CommitsDistanceDbCsvReader distanceReader = new CommitsDistanceDbCsvReader();
+        CommitsDistanceDb commitsDistanceDb = distanceReader.dbFromCsv(commitParentsFile);
+        return commitsDistanceDb.getCommits();
+    }
+
+    private void listFunctionsInSnapshots(Collection<? extends IMinimalSnapshot> snapshots) {
         logSnapshotsToProcess(snapshots);
 
         final int totalSnapshots = snapshots.size();
         int numSnapshot = 1;
-        for (final Snapshot s : snapshots) {
+        for (final IMinimalSnapshot s : snapshots) {
             LOG.info("Listing changed functions in snapshot " + (numSnapshot++) + "/" + totalSnapshots + ".");
             File resultCsv = listChangedFunctionsInSnapshot(s);
             LOG.info("Function changes saved in " + resultCsv.getAbsolutePath());
@@ -59,18 +116,18 @@ public class ListChangedFunctions {
         }
     }
 
-    private void logSnapshotsToProcess(Collection<Snapshot> snapshotsToProcess) {
+    private void logSnapshotsToProcess(Collection<? extends IMinimalSnapshot> snapshotsToProcesses) {
         if (LOG.isDebugEnabled()) {
             LOG.debug("The following snapshots will be processed:");
-            for (Snapshot s : snapshotsToProcess) {
+            for (IMinimalSnapshot s : snapshotsToProcesses) {
                 LOG.debug("" + s);
             }
         }
     }
 
-    private File listChangedFunctionsInSnapshot(Snapshot snapshot) {
-        LOG.debug("Listing functions changed in " + snapshot);
-        SnapshotChangedFunctionLister lister = new SnapshotChangedFunctionLister(config, snapshot);
+    private File listChangedFunctionsInSnapshot(IMinimalSnapshot IMinimalSnapshot) {
+        LOG.debug("Listing functions changed in " + IMinimalSnapshot);
+        SnapshotChangedFunctionLister lister = new SnapshotChangedFunctionLister(config, IMinimalSnapshot);
         File resultCsv = lister.listChangedFunctions();
         if (lister.errorsOccurred()) {
             errors++;

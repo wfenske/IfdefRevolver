@@ -1,6 +1,6 @@
 package de.ovgu.ifdefrevolver.commitanalysis;
 
-import de.ovgu.ifdefrevolver.bugs.correlate.data.Snapshot;
+import de.ovgu.ifdefrevolver.bugs.correlate.data.IMinimalSnapshot;
 import de.ovgu.ifdefrevolver.bugs.correlate.input.ProjectInformationReader;
 import de.ovgu.ifdefrevolver.bugs.correlate.main.ProjectInformationConfig;
 import de.ovgu.ifdefrevolver.bugs.createsnapshots.data.Commit;
@@ -104,14 +104,16 @@ public class AddChangeDistances {
         projectInfo.readSnapshotsAndRevisionsFile();
         LOG.debug("Done reading project information");
 
-        Collection<Snapshot> snapshotsToProcess = projectInfo.getSnapshotsFiltered(config);
+        Collection<Date> snapshotDates = getDatesOfActualSnapshots(projectInfo);
+        maybeAddDummySnapshotToCoverRemainingChanges(snapshotDates);
+
         changesByCommit = new GroupingListMap<>();
         changesByFunction = new GroupingListMap<>();
         adds = new LinkedHashMap<>();
         dels = new LinkedHashMap<>();
 
         LOG.debug("Reading all function changes.");
-        readFunctionsChangedInSnapshots(snapshotsToProcess);
+        readFunctionsChangedInSnapshots(snapshotDates);
         LOG.debug("Done reading all function changes. Number of distinct changed functions: " + changesByFunction.getMap().size());
 
         LOG.debug("Extracting function additions and deletions from " + allCommits.size() + " commits.");
@@ -125,7 +127,7 @@ public class AddChangeDistances {
         for (Map.Entry<FunctionId, List<FunctionChangeRow>> e : changesByFunction.getMap().entrySet()) {
             final FunctionId function = e.getKey();
             List<FunctionChangeRow> changes = new LinkedList<>(e.getValue());
-            List<String> commitsToFunction = new ArrayList<>(changes.size());
+            Set<String> commitsToFunction = new HashSet<>(changes.size());
             for (FunctionChangeRow change : changes) {
                 commitsToFunction.add(change.commitId);
             }
@@ -133,25 +135,31 @@ public class AddChangeDistances {
             final String creatingCommit;
             FunctionChangeRow addition = adds.get(function);
             if (addition != null) {
-                creatingCommit = addition.commitId;
+                //creatingCommit = addition.commitId;
             } else {
                 missingAdditions++;
-                LOG.warn("Exact addition of function unknown. Assuming first modification instead. Function: " + function);
-                creatingCommit = guessCreatingCommit(changes);
+                LOG.warn("Exact addition of function unknown. Guessing addition instead. Function: " + function);
+                //creatingCommit = guessCreatingCommit(changes);
             }
-            //changes.remove(addition);
+            creatingCommit = guessCreatingCommit(commitsToFunction);
+
             Set<String> commitsAlreadySeen = new HashSet<>();
             for (FunctionChangeRow change : changes) {
                 final String currentCommit = change.commitId;
                 if (commitsAlreadySeen.contains(currentCommit)) continue;
                 else commitsAlreadySeen.add(currentCommit);
 
-                int minDist = Integer.MAX_VALUE;
-                for (String otherCommit : commitsToFunction) {
-                    if (currentCommit.equals(otherCommit)) continue;
-                    Optional<Integer> currentDist = commitsDistanceDb.minDistance(currentCommit, otherCommit);
-                    if (currentDist.isPresent()) {
-                        minDist = Math.min(minDist, currentDist.get());
+                int minDist;
+                if (currentCommit.equals(creatingCommit)) {
+                    minDist = 0;
+                } else {
+                    minDist = Integer.MAX_VALUE;
+                    for (String otherCommit : commitsToFunction) {
+                        if (currentCommit.equals(otherCommit)) continue;
+                        Optional<Integer> currentDist = commitsDistanceDb.minDistance(currentCommit, otherCommit);
+                        if (currentDist.isPresent()) {
+                            minDist = Math.min(minDist, currentDist.get());
+                        }
                     }
                 }
                 String minDistStr = minDist < Integer.MAX_VALUE ? Integer.toString(minDist) : "";
@@ -167,17 +175,32 @@ public class AddChangeDistances {
                 System.out.println(change.modType + ",\"" + function.signature + "\"," + function.file + "," + currentCommit + "," + ageStr + "," + minDistStr);
             }
         }
-        LOG.debug("Found age of a commit " + successes + " time(s). Failed " + failures + " time(s). Functions with unknown additions: " + missingAdditions);
+        LOG.debug("Determined function age " + successes + " time(s). Failed " + failures + " time(s). Functions with unknown additions: " + missingAdditions);
     }
 
-    private String guessCreatingCommit(List<FunctionChangeRow> changes) {
-        Set<String> allCommits = new LinkedHashSet<>();
-        for (FunctionChangeRow row : changes) {
-            allCommits.add(row.commitId);
+    private Collection<Date> getDatesOfActualSnapshots(ProjectInformationReader<ListChangedFunctionsConfig> projectInfo) {
+        Collection<? extends IMinimalSnapshot> snapshotsToProcesses = projectInfo.getSnapshotsFiltered(config);
+        Collection<Date> snapshotDates = new LinkedHashSet<>();
+        for (IMinimalSnapshot s : snapshotsToProcesses) {
+            snapshotDates.add(s.getSnapshotDate());
         }
+        return snapshotDates;
+    }
 
+    private void maybeAddDummySnapshotToCoverRemainingChanges(Collection<Date> snapshotDates) {
+        if (!config.getSnapshotFilter().isPresent()) {
+            Date dummySnapshotDate = new Date(0);
+            File dummySnapshotFile = new File(config.snapshotResultsDirForDate(dummySnapshotDate),
+                    FunctionChangeHunksColumns.FILE_BASENAME);
+            if (dummySnapshotFile.exists()) {
+                LOG.info("Adding changes from dummy snapshot in " + dummySnapshotFile);
+                snapshotDates.add(dummySnapshotDate);
+            }
+        }
+    }
+
+    private String guessCreatingCommit(Set<String> allCommits) {
         // Determine for each commit how often it is true that is an ancestor of the other commits.
-        //Map<String, Integer> numberOfDescendantsPerCommit = new HashMap<>();
         int winningNumberOfDescendants = -1;
         String winningCommit = null;
         for (String ancestor : allCommits) {
@@ -190,15 +213,12 @@ public class AddChangeDistances {
                 }
             }
 
-            //numberOfDescendantsPerCommit.put(ancestor, numDescendants);
             if (numDescendants > winningNumberOfDescendants) {
                 winningCommit = ancestor;
                 winningNumberOfDescendants = numDescendants;
             }
         }
 
-        //FunctionChangeRow firstChange = changes.get(0);
-        //return firstChange.commitId;
         return winningCommit;
     }
 
@@ -237,11 +257,11 @@ public class AddChangeDistances {
         }
     }
 
-    private void readFunctionsChangedInSnapshots(Collection<Snapshot> snapshotsToProcess) {
-        LOG.debug("Reading function changes for " + snapshotsToProcess.size() + " snapshot(s).");
+    private void readFunctionsChangedInSnapshots(Collection<Date> snapshotsToProcesses) {
+        LOG.debug("Reading function changes for " + snapshotsToProcesses.size() + " snapshot(s).");
         int numChanges = 0;
-        for (Snapshot s : snapshotsToProcess) {
-            Collection<FunctionChangeRow> functionChanges = readFunctionsChangedInSnapshot(s);
+        for (Date snapshotDate : snapshotsToProcesses) {
+            Collection<FunctionChangeRow> functionChanges = readFunctionsChangedInSnapshot(snapshotDate);
             for (FunctionChangeRow change : functionChanges) {
                 changesByFunction.put(change.functionId, change);
                 changesByCommit.put(change.commitId, change);
@@ -295,7 +315,7 @@ public class AddChangeDistances {
         public String newFile;
     }
 
-    private List<FunctionChangeRow> readFunctionsChangedInSnapshot(Snapshot s) {
+    private List<FunctionChangeRow> readFunctionsChangedInSnapshot(Date snapshotDate) {
         SimpleCsvFileReader<List<FunctionChangeRow>> r = new SimpleCsvFileReader<List<FunctionChangeRow>>() {
             List<FunctionChangeRow> results = new ArrayList<>();
 
@@ -339,15 +359,15 @@ public class AddChangeDistances {
             }
         };
 
-        File f = new File(config.snapshotResultsDirForDate(s.getSnapshotDate()), FunctionChangeHunksColumns.FILE_BASENAME);
+        File f = new File(config.snapshotResultsDirForDate(snapshotDate), FunctionChangeHunksColumns.FILE_BASENAME);
 
         return r.readFile(f);
     }
 
-    private void logSnapshotsToProcess(Collection<Snapshot> snapshotsToProcess) {
+    private void logSnapshotsToProcess(Collection<IMinimalSnapshot> snapshotsToProcesses) {
         if (LOG.isDebugEnabled()) {
             LOG.debug("The following snapshots will be processed:");
-            for (Snapshot s : snapshotsToProcess) {
+            for (IMinimalSnapshot s : snapshotsToProcesses) {
                 LOG.debug("" + s);
             }
         }

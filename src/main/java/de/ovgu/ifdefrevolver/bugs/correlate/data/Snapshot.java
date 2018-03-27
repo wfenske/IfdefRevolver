@@ -14,7 +14,7 @@ import java.util.Set;
  *
  * @author wfenske
  */
-public class Snapshot implements Comparable<Snapshot> {
+public class Snapshot implements Comparable<Snapshot>, IMinimalSnapshot {
     private final SimpleDateFormat dateFormatter = new SimpleDateFormat("yyyy-MM-dd");
 
     private final int snapshotIndex;
@@ -40,17 +40,12 @@ public class Snapshot implements Comparable<Snapshot> {
         return snapshotIndex;
     }
 
-    /**
-     * @return The (start) date of this snapshot
-     */
+    @Override
     public Date getSnapshotDate() {
         return snapshotDate;
     }
 
-    /**
-     * @return Hashes of the commits within this snapshot. The iterator of this
-     * set returns the hashes in chronological order.
-     */
+    @Override
     public Set<String> getCommitHashes() {
         return commitHashes;
     }
@@ -121,6 +116,7 @@ public class Snapshot implements Comparable<Snapshot> {
         this.bugfixCommits.add(commitId);
     }
 
+    @Override
     public boolean isBugfixCommit(String commitId) {
         return this.bugfixCommits.contains(commitId);
     }

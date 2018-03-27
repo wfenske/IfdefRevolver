@@ -1,6 +1,6 @@
 package de.ovgu.ifdefrevolver.commitanalysis;
 
-import de.ovgu.ifdefrevolver.bugs.correlate.data.Snapshot;
+import de.ovgu.ifdefrevolver.bugs.correlate.data.IMinimalSnapshot;
 import de.ovgu.skunk.detection.output.CsvColumnValueProvider;
 import de.ovgu.skunk.detection.output.CsvRowProvider;
 
@@ -8,13 +8,13 @@ import de.ovgu.skunk.detection.output.CsvRowProvider;
  * <p>Describes the columns of the CSV file that lists all the individual hunks of change to functions defined in the C
  * files within an individual snapshot.</p> <p> Created by wfenske on 28.02.17. </p>
  */
-public enum FunctionChangeHunksColumns implements CsvColumnValueProvider<FunctionChangeHunk, Snapshot> {
+public enum FunctionChangeHunksColumns implements CsvColumnValueProvider<FunctionChangeHunk, IMinimalSnapshot> {
     /**
      * Function signature (includes return type, name, parameter list)
      */
     FUNCTION_SIGNATURE {
         @Override
-        public String csvColumnValue(FunctionChangeHunk changedFunc, Snapshot snapshot) {
+        public String csvColumnValue(FunctionChangeHunk changedFunc, IMinimalSnapshot snapshot) {
             return changedFunc.getFunction().functionSignatureXml;
         }
     },
@@ -23,7 +23,7 @@ public enum FunctionChangeHunksColumns implements CsvColumnValueProvider<Functio
      */
     FILE {
         @Override
-        public String csvColumnValue(FunctionChangeHunk changedFunc, Snapshot snapshot) {
+        public String csvColumnValue(FunctionChangeHunk changedFunc, IMinimalSnapshot snapshot) {
             return changedFunc.getFunction().FilePathForDisplay();
         }
     },
@@ -32,7 +32,7 @@ public enum FunctionChangeHunksColumns implements CsvColumnValueProvider<Functio
      */
     FUNCTION_GROSS_LOC {
         @Override
-        public Integer csvColumnValue(FunctionChangeHunk changedFunc, Snapshot snapshot) {
+        public Integer csvColumnValue(FunctionChangeHunk changedFunc, IMinimalSnapshot snapshot) {
             return changedFunc.getFunction().getGrossLoc();
         }
     },
@@ -41,7 +41,7 @@ public enum FunctionChangeHunksColumns implements CsvColumnValueProvider<Functio
      */
     COMMIT_ID {
         @Override
-        public String csvColumnValue(FunctionChangeHunk changedFunc, Snapshot snapshot) {
+        public String csvColumnValue(FunctionChangeHunk changedFunc, IMinimalSnapshot snapshot) {
             return changedFunc.getHunk().getCommitId();
         }
     },
@@ -50,7 +50,7 @@ public enum FunctionChangeHunksColumns implements CsvColumnValueProvider<Functio
      */
     BUGFIX {
         @Override
-        public Integer csvColumnValue(FunctionChangeHunk changedFunc, Snapshot snapshot) {
+        public Integer csvColumnValue(FunctionChangeHunk changedFunc, IMinimalSnapshot snapshot) {
             String commitId = changedFunc.getHunk().getCommitId();
             if (snapshot.isBugfixCommit(commitId)) {
                 return 1;
@@ -64,7 +64,7 @@ public enum FunctionChangeHunksColumns implements CsvColumnValueProvider<Functio
      */
     LINE_DELTA {
         @Override
-        public Integer csvColumnValue(FunctionChangeHunk changedFunc, Snapshot snapshot) {
+        public Integer csvColumnValue(FunctionChangeHunk changedFunc, IMinimalSnapshot snapshot) {
             return changedFunc.getHunk().getDelta();
         }
     },
@@ -73,7 +73,7 @@ public enum FunctionChangeHunksColumns implements CsvColumnValueProvider<Functio
      */
     LINES_DELETED {
         @Override
-        public Integer csvColumnValue(FunctionChangeHunk changedFunc, Snapshot snapshot) {
+        public Integer csvColumnValue(FunctionChangeHunk changedFunc, IMinimalSnapshot snapshot) {
             return changedFunc.getHunk().getLinesDeleted();
         }
     },
@@ -82,7 +82,7 @@ public enum FunctionChangeHunksColumns implements CsvColumnValueProvider<Functio
      */
     LINES_ADDED {
         @Override
-        public Integer csvColumnValue(FunctionChangeHunk changedFunc, Snapshot snapshot) {
+        public Integer csvColumnValue(FunctionChangeHunk changedFunc, IMinimalSnapshot snapshot) {
             return changedFunc.getHunk().getLinesAdded();
         }
     },
@@ -91,7 +91,7 @@ public enum FunctionChangeHunksColumns implements CsvColumnValueProvider<Functio
      */
     FUNCTION_DELETE {
         @Override
-        public Boolean csvColumnValue(FunctionChangeHunk changedFunc, Snapshot snapshot) {
+        public Boolean csvColumnValue(FunctionChangeHunk changedFunc, IMinimalSnapshot snapshot) {
             return changedFunc.deletesFunction();
         }
     },
@@ -100,7 +100,7 @@ public enum FunctionChangeHunksColumns implements CsvColumnValueProvider<Functio
      */
     MOD_TYPE {
         @Override
-        public String csvColumnValue(FunctionChangeHunk changedFunc, Snapshot snapshot) {
+        public String csvColumnValue(FunctionChangeHunk changedFunc, IMinimalSnapshot snapshot) {
             return changedFunc.getModType().name();
         }
     },
@@ -109,13 +109,13 @@ public enum FunctionChangeHunksColumns implements CsvColumnValueProvider<Functio
      */
     NEW_FILE {
         @Override
-        public String csvColumnValue(FunctionChangeHunk changedFunc, Snapshot snapshot) {
+        public String csvColumnValue(FunctionChangeHunk changedFunc, IMinimalSnapshot snapshot) {
             return changedFunc.getHunk().getNewPath();
         }
     };
 
-    public static CsvRowProvider<FunctionChangeHunk, Snapshot, FunctionChangeHunksColumns>
-    newCsvRowProviderForSnapshot(Snapshot snapshot) {
+    public static CsvRowProvider<FunctionChangeHunk, IMinimalSnapshot, FunctionChangeHunksColumns>
+    newCsvRowProviderForSnapshot(IMinimalSnapshot snapshot) {
         return new CsvRowProvider<>(FunctionChangeHunksColumns.class, snapshot);
     }
 

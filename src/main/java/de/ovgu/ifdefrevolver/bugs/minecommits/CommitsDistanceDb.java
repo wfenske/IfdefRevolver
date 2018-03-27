@@ -131,6 +131,10 @@ public class CommitsDistanceDb {
         }
     }
 
+    public Set<String> getCommits() {
+        return parents.keySet();
+    }
+
     private void populateIntParents() {
         intParents = new int[parents.size()][];
         for (Map.Entry<String, Set<String>> e : parents.entrySet()) {
@@ -278,7 +282,7 @@ public class CommitsDistanceDb {
      *
      * @param descendant the descendant commit
      * @param ancestor   a preceding commit
-     * @return <code>true</code> if the descendant commit actually has ancestor among its ancestors. <code>false</code> otherwise.
+     * @return <code>true</code> if the descendant commit actually has ancestor among its ancestors, <code>false</code> otherwise.
      */
     public boolean isDescendant(String descendant, String ancestor) {
         ensurePreprocessed();

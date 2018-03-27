@@ -2,7 +2,7 @@ package de.ovgu.ifdefrevolver.bugs.correlate.input;
 
 import com.opencsv.CSVReader;
 import de.ovgu.ifdefrevolver.bugs.correlate.data.Feature;
-import de.ovgu.ifdefrevolver.bugs.correlate.data.Snapshot;
+import de.ovgu.ifdefrevolver.bugs.correlate.data.IMinimalSnapshot;
 import de.ovgu.ifdefrevolver.bugs.correlate.main.Config;
 import de.ovgu.ifdefrevolver.bugs.correlate.main.Smell;
 import org.apache.log4j.Logger;
@@ -22,7 +22,7 @@ import java.util.Map.Entry;
 public class CSVHelper extends ProjectInformationReader<Config> {
     private static Logger log = Logger.getLogger(CSVHelper.class);
 
-	/* Indices into Skunk's feature location CSV file */
+    /* Indices into Skunk's feature location CSV file */
     /**
      * Column LGSmell (smell score assigned by Skunk)
      */
@@ -158,17 +158,17 @@ public class CSVHelper extends ProjectInformationReader<Config> {
         // @formatter:off
         /*
          * int totalSum = 0; log.
-		 * warn("This code is inefficient and should be removed. Just return minVal instead."
-		 * ); Collections.reverse(scoreList);
-		 * 
-		 * for (double temp : scoreList) { totalSum++; if (totalSum >= percSum)
-		 * { if (temp != minVal) { throw new RuntimeException(
-		 * "Got different values for min smell score: " + temp + " vs. " +
-		 * minVal + ". ScoreList == " + Arrays.toString(scoreList.toArray()) +
-		 * " percentile == " + percentile); } return temp; } }
-		 * 
-		 * return 0;
-		 */
+         * warn("This code is inefficient and should be removed. Just return minVal instead."
+         * ); Collections.reverse(scoreList);
+         *
+         * for (double temp : scoreList) { totalSum++; if (totalSum >= percSum)
+         * { if (temp != minVal) { throw new RuntimeException(
+         * "Got different values for min smell score: " + temp + " vs. " +
+         * minVal + ". ScoreList == " + Arrays.toString(scoreList.toArray()) +
+         * " percentile == " + percentile); } return temp; } }
+         *
+         * return 0;
+         */
         // @formatter:on
     }
 
@@ -240,39 +240,39 @@ public class CSVHelper extends ProjectInformationReader<Config> {
      */
     /*
      * private void processFileSingle() { BufferedReader br = null; String line
-	 * = ""; String cvsSplitBy = ",";
-	 * 
-	 * SimpleDateFormat formatter = new SimpleDateFormat("yyyy-MM-dd");
-	 * 
-	 * try {
-	 * 
-	 * br = new BufferedReader(new FileReader(conf.revisionCsvFile())); while
-	 * ((line = br.readLine()) != null) { // use comma as separator String[]
-	 * commit = line.split(cvsSplitBy); String curHash = commit[0]; boolean
-	 * bugfixCommit = Boolean.parseBoolean(commit[1]); int bugfixCount =
-	 * (Integer.parseInt(commit[8]) - 1) % 100; String strDate = commit[7];
-	 * String fileName = null; if (bugfixCount < 10) { fileName = commit[3] +
-	 * "0" + bugfixCount; } else { fileName = commit[3] + bugfixCount; }
-	 * 
-	 * Date dateStr; Date comDate = null; try { dateStr =
-	 * formatter.parse(strDate); String formattedDate =
-	 * formatter.format(dateStr); comDate = formatter.parse(formattedDate); }
-	 * catch (ParseException e) { throw new RuntimeException(
-	 * "Could not parse date " + strDate + " in file " +
-	 * conf.revisionCsvFile(), e); }
-	 * 
-	 * ChangedFile chFile = new ChangedFile(fileName, curHash, comDate);
-	 * 
-	 * changedFilesSingle.put(chFile, fileName); if (bugfixCommit)
-	 * bugFilesSingle.put(chFile, fileName);
-	 * 
-	 * }
-	 * 
-	 * } catch (IOException e) { throw new
-	 * RuntimeException("Error reading file " + conf.revisionCsvFile(), e); }
-	 * finally { if (br != null) { try { br.close(); } catch (IOException e) {
-	 * // We don't care. } } } }
-	 */
+     * = ""; String cvsSplitBy = ",";
+     *
+     * SimpleDateFormat formatter = new SimpleDateFormat("yyyy-MM-dd");
+     *
+     * try {
+     *
+     * br = new BufferedReader(new FileReader(conf.revisionCsvFile())); while
+     * ((line = br.readLine()) != null) { // use comma as separator String[]
+     * commit = line.split(cvsSplitBy); String curHash = commit[0]; boolean
+     * bugfixCommit = Boolean.parseBoolean(commit[1]); int bugfixCount =
+     * (Integer.parseInt(commit[8]) - 1) % 100; String strDate = commit[7];
+     * String fileName = null; if (bugfixCount < 10) { fileName = commit[3] +
+     * "0" + bugfixCount; } else { fileName = commit[3] + bugfixCount; }
+     *
+     * Date dateStr; Date comDate = null; try { dateStr =
+     * formatter.parse(strDate); String formattedDate =
+     * formatter.format(dateStr); comDate = formatter.parse(formattedDate); }
+     * catch (ParseException e) { throw new RuntimeException(
+     * "Could not parse date " + strDate + " in file " +
+     * conf.revisionCsvFile(), e); }
+     *
+     * ChangedFile chFile = new ChangedFile(fileName, curHash, comDate);
+     *
+     * changedFilesSingle.put(chFile, fileName); if (bugfixCommit)
+     * bugFilesSingle.put(chFile, fileName);
+     *
+     * }
+     *
+     * } catch (IOException e) { throw new
+     * RuntimeException("Error reading file " + conf.revisionCsvFile(), e); }
+     * finally { if (br != null) { try { br.close(); } catch (IOException e) {
+     * // We don't care. } } } }
+     */
     // @formatter:on
 
     /**
@@ -318,7 +318,7 @@ public class CSVHelper extends ProjectInformationReader<Config> {
         return featMap;
     }
 
-    public Set<String> getFilesInSnapshot(Snapshot snapshot) {
+    public Set<String> getFilesInSnapshot(IMinimalSnapshot snapshot) {
         Set<String> resultSet = new HashSet<>();
         Date snapshotDate = snapshot.getSnapshotDate();
 
@@ -369,7 +369,7 @@ public class CSVHelper extends ProjectInformationReader<Config> {
      * @return Map from filename of a smelly file to its smelliness scores. Each smelliness score list will contain at
      * least one entry.
      */
-    public Map<String, List<Double>> getSmells(Snapshot snapshot, final Smell smell) {
+    public Map<String, List<Double>> getSmells(IMinimalSnapshot snapshot, final Smell smell) {
         Map<String, List<Double>> scoresByFilename = new HashMap<>();
         Date snapshotDate = snapshot.getSnapshotDate();
 

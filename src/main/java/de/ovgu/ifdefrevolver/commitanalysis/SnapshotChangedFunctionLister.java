@@ -1,6 +1,6 @@
 package de.ovgu.ifdefrevolver.commitanalysis;
 
-import de.ovgu.ifdefrevolver.bugs.correlate.data.Snapshot;
+import de.ovgu.ifdefrevolver.bugs.correlate.data.IMinimalSnapshot;
 import de.ovgu.skunk.detection.output.CsvFileWriterHelper;
 import de.ovgu.skunk.detection.output.CsvRowProvider;
 import org.apache.commons.csv.CSVPrinter;
@@ -19,12 +19,12 @@ import java.util.function.Consumer;
 public class SnapshotChangedFunctionLister {
     private static final Logger LOG = Logger.getLogger(SnapshotChangedFunctionLister.class);
     private ListChangedFunctionsConfig config;
-    private Snapshot snapshot;
+    private IMinimalSnapshot snapshot;
     private int errors = 0;
     private Git git = null;
     private Repository repo = null;
 
-    public SnapshotChangedFunctionLister(ListChangedFunctionsConfig config, Snapshot snapshot) {
+    public SnapshotChangedFunctionLister(ListChangedFunctionsConfig config, IMinimalSnapshot snapshot) {
         this.config = config;
         this.snapshot = snapshot;
     }
@@ -63,17 +63,17 @@ public class SnapshotChangedFunctionLister {
     private File listChangedFunctionsInSnapshot() {
         File outputFileDir = config.snapshotResultsDirForDate(snapshot.getSnapshotDate());
         File outputFile = new File(outputFileDir, FunctionChangeHunksColumns.FILE_BASENAME);
-        CsvFileWriterHelper helper = newCsvFileWriterForSnapshot(snapshot, outputFile);
+        CsvFileWriterHelper helper = newCsvFileWriterForSnapshot(outputFile);
         helper.write(outputFile);
         return outputFile;
     }
 
-    private CsvFileWriterHelper newCsvFileWriterForSnapshot(final Snapshot snapshot, final File outputFile) {
+    private CsvFileWriterHelper newCsvFileWriterForSnapshot(final File outputFile) {
         final String uncaughtExceptionErrorMessage = "Uncaught exception while listing changing functions in snapshot " + snapshot + ". Deleting output file " + outputFile.getAbsolutePath();
         final String fileDeleteFailedErrorMessage = "Failed to delete output file " + outputFile.getAbsolutePath() + ". Must be deleted manually.";
 
         return new CsvFileWriterHelper() {
-            CsvRowProvider<FunctionChangeHunk, Snapshot, FunctionChangeHunksColumns> csvRowProvider = FunctionChangeHunksColumns.newCsvRowProviderForSnapshot(snapshot);
+            CsvRowProvider<FunctionChangeHunk, IMinimalSnapshot, FunctionChangeHunksColumns> csvRowProvider = FunctionChangeHunksColumns.newCsvRowProviderForSnapshot(snapshot);
 
             @Override
             protected void actuallyDoStuff(CSVPrinter csv) throws IOException {
@@ -93,7 +93,7 @@ public class SnapshotChangedFunctionLister {
         };
     }
 
-    private Consumer<FunctionChangeHunk> newThreadSafeFunctionToCsvWriter(final CSVPrinter csv, final CsvRowProvider<FunctionChangeHunk, Snapshot, FunctionChangeHunksColumns> csvRowProvider) {
+    private Consumer<FunctionChangeHunk> newThreadSafeFunctionToCsvWriter(final CSVPrinter csv, final CsvRowProvider<FunctionChangeHunk, IMinimalSnapshot, FunctionChangeHunksColumns> csvRowProvider) {
         return functionChange -> {
 //            if (functionChange.deletesFunction()) {
 //                LOG.debug("Ignoring change " + functionChange + ". The whole function is deleted (probably moved someplace else).");

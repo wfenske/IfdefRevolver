@@ -2,6 +2,7 @@ package de.ovgu.ifdefrevolver.bugs.correlate.input;
 
 import com.opencsv.CSVReader;
 import de.ovgu.ifdefrevolver.bugs.correlate.data.FileChangeHunk;
+import de.ovgu.ifdefrevolver.bugs.correlate.data.IMinimalSnapshot;
 import de.ovgu.ifdefrevolver.bugs.correlate.data.Snapshot;
 import de.ovgu.ifdefrevolver.bugs.correlate.main.IHasProjectInfoFile;
 import de.ovgu.ifdefrevolver.bugs.correlate.main.IHasResultsDir;
@@ -33,8 +34,8 @@ public class ProjectInformationReader<TConfig extends IHasProjectInfoFile & IHas
 
     protected SortedMap<Date, Snapshot> snapshots;
 
-    protected SortedMap<Snapshot, SortedMap<FileChangeHunk, String>> changedFilesBySnapshot = new TreeMap<>();
-    protected SortedMap<Snapshot, SortedMap<FileChangeHunk, String>> fixedFilesBySnapshot = new TreeMap<>();
+    protected SortedMap<IMinimalSnapshot, SortedMap<FileChangeHunk, String>> changedFilesBySnapshot = new TreeMap<>();
+    protected SortedMap<IMinimalSnapshot, SortedMap<FileChangeHunk, String>> fixedFilesBySnapshot = new TreeMap<>();
 
     public ProjectInformationReader(TConfig conf) {
         this.conf = conf;
@@ -43,7 +44,7 @@ public class ProjectInformationReader<TConfig extends IHasProjectInfoFile & IHas
     /**
      * <p>Main entry point of this class, reads the necessary project information:</p> <ul> <li>Snapshot information
      * (accessible via {@link #getSnapshots()})</li> <li>Revisions information (accessible via {@link
-     * #getChangedFiles(Snapshot)} and {@link #getFixedFiles(Snapshot)})</li> </ul>
+     * #getChangedFiles(IMinimalSnapshot)} and {@link #getFixedFiles(IMinimalSnapshot)})</li> </ul>
      */
     public void readSnapshotsAndRevisionsFile() {
         snapshots = readSnapshots();
@@ -220,14 +221,14 @@ public class ProjectInformationReader<TConfig extends IHasProjectInfoFile & IHas
     /**
      * @return Changed files for the given snapshot
      */
-    public SortedMap<FileChangeHunk, String> getChangedFiles(Snapshot s) {
+    public SortedMap<FileChangeHunk, String> getChangedFiles(IMinimalSnapshot s) {
         return changedFilesBySnapshot.get(s);
     }
 
     /**
      * @return Fixed files for the given snapshot
      */
-    public SortedMap<FileChangeHunk, String> getFixedFiles(Snapshot s) {
+    public SortedMap<FileChangeHunk, String> getFixedFiles(IMinimalSnapshot s) {
         return fixedFilesBySnapshot.get(s);
     }
 
@@ -280,15 +281,15 @@ public class ProjectInformationReader<TConfig extends IHasProjectInfoFile & IHas
         return snapshotsByCommit;
     }
 
-    protected void putChangedFile(SortedMap<Snapshot, SortedMap<FileChangeHunk, String>> map,
-                                  Snapshot snapshot, FileChangeHunk chFile, String fileName) {
+    protected void putChangedFile(SortedMap<IMinimalSnapshot, SortedMap<FileChangeHunk, String>> map,
+                                  IMinimalSnapshot snapshot, FileChangeHunk chFile, String fileName) {
         SortedMap<FileChangeHunk, String> changedFiles = ensureValueForKey(map, snapshot);
         changedFiles.put(chFile, fileName);
     }
 
     private static SortedMap<FileChangeHunk, String> ensureValueForKey(
-            SortedMap<Snapshot, SortedMap<FileChangeHunk, String>> filesBySnapshot,
-            Snapshot snapshot) {
+            SortedMap<IMinimalSnapshot, SortedMap<FileChangeHunk, String>> filesBySnapshot,
+            IMinimalSnapshot snapshot) {
         SortedMap<FileChangeHunk, String> value = filesBySnapshot.get(snapshot);
         if (value != null) {
             return value;
