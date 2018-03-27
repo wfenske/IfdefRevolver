@@ -148,13 +148,17 @@ public class AddChangeDistances {
                 //creatingCommit = guessCreatingCommit(commitsToFunction);
                 //creatingCommit = addsForFunction.iterator().next();
             } else {
-                missingAdditions++;
-                LOG.warn("Exact addition of function unknown. Guessing addition instead. Function: " + function);
                 //creatingCommit = guessCreatingCommit(changes);
                 //creatingCommit = guessCreatingCommit(commitsToFunction);
                 //LOG.warn("Assumed creating commit is " + creatingCommit);
                 addsForFunction = guessAddsForFunction(commitsToFunction);
             }
+
+            if (addsForFunction.isEmpty()) {
+                missingAdditions++;
+                LOG.warn("Exact addition of function unknown. Guessing addition instead. Function: " + function);
+            }
+
             //}
             Set<String> commitsAlreadySeen = new HashSet<>();
             for (FunctionChangeRow change : changes) {
@@ -182,7 +186,7 @@ public class AddChangeDistances {
                 for (String addingCommit : addsForFunction) {
                     age = commitsDistanceDb.minDistance(currentCommit, addingCommit);
                     if (age.isPresent()) {
-                        LOG.info("Determined function age by referring to a different adding commit. Yeah!");
+                        //LOG.info("Determined function age by referring to a different adding commit. Yeah!");
                         break;
                     }
                 }
