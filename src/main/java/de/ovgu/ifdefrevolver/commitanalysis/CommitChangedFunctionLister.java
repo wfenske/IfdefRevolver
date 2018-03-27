@@ -61,14 +61,17 @@ public class CommitChangedFunctionLister {
                 rw = new RevWalk(repo);
                 RevCommit commit = rw.parseCommit(repo.resolve(commitId));
                 final int parentCount = commit.getParentCount();
+
                 if (parentCount == 0) {
                     LOG.warn("Ignoring commit " + commitId + ": no parents");
                     return;
                 }
+
                 if (parentCount > 1) {
                     LOG.info("Ignoring merge commit " + commitId + ": expected exactly one parent, got " + parentCount);
                     return;
                 }
+
                 ObjectId parentCommitId = commit.getParent(0).getId();
                 RevCommit parent = rw.parseCommit(parentCommitId);
                 formatter = getDiffFormatterInstance();

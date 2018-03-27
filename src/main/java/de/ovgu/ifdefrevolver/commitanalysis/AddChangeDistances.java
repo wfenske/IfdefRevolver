@@ -3,7 +3,6 @@ package de.ovgu.ifdefrevolver.commitanalysis;
 import de.ovgu.ifdefrevolver.bugs.correlate.data.IMinimalSnapshot;
 import de.ovgu.ifdefrevolver.bugs.correlate.input.ProjectInformationReader;
 import de.ovgu.ifdefrevolver.bugs.correlate.main.ProjectInformationConfig;
-import de.ovgu.ifdefrevolver.bugs.createsnapshots.data.Commit;
 import de.ovgu.ifdefrevolver.bugs.createsnapshots.input.RevisionsCsvReader;
 import de.ovgu.ifdefrevolver.bugs.minecommits.CommitsDistanceDb;
 import de.ovgu.ifdefrevolver.bugs.minecommits.CommitsDistanceDbCsvReader;
@@ -97,7 +96,8 @@ public class AddChangeDistances {
 
         RevisionsCsvReader revisionsReader = new RevisionsCsvReader(config.revisionCsvFile());
         revisionsReader.readAllCommits();
-        SortedSet<Commit> allCommits = revisionsReader.getCommits();
+        //SortedSet<Commit> allCommits = revisionsReader.getCommits();
+        Set<String> allCommits = commitsDistanceDb.getCommits();
 
         ProjectInformationReader<ListChangedFunctionsConfig> projectInfo = new ProjectInformationReader<>(config);
         LOG.debug("Reading project information");
@@ -222,9 +222,9 @@ public class AddChangeDistances {
         return winningCommit;
     }
 
-    private void extractFunctionAdditionsAndDeletions(SortedSet<Commit> allCommits) {
-        for (Commit c : allCommits) {
-            List<FunctionChangeRow> changes = changesByCommit.get(c.getHash());
+    private void extractFunctionAdditionsAndDeletions(Set<String> allCommits) {
+        for (String commitHash : allCommits) {
+            List<FunctionChangeRow> changes = changesByCommit.get(commitHash);
             if (changes == null) continue;
             //LOG.debug("Commit " + c.getHash() + " changes " + changes.size() + " function(s).");
             for (FunctionChangeRow ch : changes) {

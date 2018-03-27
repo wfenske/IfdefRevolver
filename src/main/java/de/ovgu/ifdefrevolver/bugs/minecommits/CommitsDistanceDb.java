@@ -20,6 +20,11 @@ public class CommitsDistanceDb {
     Map<String, Set<String>> parents = new HashMap<>();
 
     /**
+     * Simply all commits, in order of appearance
+     */
+    Set<String> allCommits = new LinkedHashSet<>();
+
+    /**
      * Map of the integers that have been assigned to each hash.
      */
     Map<String, Integer> intsFromHashes = new HashMap<>();
@@ -132,7 +137,7 @@ public class CommitsDistanceDb {
     }
 
     public Set<String> getCommits() {
-        return parents.keySet();
+        return allCommits;
     }
 
     private void populateIntParents() {
@@ -282,7 +287,8 @@ public class CommitsDistanceDb {
      *
      * @param descendant the descendant commit
      * @param ancestor   a preceding commit
-     * @return <code>true</code> if the descendant commit actually has ancestor among its ancestors, <code>false</code> otherwise.
+     * @return <code>true</code> if the descendant commit actually has ancestor among its ancestors, <code>false</code>
+     * otherwise.
      */
     public boolean isDescendant(String descendant, String ancestor) {
         ensurePreprocessed();
@@ -346,6 +352,7 @@ public class CommitsDistanceDb {
 
     public synchronized void put(String commit, String... parents) {
         assertNotPreprocessed();
+        this.allCommits.add(commit);
         Set<String> existingParents = ensureExistingParentsSet(commit);
         for (String parent : parents) {
             existingParents.add(parent);
@@ -354,6 +361,7 @@ public class CommitsDistanceDb {
 
     public synchronized void put(String commit, Set<String> parents) {
         assertNotPreprocessed();
+        this.allCommits.add(commit);
         Set<String> existingParents = ensureExistingParentsSet(commit);
         existingParents.addAll(parents);
     }
