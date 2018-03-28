@@ -23,6 +23,9 @@ class CommitHunkToFunctionLocationMapper implements Consumer<Edit> {
     final String newPath;
     final List<Method> functionsInNewPathByOccurrence;
 
+    final Set<Method> appearedFunctions;
+    final Set<Method> disappearedFunctions;
+
     private final String commitId;
     private final Consumer<FunctionChangeHunk> changedFunctionConsumer;
     /**
@@ -42,6 +45,25 @@ class CommitHunkToFunctionLocationMapper implements Consumer<Edit> {
         this.functionsInOldPathByOccurrence = new LinkedList<>(functionsInOldPathByOccurrence);
         this.functionsInNewPathByOccurrence = new LinkedList<>(functionsInNewPathByOccurrence);
         this.changedFunctionConsumer = changedFunctionConsumer;
+
+        if (oldPath.equals(newPath)) {
+            appearedFunctions = new LinkedHashSet<>(functionsInNewPathByOccurrence);
+            appearedFunctions.removeAll(functionsInOldPathByOccurrence);
+            disappearedFunctions = new LinkedHashSet<>(functionsInOldPathByOccurrence);
+            disappearedFunctions.removeAll(functionsInNewPathByOccurrence);
+            if (LOG.isDebugEnabled()) {
+                for (Method m : appearedFunctions) {
+                    LOG.debug("Commit " + commitId + "    adds function: " + m);
+                }
+                for (Method m : disappearedFunctions) {
+                    LOG.debug("Commit " + commitId + " deletes function: " + m);
+                }
+            }
+        } else {
+            appearedFunctions = Collections.emptySet();
+            disappearedFunctions = Collections.emptySet();
+        }
+
     }
 
     @Override
@@ -73,20 +95,23 @@ class CommitHunkToFunctionLocationMapper implements Consumer<Edit> {
                     break;
                 default: /* May also happen if a delete and an add are right next to each other */
                     LOG.debug("Merging two or more hunks");
-                    FunctionChangeHunk mergedHunk = mergeHunks(hunks);
-                    changedFunctionConsumer.accept(mergedHunk);
+                    mergeAndPublishHunks(hunks);
             }
         }
     }
 
     /**
-     * Merge a non-empty list of changes to the same function
+     * Merge a non-empty list of changes to the same function and publish them
      */
-    private FunctionChangeHunk mergeHunks(List<FunctionChangeHunk> hunks) {
+    private void mergeAndPublishHunks(List<FunctionChangeHunk> hunks) {
         int linesAdded = 0;
         int linesDeleted = 0;
 
         for (FunctionChangeHunk fh : hunks) {
+            if (fh.getModType() != FunctionChangeHunk.ModificationType.MOD) {
+                changedFunctionConsumer.accept(fh);
+                continue;
+            }
             ChangeHunk h = fh.getHunk();
             linesAdded += h.getLinesAdded();
             linesDeleted += h.getLinesDeleted();
@@ -94,7 +119,8 @@ class CommitHunkToFunctionLocationMapper implements Consumer<Edit> {
 
         final FunctionChangeHunk functionHunk = hunks.get(0);
         final ChangeHunk aggregatedChangeHunk = new ChangeHunk(functionHunk.getHunk(), linesDeleted, linesAdded);
-        return new FunctionChangeHunk(functionHunk.getFunction(), aggregatedChangeHunk, FunctionChangeHunk.ModificationType.MOD);
+        FunctionChangeHunk merged = new FunctionChangeHunk(functionHunk.getFunction(), aggregatedChangeHunk, FunctionChangeHunk.ModificationType.MOD);
+        changedFunctionConsumer.accept(merged);
     }
 
     private void analyzeASide(Edit edit) {
@@ -118,9 +144,17 @@ class CommitHunkToFunctionLocationMapper implements Consumer<Edit> {
                         LOG.debug("Edit " + remBegin + ".." + remEnd + " fully deletes " + f);
                     }
                 } else {
-                    modType = FunctionChangeHunk.ModificationType.MOD;
                     if (logDebug) {
                         LOG.debug("Edit " + remBegin + ".." + remEnd + " deletes lines from " + f);
+                    }
+
+                    if (editOverlapsSignature(f, remBegin, remEnd) && disappearedFunctions.contains(f)) {
+                        if (logDebug) {
+                            LOG.debug("Commit " + commitId + " might delete " + f);
+                        }
+                        modType = FunctionChangeHunk.ModificationType.DEL;
+                    } else {
+                        modType = FunctionChangeHunk.ModificationType.MOD;
                     }
                 }
                 markFunctionASideEdit(edit, f, modType);
@@ -157,9 +191,17 @@ class CommitHunkToFunctionLocationMapper implements Consumer<Edit> {
                         LOG.debug("Edit " + addBegin + ".." + addEnd + " fully adds " + f);
                     }
                 } else {
-                    modType = FunctionChangeHunk.ModificationType.MOD;
                     if (logDebug) {
                         LOG.debug("Edit " + addBegin + ".." + addEnd + " adds lines to " + f);
+                    }
+
+                    if (editOverlapsSignature(f, addBegin, addEnd) && appearedFunctions.contains(f)) {
+                        if (logDebug) {
+                            LOG.debug("Commit " + commitId + " might add    " + f);
+                        }
+                        modType = FunctionChangeHunk.ModificationType.ADD;
+                    } else {
+                        modType = FunctionChangeHunk.ModificationType.MOD;
                     }
                 }
                 markFunctionBSideEdit(edit, f, modType);
@@ -287,6 +329,27 @@ class CommitHunkToFunctionLocationMapper implements Consumer<Edit> {
         int fBegin = func.start1 - 1;
         int fEnd = func.end1 - 1;
         return ((editBegin < fEnd) && (editEnd > fBegin));
+    }
+
+    /**
+     * Determine whether the given edit touches the function's signature.
+     *
+     * @param func
+     * @param editBegin
+     * @param editEnd
+     * @return <code>true</code> iff the signature is probably changed by the commit
+     */
+    private boolean editOverlapsSignature(Method func, final int editBegin, final int editEnd) {
+        // NOTE, 2017-03-28, wf: We subtract 1 from the function's line
+        // numbers because function line numbers are 1-based, whereas edit
+        // line numbers are 0-based.
+
+        // NOTE, 2018-03-15, wf: The end of an edit is actually the first
+        // line *not* edited.  Thus, we need to compare the end with '>',
+        // not '>='.
+        int signatureBegin = func.start1 - 1;
+        int signatureEnd = signatureBegin + func.getSignatureGrossLinesOfCode();
+        return ((editBegin < signatureEnd) && (editEnd > signatureBegin));
     }
 
     private boolean editCompletelyCovers(Method func, final int editBegin, final int editEnd) {

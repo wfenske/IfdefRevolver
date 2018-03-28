@@ -53,12 +53,12 @@
         <level value="debug"/>
     </logger>
 
-    <logger name="de.ovgu.ifdefrevolver.commitanalysis.CommitMovedFunctionLister">
-        <level value="info"/>
+    <logger name="de.ovgu.ifdefrevolver.commitanalysis.CommitChangedFunctionLister">
+        <level value="debug"/>
     </logger>
 
     <logger name="de.ovgu.ifdefrevolver.commitanalysis.CommitHunkToFunctionLocationMapper">
-        <level value="info"/>
+        <level value="debug"/>
     </logger>
 
     <logger name="de.ovgu.ifdefrevolver.commitanalysis.CachingFunctionLocationProvider">

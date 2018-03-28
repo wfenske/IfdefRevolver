@@ -84,8 +84,8 @@ public class CommitChangedFunctionLister {
                 Set<String> bSideCFilePaths = getFilenamesOfCFilesModifiedByDiffs(diffs, DiffEntry.Side.NEW);
                 allBSideFunctions = listAllFunctionsInModifiedFiles(commit, bSideCFilePaths);
 
-                logFilesAndFunction("A-side", aSideCFilePaths, allASideFunctions);
-                logFilesAndFunction("B-side", bSideCFilePaths, allBSideFunctions);
+                logFilesAndFunctions("A-side", aSideCFilePaths, allASideFunctions);
+                logFilesAndFunctions("B-side", bSideCFilePaths, allBSideFunctions);
 
             } catch (RuntimeException re) {
                 LOG.warn("Error analyzing commit " + commitId, re);
@@ -101,7 +101,7 @@ public class CommitChangedFunctionLister {
         }
     }
 
-    private void logFilesAndFunction(String side, Set<String> cFiles, Map<String, List<Method>> functionsByFile) {
+    private void logFilesAndFunctions(String side, Set<String> cFiles, Map<String, List<Method>> functionsByFile) {
         if (LOG.isTraceEnabled()) {
             for (String fn : cFiles) {
                 LOG.trace(side + " modified file: " + fn);
