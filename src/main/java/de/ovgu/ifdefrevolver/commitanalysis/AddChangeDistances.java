@@ -120,89 +120,121 @@ public class AddChangeDistances {
         extractFunctionAdditionsAndDeletions(allCommits);
         LOG.debug("Done extracting function additions and deletions. Detected " + adds.size() + " additions and " + dels.size() + " corresponding deletions.");
 
-        int successes = 0;
-        int failures = 0;
+        int ageRequests = 0, actualAge = 0, guessedAge = 0, guessed0Age = 0, noAgeAtAll = 0;
         int missingAdditions = 0;
+
         System.out.println("MOD_TYPE,FUNCTION_SIGNATURE,FILE,COMMIT,AGE,DIST");
         for (Map.Entry<FunctionId, List<FunctionChangeRow>> e : changesByFunction.getMap().entrySet()) {
             final FunctionId function = e.getKey();
             List<FunctionChangeRow> changes = new LinkedList<>(e.getValue());
             Set<String> commitsToFunction = new HashSet<>(changes.size());
-            Set<String> addsForFunction = new LinkedHashSet<>();
+            Set<String> knownAddsForFunction = new LinkedHashSet<>();
             for (FunctionChangeRow change : changes) {
                 commitsToFunction.add(change.commitId);
                 if (change.modType == FunctionChangeHunk.ModificationType.ADD) {
-                    addsForFunction.add(change.commitId);
+                    knownAddsForFunction.add(change.commitId);
                 }
             }
 
-            //final String creatingCommit;
-            //FunctionChangeRow addition = adds.get(function);
-            boolean additionMissing = true;
-            //if (addition != null) {
-            //creatingCommit = addition.commitId;
-            //} else {
-            if (!addsForFunction.isEmpty()) {
-                //LOG.warn("Adds not extracted, although there were some. Function: " + function);
-                //addition = addsForFunction.iterator().next();
-                //creatingCommit = guessCreatingCommit(commitsToFunction);
-                //creatingCommit = addsForFunction.iterator().next();
-            } else {
-                //creatingCommit = guessCreatingCommit(changes);
-                //creatingCommit = guessCreatingCommit(commitsToFunction);
-                //LOG.warn("Assumed creating commit is " + creatingCommit);
-                addsForFunction = guessAddsForFunction(commitsToFunction);
-            }
+            Set<String> guessedAddsForFunction = guessAddsForFunction(commitsToFunction);
+            guessedAddsForFunction.removeAll(knownAddsForFunction);
 
-            if (addsForFunction.isEmpty()) {
+            if (knownAddsForFunction.isEmpty()) {
                 missingAdditions++;
-                LOG.warn("Exact addition of function unknown. Guessing addition instead. Function: " + function);
+                LOG.warn("No known creating commits for function '" + function + "'.");
             }
 
-            //}
-            Set<String> commitsAlreadySeen = new HashSet<>();
+            if (!guessedAddsForFunction.isEmpty()) {
+                LOG.warn("Some unknown creating commits for function '" + function +
+                        "'. Assuming the following additional creating commits: " + guessedAddsForFunction);
+            }
+
+            Map<String, AgeAndDistanceStrings> knownDistancesCache = new HashMap<>();
+
             for (FunctionChangeRow change : changes) {
                 final String currentCommit = change.commitId;
-                if (commitsAlreadySeen.contains(currentCommit)) continue;
-                else commitsAlreadySeen.add(currentCommit);
-
-                int minDist;
-                if (addsForFunction.contains(currentCommit)) {
-                    minDist = 0;
-                } else {
-                    minDist = Integer.MAX_VALUE;
-                    for (String otherCommit : commitsToFunction) {
-                        if (currentCommit.equals(otherCommit)) continue;
-                        Optional<Integer> currentDist = commitsDistanceDb.minDistance(currentCommit, otherCommit);
-                        if (currentDist.isPresent()) {
-                            minDist = Math.min(minDist, currentDist.get());
+                AgeAndDistanceStrings distanceStrings = knownDistancesCache.get(currentCommit);
+                if (distanceStrings == null) {
+                    int minDist;
+                    if (knownAddsForFunction.contains(currentCommit)) {
+                        minDist = 0;
+                    } else {
+                        minDist = Integer.MAX_VALUE;
+                        for (String otherCommit : commitsToFunction) {
+                            if (currentCommit.equals(otherCommit)) continue;
+                            Optional<Integer> currentDist = commitsDistanceDb.minDistance(currentCommit, otherCommit);
+                            if (currentDist.isPresent()) {
+                                int currentDistValue = currentDist.get();
+                                if (currentDistValue == 0) {
+                                    LOG.warn("Distance between commits is 0? " + currentCommit + " .. " + otherCommit);
+                                }
+                                minDist = Math.min(minDist, currentDistValue);
+                            }
                         }
                     }
-                }
-                String minDistStr = minDist < Integer.MAX_VALUE ? Integer.toString(minDist) : "";
-                //Optional<Integer> age = commitsDistanceDb.minDistance(currentCommit, creatingCommit);
-                //if (!age.isPresent()) {
-                Optional<Integer> age = Optional.empty();
-                for (String addingCommit : addsForFunction) {
-                    age = commitsDistanceDb.minDistance(currentCommit, addingCommit);
-                    if (age.isPresent()) {
-                        //LOG.info("Determined function age by referring to a different adding commit. Yeah!");
-                        break;
+                    String minDistStr = minDist < Integer.MAX_VALUE ? Integer.toString(minDist) : "";
+                    Optional<Integer> age;
+                    ageRequests++;
+                    if (knownAddsForFunction.contains(currentCommit)) {
+                        age = Optional.of(0);
+                    } else {
+                        age = Optional.empty();
+                        for (String addingCommit : knownAddsForFunction) {
+                            age = commitsDistanceDb.minDistance(currentCommit, addingCommit);
+                            if (age.isPresent()) {
+                                actualAge++;
+                                break;
+                            }
+                        }
+
+                        if (!age.isPresent()) {
+                            for (String addingCommit : guessedAddsForFunction) {
+                                age = commitsDistanceDb.minDistance(currentCommit, addingCommit);
+                                if (age.isPresent()) {
+                                    int ageValue = age.get();
+                                    if (ageValue == 0) {
+                                        age = Optional.empty();
+                                        continue;
+                                    } else {
+                                        guessedAge++;
+                                        LOG.warn("Forced to assume alternative adding commit. Function: " + function + " Current commit: " + currentCommit + " Assumed creating commit: " + addingCommit);
+//                                    if (ageValue == 0) {
+//                                        LOG.warn("Age of function at commit is 0? Function: " + function + " Current commit: " + currentCommit + " Assumed creating commit: " + addingCommit);
+//                                        guessed0Age++;
+//                                    }
+                                        break;
+                                    }
+                                }
+                            }
+                        }
                     }
+                    String ageStr;
+                    if (age.isPresent()) {
+                        ageStr = age.get().toString();
+                    } else {
+                        noAgeAtAll++;
+                        ageStr = "";
+                    }
+                    distanceStrings = new AgeAndDistanceStrings(ageStr, minDistStr);
+                    knownDistancesCache.put(currentCommit, distanceStrings);
                 }
-                //}
-                final String ageStr;
-                if (age.isPresent()) {
-                    successes++;
-                    ageStr = age.get().toString();
-                } else {
-                    failures++;
-                    ageStr = "";
-                }
-                System.out.println(change.modType + ",\"" + function.signature + "\"," + function.file + "," + currentCommit + "," + ageStr + "," + minDistStr);
+
+                System.out.println(change.modType + ",\"" + function.signature + "\"," + function.file + "," + currentCommit + "," + distanceStrings.ageString + "," + distanceStrings.distanceString);
             }
         }
-        LOG.debug("Determined function age " + successes + " time(s). Failed " + failures + " time(s). Functions with unknown additions: " + missingAdditions);
+        LOG.debug("Functions with unknown additions: " + missingAdditions);
+        LOG.debug("Found ages: ageRequests: " + ageRequests + " actualAge: " + actualAge + " guessedAge: " + guessedAge + " guessed0Age: " + guessed0Age +
+                " noAgeAtAll: " + noAgeAtAll);
+    }
+
+    private static class AgeAndDistanceStrings {
+        final String ageString;
+        final String distanceString;
+
+        private AgeAndDistanceStrings(String ageString, String distanceString) {
+            this.ageString = ageString;
+            this.distanceString = distanceString;
+        }
     }
 
     private Collection<Date> getDatesOfActualSnapshots(ProjectInformationReader<ListChangedFunctionsConfig> projectInfo) {

@@ -46,6 +46,15 @@ public enum FunctionChangeHunksColumns implements CsvColumnValueProvider<Functio
         }
     },
     /**
+     * Number of the hunk (a.k.a. edit) within the file that this change represents
+     */
+    HUNK {
+        @Override
+        public Integer csvColumnValue(FunctionChangeHunk changedFunc, IMinimalSnapshot snapshot) {
+            return changedFunc.getHunk().getHunkNo();
+        }
+    },
+    /**
      * Contains <code>1</code> if the commit is a bug-fix commit, else <code>0</code>
      */
     BUGFIX {
