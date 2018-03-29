@@ -94,10 +94,11 @@ Other Unix-like systems will probably work. Windows has not been tested.
 
    I installed cppstats using Python version 2.7.6, a somewhat dated
    Python version, because cppstats does not work with Python 3.
-   Cppstats has a number of dependencies, such as `enum`, `pyparsing`,
-   `statlib`, `lxml`, `pyparsing`.  Most, if not all of them, can be
-   installed via Pythons `pip` packet manager.  Assuming Python is
-   installed under `/opt/python-2.7.6`, the command would be
+   Cppstats has a number of dependencies, such as `enum` (version 
+   0.4.4 works), `pyparsing`, `statlib`, `lxml`, `pyparsing`.  Most,
+   if not all of them, can be installed via Pythons `pip` packet
+   manager.  Assuming Python is installed under `/opt/python-2.7.6`,
+   the command would be
 
    `sudo -H /opt/python-2.7.6/bin/pip install pyparsing`
 
