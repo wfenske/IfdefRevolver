@@ -63,7 +63,6 @@ class CommitHunkToFunctionLocationMapper implements Consumer<Edit> {
             appearedFunctions = Collections.emptySet();
             disappearedFunctions = Collections.emptySet();
         }
-
     }
 
     @Override

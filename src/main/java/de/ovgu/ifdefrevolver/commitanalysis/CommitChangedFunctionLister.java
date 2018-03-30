@@ -3,10 +3,7 @@ package de.ovgu.ifdefrevolver.commitanalysis;
 import de.ovgu.skunk.detection.data.Method;
 import org.apache.log4j.Logger;
 import org.eclipse.jgit.api.Git;
-import org.eclipse.jgit.diff.DiffEntry;
-import org.eclipse.jgit.diff.DiffFormatter;
-import org.eclipse.jgit.diff.Edit;
-import org.eclipse.jgit.diff.RawTextComparator;
+import org.eclipse.jgit.diff.*;
 import org.eclipse.jgit.lib.ObjectId;
 import org.eclipse.jgit.lib.Repository;
 import org.eclipse.jgit.revwalk.RevCommit;
@@ -53,7 +50,7 @@ public class CommitChangedFunctionLister {
      * Stackoverflow</a> </p>
      */
     public void listChangedFunctions() {
-        LOG.info("Analyzing commit " + commitId);
+        LOG.debug("Analyzing commit " + commitId);
         RevWalk rw = null;
         try {
             List<DiffEntry> diffs;
@@ -68,7 +65,7 @@ public class CommitChangedFunctionLister {
                 }
 
                 if (parentCount > 1) {
-                    LOG.info("Ignoring merge commit " + commitId + ": expected exactly one parent, got " + parentCount);
+                    LOG.debug("Ignoring merge commit " + commitId + ": expected exactly one parent, got " + parentCount);
                     return;
                 }
 
@@ -158,15 +155,91 @@ public class CommitChangedFunctionLister {
     }
 
     private Map<String, List<Method>> listAllFunctionsInModifiedFiles(RevCommit state, Set<String> modifiedFiles) throws IOException {
+        //if (!commitId.equals("34cb9132ef2dae08f91a66015ea5437539a4b557")) return new HashMap<>();
         return functionLocationProvider.listFunctionsInFiles(commitId, state, modifiedFiles);
+    }
+
+    //static boolean printedHeader = false;
+
+    private enum DiffType {
+        EDIT {
+            @Override
+            public void handleZeroEdits(CommitChangedFunctionLister self, String oldPath, String newPath, List<Method> oldFunctions, List<Method> newFunctions) {
+                // Nothing to do: old and new file are the same, but there are no edits
+                return;
+            }
+        },
+        ADD {
+            @Override
+            public void handleZeroEdits(CommitChangedFunctionLister self, String oldPath, String newPath, List<Method> oldFunctions, List<Method> newFunctions) {
+                throw new RuntimeException("Didn't really expect a file addition with zero edits. Commit: " + self.commitId + " old path: " + oldPath + " new path: " + newPath + " old functions: " + oldFunctions + " new functions: " + newFunctions);
+            }
+        },
+        DEL {
+            @Override
+            public void handleZeroEdits(CommitChangedFunctionLister self, String oldPath, String newPath, List<Method> oldFunctions, List<Method> newFunctions) {
+                throw new RuntimeException("Didn't really expect a file deletions with zero edits. Commit: " + self.commitId + " old path: " + oldPath + " new path: " + newPath + " old functions: " + oldFunctions + " new functions: " + newFunctions);
+            }
+        },
+        RENAME {
+            @Override
+            public void handleZeroEdits(CommitChangedFunctionLister self, String oldPath, String newPath, List<Method> oldFunctions, List<Method> newFunctions) {
+                self.publishMoveEvents(oldPath, newPath, oldFunctions, newFunctions);
+            }
+        };
+
+        public abstract void handleZeroEdits(CommitChangedFunctionLister self, String oldPath, String newPath, List<Method> oldFunctions, List<Method> newFunctions);
+    }
+
+    private void publishMoveEvents(String oldPath, String newPath, List<Method> oldFunctions, List<Method> newFunctions) {
+        Set<String> oldSignatures = new HashSet<>();
+        oldFunctions.forEach(f -> oldSignatures.add(f.functionSignatureXml));
+        Set<String> newSignatures = new HashSet<>();
+        newFunctions.forEach(f -> newSignatures.add(f.functionSignatureXml));
+        if (!oldSignatures.equals(newSignatures)) {
+            throw new RuntimeException("Expected the same functions during file rename. Commit: " + commitId +
+                    " old path: " + oldPath + " new path: " + newPath + " old functions: " + oldFunctions +
+                    " new functions: " + newFunctions);
+        }
+
+        int hunkNo = 0;
+        for (Method f : oldFunctions) {
+            ChangeHunk ch = new ChangeHunk(commitId, oldPath, newPath, hunkNo, 0, 0);
+            FunctionChangeHunk fh = new FunctionChangeHunk(f, ch, FunctionChangeHunk.ModificationType.MOVE);
+            changedFunctionConsumer.accept(fh);
+            hunkNo++;
+        }
     }
 
     private void listFunctionChanges(final DiffEntry diff) throws IOException {
         final String oldPath = diff.getOldPath();
         final String newPath = diff.getNewPath();
 
+        final DiffType diffType = getFileDiffType(oldPath, newPath);
+
         List<Method> oldFunctions = allASideFunctions.get(oldPath);
         List<Method> newFunctions = allBSideFunctions.get(newPath);
+
+//        if ((diffType == DiffType.RENAME) && oldPath.endsWith(".c")) {
+//            synchronized (CommitChangedFunctionLister.class) {
+//                if (!printedHeader) {
+//                    System.out.println("COMMIT_ID,FOLD,FNEW,EDITS,SIGNATURE,OLDP");
+//                    printedHeader = true;
+//                }
+//            }
+//
+//            EditList edits = formatter.toFileHeader(diff).toEditList();
+//            int numEdits = edits.size();
+//
+//            if (oldFunctions != null)
+//                for (Method m : oldFunctions) {
+//                    System.out.println(commitId + "," + oldPath + "," + newPath + "," + numEdits + ",\"" + m.functionSignatureXml + "\",0");
+//                }
+//            if (newFunctions != null)
+//                for (Method m : newFunctions) {
+//                    System.out.println(commitId + "," + oldPath + "," + newPath + "," + numEdits + ",\"" + m.functionSignatureXml + "\",1");
+//                }
+//        }
 
         if (oldFunctions == null) {
             if (newFunctions == null) {
@@ -186,19 +259,38 @@ public class CommitChangedFunctionLister {
             LOG.debug("+++ " + newPath);
         }
 
-        CommitHunkToFunctionLocationMapper editLocMapper = new CommitHunkToFunctionLocationMapper(commitId,
-                oldPath, oldFunctions,
-                newPath, newFunctions,
-                changedFunctionConsumer);
-
         int iEdit = 0;
-        for (Edit edit : formatter.toFileHeader(diff).toEditList()) {
-            if (logDebug) {
-                LOG.debug("Edit " + (iEdit++) + ": - " + edit.getBeginA() + "," + edit.getEndA() +
-                        " + " + edit.getBeginB() + "," + edit.getEndB());
+        EditList edits = formatter.toFileHeader(diff).toEditList();
+
+        if (edits.isEmpty()) {
+            diffType.handleZeroEdits(this, oldPath, newPath, oldFunctions, newFunctions);
+        } else {
+            CommitHunkToFunctionLocationMapper editLocMapper = new CommitHunkToFunctionLocationMapper(commitId,
+                    oldPath, oldFunctions,
+                    newPath, newFunctions,
+                    changedFunctionConsumer);
+
+            for (Edit edit : edits) {
+                if (logDebug) {
+                    LOG.debug("Edit " + (iEdit++) + ": - " + edit.getBeginA() + "," + edit.getEndA() +
+                            " + " + edit.getBeginB() + "," + edit.getEndB());
+                }
+                editLocMapper.accept(edit);
             }
-            editLocMapper.accept(edit);
         }
+    }
+
+    private DiffType getFileDiffType(String oldPath, String newPath) {
+        DiffType diffType = DiffType.EDIT;
+        if (!oldPath.equals(newPath)) {
+            if (oldPath.equals("/dev/null"))
+                diffType = DiffType.ADD;
+            else if (newPath.equals("/dev/null"))
+                diffType = DiffType.DEL;
+            else
+                diffType = DiffType.RENAME;
+        }
+        return diffType;
     }
 
     public static void main(String[] args) {

@@ -106,7 +106,7 @@ public class AddDelMergingConsumer implements Consumer<FunctionChangeHunk> {
         ChangeHunk delHunk = del.getHunk();
         ChangeHunk addHunk = add.getHunk();
         ChangeHunk moveHunk = new ChangeHunk(delHunk.getCommitId(), delHunk.getOldPath(), addHunk.getNewPath(), delHunk.getHunkNo(),
-                delHunk.getLinesDeleted(), addHunk.getLinesAdded());
+                0, 0);
         return new FunctionChangeHunk(delFunc, moveHunk, FunctionChangeHunk.ModificationType.MOVE);
     }
 

@@ -101,7 +101,7 @@ public class SnapshotChangedFunctionLister {
 //            }
             ChangeHunk hunk = functionChange.getHunk();
             if ((hunk.getLinesAdded() == 0) && (hunk.getLinesDeleted() == 0)) {
-                if (functionChange.getModType() != FunctionChangeHunk.ModificationType.MOD) {
+                if (functionChange.getModType() != FunctionChangeHunk.ModificationType.MOVE) {
                     LOG.warn("Function changes that don't add or delete anything should no longer occur! But they do: " + functionChange);
                 }
 //                LOG.debug("Ignoring change " + functionChange + ". No lines are added or deleted.");
