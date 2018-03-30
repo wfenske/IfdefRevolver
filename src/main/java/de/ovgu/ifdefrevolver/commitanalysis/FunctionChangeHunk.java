@@ -2,6 +2,8 @@ package de.ovgu.ifdefrevolver.commitanalysis;
 
 import de.ovgu.skunk.detection.data.Method;
 
+import java.util.Optional;
+
 /**
  * Information about a hunk of change within a commit and the function that it changes
  * <p>
@@ -16,6 +18,11 @@ public class FunctionChangeHunk {
      * The change applied to the function
      */
     private ChangeHunk hunk;
+
+    /**
+     * Function after the change (may have a different signature or reside in a new file)
+     */
+    private Optional<Method> newFunction;
 
     public static enum ModificationType {
         /**
@@ -44,10 +51,22 @@ public class FunctionChangeHunk {
         this.function = function;
         this.hunk = hunk;
         this.modType = modType;
+        this.newFunction = Optional.empty();
+    }
+
+    public FunctionChangeHunk(Method function, ChangeHunk hunk, ModificationType modType, Method newFunction) {
+        this.function = function;
+        this.hunk = hunk;
+        this.modType = modType;
+        this.newFunction = Optional.of(newFunction);
     }
 
     public Method getFunction() {
         return function;
+    }
+
+    public Optional<Method> getNewFunction() {
+        return newFunction;
     }
 
     public ChangeHunk getHunk() {
@@ -58,19 +77,16 @@ public class FunctionChangeHunk {
         return modType;
     }
 
-
-    /**
-     * @return {@code true} if this change deletes the entire function (happens sometimes if a function is moved to
-     * another file or within the same file)
-     */
-    public boolean deletesFunction() {
-        return modType == ModificationType.DEL;
-    }
-
     @Override
     public String toString() {
+        final String newFuncText;
+        if (newFunction.isPresent()) {
+            newFuncText = " -> " + newFunction.get();
+        } else {
+            newFuncText = "";
+        }
         return this.getClass().getSimpleName() + "{" +
-                "f=" + function +
+                "f=" + function + newFuncText +
                 ", hunk=" + hunk +
                 ", modificationType=" + modType +
                 '}';

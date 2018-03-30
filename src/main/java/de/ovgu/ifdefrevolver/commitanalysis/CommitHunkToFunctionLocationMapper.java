@@ -34,6 +34,8 @@ class CommitHunkToFunctionLocationMapper implements Consumer<Edit> {
      */
     int numHunkInFile = 0;
     private Map<Method, List<FunctionChangeHunk>> hunksForCurrentEdit;
+    private List<FunctionChangeHunk> possibleSignatureChangesASides;
+    private List<FunctionChangeHunk> possibleSignatureChangesBSides;
 
     public CommitHunkToFunctionLocationMapper(String commitId,
                                               String oldPath, Collection<Method> functionsInOldPathByOccurrence,
@@ -72,6 +74,8 @@ class CommitHunkToFunctionLocationMapper implements Consumer<Edit> {
         // This is good because "A"-side line numbers are much easier to correlate with the
         // function locations we have than the "B"-side offsets.
         hunksForCurrentEdit = new HashMap<>();
+        possibleSignatureChangesASides = new ArrayList<>();
+        possibleSignatureChangesBSides = new ArrayList<>();
         try {
             analyzeASide(edit);
             analyzeBSide(edit);
@@ -79,30 +83,119 @@ class CommitHunkToFunctionLocationMapper implements Consumer<Edit> {
         } finally {
             numHunkInFile++;
             hunksForCurrentEdit = null;
+            possibleSignatureChangesASides = null;
+            possibleSignatureChangesBSides = null;
         }
     }
 
     private void publishHunksForCurrentEdit() {
-        for (Map.Entry<Method, List<FunctionChangeHunk>> entry : hunksForCurrentEdit.entrySet()) {
-            List<FunctionChangeHunk> hunks = entry.getValue();
+        processPossibleSignatureChanges();
+
+        for (List<FunctionChangeHunk> hunks : hunksForCurrentEdit.values()) {
             switch (hunks.size()) {
                 case 0: /* Can this even happen? */
                     break;
                 case 1: /* Expected case */
-                    LOG.debug("Single hunk case");
+                    //LOG.debug("Single hunk case");
                     changedFunctionConsumer.accept(hunks.get(0));
                     break;
                 default: /* May also happen if a delete and an add are right next to each other */
                     LOG.debug("Merging two or more hunks");
-                    mergeAndPublishHunks(hunks);
+                    mergeAndPublishAAndBSideHunks(hunks);
             }
         }
     }
 
+    private void processPossibleSignatureChanges() {
+        if (!haveExactlyOneSignatureChangeOnASideAndBSide()) return;
+        FunctionChangeHunk del = possibleSignatureChangesASides.get(0);
+        FunctionChangeHunk add = possibleSignatureChangesBSides.get(0);
+
+        ChangeHunk delChangeHunk = del.getHunk();
+        ChangeHunk addChangeHunk = add.getHunk();
+
+        ChangeHunk mergedChangeHunk = new ChangeHunk(delChangeHunk,
+                delChangeHunk.getLinesDeleted() + addChangeHunk.getLinesDeleted(),
+                delChangeHunk.getLinesAdded() + addChangeHunk.getLinesAdded()
+        );
+
+        final Method delFunction = del.getFunction();
+        final Method addFunction = add.getFunction();
+
+
+        // Test the (unlikely) case that the signature didn't change
+        if (delFunction.equals(addFunction)) { // same signature, same file
+            if (LOG.isDebugEnabled()) {
+                LOG.debug("Suspected signature change was a false alarm: " + del + " -> " + add);
+            }
+            forgetHunk(del);
+            forgetHunk(add);
+            rememberHunk(delFunction, FunctionChangeHunk.ModificationType.MOD, mergedChangeHunk);
+        } else {
+            // Signature did change!
+            if (LOG.isDebugEnabled()) {
+                LOG.debug("Detected function signature change: " + del + " -> " + add);
+            }
+            forgetHunk(del);
+            forgetHunk(add);
+            FunctionChangeHunk move = new FunctionChangeHunk(delFunction, mergedChangeHunk,
+                    FunctionChangeHunk.ModificationType.MOVE, addFunction);
+            changedFunctionConsumer.accept(move);
+            remapModsOfRenamedFunction(delFunction, addFunction);
+        }
+    }
+
+    private void remapModsOfRenamedFunction(Method delFunction, Method addFunction) {
+        // Remap all MODs to the old function so they become MODs of the new function
+        List<FunctionChangeHunk> hunksForDelFunction = hunksForCurrentEdit.get(delFunction);
+        if ((hunksForDelFunction == null) || hunksForDelFunction.isEmpty()) {
+            return;
+        }
+
+        hunksForDelFunction = new ArrayList<>(hunksForDelFunction);
+        int numRemappedMods = 0;
+        for (FunctionChangeHunk fHunk : hunksForDelFunction) {
+            if (fHunk.getModType() != FunctionChangeHunk.ModificationType.MOD) continue;
+            forgetHunk(fHunk);
+            rememberHunk(addFunction, FunctionChangeHunk.ModificationType.MOD, fHunk.getHunk());
+            numRemappedMods++;
+        }
+
+        if (LOG.isDebugEnabled() && (numRemappedMods > 0)) {
+            LOG.debug("Remapped " + numRemappedMods + " modification after function signature change: "
+                    + delFunction + " -> " + addFunction);
+        }
+    }
+
+    private boolean haveExactlyOneSignatureChangeOnASideAndBSide() {
+        int numChanges = possibleSignatureChangesASides.size();
+        if (numChanges != possibleSignatureChangesBSides.size()) {
+            if (LOG.isDebugEnabled()) {
+                LOG.debug("Possible signature changes on A side don't match possible signature changes on B side. Aborting. A side changes: "
+                        + possibleSignatureChangesASides + " B side changes: " + possibleSignatureChangesBSides);
+            }
+            return false;
+        } else if (numChanges == 0) {
+            if (LOG.isDebugEnabled()) {
+                LOG.debug("No signature change detected for commit " + commitId
+                        + " edit " + numHunkInFile);
+            }
+            return false;
+        } else if (numChanges > 1) {
+            if (LOG.isDebugEnabled()) {
+                LOG.debug("Don't know how to deal with multiple signature changes in one edit. Aborting. A side changes: "
+                        + possibleSignatureChangesASides + " B side changes: " + possibleSignatureChangesBSides);
+            }
+            return false;
+        }
+        return true;
+    }
+
     /**
-     * Merge a non-empty list of changes to the same function and publish them
+     * Merge a non-empty list of changes to the same function and publish them. This is meant to merge edits that both
+     * delete some lines and add some lines in the same place, i.e. edits with modifications on both A and B side.
      */
-    private void mergeAndPublishHunks(List<FunctionChangeHunk> hunks) {
+    private void mergeAndPublishAAndBSideHunks(List<FunctionChangeHunk> hunks) {
         int linesAdded = 0;
         int linesDeleted = 0;
 
@@ -118,7 +211,8 @@ class CommitHunkToFunctionLocationMapper implements Consumer<Edit> {
 
         final FunctionChangeHunk functionHunk = hunks.get(0);
         final ChangeHunk aggregatedChangeHunk = new ChangeHunk(functionHunk.getHunk(), linesDeleted, linesAdded);
-        FunctionChangeHunk merged = new FunctionChangeHunk(functionHunk.getFunction(), aggregatedChangeHunk, FunctionChangeHunk.ModificationType.MOD);
+        FunctionChangeHunk merged = new FunctionChangeHunk(functionHunk.getFunction(), aggregatedChangeHunk,
+                FunctionChangeHunk.ModificationType.MOD);
         changedFunctionConsumer.accept(merged);
     }
 
@@ -135,13 +229,13 @@ class CommitHunkToFunctionLocationMapper implements Consumer<Edit> {
             if (logDebug) {
                 LOG.debug("Checking " + f);
             }
+
             if (editOverlaps(f, remBegin, remEnd)) {
-                final FunctionChangeHunk.ModificationType modType;
                 if (editCompletelyCovers(f, remBegin, remEnd)) {
-                    modType = FunctionChangeHunk.ModificationType.DEL;
                     if (logDebug) {
                         LOG.debug("Edit " + remBegin + ".." + remEnd + " fully deletes " + f);
                     }
+                    markFunctionASideEdit(edit, f, FunctionChangeHunk.ModificationType.DEL, false);
                 } else {
                     if (logDebug) {
                         LOG.debug("Edit " + remBegin + ".." + remEnd + " deletes lines from " + f);
@@ -151,12 +245,11 @@ class CommitHunkToFunctionLocationMapper implements Consumer<Edit> {
                         if (logDebug) {
                             LOG.debug("Commit " + commitId + " might delete " + f);
                         }
-                        modType = FunctionChangeHunk.ModificationType.DEL;
+                        markFunctionASideEdit(edit, f, FunctionChangeHunk.ModificationType.DEL, true);
                     } else {
-                        modType = FunctionChangeHunk.ModificationType.MOD;
+                        markFunctionASideEdit(edit, f, FunctionChangeHunk.ModificationType.MOD, false);
                     }
                 }
-                markFunctionASideEdit(edit, f, modType);
             } else if (f.end1 < remBegin) {
                 if (logDebug) {
                     LOG.debug("No future edits possible for " + f);
@@ -183,12 +276,11 @@ class CommitHunkToFunctionLocationMapper implements Consumer<Edit> {
                 LOG.debug("Checking " + f);
             }
             if (editOverlaps(f, addBegin, addEnd)) {
-                final FunctionChangeHunk.ModificationType modType;
                 if (editCompletelyCovers(f, addBegin, addEnd)) {
-                    modType = FunctionChangeHunk.ModificationType.ADD;
                     if (logDebug) {
                         LOG.debug("Edit " + addBegin + ".." + addEnd + " fully adds " + f);
                     }
+                    markFunctionBSideEdit(edit, f, FunctionChangeHunk.ModificationType.ADD, false);
                 } else {
                     if (logDebug) {
                         LOG.debug("Edit " + addBegin + ".." + addEnd + " adds lines to " + f);
@@ -198,12 +290,11 @@ class CommitHunkToFunctionLocationMapper implements Consumer<Edit> {
                         if (logDebug) {
                             LOG.debug("Commit " + commitId + " might add    " + f);
                         }
-                        modType = FunctionChangeHunk.ModificationType.ADD;
+                        markFunctionBSideEdit(edit, f, FunctionChangeHunk.ModificationType.ADD, true);
                     } else {
-                        modType = FunctionChangeHunk.ModificationType.MOD;
+                        markFunctionBSideEdit(edit, f, FunctionChangeHunk.ModificationType.MOD, false);
                     }
                 }
-                markFunctionBSideEdit(edit, f, modType);
             } else if (f.end1 < addBegin) {
                 if (logDebug) {
                     LOG.debug("No future edits possible for " + f);
@@ -216,29 +307,50 @@ class CommitHunkToFunctionLocationMapper implements Consumer<Edit> {
         }
     }
 
-    private void markFunctionASideEdit(Edit edit, Method f, FunctionChangeHunk.ModificationType modType) {
+    private void markFunctionASideEdit(Edit edit, Method f, FunctionChangeHunk.ModificationType modType,
+                                       boolean possibleSignatureChange) {
         ChangeHunk hunk = hunkFromASideEdit(f, edit);
-        rememberHunk(f, modType, hunk);
+        Optional<FunctionChangeHunk> fHunk = rememberHunk(f, modType, hunk);
+        if (possibleSignatureChange && fHunk.isPresent()) {
+            possibleSignatureChangesASides.add(fHunk.get());
+        }
     }
 
-    private void markFunctionBSideEdit(Edit edit, Method f, FunctionChangeHunk.ModificationType modType) {
+    private void markFunctionBSideEdit(Edit edit, Method f, FunctionChangeHunk.ModificationType modType,
+                                       boolean possibleSignatureChange) {
         ChangeHunk hunk = hunkFromBSideEdit(f, edit);
-        rememberHunk(f, modType, hunk);
+        Optional<FunctionChangeHunk> fHunk = rememberHunk(f, modType, hunk);
+        if (possibleSignatureChange && fHunk.isPresent()) {
+            possibleSignatureChangesBSides.add(fHunk.get());
+        }
     }
 
-    private void rememberHunk(Method f, FunctionChangeHunk.ModificationType modType, ChangeHunk hunk) {
-        if ((hunk.getLinesAdded() == 0) && (hunk.getLinesDeleted() == 0)) {
+    private Optional<FunctionChangeHunk> rememberHunk(Method f, FunctionChangeHunk.ModificationType modType, ChangeHunk hunk) {
+        if ((hunk.getLinesAdded() == 0) && (hunk.getLinesDeleted() == 0)
+                && (modType == FunctionChangeHunk.ModificationType.MOD)) {
             LOG.debug("Ignoring hunk.  No lines were added or removed in " + f);
-            return;
+            return Optional.empty();
         }
         FunctionChangeHunk fHunk = new FunctionChangeHunk(f, hunk, modType);
         List<FunctionChangeHunk> hunksForFunction = hunksForCurrentEdit.get(f);
         if (hunksForFunction == null) {
-            hunksForFunction = new ArrayList<>();
+            hunksForFunction = new LinkedList<>();
             hunksForCurrentEdit.put(f, hunksForFunction);
         }
         hunksForFunction.add(fHunk);
         //logEdit(f, edit);
+        return Optional.of(fHunk);
+    }
+
+    private boolean forgetHunk(FunctionChangeHunk fh) {
+        final Method function = fh.getFunction();
+        List<FunctionChangeHunk> changesToSameFunction = hunksForCurrentEdit.get(function);
+        if (changesToSameFunction == null) return false;
+        boolean result = changesToSameFunction.remove(fh);
+        if (changesToSameFunction.isEmpty()) {
+            hunksForCurrentEdit.remove(function);
+        }
+        return result;
     }
 
     private ChangeHunk hunkFromASideEdit(Method f, Edit edit) {

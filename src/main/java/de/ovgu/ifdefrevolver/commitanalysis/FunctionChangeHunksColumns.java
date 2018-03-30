@@ -1,8 +1,11 @@
 package de.ovgu.ifdefrevolver.commitanalysis;
 
 import de.ovgu.ifdefrevolver.bugs.correlate.data.IMinimalSnapshot;
+import de.ovgu.skunk.detection.data.Method;
 import de.ovgu.skunk.detection.output.CsvColumnValueProvider;
 import de.ovgu.skunk.detection.output.CsvRowProvider;
+
+import java.util.Optional;
 
 /**
  * <p>Describes the columns of the CSV file that lists all the individual hunks of change to functions defined in the C
@@ -96,15 +99,6 @@ public enum FunctionChangeHunksColumns implements CsvColumnValueProvider<Functio
         }
     },
     /**
-     * {@code true} if this function is deleted (or simply moved to a new location) by this change hunk
-     */
-    FUNCTION_DELETE {
-        @Override
-        public Boolean csvColumnValue(FunctionChangeHunk changedFunc, IMinimalSnapshot snapshot) {
-            return changedFunc.deletesFunction();
-        }
-    },
-    /**
      * Type of function modification. Can be ADD, DEL, MOD or MOVE.
      */
     MOD_TYPE {
@@ -114,12 +108,27 @@ public enum FunctionChangeHunksColumns implements CsvColumnValueProvider<Functio
         }
     },
     /**
+     * New signature of the function. Will be different from FUNCTION_SIGNATURE if the signature was modified (e.g., new names, changes to parameter list)
+     */
+    NEW_FUNCTION_SIGNATURE {
+        @Override
+        public String csvColumnValue(FunctionChangeHunk changedFunc, IMinimalSnapshot snapshot) {
+            Optional<Method> newFunction = changedFunc.getNewFunction();
+            if (newFunction.isPresent()) {
+                return newFunction.get().functionSignatureXml;
+            } else return "";
+        }
+    },
+    /**
      * New file where the function resides. Will be different from FILE in case the function was moved to another file.
      */
     NEW_FILE {
         @Override
         public String csvColumnValue(FunctionChangeHunk changedFunc, IMinimalSnapshot snapshot) {
-            return changedFunc.getHunk().getNewPath();
+            Optional<Method> newFunction = changedFunc.getNewFunction();
+            if (newFunction.isPresent()) {
+                return newFunction.get().FilePathForDisplay();
+            } else return "";
         }
     };
 

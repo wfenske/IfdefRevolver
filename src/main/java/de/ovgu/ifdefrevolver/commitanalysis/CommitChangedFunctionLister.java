@@ -192,20 +192,24 @@ public class CommitChangedFunctionLister {
     }
 
     private void publishMoveEvents(String oldPath, String newPath, List<Method> oldFunctions, List<Method> newFunctions) {
-        Set<String> oldSignatures = new HashSet<>();
-        oldFunctions.forEach(f -> oldSignatures.add(f.functionSignatureXml));
-        Set<String> newSignatures = new HashSet<>();
-        newFunctions.forEach(f -> newSignatures.add(f.functionSignatureXml));
-        if (!oldSignatures.equals(newSignatures)) {
-            throw new RuntimeException("Expected the same functions during file rename. Commit: " + commitId +
+        final int numFunctions = oldFunctions.size();
+        if (numFunctions != newFunctions.size()) {
+            throw new RuntimeException("Expected the same functions in the same order during file rename, but functions numbers don't match. Commit: " + commitId +
                     " old path: " + oldPath + " new path: " + newPath + " old functions: " + oldFunctions +
                     " new functions: " + newFunctions);
         }
 
         int hunkNo = 0;
-        for (Method f : oldFunctions) {
+
+        for (int i = 0; i < numFunctions; i++) {
+            Method oldFunc = oldFunctions.get(i);
+            Method newFunc = newFunctions.get(i);
+            if (!oldFunc.functionSignatureXml.equals(newFunc.functionSignatureXml)) {
+                throw new RuntimeException("Expected the same functions in the same order during file rename, but signatures don't match. Commit: " + commitId +
+                        " old function: " + oldFunc + " new function: " + newFunc);
+            }
             ChangeHunk ch = new ChangeHunk(commitId, oldPath, newPath, hunkNo, 0, 0);
-            FunctionChangeHunk fh = new FunctionChangeHunk(f, ch, FunctionChangeHunk.ModificationType.MOVE);
+            FunctionChangeHunk fh = new FunctionChangeHunk(oldFunc, ch, FunctionChangeHunk.ModificationType.MOVE, newFunc);
             changedFunctionConsumer.accept(fh);
             hunkNo++;
         }
