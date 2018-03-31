@@ -21,6 +21,14 @@ import java.util.function.Consumer;
 public class CommitChangedFunctionLister {
     private static final Logger LOG = Logger.getLogger(CommitChangedFunctionLister.class);
 
+    private static final Set<String> C_FILE_EXTENSIONS;
+
+    static {
+        C_FILE_EXTENSIONS = new HashSet<>();
+        C_FILE_EXTENSIONS.add(".c");
+        C_FILE_EXTENSIONS.add(".C");
+    }
+
     private final Repository repo;
     private final String commitId;
     private final AddDelMergingConsumer changedFunctionConsumer;
@@ -60,7 +68,8 @@ public class CommitChangedFunctionLister {
                 final int parentCount = commit.getParentCount();
 
                 if (parentCount == 0) {
-                    LOG.warn("Ignoring commit " + commitId + ": no parents");
+                    LOG.warn("Encountered parent-less commit: " + commitId);
+                    addFunctionsOfParentLessCommit(commit);
                     return;
                 }
 
@@ -96,6 +105,25 @@ public class CommitChangedFunctionLister {
             releaseFormatter();
             releaseRevisionWalker(rw);
         }
+    }
+
+    private void addFunctionsOfParentLessCommit(RevCommit commit) throws IOException {
+        final boolean logDebug = LOG.isDebugEnabled();
+        FunctionLocationProvider p = new FunctionLocationProvider(repo, commitId);
+        allBSideFunctions = p.listFunctionsInFilesWithExtension(commit, C_FILE_EXTENSIONS);
+
+        for (Map.Entry<String, List<Method>> e : allBSideFunctions.entrySet()) {
+            String newPath = e.getKey();
+            for (Method m : e.getValue()) {
+                ChangeHunk ch = new ChangeHunk(commitId, "/dev/null", newPath, 0, 0, m.getGrossLoc());
+                FunctionChangeHunk fch = new FunctionChangeHunk(m, ch, FunctionChangeHunk.ModificationType.ADD);
+                if (logDebug) {
+                    LOG.debug("ADD for parent-less commit: " + fch);
+                }
+                changedFunctionConsumer.accept(fch);
+            }
+        }
+        changedFunctionConsumer.mergeAndPublishRemainingHunks();
     }
 
     private void logFilesAndFunctions(String side, Set<String> cFiles, Map<String, List<Method>> functionsByFile) {

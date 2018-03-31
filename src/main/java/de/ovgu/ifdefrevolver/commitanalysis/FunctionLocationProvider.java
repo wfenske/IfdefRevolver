@@ -10,7 +10,9 @@ import org.eclipse.jgit.lib.Repository;
 import org.eclipse.jgit.revwalk.RevCommit;
 import org.eclipse.jgit.revwalk.RevTree;
 import org.eclipse.jgit.treewalk.TreeWalk;
+import org.eclipse.jgit.treewalk.filter.OrTreeFilter;
 import org.eclipse.jgit.treewalk.filter.PathFilterGroup;
+import org.eclipse.jgit.treewalk.filter.PathSuffixFilter;
 import org.eclipse.jgit.treewalk.filter.TreeFilter;
 import org.w3c.dom.Document;
 import org.w3c.dom.Node;
@@ -44,6 +46,37 @@ public class FunctionLocationProvider {
      * @throws IOException
      */
     public Map<String, List<Method>> listFunctionsInFiles(RevCommit state, Set<String> paths) throws IOException {
+        TreeFilter pathFilter = PathFilterGroup.createFromStrings(paths);
+        return listFunctionsInFiles(state, pathFilter);
+    }
+
+    /**
+     * @param state
+     * @param extensions A file extension, including the dot, i.e., stuff like <code>.c</code> for C files
+     * @return A map from filename to the (ordered list of) functions in that file
+     * @throws IOException
+     */
+    public Map<String, List<Method>> listFunctionsInFilesWithExtension(RevCommit state, Set<String> extensions) throws IOException {
+        final TreeFilter effectiveFilter = treeFilterFromFileExtensions(extensions);
+        return listFunctionsInFiles(state, effectiveFilter);
+    }
+
+    protected TreeFilter treeFilterFromFileExtensions(Set<String> extensions) {
+        if (extensions.isEmpty()) {
+            throw new IllegalArgumentException("Must supply at least one file extension!");
+        }
+        PathSuffixFilter[] filters = new PathSuffixFilter[extensions.size()];
+        int i = 0;
+        for (String ext : extensions) {
+            filters[i++] = PathSuffixFilter.create(ext);
+        }
+        final TreeFilter effectiveFilter;
+        if (filters.length == 1) effectiveFilter = filters[0];
+        else effectiveFilter = OrTreeFilter.create(filters);
+        return effectiveFilter;
+    }
+
+    private Map<String, List<Method>> listFunctionsInFiles(RevCommit stateBeforeCommit, TreeFilter pathFilter) throws IOException {
         final Map<String, List<Method>> functionsByFilename = new HashMap<>();
         Consumer<Method> changedFunctionHandler = method -> {
             String filePath = method.filePath;
@@ -54,16 +87,17 @@ public class FunctionLocationProvider {
             }
             functions.add(method);
         };
-        listFunctionsInFiles(state, paths, changedFunctionHandler);
+
+        listFunctionsInFiles(stateBeforeCommit, pathFilter, changedFunctionHandler);
         return functionsByFilename;
     }
 
-    private void listFunctionsInFiles(RevCommit stateBeforeCommit, Set<String> paths, Consumer<Method> functionHandler) throws IOException {
+    private void listFunctionsInFiles(RevCommit stateBeforeCommit, TreeFilter pathFilter, Consumer<Method> functionHandler) throws IOException {
         // a RevWalk allows to walk over commits based on some filtering that is defined
         // and using commit's tree find the path
         RevTree tree = stateBeforeCommit.getTree();
         LOG.debug("Analyzing state " + stateBeforeCommit.getId().name() + ". Looking at tree: " + tree);
-        LOG.debug("Paths to analyze: " + paths);
+        //LOG.debug("Paths to analyze: " + paths);
 
         // now try to find a specific file
         TreeWalk treeWalk = null;
@@ -71,25 +105,24 @@ public class FunctionLocationProvider {
             treeWalk = new TreeWalk(repository);
             treeWalk.addTree(tree);
             treeWalk.setRecursive(true);
-            TreeFilter pathFilter = PathFilterGroup.createFromStrings(paths);
             treeWalk.setFilter(pathFilter);
 
-            final Set<String> filesToGo = new HashSet<>(paths);
+            //final Set<String> filesToGo = new HashSet<>(paths);
             while (treeWalk.next()) {
                 ObjectId objectId = treeWalk.getObjectId(0);
                 String path = treeWalk.getPathString();
-                if (!filesToGo.remove(path)) {
-                    throw new IllegalStateException("Unexpected file in commit " + commitId + ". Expected one of " +
-                            filesToGo + ", got: " + path);
-                }
+//                if (!filesToGo.remove(path)) {
+//                    throw new IllegalStateException("Unexpected file in commit " + commitId + ". Expected one of " +
+//                            filesToGo + ", got: " + path);
+//                }
                 ObjectLoader loader = repository.open(objectId);
                 //System.out.print(getSrcMl(loader));
                 readFileForPath(loader, path, functionHandler);
             }
 
-            if (!filesToGo.isEmpty()) {
-                throw new IllegalStateException("Did not find the following files in commit " + commitId + ": " + filesToGo);
-            }
+//            if (!filesToGo.isEmpty()) {
+//                throw new IllegalStateException("Did not find the following files in commit " + commitId + ": " + filesToGo);
+//            }
         } finally {
             treeWalk.release();
         }
