@@ -20,10 +20,14 @@ public class AddChangeDistances {
     private ListChangedFunctionsConfig config;
     private int errors;
     private CommitsDistanceDb commitsDistanceDb;
-    private Map<FunctionId, FunctionChangeRow> adds;
-    private Map<FunctionId, FunctionChangeRow> dels;
+    //private Map<FunctionId, FunctionChangeRow> adds;
+    //private Map<FunctionId, FunctionChangeRow> dels;
     private GroupingListMap<String, FunctionChangeRow> changesByCommit;
     private GroupingListMap<FunctionId, FunctionChangeRow> changesByFunction;
+    /**
+     * Key is the new function id (after the rename/move/signature change). Values are the old function ids (before the MOVE event).
+     */
+    private GroupingHashSetMap<FunctionId, FunctionChangeRow> movesByNewFunctionId = new GroupingHashSetMap<>();
 
     public static void main(String[] args) {
         AddChangeDistances main = new AddChangeDistances();
@@ -83,6 +87,13 @@ public class AddChangeDistances {
         }
     }
 
+    public static class GroupingHashSetMap<K, V> extends GroupingMap<K, V, HashSet<V>> {
+        @Override
+        protected HashSet<V> newCollection() {
+            return new HashSet<>();
+        }
+    }
+
     private void execute() {
         LOG.debug("Reading information about commit parent-child relationships.");
         this.errors = 0;
@@ -109,16 +120,18 @@ public class AddChangeDistances {
 
         changesByCommit = new GroupingListMap<>();
         changesByFunction = new GroupingListMap<>();
-        adds = new LinkedHashMap<>();
-        dels = new LinkedHashMap<>();
 
         LOG.debug("Reading all function changes.");
         readFunctionsChangedInSnapshots(snapshotDates);
         LOG.debug("Done reading all function changes. Number of distinct changed functions: " + changesByFunction.getMap().size());
 
-        LOG.debug("Extracting function additions and deletions from " + allCommits.size() + " commits.");
-        extractFunctionAdditionsAndDeletions(allCommits);
-        LOG.debug("Done extracting function additions and deletions. Detected " + adds.size() + " additions and " + dels.size() + " corresponding deletions.");
+        //adds = new LinkedHashMap<>();
+        //dels = new LinkedHashMap<>();
+//        LOG.debug("Extracting function additions and deletions from " + allCommits.size() + " commits.");
+//        extractFunctionAdditionsAndDeletions(allCommits);
+//        LOG.debug("Done extracting function additions and deletions. Detected " + adds.size() + " additions and " + dels.size() + " corresponding deletions.");
+
+        parseRenames();
 
         int ageRequests = 0, actualAge = 0, guessedAge = 0, guessed0Age = 0, noAgeAtAll = 0;
         int missingAdditions = 0;
@@ -126,17 +139,18 @@ public class AddChangeDistances {
         System.out.println("MOD_TYPE,FUNCTION_SIGNATURE,FILE,COMMIT,AGE,DIST");
         for (Map.Entry<FunctionId, List<FunctionChangeRow>> e : changesByFunction.getMap().entrySet()) {
             final FunctionId function = e.getKey();
-            List<FunctionChangeRow> changes = new LinkedList<>(e.getValue());
-            Set<String> commitsToFunction = new HashSet<>(changes.size());
-            Set<String> knownAddsForFunction = new LinkedHashSet<>();
-            for (FunctionChangeRow change : changes) {
-                commitsToFunction.add(change.commitId);
-                if (change.modType == FunctionChangeHunk.ModificationType.ADD) {
-                    knownAddsForFunction.add(change.commitId);
-                }
+            final List<FunctionChangeRow> directChanges = e.getValue();
+            final Set<String> directCommitIds = new HashSet<>();
+            for (FunctionChangeRow r : directChanges) {
+                directCommitIds.add(r.commitId);
             }
+            final Set<FunctionId> functionAliases = getFunctionAliases(function, directCommitIds);
 
-            Set<String> guessedAddsForFunction = guessAddsForFunction(commitsToFunction);
+            // All the commits that have created this function or a previous version of it.
+            Set<String> knownAddsForFunction = getAddingCommitsIncludingAliases(functionAliases);
+
+            Set<String> commitsToFunctionAndAliases = getCommitsToFunctionIncludingAliases(functionAliases);
+            final Set<String> guessedAddsForFunction = filterAncestorCommits(commitsToFunctionAndAliases);
             guessedAddsForFunction.removeAll(knownAddsForFunction);
 
             if (knownAddsForFunction.isEmpty()) {
@@ -151,7 +165,7 @@ public class AddChangeDistances {
 
             Map<String, AgeAndDistanceStrings> knownDistancesCache = new HashMap<>();
 
-            for (FunctionChangeRow change : changes) {
+            for (FunctionChangeRow change : directChanges) {
                 final String currentCommit = change.commitId;
                 AgeAndDistanceStrings distanceStrings = knownDistancesCache.get(currentCommit);
                 if (distanceStrings == null) {
@@ -160,7 +174,7 @@ public class AddChangeDistances {
                         minDist = 0;
                     } else {
                         minDist = Integer.MAX_VALUE;
-                        for (String otherCommit : commitsToFunction) {
+                        for (String otherCommit : commitsToFunctionAndAliases) {
                             if (currentCommit.equals(otherCommit)) continue;
                             Optional<Integer> currentDist = commitsDistanceDb.minDistance(currentCommit, otherCommit);
                             if (currentDist.isPresent()) {
@@ -227,6 +241,41 @@ public class AddChangeDistances {
                 " noAgeAtAll: " + noAgeAtAll);
     }
 
+    private Set<FunctionId> getFunctionAliases(FunctionId function, Set<String> directCommitIds) {
+        Set<FunctionId> functionAliases = new HashSet<>();
+        for (String commit : filterAncestorCommits(directCommitIds)) {
+            Set<FunctionId> currentAliases = getAllOlderFunctionIds(function, commit);
+            functionAliases.addAll(currentAliases);
+        }
+        return functionAliases;
+    }
+
+    private Set<String> getCommitsToFunctionIncludingAliases(Set<FunctionId> functionAliases) {
+        Set<String> result = new LinkedHashSet<>();
+        for (FunctionId alias : functionAliases) {
+            List<FunctionChangeRow> aliasChanges = changesByFunction.get(alias);
+            if (aliasChanges == null) continue;
+            for (FunctionChangeRow change : aliasChanges) {
+                result.add(change.commitId);
+            }
+        }
+        return result;
+    }
+
+    private Set<String> getAddingCommitsIncludingAliases(Set<FunctionId> functionAliases) {
+        Set<String> result = new LinkedHashSet<>();
+        for (FunctionId alias : functionAliases) {
+            List<FunctionChangeRow> aliasChanges = changesByFunction.get(alias);
+            if (aliasChanges == null) continue;
+            for (FunctionChangeRow change : aliasChanges) {
+                if (change.modType == FunctionChangeHunk.ModificationType.ADD) {
+                    result.add(change.commitId);
+                }
+            }
+        }
+        return result;
+    }
+
     private static class AgeAndDistanceStrings {
         final String ageString;
         final String distanceString;
@@ -258,7 +307,7 @@ public class AddChangeDistances {
         }
     }
 
-    private Set<String> guessAddsForFunction(Set<String> allCommits) {
+    private Set<String> filterAncestorCommits(Set<String> allCommits) {
         // Determine all commits that are not descendants of other commits.
         Set<String> commitsWithoutAncestors = new HashSet<>(allCommits);
         for (Iterator<String> it = commitsWithoutAncestors.iterator(); it.hasNext(); ) {
@@ -298,40 +347,40 @@ public class AddChangeDistances {
         return winningCommit;
     }
 
-    private void extractFunctionAdditionsAndDeletions(Set<String> allCommits) {
-        for (String commitHash : allCommits) {
-            List<FunctionChangeRow> changes = changesByCommit.get(commitHash);
-            if (changes == null) continue;
-            //LOG.debug("Commit " + c.getHash() + " changes " + changes.size() + " function(s).");
-            for (FunctionChangeRow ch : changes) {
-                switch (ch.modType) {
-                    case ADD: {
-                        FunctionId key = ch.functionId;
-                        if (adds.containsKey(key)) {
-                            LOG.warn("Function is added a second time. Ignoring addition: " + key);
-                        } else {
-                            //LOG.debug("Function " + key + " is added by change " + ch);
-                            adds.put(key, ch);
-                        }
-                        break;
-                    }
-                    case DEL: {
-                        FunctionId key = ch.functionId;
-                        if (dels.containsKey(key)) {
-                            LOG.warn("Function is deleted a second time. Ignoring deletion: " + key);
-                        } else {
-                            if (!adds.containsKey(key)) {
-                                LOG.warn("Function appears to be deleted before it has been added: " + key);
-                            }
-                            //LOG.debug("Function " + key + " is deleted by change " + ch);
-                            dels.put(key, ch);
-                        }
-                        break;
-                    }
-                }
-            }
-        }
-    }
+//    private void extractFunctionAdditionsAndDeletions(Set<String> allCommits) {
+//        for (String commitHash : allCommits) {
+//            List<FunctionChangeRow> changes = changesByCommit.get(commitHash);
+//            if (changes == null) continue;
+//            //LOG.debug("Commit " + c.getHash() + " changes " + changes.size() + " function(s).");
+//            for (FunctionChangeRow ch : changes) {
+//                switch (ch.modType) {
+//                    case ADD: {
+//                        FunctionId key = ch.functionId;
+//                        if (adds.containsKey(key)) {
+//                            LOG.warn("Function is added a second time. Ignoring addition: " + key);
+//                        } else {
+//                            //LOG.debug("Function " + key + " is added by change " + ch);
+//                            adds.put(key, ch);
+//                        }
+//                        break;
+//                    }
+//                    case DEL: {
+//                        FunctionId key = ch.functionId;
+//                        if (dels.containsKey(key)) {
+//                            LOG.warn("Function is deleted a second time. Ignoring deletion: " + key);
+//                        } else {
+//                            if (!adds.containsKey(key)) {
+//                                LOG.warn("Function appears to be deleted before it has been added: " + key);
+//                            }
+//                            //LOG.debug("Function " + key + " is deleted by change " + ch);
+//                            dels.put(key, ch);
+//                        }
+//                        break;
+//                    }
+//                }
+//            }
+//        }
+//    }
 
     private void readFunctionsChangedInSnapshots(Collection<Date> snapshotsToProcesses) {
         LOG.debug("Reading function changes for " + snapshotsToProcesses.size() + " snapshot(s).");
@@ -345,6 +394,81 @@ public class AddChangeDistances {
             }
         }
         LOG.debug("Read " + numChanges + " function change(s).");
+    }
+
+    private void parseRenames() {
+        LOG.debug("Parsing all renames/moves/signature changes");
+        int numMoves = 0;
+        for (Collection<FunctionChangeRow> changes : changesByCommit.getMap().values()) {
+            for (FunctionChangeRow change : changes) {
+                if (change.modType != FunctionChangeHunk.ModificationType.MOVE) continue;
+                numMoves++;
+                if (!change.newFunctionId.isPresent()) {
+                    throw new RuntimeException("Encountered a MOVE without a new function id: " + change);
+                }
+                movesByNewFunctionId.put(change.newFunctionId.get(), change);
+            }
+        }
+
+        if (LOG.isDebugEnabled()) {
+            for (Map.Entry<FunctionId, HashSet<FunctionChangeRow>> e : movesByNewFunctionId.getMap().entrySet()) {
+                FunctionId functionId = e.getKey();
+                HashSet<FunctionChangeRow> moves = e.getValue();
+                for (FunctionChangeRow move : moves) {
+                    LOG.debug(functionId + " <- " + move.functionId);
+                }
+            }
+        }
+
+        LOG.debug("Parsed " + numMoves + " MOVE events.");
+    }
+
+    private Set<FunctionId> getAllOlderFunctionIds(FunctionId id, final String commit) {
+//        LOG.debug("getAllOlderFunctionIds " + id + " " + commit);
+        Queue<FunctionId> todo = new LinkedList<>();
+        todo.add(id);
+        Set<FunctionId> done = new LinkedHashSet<>();
+        FunctionId needle;
+        while ((needle = todo.poll()) != null) {
+            done.add(needle);
+
+            Set<FunctionChangeRow> moves = movesByNewFunctionId.get(needle);
+            if (moves == null) {
+//                LOG.debug("No moves whatsoever for " + needle);
+                continue;
+            }
+            for (FunctionChangeRow r : moves) {
+                String ancestorCommit = r.commitId;
+                FunctionId oldId = r.functionId;
+                if (!todo.contains(oldId) && !done.contains(oldId)) {
+                    if (commitsDistanceDb.isDescendant(commit, ancestorCommit)) {
+                        todo.add(oldId);
+                    } else {
+//                        LOG.debug("Rejecting move " + r + ": not an ancestor of " + commit);
+                    }
+                }
+            }
+        }
+
+//        if (LOG.isDebugEnabled()) {
+//            String size;
+//            Set<FunctionId> aliases = new LinkedHashSet<>(done);
+//            done.remove(id);
+//            switch (aliases.size()) {
+//                case 0:
+//                    size = "no aliases";
+//                    break;
+//                case 1:
+//                    size = "1 alias";
+//                    break;
+//                default:
+//                    size = aliases.size() + " aliases";
+//                    break;
+//            }
+//            LOG.debug("getAllOlderFunctionIds(" + id + ", " + commit + ") found " +
+//                    size + ": " + aliases);
+//        }
+        return done;
     }
 
     public static class FunctionId {
@@ -388,7 +512,17 @@ public class AddChangeDistances {
         public FunctionId functionId;
         public String commitId;
         public FunctionChangeHunk.ModificationType modType;
-        public String newFile;
+        public Optional<FunctionId> newFunctionId;
+
+        @Override
+        public String toString() {
+            return "FunctionChangeRow{" +
+                    "modType=" + modType +
+                    ", commitId='" + commitId + '\'' +
+                    ", functionId=" + functionId +
+                    ", newFunctionId=" + (newFunctionId.isPresent() ? newFunctionId : "") +
+                    '}';
+        }
     }
 
     private List<FunctionChangeRow> readFunctionsChangedInSnapshot(Date snapshotDate) {
@@ -425,8 +559,26 @@ public class AddChangeDistances {
                 result.commitId = line[FunctionChangeHunksColumns.COMMIT_ID.ordinal()];
                 String modTypeName = line[FunctionChangeHunksColumns.MOD_TYPE.ordinal()];
                 result.modType = FunctionChangeHunk.ModificationType.valueOf(modTypeName);
-                result.newFile = line[FunctionChangeHunksColumns.NEW_FILE.ordinal()];
+                result.newFunctionId = parseNewFunctionId(line);
+
                 results.add(result);
+            }
+
+            private Optional<FunctionId> parseNewFunctionId(String[] line) {
+                final Optional<FunctionId> newFunctionId;
+                String newSignature = line[FunctionChangeHunksColumns.NEW_FUNCTION_SIGNATURE.ordinal()];
+                String newFile = line[FunctionChangeHunksColumns.NEW_FILE.ordinal()];
+                boolean noNewSignature = (newSignature == null) || newSignature.isEmpty();
+                boolean noNewFile = (newFile == null) || (newFile.isEmpty());
+                if (noNewFile != noNewSignature) {
+                    throw new RuntimeException("New signature and new file must both be set or not at all! Erroneous line: " + line);
+                }
+                if (noNewFile) {
+                    newFunctionId = Optional.empty();
+                } else {
+                    newFunctionId = Optional.of(new FunctionId(newSignature, newFile));
+                }
+                return newFunctionId;
             }
 
             @Override
