@@ -366,10 +366,34 @@ public class CommitsDistanceDb {
         existingParents.addAll(parents);
     }
 
-    private void assertNotPreprocessed() {
+    private synchronized void assertNotPreprocessed() {
         if (preprocessed) {
             throw new IllegalStateException("Cannot modify database after preprocessing.");
         }
+    }
+
+    /**
+     * Determine all commits that are not a descendant of another commit.
+     *
+     * @param commits A set of commit hashes
+     * @return A subset of the original commits that only holds commits that are not descendants of other commits
+     * within the original  set of commits.
+     */
+    public Set<String> filterAncestorCommits(Collection<String> commits) {
+        ensurePreprocessed();
+        Set<String> commitsWithoutAncestors = new HashSet<>(commits);
+        for (Iterator<String> it = commitsWithoutAncestors.iterator(); it.hasNext(); ) {
+            final String descendant = it.next();
+            for (String ancestor : commits) {
+                if (ancestor.equals(descendant)) continue;
+                if (this.isDescendant(descendant, ancestor)) {
+                    it.remove();
+                    break;
+                }
+            }
+        }
+
+        return commitsWithoutAncestors;
     }
 
     private Set<String> ensureExistingParentsSet(String commit) {
