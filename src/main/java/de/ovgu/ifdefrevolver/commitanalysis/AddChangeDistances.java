@@ -39,10 +39,21 @@ public class AddChangeDistances {
         System.exit(main.errors);
     }
 
-    private static class AgeRequestStats {
-        int ageRequests = 0, actualAge = 0, guessed0Age = 0, guessedOtherAge = 0, noAgeAtAll = 0;
-        int functionsWithoutAnyKnownAddingCommits = 0;
+    private static class ProcessingStats {
+        final int total;
+        int processed;
+
+        public ProcessingStats(int total) {
+            this.total = total;
+        }
+
+        public synchronized int increaseProcessed() {
+            this.processed++;
+            return this.processed;
+        }
     }
+
+    ProcessingStats processingStats;
 
     private void execute() {
         LOG.debug("Reading information about commit parent-child relationships.");
@@ -63,8 +74,11 @@ public class AddChangeDistances {
         projectInfo.readSnapshotsAndRevisionsFile();
         LOG.debug("Done reading project information");
 
-        Collection<Date> snapshotDates = getDatesOfActualSnapshots(projectInfo);
-        maybeAddDummySnapshotToCoverRemainingChanges(snapshotDates);
+        Collection<Date> snapshotDates = projectInfo.getSnapshotDatesFiltered(config);
+        Optional<Date> leftOverSnapshotDate = config.getDummySnapshotDateToCoverRemainingChanges();
+        if (leftOverSnapshotDate.isPresent()) {
+            snapshotDates.add(leftOverSnapshotDate.get());
+        }
 
         moveResolver = new FunctionMoveResolver(commitsDistanceDb);
 
@@ -73,169 +87,127 @@ public class AddChangeDistances {
         final Set<Map.Entry<FunctionId, List<FunctionChangeRow>>> functionChangeEntries =
                 moveResolver.getChangesByFunction().entrySet();
         final int totalEntries = functionChangeEntries.size();
+        processingStats = new ProcessingStats(totalEntries);
         LOG.debug("Done reading all function changes. Number of distinct changed functions: " + totalEntries);
 
         moveResolver.parseRenames();
 
         System.out.println("MOD_TYPE,FUNCTION_SIGNATURE,FILE,COMMIT,AGE,DIST");
-        int entriesProcessed = 0;
-        for (Map.Entry<FunctionId, List<FunctionChangeRow>> e : functionChangeEntries) {
-            final FunctionId function = e.getKey();
-            final List<FunctionChangeRow> directChanges = e.getValue();
-            final Set<String> directCommitIds = new HashSet<>();
-            for (FunctionChangeRow r : directChanges) {
-                directCommitIds.add(r.commitId);
-            }
-//            final Set<FunctionId> functionAliases = moveResolver.getFunctionAliases(function, directCommitIds);
-//
-//            // All the commits that have created this function or a previous version of it.
-//            Set<String> knownAddsForFunction = moveResolver.getAddingCommitsIncludingAliases(functionAliases);
-//
-//            final Set<String> nonDeletingCommitsToFunctionAndAliases = moveResolver.getNonDeletingCommitsToFunctionIncludingAliases(functionAliases);
-//            final Set<String> guessedAddsForFunction = commitsDistanceDb.filterAncestorCommits(nonDeletingCommitsToFunctionAndAliases);
-//            guessedAddsForFunction.removeAll(knownAddsForFunction);
+        Iterator<Map.Entry<FunctionId, List<FunctionChangeRow>>> changeEntriesIterator = functionChangeEntries.iterator();
 
-            FunctionHistory history = moveResolver.getFunctionHistory(function, directCommitIds);
+        TerminableThread workers[] = new TerminableThread[config.getNumThreads()];
+        final List<Throwable> uncaughtWorkerThreadException = new ArrayList<>();
 
-            if (history.knownAddsForFunction.isEmpty()) {
-                ageRequestStats.functionsWithoutAnyKnownAddingCommits++;
-                LOG.warn("No known creating commits for function '" + function + "'.");
-            }
-
-//            if (!guessedAddsForFunction.isEmpty()) {
-//                LOG.warn("Some unknown creating commits for function '" + function +
-//                        "'. Assuming the following additional creating commits: " + guessedAddsForFunction);
-//            }
-
-            Map<String, AgeAndDistanceStrings> knownDistancesCache = new HashMap<>();
-
-            for (FunctionChangeRow change : directChanges) {
-                final String currentCommit = change.commitId;
-                AgeAndDistanceStrings distanceStrings = knownDistancesCache.get(currentCommit);
-                if (distanceStrings == null) {
-                    distanceStrings = getAgeAndDistanceStrings(history, currentCommit);
-                    knownDistancesCache.put(currentCommit, distanceStrings);
+        Thread.UncaughtExceptionHandler uncaughtExceptionHandler = new Thread.UncaughtExceptionHandler() {
+            @Override
+            public void uncaughtException(Thread th, Throwable ex) {
+                synchronized (uncaughtWorkerThreadException) {
+                    uncaughtWorkerThreadException.add(ex);
                 }
+                for (TerminableThread wt : workers) {
+                    wt.requestTermination();
+                }
+            }
+        };
 
-                System.out.println(change.modType + ",\"" + function.signature + "\"," + function.file + "," + currentCommit + "," + distanceStrings.ageString + "," + distanceStrings.distanceString);
+        for (int i = 0; i < config.getNumThreads(); i++) {
+            TerminableThread t = new TerminableThread() {
+                @Override
+                public void run() {
+                    while (!terminationRequested) {
+                        final Map.Entry<FunctionId, List<FunctionChangeRow>> nextEntry;
+                        synchronized (changeEntriesIterator) {
+                            if (!changeEntriesIterator.hasNext()) {
+                                break;
+                            }
+                            nextEntry = changeEntriesIterator.next();
+                        }
+
+                        workOnEntry(nextEntry);
+                    }
+
+                    if (terminationRequested) {
+                        LOG.info("Terminating thread " + this + ": termination requested.");
+                    }
+                }
+            };
+            t.setUncaughtExceptionHandler(uncaughtExceptionHandler);
+            workers[i] = t;
+        }
+
+        executeWorkers(workers);
+
+        for (Throwable ex : uncaughtWorkerThreadException) {
+            throw new RuntimeException(new UncaughtWorkerThreadException(ex));
+        }
+
+        LOG.info(ageRequestStats);
+    }
+
+    private void executeWorkers(Thread[] workers) {
+        for (int iWorker = 0; iWorker < workers.length; iWorker++) {
+            workers[iWorker].start();
+        }
+
+        for (int iWorker = 0; iWorker < workers.length; iWorker++) {
+            try {
+                workers[iWorker].join();
+            } catch (InterruptedException e) {
+                LOG.warn("Interrupted while waiting for change distance thread to finish.", e);
+            }
+        }
+    }
+
+    private void workOnEntry(Map.Entry<FunctionId, List<FunctionChangeRow>> e) {
+        final FunctionId function = e.getKey();
+        final List<FunctionChangeRow> directChanges = e.getValue();
+        final Set<String> directCommitIds = new HashSet<>();
+        for (FunctionChangeRow r : directChanges) {
+            directCommitIds.add(r.commitId);
+        }
+
+        FunctionHistory history = moveResolver.getFunctionHistory(function, directCommitIds);
+        history.setAgeRequestStats(ageRequestStats);
+
+        if (history.knownAddsForFunction.isEmpty()) {
+            ageRequestStats.increaseFunctionsWithoutAnyKnownAddingCommits();
+            LOG.warn("No known creating commits for function '" + function + "'.");
+        }
+
+        Map<String, AgeAndDistanceStrings> knownDistancesCache = new HashMap<>();
+
+        for (FunctionChangeRow change : directChanges) {
+            final String currentCommit = change.commitId;
+            AgeAndDistanceStrings distanceStrings = knownDistancesCache.get(currentCommit);
+            if (distanceStrings == null) {
+                distanceStrings = getAgeAndDistanceStrings(history, currentCommit);
+                knownDistancesCache.put(currentCommit, distanceStrings);
             }
 
-            entriesProcessed++;
-            int percentage = Math.round(entriesProcessed * 100.0f / totalEntries);
-            LOG.info("Processed entry " + entriesProcessed + "/" + totalEntries + " (" +
-                    percentage + "%).");
+            String line = change.modType + ",\"" + function.signature + "\"," + function.file + "," + currentCommit + "," + distanceStrings.ageString + "," + distanceStrings.distanceString;
+            synchronized (System.out) {
+                System.out.println(line);
+            }
         }
-        LOG.debug("Functions without any known addition: " + ageRequestStats.functionsWithoutAnyKnownAddingCommits);
-        LOG.debug("Found ages: ageRequests: " + ageRequestStats.ageRequests + " actualAge: " + ageRequestStats.actualAge + " errors={guessed0Age: " + ageRequestStats.guessed0Age + " guessedOtherAge: " + ageRequestStats.guessedOtherAge +
-                " noAgeAtAll: " + ageRequestStats.noAgeAtAll + "}");
+
+        final int entriesProcessed = processingStats.increaseProcessed();
+        int percentage = Math.round(entriesProcessed * 100.0f / processingStats.total);
+        LOG.info("Processed entry " + entriesProcessed + "/" + processingStats.total + " (" +
+                percentage + "%).");
     }
 
     private AgeAndDistanceStrings getAgeAndDistanceStrings(FunctionHistory history, String currentCommit) {
         AgeAndDistanceStrings distanceStrings;
-        final int minDist = getMinDistToPreviousCommit(history, currentCommit);
+        final int minDist = history.getMinDistToPreviousEdit(currentCommit);
         final String minDistStr = minDist < Integer.MAX_VALUE ? Integer.toString(minDist) : "";
 
-        final int age = getFunctionAgeAtCommit(history, currentCommit);
+        final int age = history.getFunctionAgeAtCommit(currentCommit);
         final String ageStr = age < Integer.MAX_VALUE ? Integer.toString(age) : "";
 
         distanceStrings = new AgeAndDistanceStrings(ageStr, minDistStr);
         return distanceStrings;
     }
 
-    private int getFunctionAgeAtCommit(FunctionHistory history, final String currentCommit) {
-        ageRequestStats.ageRequests++;
-
-        if (history.knownAddsForFunction.contains(currentCommit)) {
-            ageRequestStats.actualAge++;
-            return 0;
-        }
-
-        int currentMinAgeAmongKnownAdds = Integer.MAX_VALUE;
-        for (String addingCommit : history.knownAddsForFunction) {
-            if (currentCommit.equals(addingCommit)) continue;
-            Optional<Integer> age = commitsDistanceDb.minDistance(currentCommit, addingCommit);
-            if (age.isPresent()) {
-                currentMinAgeAmongKnownAdds = Math.min(age.get(), currentMinAgeAmongKnownAdds);
-            }
-        }
-
-        if (currentMinAgeAmongKnownAdds < Integer.MAX_VALUE) {
-            ageRequestStats.actualAge++;
-            return currentMinAgeAmongKnownAdds;
-        }
-
-        LOG.warn("Forced to assume alternative adding commit. Function: " + history.function + " Current commit: " + currentCommit);
-        if (history.guessedAddsForFunction.contains(currentCommit)) {
-            ageRequestStats.guessed0Age++;
-            return 0;
-        }
-
-        int currentMinAgeAmongGuessedAdds = Integer.MAX_VALUE;
-        int currentMinAgeAmongGuessedAddsIncluding0 = Integer.MAX_VALUE;
-
-        for (String addingCommit : history.guessedAddsForFunction) {
-            if (currentCommit.equals(addingCommit)) continue;
-            Optional<Integer> age = commitsDistanceDb.minDistance(currentCommit, addingCommit);
-            if (!age.isPresent()) continue;
-            int ageValue = age.get();
-            if (ageValue == 0) {
-                LOG.warn("Edit distance between commits is 0? " + currentCommit + " .. " + addingCommit);
-                currentMinAgeAmongGuessedAddsIncluding0 = Math.min(currentMinAgeAmongGuessedAddsIncluding0, ageValue);
-            } else {
-                currentMinAgeAmongGuessedAdds = Math.min(currentMinAgeAmongGuessedAdds, ageValue);
-            }
-        }
-
-        if (currentMinAgeAmongGuessedAdds < Integer.MAX_VALUE) {
-            ageRequestStats.guessedOtherAge++;
-            return currentMinAgeAmongGuessedAdds;
-        }
-
-        if (currentMinAgeAmongGuessedAddsIncluding0 < Integer.MAX_VALUE) {
-            ageRequestStats.guessed0Age++;
-            return currentMinAgeAmongGuessedAddsIncluding0;
-        }
-
-        ageRequestStats.noAgeAtAll++;
-        return Integer.MAX_VALUE;
-    }
-
-    private int getMinDistToPreviousCommit(FunctionHistory history, String currentCommit) {
-        if (history.knownAddsForFunction.contains(currentCommit)) {
-            return 0;
-        }
-
-        if (history.guessedAddsForFunction.contains(currentCommit)) {
-            LOG.warn("Forced to assume 0 edit distance because the commit has no known ancestors among the"
-                    + " function's edits. Function: " + history.function + " Current commit: " + currentCommit);
-            return 0;
-        }
-
-        int minDist = Integer.MAX_VALUE;
-        int minDistIncluding0 = Integer.MAX_VALUE;
-
-        for (String otherCommit : history.nonDeletingCommitsToFunctionAndAliases) {
-            if (currentCommit.equals(otherCommit)) continue;
-            Optional<Integer> currentDist = commitsDistanceDb.minDistance(currentCommit, otherCommit);
-            if (!currentDist.isPresent()) continue;
-            final int currentDistValue = currentDist.get();
-            if (currentDistValue == 0) {
-                LOG.warn("Distance between commits is 0? " + currentCommit + " .. " + otherCommit);
-                minDistIncluding0 = Math.min(minDistIncluding0, currentDistValue);
-            } else {
-                minDist = Math.min(minDist, currentDistValue);
-            }
-        }
-
-        final int result = (minDist < Integer.MAX_VALUE) ? minDist : minDistIncluding0;
-
-        if (result == 0) {
-            LOG.warn("Distance to most recent commits is 0, although it is not an adding commit. Function: "
-                    + history.function + " Commit: " + currentCommit);
-        }
-
-        return result;
-    }
 
     private static class AgeAndDistanceStrings {
         final String ageString;
@@ -244,27 +216,6 @@ public class AddChangeDistances {
         private AgeAndDistanceStrings(String ageString, String distanceString) {
             this.ageString = ageString;
             this.distanceString = distanceString;
-        }
-    }
-
-    private Collection<Date> getDatesOfActualSnapshots(ProjectInformationReader<ListChangedFunctionsConfig> projectInfo) {
-        Collection<? extends IMinimalSnapshot> snapshotsToProcesses = projectInfo.getSnapshotsFiltered(config);
-        Collection<Date> snapshotDates = new LinkedHashSet<>();
-        for (IMinimalSnapshot s : snapshotsToProcesses) {
-            snapshotDates.add(s.getSnapshotDate());
-        }
-        return snapshotDates;
-    }
-
-    private void maybeAddDummySnapshotToCoverRemainingChanges(Collection<Date> snapshotDates) {
-        if (!config.getSnapshotFilter().isPresent()) {
-            Date dummySnapshotDate = new Date(0);
-            File dummySnapshotFile = new File(config.snapshotResultsDirForDate(dummySnapshotDate),
-                    FunctionChangeHunksColumns.FILE_BASENAME);
-            if (dummySnapshotFile.exists()) {
-                LOG.info("Adding changes from dummy snapshot in " + dummySnapshotFile);
-                snapshotDates.add(dummySnapshotDate);
-            }
         }
     }
 

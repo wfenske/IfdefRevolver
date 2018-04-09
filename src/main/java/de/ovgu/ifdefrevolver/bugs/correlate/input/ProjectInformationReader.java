@@ -246,6 +246,19 @@ public class ProjectInformationReader<TConfig extends IHasProjectInfoFile & IHas
         return getSnapshotsFiltered(this.getSnapshots(), snapshotFilteringConfig);
     }
 
+    /**
+     * @param snapshotFilteringConfig
+     * @return A fresh list of the dates of the requested snapshots
+     */
+    public Collection<Date> getSnapshotDatesFiltered(IHasSnapshotFilter snapshotFilteringConfig) {
+        Collection<Snapshot> snapshotsToProcesses = getSnapshotsFiltered(snapshotFilteringConfig);
+        Collection<Date> snapshotDates = new LinkedHashSet<>();
+        for (Snapshot s : snapshotsToProcesses) {
+            snapshotDates.add(s.getSnapshotDate());
+        }
+        return snapshotDates;
+    }
+
     private static Collection<Snapshot> getSnapshotsFiltered(SortedMap<Date, Snapshot> allSnapshots, IHasSnapshotFilter snapshotFilteringConfig) {
         Optional<List<Date>> explicitSnapshotDates = snapshotFilteringConfig.getSnapshotFilter();
         final Collection<Snapshot> snapshotsToProcess;
@@ -254,7 +267,8 @@ public class ProjectInformationReader<TConfig extends IHasProjectInfoFile & IHas
         }
 
         Collection<Date> explicitSnapshotDatesValue = explicitSnapshotDates.get();
-        snapshotsToProcess = new ArrayList<>(explicitSnapshotDatesValue.size());
+        // by using a LinkedHashSet, we make sure that each date occurs only once.
+        snapshotsToProcess = new LinkedHashSet<>(explicitSnapshotDatesValue.size());
         for (Date snapshotDate : explicitSnapshotDatesValue) {
             Snapshot snapshot = allSnapshots.get(snapshotDate);
             if (snapshot == null) {

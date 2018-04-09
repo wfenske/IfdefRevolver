@@ -157,6 +157,6 @@ public class FunctionMoveResolver {
         guessedAddsForFunction.removeAll(knownAddsForFunction);
 
         return new FunctionHistory(function, functionAliases, knownAddsForFunction, guessedAddsForFunction,
-                nonDeletingCommitsToFunctionAndAliases);
+                nonDeletingCommitsToFunctionAndAliases, commitsDistanceDb);
     }
 }

@@ -6,6 +6,8 @@ package de.ovgu.ifdefrevolver.commitanalysis;
 import de.ovgu.ifdefrevolver.bugs.correlate.main.ProjectInformationConfig;
 
 import java.io.File;
+import java.util.Date;
+import java.util.Optional;
 
 /**
  * Runtime configuration options of this program
@@ -72,5 +74,17 @@ public class ListChangedFunctionsConfig extends ProjectInformationConfig impleme
     @Override
     public void setRepoDir(String repoDir) {
         this.repoDir = repoDir;
+    }
+
+    public Optional<Date> getDummySnapshotDateToCoverRemainingChanges() {
+        if (!this.getSnapshotFilter().isPresent()) {
+            Date dummySnapshotDate = new Date(0);
+            File dummySnapshotFile = new File(this.snapshotResultsDirForDate(dummySnapshotDate),
+                    FunctionChangeHunksColumns.FILE_BASENAME);
+            if (dummySnapshotFile.exists()) {
+                return Optional.of(dummySnapshotDate);
+            }
+        }
+        return Optional.empty();
     }
 }
