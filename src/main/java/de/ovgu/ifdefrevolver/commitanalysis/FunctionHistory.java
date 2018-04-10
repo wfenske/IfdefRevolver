@@ -11,7 +11,7 @@ public class FunctionHistory {
     private static final Logger LOG = Logger.getLogger(FunctionHistory.class);
 
     public final FunctionId function;
-    public final Set<FunctionId> functionAliases;
+    public final Set<FunctionId> olderFunctionIds;
     /**
      * All the commits that have created this function or a previous version of it.
      */
@@ -25,10 +25,10 @@ public class FunctionHistory {
 
     private AgeRequestStats ageRequestStats;
 
-    public FunctionHistory(FunctionId function, Set<FunctionId> functionAliases, Set<String> knownAddsForFunction, Set<String> guessedAddsForFunction, Set<String> nonDeletingCommitsToFunctionAndAliases,
+    public FunctionHistory(FunctionId function, Set<FunctionId> olderFunctionIds, Set<String> knownAddsForFunction, Set<String> guessedAddsForFunction, Set<String> nonDeletingCommitsToFunctionAndAliases,
                            CommitsDistanceDb commitsDistanceDb) {
         this.function = function;
-        this.functionAliases = functionAliases;
+        this.olderFunctionIds = olderFunctionIds;
         this.knownAddsForFunction = knownAddsForFunction;
         this.guessedAddsForFunction = guessedAddsForFunction;
         this.nonDeletingCommitsToFunctionAndAliases = nonDeletingCommitsToFunctionAndAliases;

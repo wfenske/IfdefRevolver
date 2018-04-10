@@ -50,6 +50,10 @@ public class Snapshot implements Comparable<Snapshot>, IMinimalSnapshot {
         return commitHashes;
     }
 
+    public String getStartHash() {
+        return startHash;
+    }
+
     /*
      * Mostly Eclipse-generated
      */

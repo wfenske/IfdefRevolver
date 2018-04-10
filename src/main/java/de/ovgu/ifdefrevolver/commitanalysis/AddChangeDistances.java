@@ -1,15 +1,20 @@
 package de.ovgu.ifdefrevolver.commitanalysis;
 
 import de.ovgu.ifdefrevolver.bugs.correlate.data.IMinimalSnapshot;
+import de.ovgu.ifdefrevolver.bugs.correlate.data.Snapshot;
 import de.ovgu.ifdefrevolver.bugs.correlate.input.ProjectInformationReader;
 import de.ovgu.ifdefrevolver.bugs.correlate.main.ProjectInformationConfig;
 import de.ovgu.ifdefrevolver.bugs.createsnapshots.input.RevisionsCsvReader;
 import de.ovgu.ifdefrevolver.bugs.minecommits.CommitsDistanceDb;
 import de.ovgu.ifdefrevolver.bugs.minecommits.CommitsDistanceDbCsvReader;
+import de.ovgu.ifdefrevolver.util.ThreadProcessor;
+import de.ovgu.skunk.detection.output.CsvFileWriterHelper;
 import org.apache.commons.cli.*;
+import org.apache.commons.csv.CSVPrinter;
 import org.apache.log4j.Logger;
 
 import java.io.File;
+import java.io.IOException;
 import java.io.PrintWriter;
 import java.nio.file.Paths;
 import java.util.*;
@@ -23,6 +28,8 @@ public class AddChangeDistances {
     private FunctionMoveResolver moveResolver;
 
     private AgeRequestStats ageRequestStats = new AgeRequestStats();
+    private Map<Date, List<FunctionChangeRow>> changesInSnapshots;
+    private ProjectInformationReader<ListChangedFunctionsConfig> projectInfo;
 
     public static void main(String[] args) {
         AddChangeDistances main = new AddChangeDistances();
@@ -69,143 +76,178 @@ public class AddChangeDistances {
         RevisionsCsvReader revisionsReader = new RevisionsCsvReader(config.revisionCsvFile());
         revisionsReader.readAllCommits();
 
-        ProjectInformationReader<ListChangedFunctionsConfig> projectInfo = new ProjectInformationReader<>(config);
+        projectInfo = new ProjectInformationReader<>(config);
         LOG.debug("Reading project information");
         projectInfo.readSnapshotsAndRevisionsFile();
         LOG.debug("Done reading project information");
 
-        Collection<Date> snapshotDates = projectInfo.getSnapshotDatesFiltered(config);
+        Collection<Date> realSnapshotDates = projectInfo.getSnapshotDatesFiltered(config);
         Optional<Date> leftOverSnapshotDate = config.getDummySnapshotDateToCoverRemainingChanges();
+        Collection<Date> allChangesSnapshotDates = new LinkedHashSet<>(realSnapshotDates);
         if (leftOverSnapshotDate.isPresent()) {
-            snapshotDates.add(leftOverSnapshotDate.get());
+            allChangesSnapshotDates.add(leftOverSnapshotDate.get());
         }
-
-        moveResolver = new FunctionMoveResolver(commitsDistanceDb);
 
         LOG.debug("Reading all function changes.");
-        readFunctionsChangedInSnapshots(snapshotDates);
+        this.changesInSnapshots = readChangesInSnapshots(allChangesSnapshotDates);
+        LOG.debug("Reading all function definitions.");
+        Map<Date, List<AllFunctionsRow>> allFunctionsInSnapshots = readAllFunctionsInSnapshots(realSnapshotDates);
+
+        this.moveResolver = buildMoveResolver(changesInSnapshots);
+
         final Set<Map.Entry<FunctionId, List<FunctionChangeRow>>> functionChangeEntries =
                 moveResolver.getChangesByFunction().entrySet();
-        final int totalEntries = functionChangeEntries.size();
-        processingStats = new ProcessingStats(totalEntries);
-        LOG.debug("Done reading all function changes. Number of distinct changed functions: " + totalEntries);
+        LOG.debug("Done reading all function changes. Number of distinct changed functions: " + functionChangeEntries.size());
 
-        moveResolver.parseRenames();
-
-        System.out.println("MOD_TYPE,FUNCTION_SIGNATURE,FILE,COMMIT,AGE,DIST");
-        Iterator<Map.Entry<FunctionId, List<FunctionChangeRow>>> changeEntriesIterator = functionChangeEntries.iterator();
-
-        TerminableThread workers[] = new TerminableThread[config.getNumThreads()];
-        final List<Throwable> uncaughtWorkerThreadException = new ArrayList<>();
-
-        Thread.UncaughtExceptionHandler uncaughtExceptionHandler = new Thread.UncaughtExceptionHandler() {
-            @Override
-            public void uncaughtException(Thread th, Throwable ex) {
-                synchronized (uncaughtWorkerThreadException) {
-                    uncaughtWorkerThreadException.add(ex);
-                }
-                for (TerminableThread wt : workers) {
-                    wt.requestTermination();
-                }
-            }
-        };
-
-        for (int i = 0; i < config.getNumThreads(); i++) {
-            TerminableThread t = new TerminableThread() {
-                @Override
-                public void run() {
-                    while (!terminationRequested) {
-                        final Map.Entry<FunctionId, List<FunctionChangeRow>> nextEntry;
-                        synchronized (changeEntriesIterator) {
-                            if (!changeEntriesIterator.hasNext()) {
-                                break;
-                            }
-                            nextEntry = changeEntriesIterator.next();
-                        }
-
-                        workOnEntry(nextEntry);
-                    }
-
-                    if (terminationRequested) {
-                        LOG.info("Terminating thread " + this + ": termination requested.");
-                    }
-                }
-            };
-            t.setUncaughtExceptionHandler(uncaughtExceptionHandler);
-            workers[i] = t;
-        }
-
-        executeWorkers(workers);
-
-        for (Throwable ex : uncaughtWorkerThreadException) {
-            throw new RuntimeException(new UncaughtWorkerThreadException(ex));
+        try {
+            //processingStats = new ProcessingStats(functionChangeEntries.size());
+            //(new ChangeEntryProcessor()).processItems(functionChangeEntries.iterator(), config.getNumThreads());
+            processingStats = new ProcessingStats(allFunctionsInSnapshots.entrySet().size());
+            (new AllFunctionsProcessor()).processItems(allFunctionsInSnapshots.entrySet().iterator(),
+                    config.getNumThreads());
+        } catch (UncaughtWorkerThreadException e) {
+            throw new RuntimeException(e);
         }
 
         LOG.info(ageRequestStats);
     }
 
-    private void executeWorkers(Thread[] workers) {
-        for (int iWorker = 0; iWorker < workers.length; iWorker++) {
-            workers[iWorker].start();
+    private class AllFunctionsProcessor extends ThreadProcessor<Map.Entry<Date, List<AllFunctionsRow>>> {
+        @Override
+        protected void processItem(final Map.Entry<Date, List<AllFunctionsRow>> snapshot) {
+            final Date snapshotDate = snapshot.getKey();
+            CsvFileWriterHelper writerHelper = new CsvFileWriterHelper() {
+                @Override
+                protected void actuallyDoStuff(CSVPrinter csv) throws IOException {
+                    csv.printRecord("FUNCTION_SIGNATURE", "FILE", "AGE", "DISTANCE", "COMMITS");
+                    List<AllFunctionsRow> allFunctions = snapshot.getValue();
+                    Set<String> commitsInSnapshot = getCommitsInSnapshot(snapshotDate);
+                    String firstCommitOfSnapshot = getFirstCommitOfSnapshot(snapshotDate);
+
+                    for (AllFunctionsRow functionRow : allFunctions) {
+                        processFunction(functionRow.functionId, commitsInSnapshot, firstCommitOfSnapshot, csv);
+                    }
+                }
+            };
+
+            File changesToAllFunctionsInSnapshotFile = new File(config.snapshotResultsDirForDate(snapshotDate),
+                    "all_functions_with_age_dist_and_changes.csv");
+            writerHelper.write(changesToAllFunctionsInSnapshotFile);
+
+            final int entriesProcessed = processingStats.increaseProcessed();
+            int percentage = Math.round(entriesProcessed * 100.0f / processingStats.total);
+            LOG.info("Processed snapshot " + entriesProcessed + "/" + processingStats.total + " (" +
+                    percentage + "%).");
         }
 
-        for (int iWorker = 0; iWorker < workers.length; iWorker++) {
+        private String getFirstCommitOfSnapshot(Date snapshotDate) {
+            Snapshot snapshot = projectInfo.getSnapshots().get(snapshotDate);
+            return snapshot.getStartHash();
+        }
+
+        private Set<String> getCommitsInSnapshot(Date snapshotDate) {
+            Snapshot snapshot = projectInfo.getSnapshots().get(snapshotDate);
+            return snapshot.getCommitHashes();
+        }
+
+        private void processFunction(final FunctionId function, final Set<String> commitsInSnapshot, String firstCommitOfSnapshot, CSVPrinter csv) {
+            final Set<String> allDirectCommitIds = getAllDirectCommitIds(function);
+            final Set<String> directCommitIdsInSnapshot = new HashSet<>(allDirectCommitIds);
+            directCommitIdsInSnapshot.retainAll(commitsInSnapshot);
+
+            FunctionHistory history = moveResolver.getFunctionHistory(function, allDirectCommitIds);
+            history.setAgeRequestStats(ageRequestStats);
+            if (history.knownAddsForFunction.isEmpty()) {
+                ageRequestStats.increaseFunctionsWithoutAnyKnownAddingCommits();
+                LOG.warn("No known creating commits for function '" + function + "'.");
+            }
+
+            FunctionFuture future = moveResolver.getFunctionFuture(function, directCommitIdsInSnapshot);
+            Set<String> commitsToFunctionAndAliasesInSnapshot = new HashSet<>(future.commitsToFunctionAndAliases);
+            commitsToFunctionAndAliasesInSnapshot.retainAll(commitsInSnapshot);
+            int numCommits = commitsToFunctionAndAliasesInSnapshot.size();
+            AgeAndDistanceStrings distanceStrings = AgeAndDistanceStrings.fromHistoryAndCommit(history, firstCommitOfSnapshot);
+
             try {
-                workers[iWorker].join();
-            } catch (InterruptedException e) {
-                LOG.warn("Interrupted while waiting for change distance thread to finish.", e);
+                csv.printRecord(function.signature, function.file, distanceStrings.ageString, distanceStrings.distanceString, numCommits);
+            } catch (IOException ioe) {
+                throw new RuntimeException(ioe);
             }
+        }
+
+        private Set<String> getAllDirectCommitIds(FunctionId function) {
+            final List<FunctionChangeRow> directChanges = moveResolver.getChangesByFunction().get(function);
+            if (directChanges == null) {
+                if (LOG.isDebugEnabled()) {
+                    LOG.debug(function + " is never changed.");
+                }
+                return Collections.emptySet();
+            }
+
+            final Set<String> allDirectCommitIds = new LinkedHashSet<>(directChanges.size());
+            for (FunctionChangeRow r : directChanges) {
+                allDirectCommitIds.add(r.commitId);
+            }
+            return allDirectCommitIds;
         }
     }
 
-    private void workOnEntry(Map.Entry<FunctionId, List<FunctionChangeRow>> e) {
-        final FunctionId function = e.getKey();
-        final List<FunctionChangeRow> directChanges = e.getValue();
-        final Set<String> directCommitIds = new HashSet<>();
-        for (FunctionChangeRow r : directChanges) {
-            directCommitIds.add(r.commitId);
+    private class ChangeEntryProcessor extends ThreadProcessor<Map.Entry<FunctionId, List<FunctionChangeRow>>> {
+        @Override
+        public void processItems(Iterator<Map.Entry<FunctionId, List<FunctionChangeRow>>> entryIterator, int numThreads) throws UncaughtWorkerThreadException {
+            System.out.println("MOD_TYPE,FUNCTION_SIGNATURE,FILE,COMMIT,AGE,DIST");
+            super.processItems(entryIterator, numThreads);
         }
 
-        FunctionHistory history = moveResolver.getFunctionHistory(function, directCommitIds);
-        history.setAgeRequestStats(ageRequestStats);
-
-        if (history.knownAddsForFunction.isEmpty()) {
-            ageRequestStats.increaseFunctionsWithoutAnyKnownAddingCommits();
-            LOG.warn("No known creating commits for function '" + function + "'.");
-        }
-
-        Map<String, AgeAndDistanceStrings> knownDistancesCache = new HashMap<>();
-
-        for (FunctionChangeRow change : directChanges) {
-            final String currentCommit = change.commitId;
-            AgeAndDistanceStrings distanceStrings = knownDistancesCache.get(currentCommit);
-            if (distanceStrings == null) {
-                distanceStrings = getAgeAndDistanceStrings(history, currentCommit);
-                knownDistancesCache.put(currentCommit, distanceStrings);
+        @Override
+        protected void processItem(Map.Entry<FunctionId, List<FunctionChangeRow>> e) {
+            final FunctionId function = e.getKey();
+            final List<FunctionChangeRow> directChanges = e.getValue();
+            final Set<String> directCommitIds = new HashSet<>();
+            for (FunctionChangeRow r : directChanges) {
+                directCommitIds.add(r.commitId);
             }
 
-            String line = change.modType + ",\"" + function.signature + "\"," + function.file + "," + currentCommit + "," + distanceStrings.ageString + "," + distanceStrings.distanceString;
-            synchronized (System.out) {
-                System.out.println(line);
-            }
-        }
+            FunctionHistory history = moveResolver.getFunctionHistory(function, directCommitIds);
+            history.setAgeRequestStats(ageRequestStats);
 
-        final int entriesProcessed = processingStats.increaseProcessed();
-        int percentage = Math.round(entriesProcessed * 100.0f / processingStats.total);
-        LOG.info("Processed entry " + entriesProcessed + "/" + processingStats.total + " (" +
-                percentage + "%).");
+            if (history.knownAddsForFunction.isEmpty()) {
+                ageRequestStats.increaseFunctionsWithoutAnyKnownAddingCommits();
+                LOG.warn("No known creating commits for function '" + function + "'.");
+            }
+
+            Map<String, AgeAndDistanceStrings> knownDistancesCache = new HashMap<>();
+
+            for (FunctionChangeRow change : directChanges) {
+                final String currentCommit = change.commitId;
+                AgeAndDistanceStrings distanceStrings = knownDistancesCache.get(currentCommit);
+                if (distanceStrings == null) {
+                    distanceStrings = AgeAndDistanceStrings.fromHistoryAndCommit(history, currentCommit);
+                    knownDistancesCache.put(currentCommit, distanceStrings);
+                }
+
+                String line = change.modType + ",\"" + function.signature + "\"," + function.file + "," + currentCommit + "," + distanceStrings.ageString + "," + distanceStrings.distanceString;
+                synchronized (System.out) {
+                    System.out.println(line);
+                }
+            }
+
+            final int entriesProcessed = processingStats.increaseProcessed();
+            int percentage = Math.round(entriesProcessed * 100.0f / processingStats.total);
+            LOG.info("Processed entry " + entriesProcessed + "/" + processingStats.total + " (" +
+                    percentage + "%).");
+        }
     }
 
-    private AgeAndDistanceStrings getAgeAndDistanceStrings(FunctionHistory history, String currentCommit) {
-        AgeAndDistanceStrings distanceStrings;
-        final int minDist = history.getMinDistToPreviousEdit(currentCommit);
-        final String minDistStr = minDist < Integer.MAX_VALUE ? Integer.toString(minDist) : "";
-
-        final int age = history.getFunctionAgeAtCommit(currentCommit);
-        final String ageStr = age < Integer.MAX_VALUE ? Integer.toString(age) : "";
-
-        distanceStrings = new AgeAndDistanceStrings(ageStr, minDistStr);
-        return distanceStrings;
+    private FunctionMoveResolver buildMoveResolver(Map<Date, List<FunctionChangeRow>> changesInSnapshots) {
+        FunctionMoveResolver result = new FunctionMoveResolver(commitsDistanceDb);
+        for (List<FunctionChangeRow> changes : changesInSnapshots.values()) {
+            for (FunctionChangeRow change : changes) {
+                result.putChange(change);
+            }
+        }
+        result.parseRenames();
+        return result;
     }
 
 
@@ -213,26 +255,50 @@ public class AddChangeDistances {
         final String ageString;
         final String distanceString;
 
-        private AgeAndDistanceStrings(String ageString, String distanceString) {
+        public AgeAndDistanceStrings(String ageString, String distanceString) {
             this.ageString = ageString;
             this.distanceString = distanceString;
         }
+
+        public static AgeAndDistanceStrings fromHistoryAndCommit(FunctionHistory history, String currentCommit) {
+            AgeAndDistanceStrings distanceStrings;
+            final int minDist = history.getMinDistToPreviousEdit(currentCommit);
+            final String minDistStr = minDist < Integer.MAX_VALUE ? Integer.toString(minDist) : "";
+
+            final int age = history.getFunctionAgeAtCommit(currentCommit);
+            final String ageStr = age < Integer.MAX_VALUE ? Integer.toString(age) : "";
+
+            return new AgeAndDistanceStrings(ageStr, minDistStr);
+        }
     }
 
-    private void readFunctionsChangedInSnapshots(Collection<Date> snapshotsToProcesses) {
+    private Map<Date, List<FunctionChangeRow>> readChangesInSnapshots(Collection<Date> snapshotsToProcesses) {
         LOG.debug("Reading function changes for " + snapshotsToProcesses.size() + " snapshot(s).");
         int numChanges = 0;
         FunctionChangeHunksCsvReader reader = new FunctionChangeHunksCsvReader();
+        Map<Date, List<FunctionChangeRow>> result = new LinkedHashMap<>();
         for (Date snapshotDate : snapshotsToProcesses) {
-            Collection<FunctionChangeRow> functionChanges = reader.readFile(config, snapshotDate);
-            for (FunctionChangeRow change : functionChanges) {
-                moveResolver.putChange(change);
-                numChanges++;
-            }
+            List<FunctionChangeRow> functionChanges = reader.readFile(config, snapshotDate);
+            result.put(snapshotDate, functionChanges);
+            numChanges += functionChanges.size();
         }
         LOG.debug("Read " + numChanges + " function change(s).");
+        return result;
     }
 
+    private Map<Date, List<AllFunctionsRow>> readAllFunctionsInSnapshots(Collection<Date> snapshotsToProcesses) {
+        LOG.debug("Reading functions defined in " + snapshotsToProcesses.size() + " snapshot(s).");
+        int numChanges = 0;
+        AllFunctionsCsvReader reader = new AllFunctionsCsvReader();
+        Map<Date, List<AllFunctionsRow>> result = new LinkedHashMap<>();
+        for (Date snapshotDate : snapshotsToProcesses) {
+            List<AllFunctionsRow> functions = reader.readFile(config, snapshotDate);
+            result.put(snapshotDate, functions);
+            numChanges += functions.size();
+        }
+        LOG.debug("Read " + numChanges + " function definitions(s).");
+        return result;
+    }
 
     private void logSnapshotsToProcess(Collection<IMinimalSnapshot> snapshotsToProcesses) {
         if (LOG.isDebugEnabled()) {

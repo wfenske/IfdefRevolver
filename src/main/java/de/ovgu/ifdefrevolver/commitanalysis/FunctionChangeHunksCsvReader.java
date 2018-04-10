@@ -9,6 +9,9 @@ import java.util.Date;
 import java.util.List;
 import java.util.Optional;
 
+/**
+ * Reads the <code>function_change_hunks.csv</code> file for a snapshot
+ */
 public class FunctionChangeHunksCsvReader extends SimpleCsvFileReader<List<FunctionChangeRow>> {
     List<FunctionChangeRow> results;
 
@@ -73,11 +76,6 @@ public class FunctionChangeHunksCsvReader extends SimpleCsvFileReader<List<Funct
     @Override
     protected List<FunctionChangeRow> finalizeResult() {
         return results;
-    }
-
-    @Override
-    public List<FunctionChangeRow> readFile(File file) {
-        return super.readFile(file);
     }
 
     public List<FunctionChangeRow> readFile(IHasResultsDir config, Date snapshotDate) {
