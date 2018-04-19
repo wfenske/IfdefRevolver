@@ -119,7 +119,7 @@ public class AddChangeDistances {
             CsvFileWriterHelper writerHelper = new CsvFileWriterHelper() {
                 @Override
                 protected void actuallyDoStuff(CSVPrinter csv) throws IOException {
-                    csv.printRecord("FUNCTION_SIGNATURE", "FILE", "AGE", "DISTANCE", "COMMITS");
+                    csv.printRecord("FUNCTION_SIGNATURE", "FILE", "AGE", "DISTANCE", "COMMITS", "LINES_ADDED", "LINES_DELETED", "LINES_CHANGED");
                     List<AllFunctionsRow> allFunctions = snapshot.getValue();
                     Set<String> commitsInSnapshot = getCommitsInSnapshot(snapshotDate);
                     String firstCommitOfSnapshot = getFirstCommitOfSnapshot(snapshotDate);
@@ -130,9 +130,9 @@ public class AddChangeDistances {
                 }
             };
 
-            File changesToAllFunctionsInSnapshotFile = new File(config.snapshotResultsDirForDate(snapshotDate),
+            File resultFile = new File(config.snapshotResultsDirForDate(snapshotDate),
                     "all_functions_with_age_dist_and_changes.csv");
-            writerHelper.write(changesToAllFunctionsInSnapshotFile);
+            writerHelper.write(resultFile);
 
             final int entriesProcessed = processingStats.increaseProcessed();
             int percentage = Math.round(entriesProcessed * 100.0f / processingStats.total);
@@ -163,13 +163,27 @@ public class AddChangeDistances {
             }
 
             FunctionFuture future = moveResolver.getFunctionFuture(function, directCommitIdsInSnapshot);
-            Set<String> commitsToFunctionAndAliasesInSnapshot = new HashSet<>(future.commitsToFunctionAndAliases);
-            commitsToFunctionAndAliasesInSnapshot.retainAll(commitsInSnapshot);
-            int numCommits = commitsToFunctionAndAliasesInSnapshot.size();
+            Set<String> commitsToFunctionAndAliasesInSnapshot = new HashSet<>();
+            int linesAdded = 0;
+            int linesDeleted = 0;
+            Set<FunctionChangeRow> changesToFunctionAndAliasesInSnapshot = future.getChangesFilteredByCommitIds(commitsInSnapshot);
+            for (FunctionChangeRow change : changesToFunctionAndAliasesInSnapshot) {
+                commitsToFunctionAndAliasesInSnapshot.add(change.commitId);
+                switch (change.modType) {
+                    case ADD:
+                    case DEL:
+                        continue;
+                }
+                linesAdded += change.linesAdded;
+                linesDeleted += change.linesDeleted;
+            }
+            final int numCommits = commitsToFunctionAndAliasesInSnapshot.size();
+            final int linesChanged = linesAdded + linesDeleted;
+
             AgeAndDistanceStrings distanceStrings = AgeAndDistanceStrings.fromHistoryAndCommit(history, firstCommitOfSnapshot);
 
             try {
-                csv.printRecord(function.signature, function.file, distanceStrings.ageString, distanceStrings.distanceString, numCommits);
+                csv.printRecord(function.signature, function.file, distanceStrings.ageString, distanceStrings.distanceString, numCommits, linesAdded, linesDeleted, linesChanged);
             } catch (IOException ioe) {
                 throw new RuntimeException(ioe);
             }

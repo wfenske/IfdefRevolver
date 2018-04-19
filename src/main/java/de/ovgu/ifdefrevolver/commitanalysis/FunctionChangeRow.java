@@ -8,6 +8,8 @@ import java.util.Optional;
 public class FunctionChangeRow {
     public FunctionId functionId;
     public String commitId;
+    public int linesAdded;
+    public int linesDeleted;
     public FunctionChangeHunk.ModificationType modType;
     public Optional<FunctionId> newFunctionId;
 

@@ -44,10 +44,19 @@ public class FunctionChangeHunksCsvReader extends SimpleCsvFileReader<List<Funct
         result.functionId = functionId;
         result.commitId = line[FunctionChangeHunksColumns.COMMIT_ID.ordinal()];
         String modTypeName = line[FunctionChangeHunksColumns.MOD_TYPE.ordinal()];
+
+        result.linesAdded = parseMandatoryInt(line, FunctionChangeHunksColumns.LINES_ADDED);
+        result.linesDeleted = parseMandatoryInt(line, FunctionChangeHunksColumns.LINES_DELETED);
+
         result.modType = FunctionChangeHunk.ModificationType.valueOf(modTypeName);
         result.newFunctionId = parseNewFunctionId(line);
 
         results.add(result);
+    }
+
+    private int parseMandatoryInt(String[] line, FunctionChangeHunksColumns column) {
+        String value = line[column.ordinal()];
+        return Integer.parseInt(value);
     }
 
     private Optional<FunctionId> parseNewFunctionId(String[] line) {

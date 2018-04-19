@@ -31,15 +31,15 @@ public class FunctionMoveResolver {
      */
     private GroupingHashSetMap<FunctionId, FunctionChangeRow> movesByOldFunctionId = new GroupingHashSetMap<>();
 
-    private Set<String> getCommitsToFunctionIncludingAliasesConformingTo(Set<FunctionId> functionAliases,
-                                                                         Predicate<FunctionChangeRow> predicate) {
-        Set<String> result = new LinkedHashSet<>();
+    private Set<FunctionChangeRow> getCommitsToFunctionIncludingAliasesConformingTo(Set<FunctionId> functionAliases,
+                                                                                    Predicate<FunctionChangeRow> predicate) {
+        Set<FunctionChangeRow> result = new LinkedHashSet<>();
         for (FunctionId alias : functionAliases) {
             List<FunctionChangeRow> aliasChanges = changesByFunction.get(alias);
             if (aliasChanges == null) continue;
             for (FunctionChangeRow change : aliasChanges) {
                 if (predicate.test(change)) {
-                    result.add(change.commitId);
+                    result.add(change);
                 }
             }
         }
@@ -67,37 +67,37 @@ public class FunctionMoveResolver {
         }
     };
 
-    private Set<String> getNonDeletingCommitsToFunctionIncludingAliases(Set<FunctionId> functionAliases) {
+    private Set<FunctionChangeRow> getNonDeletingCommitsToFunctionIncludingAliases(Set<FunctionId> functionAliases) {
         return getCommitsToFunctionIncludingAliasesConformingTo(functionAliases, NON_DELETING_CHANGE);
     }
 
-    private Set<String> getAddingCommitsToFunctionIncludingAliases(Set<FunctionId> functionAliases) {
+    private Set<FunctionChangeRow> getAddingCommitsToFunctionIncludingAliases(Set<FunctionId> functionAliases) {
         return getCommitsToFunctionIncludingAliasesConformingTo(functionAliases, ADDING_CHANGE);
     }
 
-    private Set<String> getAllCommitsToFunctionIncludingAliases(Set<FunctionId> functionAliases) {
+    private Set<FunctionChangeRow> getAllCommitsToFunctionIncludingAliases(Set<FunctionId> functionAliases) {
         return getCommitsToFunctionIncludingAliasesConformingTo(functionAliases, ANY_CHANGE);
     }
 
-    private Set<FunctionId> getOlderFunctionIds(FunctionId function, Set<String> directCommitIds) {
+    private Set<FunctionId> getCurrentAndOlderFunctionIds(FunctionId function, Set<String> directCommitIds) {
         Set<FunctionId> functionAliases = new HashSet<>();
         for (String commit : directCommitIds) {
-            Set<FunctionId> currentAliases = getOlderFunctionIds(function, commit);
+            Set<FunctionId> currentAliases = getCurrentAndOlderFunctionIds(function, commit);
             functionAliases.addAll(currentAliases);
         }
         return functionAliases;
     }
 
-    private Set<FunctionId> getNewerFunctionIds(FunctionId function, Set<String> directCommitIds) {
+    private Set<FunctionId> getCurrentAndNewerFunctionIds(FunctionId function, Set<String> directCommitIds) {
         Set<FunctionId> functionAliases = new HashSet<>();
         for (String commit : directCommitIds) {
-            Set<FunctionId> currentAliases = getNewerFunctionIds(function, commit);
+            Set<FunctionId> currentAliases = getCurrentAndNewerFunctionIds(function, commit);
             functionAliases.addAll(currentAliases);
         }
         return functionAliases;
     }
 
-    private Set<FunctionId> getOlderFunctionIds(FunctionId id, final String descendantCommit) {
+    private Set<FunctionId> getCurrentAndOlderFunctionIds(FunctionId id, final String descendantCommit) {
         Queue<FunctionId> todo = new LinkedList<>();
         todo.add(id);
         Set<FunctionId> done = new LinkedHashSet<>();
@@ -122,12 +122,12 @@ public class FunctionMoveResolver {
             }
         }
 
-        logAliases("getOlderFunctionIds", id, descendantCommit, done);
+        logAliases("getCurrentAndOlderFunctionIds", id, descendantCommit, done);
 
         return done;
     }
 
-    private Set<FunctionId> getNewerFunctionIds(FunctionId id, final String ancestorCommit) {
+    private Set<FunctionId> getCurrentAndNewerFunctionIds(FunctionId id, final String ancestorCommit) {
         Queue<FunctionId> todo = new LinkedList<>();
         todo.add(id);
         Set<FunctionId> done = new LinkedHashSet<>();
@@ -152,7 +152,7 @@ public class FunctionMoveResolver {
             }
         }
 
-        logAliases("getNewerFunctionIds", id, ancestorCommit, done);
+        logAliases("getCurrentAndNewerFunctionIds", id, ancestorCommit, done);
 
         return done;
     }
@@ -217,26 +217,37 @@ public class FunctionMoveResolver {
         return changesByFunction.getMap();
     }
 
+    private static Set<String> commitIdsFromChanges(Collection<FunctionChangeRow> changes) {
+        Set<String> commitIds = new LinkedHashSet<>();
+        changes.forEach((c) -> commitIds.add(c.commitId));
+        return commitIds;
+    }
+
     public FunctionHistory getFunctionHistory(final FunctionId function,
                                               final Set<String> directCommitsToThisFunction) {
-        final Set<FunctionId> functionAliases = this.getOlderFunctionIds(function, directCommitsToThisFunction);
+        final Set<FunctionId> functionAliases = this.getCurrentAndOlderFunctionIds(function, directCommitsToThisFunction);
         // All the commits that have created this function or a previous version of it.
-        final Set<String> knownAddsForFunction = this.getAddingCommitsToFunctionIncludingAliases(functionAliases);
-        final Set<String> nonDeletingCommitsToFunctionAndAliases =
+        final Set<FunctionChangeRow> knownAddsForFunction = this.getAddingCommitsToFunctionIncludingAliases(functionAliases);
+        final Set<FunctionChangeRow> nonDeletingChangesToFunctionAndAliases =
                 this.getNonDeletingCommitsToFunctionIncludingAliases(functionAliases);
+
+        final Set<String> knownAddingCommitsForFunction = commitIdsFromChanges(knownAddsForFunction);
+        final Set<String> nonDeletingCommitsToFunctionAndAliases = commitIdsFromChanges(nonDeletingChangesToFunctionAndAliases);
+
         final Set<String> guessedAddsForFunction =
                 commitsDistanceDb.filterAncestorCommits(nonDeletingCommitsToFunctionAndAliases);
-        guessedAddsForFunction.removeAll(knownAddsForFunction);
+        guessedAddsForFunction.removeAll(knownAddingCommitsForFunction);
 
-        return new FunctionHistory(function, functionAliases, knownAddsForFunction, guessedAddsForFunction,
+        return new FunctionHistory(function, functionAliases, knownAddingCommitsForFunction, guessedAddsForFunction,
                 nonDeletingCommitsToFunctionAndAliases, commitsDistanceDb);
     }
 
     public FunctionFuture getFunctionFuture(final FunctionId function,
                                             final Set<String> directCommitsToThisFunction) {
-        final Set<FunctionId> functionAliases = this.getNewerFunctionIds(function, directCommitsToThisFunction);
-        final Set<String> commitsToFunctionAndAliases =
+        final Set<FunctionId> functionAliases = this.getCurrentAndNewerFunctionIds(function, directCommitsToThisFunction);
+        final Set<FunctionChangeRow> changesToFunctionAndAliases =
                 this.getAllCommitsToFunctionIncludingAliases(functionAliases);
-        return new FunctionFuture(function, functionAliases, commitsToFunctionAndAliases);
+        final Set<String> commitsToFunctionAndAliases = commitIdsFromChanges(changesToFunctionAndAliases);
+        return new FunctionFuture(function, functionAliases, commitsToFunctionAndAliases, changesToFunctionAndAliases);
     }
 }
