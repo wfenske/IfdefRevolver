@@ -18,14 +18,16 @@ public class Snapshot implements Comparable<Snapshot>, IMinimalSnapshot {
     private final SimpleDateFormat dateFormatter = new SimpleDateFormat("yyyy-MM-dd");
 
     private final int snapshotIndex;
+    private final int branch;
     private final Date snapshotDate;
     private final Set<String> commitHashes;
     private final String startHash;
     private final File snapshotDir;
     private Set<String> bugfixCommits = new HashSet<>();
 
-    public Snapshot(int snapshotIndex, Date snapshotDate, Set<String> commitHashes, File snapshotDir) {
+    public Snapshot(int snapshotIndex, int branch, Date snapshotDate, Set<String> commitHashes, File snapshotDir) {
         this.snapshotIndex = snapshotIndex;
+        this.branch = branch;
         this.snapshotDate = snapshotDate;
         this.commitHashes = commitHashes;
         this.startHash = commitHashes.iterator().next();
@@ -38,6 +40,10 @@ public class Snapshot implements Comparable<Snapshot>, IMinimalSnapshot {
      */
     public int getSnapshotIndex() {
         return snapshotIndex;
+    }
+
+    public int getBranch() {
+        return branch;
     }
 
     @Override

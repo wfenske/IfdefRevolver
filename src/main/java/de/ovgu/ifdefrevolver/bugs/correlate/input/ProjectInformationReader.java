@@ -8,14 +8,13 @@ import de.ovgu.ifdefrevolver.bugs.correlate.main.IHasProjectInfoFile;
 import de.ovgu.ifdefrevolver.bugs.correlate.main.IHasResultsDir;
 import de.ovgu.ifdefrevolver.bugs.correlate.main.IHasRevisionCsvFile;
 import de.ovgu.ifdefrevolver.bugs.correlate.main.IHasSnapshotsDir;
+import de.ovgu.ifdefrevolver.bugs.createsnapshots.data.Commit;
 import de.ovgu.ifdefrevolver.bugs.createsnapshots.input.RevisionsCsvReader;
-import de.ovgu.ifdefrevolver.bugs.minecommits.OrderedRevisionsColumns;
 import de.ovgu.ifdefrevolver.commitanalysis.IHasSnapshotFilter;
 import de.ovgu.ifdefrevolver.util.SimpleCsvFileReader;
 import org.apache.commons.lang3.tuple.Pair;
 import org.apache.log4j.Logger;
 
-import java.io.BufferedReader;
 import java.io.File;
 import java.io.FileReader;
 import java.io.IOException;
@@ -34,8 +33,10 @@ public class ProjectInformationReader<TConfig extends IHasProjectInfoFile & IHas
 
     protected SortedMap<Date, Snapshot> snapshots;
 
-    protected SortedMap<IMinimalSnapshot, SortedMap<FileChangeHunk, String>> changedFilesBySnapshot = new TreeMap<>();
-    protected SortedMap<IMinimalSnapshot, SortedMap<FileChangeHunk, String>> fixedFilesBySnapshot = new TreeMap<>();
+    private RevisionsCsvReader revisionsReader;
+
+    //protected SortedMap<IMinimalSnapshot, SortedMap<FileChangeHunk, String>> changedFilesBySnapshot = new TreeMap<>();
+    //protected SortedMap<IMinimalSnapshot, SortedMap<FileChangeHunk, String>> fixedFilesBySnapshot = new TreeMap<>();
 
     public ProjectInformationReader(TConfig conf) {
         this.conf = conf;
@@ -47,78 +48,10 @@ public class ProjectInformationReader<TConfig extends IHasProjectInfoFile & IHas
      * #getChangedFiles(IMinimalSnapshot)} and {@link #getFixedFiles(IMinimalSnapshot)})</li> </ul>
      */
     public void readSnapshotsAndRevisionsFile() {
-        snapshots = readSnapshots();
-        processRevisionsFile();
-    }
-
-    /**
-     * Nimmt die ursprüngliche CSV-Datei von {@line FindBugfixCommits} und erstellt die
-     * Listen der Bugfixes und geänderten Dateien mit ihren Änderungsdaten
-     */
-    private void processRevisionsFile() {
         LOG.info("Reading revisions file " + conf.revisionCsvFile());
-
-        final String cvsSplitBy = ",";
-        final DateFormat formatter = new SimpleDateFormat(OrderedRevisionsColumns.TIMESTAMP_FORMAT);
-
-        final Map<String, Snapshot> snapshotsByCommit = mapSnapshotsToCommits();
-
-        BufferedReader br = null;
-
-        try {
-
-            br = new BufferedReader(new FileReader(conf.revisionCsvFile()));
-            String headerLine = br.readLine();
-            RevisionsCsvReader.assertRevisionsFullCsvHeaderIsSane(headerLine);
-
-            String line;
-            while ((line = br.readLine()) != null) {
-
-                // use comma as separator
-                String[] modification = line.split(cvsSplitBy);
-                String curHash = modification[0];
-
-                Snapshot snapshot = snapshotsByCommit.get(curHash);
-
-                if (snapshot == null) {
-                    LOG.debug("Skipping commit " + curHash + ": not part of any snapshot");
-                    continue;
-                }
-
-                boolean bugfixCommit = Boolean.parseBoolean(modification[1]);
-                String strDate = modification[7];
-                String fileName = modification[3];
-
-                Date comDate;
-                try {
-                    comDate = formatter.parse(strDate);
-                } catch (ParseException e) {
-                    throw new RuntimeException("Could not parse date " + strDate + " in file "
-                            + conf.revisionCsvFile(), e);
-                }
-
-                FileChangeHunk chFile = new FileChangeHunk(fileName, curHash, comDate);
-
-                putChangedFile(this.changedFilesBySnapshot, snapshot, chFile, fileName);
-
-                if (bugfixCommit) {
-                    putChangedFile(this.fixedFilesBySnapshot, snapshot, chFile, fileName);
-                    snapshot.addBugfixCommit(curHash);
-                }
-            }
-
-        } catch (IOException e) {
-            throw new RuntimeException(
-                    "Error reading revisions CSV file " + conf.revisionCsvFile(), e);
-        } finally {
-            if (br != null) {
-                try {
-                    br.close();
-                } catch (IOException e) {
-                    // Don't care
-                }
-            }
-        }
+        revisionsReader = new RevisionsCsvReader(conf.revisionCsvFile());
+        revisionsReader.readAllCommits();
+        snapshots = readSnapshots();
     }
 
     protected SortedMap<Date, Snapshot> readSnapshots() {
@@ -126,7 +59,13 @@ public class ProjectInformationReader<TConfig extends IHasProjectInfoFile & IHas
 
         SortedMap<Date, Snapshot> result = new TreeMap<>();
         for (RawSnapshotInfo rawSnapshotInfo : rawSnapshotInfos) {
-            Snapshot snapshot = new Snapshot(rawSnapshotInfo.sortIndex, rawSnapshotInfo.date,
+            String startHash = rawSnapshotInfo.commitHashes.iterator().next();
+            Optional<Commit> startCommit = revisionsReader.getCommitByHash(startHash);
+            if (!startCommit.isPresent()) {
+                throw new IllegalArgumentException("Cannot determine branch number of unknown commit");
+            }
+            int branch = startCommit.get().getBranch();
+            Snapshot snapshot = new Snapshot(rawSnapshotInfo.sortIndex, branch, rawSnapshotInfo.date,
                     rawSnapshotInfo.commitHashes, rawSnapshotInfo.snapshotDir);
             result.put(rawSnapshotInfo.date, snapshot);
         }
@@ -221,16 +160,16 @@ public class ProjectInformationReader<TConfig extends IHasProjectInfoFile & IHas
     /**
      * @return Changed files for the given snapshot
      */
-    public SortedMap<FileChangeHunk, String> getChangedFiles(IMinimalSnapshot s) {
-        return changedFilesBySnapshot.get(s);
-    }
+//    public SortedMap<FileChangeHunk, String> getChangedFiles(IMinimalSnapshot s) {
+//        return changedFilesBySnapshot.get(s);
+//    }
 
     /**
      * @return Fixed files for the given snapshot
      */
-    public SortedMap<FileChangeHunk, String> getFixedFiles(IMinimalSnapshot s) {
-        return fixedFilesBySnapshot.get(s);
-    }
+//    public SortedMap<FileChangeHunk, String> getFixedFiles(IMinimalSnapshot s) {
+//        return fixedFilesBySnapshot.get(s);
+//    }
 
     /**
      * @return Snapshots, ordered by date

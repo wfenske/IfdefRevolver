@@ -33,7 +33,8 @@ public enum OrderedRevisionsColumns {
         public String stringValue(OrderedCommit c) {
             return c.getHash();
         }
-    }, TIMESTAMP {
+    },
+    TIMESTAMP {
         @Override
         public String stringValue(OrderedCommit c) {
             DateFormat format = new SimpleDateFormat(TIMESTAMP_FORMAT);

@@ -7,6 +7,7 @@ import de.ovgu.ifdefrevolver.bugs.correlate.main.ProjectInformationConfig;
 import de.ovgu.ifdefrevolver.bugs.createsnapshots.input.RevisionsCsvReader;
 import de.ovgu.ifdefrevolver.bugs.minecommits.CommitsDistanceDb;
 import de.ovgu.ifdefrevolver.bugs.minecommits.CommitsDistanceDbCsvReader;
+import de.ovgu.ifdefrevolver.util.LinkedGroupingListMap;
 import de.ovgu.ifdefrevolver.util.ThreadProcessor;
 import de.ovgu.skunk.detection.output.CsvFileWriterHelper;
 import org.apache.commons.cli.*;
@@ -30,6 +31,12 @@ public class AddChangeDistances {
     private AgeRequestStats ageRequestStats = new AgeRequestStats();
     private Map<Date, List<FunctionChangeRow>> changesInSnapshots;
     private ProjectInformationReader<ListChangedFunctionsConfig> projectInfo;
+    private Map<Date, List<AllFunctionsRow>> allFunctionsInSnapshots;
+
+    /**
+     * Number of commit snapshots per commit window
+     */
+    private static final int WINDOW_SIZE = 10;
 
     public static void main(String[] args) {
         AddChangeDistances main = new AddChangeDistances();
@@ -57,6 +64,36 @@ public class AddChangeDistances {
         public synchronized int increaseProcessed() {
             this.processed++;
             return this.processed;
+        }
+    }
+
+    static class AggregatedFunctionChangeStats {
+        final int numCommits;
+        final int linesChanged, linesAdded, linesDeleted;
+
+        public AggregatedFunctionChangeStats(int numCommits, int linesAdded, int linesDeleted) {
+            this.numCommits = numCommits;
+            this.linesAdded = linesAdded;
+            this.linesDeleted = linesDeleted;
+            this.linesChanged = linesAdded + linesDeleted;
+        }
+
+        public static AggregatedFunctionChangeStats fromChanges(Set<FunctionChangeRow> changes) {
+            int linesAdded = 0;
+            int linesDeleted = 0;
+            Set<String> commits = new HashSet<>();
+            for (FunctionChangeRow change : changes) {
+                commits.add(change.commitId);
+                switch (change.modType) {
+                    case ADD:
+                    case DEL:
+                        continue;
+                }
+                linesAdded += change.linesAdded;
+                linesDeleted += change.linesDeleted;
+            }
+
+            return new AggregatedFunctionChangeStats(commits.size(), linesAdded, linesDeleted);
         }
     }
 
@@ -91,7 +128,6 @@ public class AddChangeDistances {
         LOG.debug("Reading all function changes.");
         this.changesInSnapshots = readChangesInSnapshots(allChangesSnapshotDates);
         LOG.debug("Reading all function definitions.");
-        Map<Date, List<AllFunctionsRow>> allFunctionsInSnapshots = readAllFunctionsInSnapshots(realSnapshotDates);
 
         this.moveResolver = buildMoveResolver(changesInSnapshots);
 
@@ -99,12 +135,15 @@ public class AddChangeDistances {
                 moveResolver.getChangesByFunction().entrySet();
         LOG.debug("Done reading all function changes. Number of distinct changed functions: " + functionChangeEntries.size());
 
+        allFunctionsInSnapshots = readAllFunctionsInSnapshots(realSnapshotDates);
+
+        List<CommitWindow> allWindows = groupSnapshots();
+
         try {
             //processingStats = new ProcessingStats(functionChangeEntries.size());
             //(new ChangeEntryProcessor()).processItems(functionChangeEntries.iterator(), config.getNumThreads());
-            processingStats = new ProcessingStats(allFunctionsInSnapshots.entrySet().size());
-            (new AllFunctionsProcessor()).processItems(allFunctionsInSnapshots.entrySet().iterator(),
-                    config.getNumThreads());
+            processingStats = new ProcessingStats(allWindows.size());
+            (new AllFunctionsProcessor()).processItems(allWindows.iterator(), config.getNumThreads());
         } catch (UncaughtWorkerThreadException e) {
             throw new RuntimeException(e);
         }
@@ -112,48 +151,113 @@ public class AddChangeDistances {
         LOG.info(ageRequestStats);
     }
 
-    private class AllFunctionsProcessor extends ThreadProcessor<Map.Entry<Date, List<AllFunctionsRow>>> {
+    private static class CommitWindow {
+        public final Set<AllFunctionsRow> allFunctions;
+        public final Set<String> commits;
+        public final String firstCommit;
+        public final Date date;
+
+        public CommitWindow(Date date, String firstCommit, Set<String> commits, Set<AllFunctionsRow> allFunctions) {
+            this.allFunctions = allFunctions;
+            this.commits = commits;
+            this.firstCommit = firstCommit;
+            this.date = date;
+        }
+    }
+
+    private List<CommitWindow> groupSnapshots() {
+        LinkedGroupingListMap<Integer, Snapshot> snapshotsByBranch = new LinkedGroupingListMap();
+        int totalSnapshots = 0;
+        for (Snapshot s : projectInfo.getSnapshots().values()) {
+            snapshotsByBranch.put(s.getBranch(), s);
+            totalSnapshots++;
+        }
+
+        LinkedGroupingListMap<Integer, CommitWindow> windowsByBranch = new LinkedGroupingListMap<>();
+        final int WINDOW_SIZE = AddChangeDistances.WINDOW_SIZE;
+        int totalSnapshotsDiscarded = 0;
+        for (Map.Entry<Integer, List<Snapshot>> e : snapshotsByBranch.getMap().entrySet()) {
+            final Integer branch = e.getKey();
+            List<Snapshot> remainingSnapshots = e.getValue();
+            int windowsCreated = 0;
+            while (remainingSnapshots.size() >= WINDOW_SIZE) {
+                List<Snapshot> snapshotsInWindow = remainingSnapshots.subList(0, WINDOW_SIZE);
+                remainingSnapshots = remainingSnapshots.subList(WINDOW_SIZE, remainingSnapshots.size());
+                CommitWindow window = windowFromSnapshots(snapshotsInWindow);
+                windowsByBranch.put(branch, window);
+                windowsCreated++;
+            }
+            LOG.info("Created " + windowsCreated + " window(s) for branch " + branch
+                    + ". Discarding " + remainingSnapshots.size() + " snapshot(s).");
+            totalSnapshotsDiscarded += remainingSnapshots.size();
+        }
+
+        List<CommitWindow> result = new ArrayList<>();
+        windowsByBranch.getMap().values().forEach((windows) -> windows.forEach((w) -> result.add(w)));
+        LOG.info("Created " + result + " window(s) in total. Discarded " + totalSnapshotsDiscarded
+                + " out of " + totalSnapshots + "snapshots(s).");
+        return result;
+    }
+
+    private CommitWindow windowFromSnapshots(List<Snapshot> snapshots) {
+        Snapshot firstSnapshot = snapshots.get(0);
+        Map<FunctionId, AllFunctionsRow> allFunctionsMap = new LinkedHashMap<>();
+        Set<String> commits = new LinkedHashSet<>();
+        for (Snapshot s : snapshots) {
+            List<AllFunctionsRow> funcs = allFunctionsInSnapshots.get(s.getSnapshotDate());
+            for (AllFunctionsRow f : funcs) {
+                if (!allFunctionsMap.containsKey(f.functionId)) {
+                    allFunctionsMap.put(f.functionId, f);
+                }
+            }
+            commits.addAll(s.getCommitHashes());
+        }
+        Set<AllFunctionsRow> allFunctions = new LinkedHashSet<>(allFunctionsMap.values());
+        return new CommitWindow(firstSnapshot.getSnapshotDate(), firstSnapshot.getStartHash(), commits, allFunctions);
+    }
+
+    private String getFirstCommitOfSnapshot(Date snapshotDate) {
+        Snapshot snapshot = projectInfo.getSnapshots().get(snapshotDate);
+        return snapshot.getStartHash();
+    }
+
+    private Set<String> getCommitsInSnapshot(Date snapshotDate) {
+        Snapshot snapshot = projectInfo.getSnapshots().get(snapshotDate);
+        return snapshot.getCommitHashes();
+    }
+
+    private class AllFunctionsProcessor extends ThreadProcessor<CommitWindow> {
         @Override
-        protected void processItem(final Map.Entry<Date, List<AllFunctionsRow>> snapshot) {
-            final Date snapshotDate = snapshot.getKey();
+        protected void processItem(CommitWindow window) {
+            //final Date snapshotDate = snapshot.getKey();
             CsvFileWriterHelper writerHelper = new CsvFileWriterHelper() {
                 @Override
                 protected void actuallyDoStuff(CSVPrinter csv) throws IOException {
                     csv.printRecord("FUNCTION_SIGNATURE", "FILE", "AGE", "DISTANCE", "COMMITS", "LINES_ADDED", "LINES_DELETED", "LINES_CHANGED");
-                    List<AllFunctionsRow> allFunctions = snapshot.getValue();
-                    Set<String> commitsInSnapshot = getCommitsInSnapshot(snapshotDate);
-                    String firstCommitOfSnapshot = getFirstCommitOfSnapshot(snapshotDate);
+                    //List<AllFunctionsRow> allFunctions = snapshot.getValue();
+                    //Set<String> commitsInSnapshot = getCommitsInSnapshot(snapshotDate);
+                    //String firstCommitOfSnapshot = getFirstCommitOfSnapshot(snapshotDate);
 
-                    for (AllFunctionsRow functionRow : allFunctions) {
-                        processFunction(functionRow.functionId, commitsInSnapshot, firstCommitOfSnapshot, csv);
+                    for (AllFunctionsRow functionRow : window.allFunctions) {
+                        processFunction(functionRow.functionId, window, csv);
                     }
                 }
             };
 
-            File resultFile = new File(config.snapshotResultsDirForDate(snapshotDate),
+            File resultFile = new File(config.snapshotResultsDirForDate(window.date),
                     "all_functions_with_age_dist_and_changes.csv");
             writerHelper.write(resultFile);
 
             final int entriesProcessed = processingStats.increaseProcessed();
             int percentage = Math.round(entriesProcessed * 100.0f / processingStats.total);
-            LOG.info("Processed snapshot " + entriesProcessed + "/" + processingStats.total + " (" +
+            LOG.info("Processed window " + entriesProcessed + "/" + processingStats.total + " (" +
                     percentage + "%).");
         }
 
-        private String getFirstCommitOfSnapshot(Date snapshotDate) {
-            Snapshot snapshot = projectInfo.getSnapshots().get(snapshotDate);
-            return snapshot.getStartHash();
-        }
-
-        private Set<String> getCommitsInSnapshot(Date snapshotDate) {
-            Snapshot snapshot = projectInfo.getSnapshots().get(snapshotDate);
-            return snapshot.getCommitHashes();
-        }
-
-        private void processFunction(final FunctionId function, final Set<String> commitsInSnapshot, String firstCommitOfSnapshot, CSVPrinter csv) {
+        private void processFunction(final FunctionId function, final CommitWindow window, CSVPrinter csv) {
             final Set<String> allDirectCommitIds = getAllDirectCommitIds(function);
             final Set<String> directCommitIdsInSnapshot = new HashSet<>(allDirectCommitIds);
-            directCommitIdsInSnapshot.retainAll(commitsInSnapshot);
+            directCommitIdsInSnapshot.retainAll(window.commits);
 
             FunctionHistory history = moveResolver.getFunctionHistory(function, allDirectCommitIds);
             history.setAgeRequestStats(ageRequestStats);
@@ -163,27 +267,14 @@ public class AddChangeDistances {
             }
 
             FunctionFuture future = moveResolver.getFunctionFuture(function, directCommitIdsInSnapshot);
-            Set<String> commitsToFunctionAndAliasesInSnapshot = new HashSet<>();
-            int linesAdded = 0;
-            int linesDeleted = 0;
-            Set<FunctionChangeRow> changesToFunctionAndAliasesInSnapshot = future.getChangesFilteredByCommitIds(commitsInSnapshot);
-            for (FunctionChangeRow change : changesToFunctionAndAliasesInSnapshot) {
-                commitsToFunctionAndAliasesInSnapshot.add(change.commitId);
-                switch (change.modType) {
-                    case ADD:
-                    case DEL:
-                        continue;
-                }
-                linesAdded += change.linesAdded;
-                linesDeleted += change.linesDeleted;
-            }
-            final int numCommits = commitsToFunctionAndAliasesInSnapshot.size();
-            final int linesChanged = linesAdded + linesDeleted;
+            Set<FunctionChangeRow> changesToFunctionAndAliasesInSnapshot = future.getChangesFilteredByCommitIds(window.commits);
+            AggregatedFunctionChangeStats changeStats = AggregatedFunctionChangeStats.fromChanges(changesToFunctionAndAliasesInSnapshot);
 
-            AgeAndDistanceStrings distanceStrings = AgeAndDistanceStrings.fromHistoryAndCommit(history, firstCommitOfSnapshot);
+            AgeAndDistanceStrings distanceStrings = AgeAndDistanceStrings.fromHistoryAndCommit(history, window.firstCommit);
 
             try {
-                csv.printRecord(function.signature, function.file, distanceStrings.ageString, distanceStrings.distanceString, numCommits, linesAdded, linesDeleted, linesChanged);
+                csv.printRecord(function.signature, function.file, distanceStrings.ageString, distanceStrings.distanceString,
+                        changeStats.numCommits, changeStats.linesAdded, changeStats.linesDeleted, changeStats.linesChanged);
             } catch (IOException ioe) {
                 throw new RuntimeException(ioe);
             }

@@ -381,4 +381,12 @@ public class RevisionsCsvReader {
     public SortedSet<Commit> getCommits() {
         return commits;
     }
+
+    /**
+     * @return Commit for the corresponding hash
+     */
+    public Optional<Commit> getCommitByHash(String hash) {
+        Commit c = commitsByHash.get(hash);
+        return Optional.ofNullable(c);
+    }
 }

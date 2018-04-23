@@ -82,10 +82,10 @@ public class Correlate {
 
             List<MergedFileInfo> outputList = new ArrayList<>();
 
-            SortedMap<FileChangeHunk, String> bugFixesInSnapshot = csvHelper
-                    .getFixedFiles(snapshot);
-            SortedMap<FileChangeHunk, String> changesInSnapshot = csvHelper
-                    .getChangedFiles(snapshot);
+            SortedMap<FileChangeHunk, String> bugFixesInSnapshot = null;
+            //csvHelper                    .getFixedFiles(snapshot);
+            SortedMap<FileChangeHunk, String> changesInSnapshot = null;
+            //csvHelper                    .getChangedFiles(snapshot);
 
             // Vorbereitung für MergedFileInfos
             Map<String, Integer> curBugFixCounts = countOccurrencesOfSameName(bugFixesInSnapshot);
