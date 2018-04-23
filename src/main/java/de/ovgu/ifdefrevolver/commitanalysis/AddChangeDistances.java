@@ -194,8 +194,9 @@ public class AddChangeDistances {
 
         List<CommitWindow> result = new ArrayList<>();
         windowsByBranch.getMap().values().forEach((windows) -> windows.forEach((w) -> result.add(w)));
-        LOG.info("Created " + result + " window(s) in total. Discarded " + totalSnapshotsDiscarded
-                + " out of " + totalSnapshots + "snapshots(s).");
+        int discardedPercent = Math.round(totalSnapshotsDiscarded * 100.0f / totalSnapshots);
+        LOG.info("Created " + result.size() + " window(s) in total. Discarded " + totalSnapshotsDiscarded
+                + " out of " + totalSnapshots + " snapshots(s) (" + discardedPercent + "%).");
         return result;
     }
 
