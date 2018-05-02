@@ -156,11 +156,36 @@ public class FunctionLocationProvider {
 
 
     private Document getSrcMlDoc(ObjectLoader loader, String path) {
-        LOG.debug("Getting SrcML of " + path);
+        LOG.debug("Getting SrcML of " + path + " at " + commitId);
         Document[] doc = new Document[1];
         getSrcMlStdoutStream(loader, new Consumer<InputStream>() {
             @Override
             public void accept(InputStream procStdout) {
+                /*
+                final int len = 100_000_000;
+                byte[] buffer = new byte[len];
+                int read = 0;
+                while (true) {
+                    try {
+                        int readLocally = procStdout.read(buffer, read, len - read);
+                        if (readLocally == -1) break;
+                        read += readLocally;
+                    } catch (IOException ioe) {
+                        LOG.warn("Error reading " + path + " at " + commitId, ioe);
+                    }
+                }
+
+                String s = "";
+                try {
+                    s = new String(buffer, 0, read, "UTF-8");
+                } catch (UnsupportedEncodingException e) {
+                    LOG.warn("Error reading " + path + " at " + commitId, e);
+                }
+                LOG.debug("XXX File " + path + " at " + commitId + "\n" + s);
+
+                procStdout = new ByteArrayInputStream(buffer, 0, read);
+                */
+
                 doc[0] = folderReader.readAndRememberSrcmlFile(procStdout, path);
             }
         });

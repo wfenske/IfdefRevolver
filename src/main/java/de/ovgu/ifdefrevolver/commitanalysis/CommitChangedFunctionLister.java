@@ -114,6 +114,8 @@ public class CommitChangedFunctionLister {
 
         for (Map.Entry<String, List<Method>> e : allBSideFunctions.entrySet()) {
             String newPath = e.getKey();
+            LOG.debug("File changed by parent-less commit: " + newPath);
+
             for (Method m : e.getValue()) {
                 ChangeHunk ch = new ChangeHunk(commitId, "/dev/null", newPath, 0, 0, m.getGrossLoc());
                 FunctionChangeHunk fch = new FunctionChangeHunk(m, ch, FunctionChangeHunk.ModificationType.ADD);
