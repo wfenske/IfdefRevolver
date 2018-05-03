@@ -1,8 +1,17 @@
 package de.ovgu.ifdefrevolver.commitanalysis;
 
+import org.apache.log4j.Logger;
+
+import java.util.HashSet;
+import java.util.Set;
+
 public class AgeRequestStats {
+    private static final Logger LOG = Logger.getLogger(AgeRequestStats.class);
+
     private int ageRequests = 0, actualAge = 0, guessed0Age = 0, guessedOtherAge = 0, noAgeAtAll = 0;
     private int functionsWithoutAnyKnownAddingCommits = 0;
+    private int uniqueFunctionsWithoutAnyKnownAddingCommits = 0;
+    private Set<FunctionId> functionsWithoutAnyKnownAddingCommitsNames = new HashSet<>();
 
     public synchronized void increaseAgeRequests() {
         this.ageRequests++;
@@ -24,14 +33,25 @@ public class AgeRequestStats {
         this.noAgeAtAll++;
     }
 
-    public synchronized void increaseFunctionsWithoutAnyKnownAddingCommits() {
+    public synchronized void increaseFunctionsWithoutAnyKnownAddingCommits(FunctionId function) {
         this.functionsWithoutAnyKnownAddingCommits++;
+
+        boolean weKnowThisAlready = functionsWithoutAnyKnownAddingCommitsNames.contains(function);
+        functionsWithoutAnyKnownAddingCommitsNames.add(function);
+
+        if (weKnowThisAlready) {
+            LOG.info("No known creating commits for function " + function + " (repeated entry for this function).");
+        } else {
+            LOG.warn("No known creating commits for function " + function + " (first entry for this function).");
+            this.uniqueFunctionsWithoutAnyKnownAddingCommits++;
+        }
     }
 
     @Override
     public String toString() {
         final StringBuilder sb = new StringBuilder("AgeRequestStats{");
         sb.append("functionsWithoutAnyKnownAddingCommits=").append(functionsWithoutAnyKnownAddingCommits);
+        sb.append(", uniqueFunctionsWithoutAnyKnownAddingCommits=").append(uniqueFunctionsWithoutAnyKnownAddingCommits);
         sb.append(", ageRequests=").append(ageRequests);
         sb.append(", actualAge=").append(actualAge);
 

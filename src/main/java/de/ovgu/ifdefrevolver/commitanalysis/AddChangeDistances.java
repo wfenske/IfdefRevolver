@@ -263,8 +263,7 @@ public class AddChangeDistances {
             FunctionHistory history = moveResolver.getFunctionHistory(function, allDirectCommitIds);
             history.setAgeRequestStats(ageRequestStats);
             if (history.knownAddsForFunction.isEmpty()) {
-                ageRequestStats.increaseFunctionsWithoutAnyKnownAddingCommits();
-                LOG.warn("No known creating commits for function '" + function + "'.");
+                ageRequestStats.increaseFunctionsWithoutAnyKnownAddingCommits(function);
             }
 
             FunctionFuture future = moveResolver.getFunctionFuture(function, directCommitIdsInSnapshot);
@@ -318,7 +317,7 @@ public class AddChangeDistances {
             history.setAgeRequestStats(ageRequestStats);
 
             if (history.knownAddsForFunction.isEmpty()) {
-                ageRequestStats.increaseFunctionsWithoutAnyKnownAddingCommits();
+                ageRequestStats.increaseFunctionsWithoutAnyKnownAddingCommits(function);
                 LOG.warn("No known creating commits for function '" + function + "'.");
             }
 
@@ -394,16 +393,29 @@ public class AddChangeDistances {
 
     private Map<Date, List<AllFunctionsRow>> readAllFunctionsInSnapshots(Collection<Date> snapshotsToProcesses) {
         LOG.debug("Reading functions defined in " + snapshotsToProcesses.size() + " snapshot(s).");
-        int numChanges = 0;
+        int numFunctionDefinitions = 0;
         AllFunctionsCsvReader reader = new AllFunctionsCsvReader();
         Map<Date, List<AllFunctionsRow>> result = new LinkedHashMap<>();
         for (Date snapshotDate : snapshotsToProcesses) {
             List<AllFunctionsRow> functions = reader.readFile(config, snapshotDate);
             result.put(snapshotDate, functions);
-            numChanges += functions.size();
+            rememberFunctionsKnownToExistAt(snapshotDate, functions);
+            numFunctionDefinitions += functions.size();
         }
-        LOG.debug("Read " + numChanges + " function definitions(s).");
+        LOG.debug("Read " + numFunctionDefinitions + " function definitions(s).");
         return result;
+    }
+
+    private void rememberFunctionsKnownToExistAt(Date snapshotDate, List<AllFunctionsRow> functions) {
+        SortedMap<Date, Snapshot> snapshots = projectInfo.getSnapshots();
+        Snapshot snapshot = snapshots.get(snapshotDate);
+        String startHash = snapshot.getStartHash();
+        for (AllFunctionsRow row : functions) {
+            moveResolver.putFunctionKnownToExistAt(row.functionId, startHash);
+//            if (startHash.equalsIgnoreCase("0098ed12c242cabb34646a4453f2c1b012c919c7")) {
+//                LOG.warn("XXX Exists at: " + startHash + "," + row.functionId);
+//            }
+        }
     }
 
     private void logSnapshotsToProcess(Collection<IMinimalSnapshot> snapshotsToProcesses) {

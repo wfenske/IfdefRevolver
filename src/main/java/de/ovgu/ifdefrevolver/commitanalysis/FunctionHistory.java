@@ -19,18 +19,23 @@ public class FunctionHistory {
 
     public final Set<String> guessedAddsForFunction;
 
+    public final Set<String> additionalGuessedAdds;
+
     public final Set<String> nonDeletingCommitsToFunctionAndAliases;
 
     private final CommitsDistanceDb commitsDistanceDb;
 
     private AgeRequestStats ageRequestStats;
 
-    public FunctionHistory(FunctionId function, Set<FunctionId> olderFunctionIds, Set<String> knownAddsForFunction, Set<String> guessedAddsForFunction, Set<String> nonDeletingCommitsToFunctionAndAliases,
+    public FunctionHistory(FunctionId function, Set<FunctionId> olderFunctionIds, Set<String> knownAddsForFunction,
+                           Set<String> guessedAddsForFunction, Set<String> additionalGuessedAdds,
+                           Set<String> nonDeletingCommitsToFunctionAndAliases,
                            CommitsDistanceDb commitsDistanceDb) {
         this.function = function;
         this.olderFunctionIds = olderFunctionIds;
         this.knownAddsForFunction = knownAddsForFunction;
         this.guessedAddsForFunction = guessedAddsForFunction;
+        this.additionalGuessedAdds = additionalGuessedAdds;
         this.nonDeletingCommitsToFunctionAndAliases = nonDeletingCommitsToFunctionAndAliases;
         this.commitsDistanceDb = commitsDistanceDb;
         this.ageRequestStats = new AgeRequestStats();
@@ -54,39 +59,52 @@ public class FunctionHistory {
             return 0;
         }
 
-        int currentMinAgeAmongKnownAdds = Integer.MAX_VALUE;
-        for (String addingCommit : this.knownAddsForFunction) {
-            Optional<Integer> age = commitsDistanceDb.minDistance(currentCommit, addingCommit);
-            if (age.isPresent()) {
-                currentMinAgeAmongKnownAdds = Math.min(age.get(), currentMinAgeAmongKnownAdds);
+        final Optional<Integer> ageAmongKnownAdds = computeMaxDistance(currentCommit, knownAddsForFunction);
+        if (ageAmongKnownAdds.isPresent()) {
+            ageRequestStats.increaseActualAge();
+            return ageAmongKnownAdds.get();
+        }
+
+        LOG.warn("Forced to assume alternative adding commit. Function: " + this.function +
+                " Current commit: " + currentCommit);
+//        if (this.guessedAddsForFunction.contains(currentCommit)) {
+//            ageRequestStats.increaseGuessed0Age();
+//            return 0;
+//        }
+
+        final Optional<Integer> guessedAge = computeMaxDistance(currentCommit, guessedAddsForFunction);
+        final Optional<Integer> additionalGuessedAge = computeMaxDistance(currentCommit, additionalGuessedAdds);
+
+        if (guessedAge.isPresent()) {
+            if (additionalGuessedAge.isPresent()) {
+                final int winner = Math.max(guessedAge.get(), additionalGuessedAge.get());
+                return useGuessedAge(winner);
+            }
+            return useGuessedAge(guessedAge.get());
+        } else if (additionalGuessedAge.isPresent()) {
+            return useGuessedAge(additionalGuessedAge.get());
+        }
+
+        boolean
+        for (String c : nonDeletingCommitsToFunctionAndAliases) {
+            if (commitsDistanceDb.isDescendant(c, currentCommit)) {
+
             }
         }
 
-        if (currentMinAgeAmongKnownAdds < Integer.MAX_VALUE) {
-            ageRequestStats.increaseActualAge();
-            return currentMinAgeAmongKnownAdds;
-        }
-
-        LOG.warn("Forced to assume alternative adding commit. Function: " + this.function + " Current commit: " + currentCommit);
-        if (this.guessedAddsForFunction.contains(currentCommit)) {
-            ageRequestStats.increaseGuessed0Age();
-            return 0;
-        }
-
-        final MinDistances d = computeMinDistances(currentCommit, guessedAddsForFunction);
-
-        if (d.minDist < Integer.MAX_VALUE) {
-            ageRequestStats.increaseGuessedOtherAge();
-            return d.minDist;
-        }
-
-        if (d.minDistIncluding0 < Integer.MAX_VALUE) {
-            ageRequestStats.increaseGuessed0Age();
-            return d.minDistIncluding0;
-        }
+        LOG.warn("No age at all! Function: " + this.function + " Current commit: " + currentCommit);
 
         ageRequestStats.increaseNoAgeAtAll();
         return Integer.MAX_VALUE;
+    }
+
+    private int useGuessedAge(int age) {
+        if (age == 0) {
+            ageRequestStats.increaseGuessed0Age();
+        } else {
+            ageRequestStats.increaseGuessedOtherAge();
+        }
+        return age;
     }
 
     /**
@@ -106,33 +124,40 @@ public class FunctionHistory {
             return 0;
         }
 
-        final MinDistances d = computeMinDistances(currentCommit, nonDeletingCommitsToFunctionAndAliases);
-        final int result = (d.minDist < Integer.MAX_VALUE) ? d.minDist : d.minDistIncluding0;
+        final Distances nonDelEditDist = computeMinDistances(currentCommit, nonDeletingCommitsToFunctionAndAliases);
+        final int nonDelEditWinner = nonDelEditDist.getWinner();
 
-        if (result == 0) {
+        if (nonDelEditWinner == 0) {
             LOG.warn("Distance to most recent commits is 0, although it is not an adding commit. Function: "
                     + function + " Commit: " + currentCommit);
         }
 
-        return result;
+        return nonDelEditWinner;
     }
 
-    private static class MinDistances {
-        final int minDist;
-        final int minDistIncluding0;
+    private static class Distances {
+        final int dist;
+        final int distIncluding0;
 
-        public MinDistances(int minDist, int minDistIncluding0) {
-            this.minDist = minDist;
-            this.minDistIncluding0 = minDistIncluding0;
+        public Distances(int dist, int distIncluding0) {
+            this.dist = dist;
+            this.distIncluding0 = distIncluding0;
+        }
+
+        public int getWinner() {
+            return (dist < Integer.MAX_VALUE) ? dist : distIncluding0;
         }
     }
 
-    private MinDistances computeMinDistances(final String currentCommit, final Collection<String> otherCommits) {
+    private Distances computeMinDistances(final String currentCommit, final Collection<String> otherCommits) {
         int minDist = Integer.MAX_VALUE;
         int minDistIncluding0 = Integer.MAX_VALUE;
 
         for (String otherCommit : otherCommits) {
-            if (currentCommit.equals(otherCommit)) continue;
+            if (currentCommit.equals(otherCommit)) {
+                minDistIncluding0 = 0;
+                continue;
+            }
             Optional<Integer> currentDist = commitsDistanceDb.minDistance(currentCommit, otherCommit);
             if (!currentDist.isPresent()) continue;
             final int currentDistValue = currentDist.get();
@@ -144,6 +169,20 @@ public class FunctionHistory {
             }
         }
 
-        return new MinDistances(minDist, minDistIncluding0);
+        return new Distances(minDist, minDistIncluding0);
+    }
+
+    private Optional<Integer> computeMaxDistance(final String currentCommit, final Collection<String> otherCommits) {
+        int maxDist = Integer.MIN_VALUE;
+
+        for (String otherCommit : otherCommits) {
+            Optional<Integer> currentDist = commitsDistanceDb.minDistance(currentCommit, otherCommit);
+            if (!currentDist.isPresent()) continue;
+            final int currentDistValue = currentDist.get();
+            maxDist = Math.max(maxDist, currentDistValue);
+        }
+
+        if (maxDist > Integer.MIN_VALUE) return Optional.of(maxDist);
+        else return Optional.empty();
     }
 }

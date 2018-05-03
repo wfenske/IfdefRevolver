@@ -31,6 +31,12 @@ public class FunctionMoveResolver {
      */
     private GroupingHashSetMap<FunctionId, FunctionChangeRow> movesByOldFunctionId = new GroupingHashSetMap<>();
 
+    /**
+     * Key is a function ID; Value is a set of commits for which know that the function existed at this stage.  We use
+     * this information to resolve function ages in case we missed a creating commit due to an error.
+     */
+    private GroupingHashSetMap<FunctionId, String> commitsWhereFunctionIsKnownToExitsByFunctionId = new GroupingHashSetMap<>();
+
     private Set<FunctionChangeRow> getCommitsToFunctionIncludingAliasesConformingTo(Set<FunctionId> functionAliases,
                                                                                     Predicate<FunctionChangeRow> predicate) {
         Set<FunctionChangeRow> result = new LinkedHashSet<>();
@@ -230,16 +236,30 @@ public class FunctionMoveResolver {
         final Set<FunctionChangeRow> knownAddsForFunction = this.getAddingCommitsToFunctionIncludingAliases(functionAliases);
         final Set<FunctionChangeRow> nonDeletingChangesToFunctionAndAliases =
                 this.getNonDeletingCommitsToFunctionIncludingAliases(functionAliases);
-
         final Set<String> knownAddingCommitsForFunction = commitIdsFromChanges(knownAddsForFunction);
         final Set<String> nonDeletingCommitsToFunctionAndAliases = commitIdsFromChanges(nonDeletingChangesToFunctionAndAliases);
 
         final Set<String> guessedAddsForFunction =
                 commitsDistanceDb.filterAncestorCommits(nonDeletingCommitsToFunctionAndAliases);
         guessedAddsForFunction.removeAll(knownAddingCommitsForFunction);
+        Set<String> additionalGuessedAdds = getCommitsWhereFunctionIsKnownToExist(functionAliases);
+        //additionalGuessedAdds = commitsDistanceDb.filterAncestorCommits(additionalGuessedAdds);
+        //additionalGuessedAdds.removeAll(guessedAddsForFunction);
+        //additionalGuessedAdds.removeAll(knownAddingCommitsForFunction);
 
         return new FunctionHistory(function, functionAliases, knownAddingCommitsForFunction, guessedAddsForFunction,
-                nonDeletingCommitsToFunctionAndAliases, commitsDistanceDb);
+                additionalGuessedAdds, nonDeletingCommitsToFunctionAndAliases, commitsDistanceDb);
+    }
+
+    private Set<String> getCommitsWhereFunctionIsKnownToExist(Set<FunctionId> functionAliases) {
+        Set<String> result = new HashSet<>();
+        for (FunctionId function : functionAliases) {
+            HashSet<String> commits = commitsWhereFunctionIsKnownToExitsByFunctionId.get(function);
+            if (commits != null) {
+                result.addAll(commits);
+            }
+        }
+        return result;
     }
 
     public FunctionFuture getFunctionFuture(final FunctionId function,
@@ -249,5 +269,9 @@ public class FunctionMoveResolver {
                 this.getAllCommitsToFunctionIncludingAliases(functionAliases);
         final Set<String> commitsToFunctionAndAliases = commitIdsFromChanges(changesToFunctionAndAliases);
         return new FunctionFuture(function, functionAliases, commitsToFunctionAndAliases, changesToFunctionAndAliases);
+    }
+
+    public void putFunctionKnownToExistAt(FunctionId functionId, String startHash) {
+        commitsWhereFunctionIsKnownToExitsByFunctionId.put(functionId, startHash);
     }
 }
