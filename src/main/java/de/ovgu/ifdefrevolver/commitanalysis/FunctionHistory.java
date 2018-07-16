@@ -85,13 +85,6 @@ public class FunctionHistory {
             return useGuessedAge(additionalGuessedAge.get());
         }
 
-        boolean
-        for (String c : nonDeletingCommitsToFunctionAndAliases) {
-            if (commitsDistanceDb.isDescendant(c, currentCommit)) {
-
-            }
-        }
-
         LOG.warn("No age at all! Function: " + this.function + " Current commit: " + currentCommit);
 
         ageRequestStats.increaseNoAgeAtAll();

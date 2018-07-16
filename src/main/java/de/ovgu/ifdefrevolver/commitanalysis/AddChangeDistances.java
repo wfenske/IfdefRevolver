@@ -152,15 +152,13 @@ public class AddChangeDistances {
     }
 
     private static class CommitWindow {
-        public final Set<AllFunctionsRow> allFunctions;
+        public final Set<AllFunctionsRowInWindow> allFunctions;
         public final Set<String> commits;
-        public final String firstCommit;
         public final Date date;
 
-        public CommitWindow(Date date, String firstCommit, Set<String> commits, Set<AllFunctionsRow> allFunctions) {
+        public CommitWindow(Date date, Set<String> commits, Set<AllFunctionsRowInWindow> allFunctions) {
             this.allFunctions = allFunctions;
             this.commits = commits;
-            this.firstCommit = firstCommit;
             this.date = date;
         }
     }
@@ -181,6 +179,7 @@ public class AddChangeDistances {
             List<Snapshot> remainingSnapshots = e.getValue();
             int windowsCreated = 0;
             while (remainingSnapshots.size() >= WINDOW_SIZE) {
+                LOG.info("Creating window " + (windowsCreated + 1));
                 List<Snapshot> snapshotsInWindow = remainingSnapshots.subList(0, WINDOW_SIZE);
                 remainingSnapshots = remainingSnapshots.subList(WINDOW_SIZE, remainingSnapshots.size());
                 CommitWindow window = windowFromSnapshots(snapshotsInWindow);
@@ -201,20 +200,25 @@ public class AddChangeDistances {
     }
 
     private CommitWindow windowFromSnapshots(List<Snapshot> snapshots) {
-        Snapshot firstSnapshot = snapshots.get(0);
-        Map<FunctionId, AllFunctionsRow> allFunctionsMap = new LinkedHashMap<>();
+        Map<FunctionId, AllFunctionsRowInWindow> allFunctionsMap = new LinkedHashMap<>();
         Set<String> commits = new LinkedHashSet<>();
+        int iSnapshot = 0;
+        final int numSnapshots = snapshots.size();
         for (Snapshot s : snapshots) {
             List<AllFunctionsRow> funcs = allFunctionsInSnapshots.get(s.getSnapshotDate());
+            List<Snapshot> snapshotsBefore = snapshots.subList(0, iSnapshot);
+            List<Snapshot> snapshotsIncludingAndAfter = snapshots.subList(iSnapshot, numSnapshots);
             for (AllFunctionsRow f : funcs) {
                 if (!allFunctionsMap.containsKey(f.functionId)) {
-                    allFunctionsMap.put(f.functionId, f);
+                    AllFunctionsRowInWindow extendedF = new AllFunctionsRowInWindow(f, snapshotsBefore, snapshotsIncludingAndAfter);
+                    allFunctionsMap.put(f.functionId, extendedF);
                 }
             }
             commits.addAll(s.getCommitHashes());
+            iSnapshot++;
         }
-        Set<AllFunctionsRow> allFunctions = new LinkedHashSet<>(allFunctionsMap.values());
-        return new CommitWindow(firstSnapshot.getSnapshotDate(), firstSnapshot.getStartHash(), commits, allFunctions);
+        Set<AllFunctionsRowInWindow> allFunctions = new LinkedHashSet<>(allFunctionsMap.values());
+        return new CommitWindow(snapshots.get(0).getSnapshotDate(), commits, allFunctions);
     }
 
     private String getFirstCommitOfSnapshot(Date snapshotDate) {
@@ -239,8 +243,8 @@ public class AddChangeDistances {
                     //Set<String> commitsInSnapshot = getCommitsInSnapshot(snapshotDate);
                     //String firstCommitOfSnapshot = getFirstCommitOfSnapshot(snapshotDate);
 
-                    for (AllFunctionsRow functionRow : window.allFunctions) {
-                        processFunction(functionRow.functionId, window, csv);
+                    for (AllFunctionsRowInWindow function : window.allFunctions) {
+                        processFunction(function, window, csv);
                     }
                 }
             };
@@ -255,25 +259,27 @@ public class AddChangeDistances {
                     percentage + "%).");
         }
 
-        private void processFunction(final FunctionId function, final CommitWindow window, CSVPrinter csv) {
-            final Set<String> allDirectCommitIds = getAllDirectCommitIds(function);
+        private void processFunction(final AllFunctionsRowInWindow function, final CommitWindow window, CSVPrinter csv) {
+            final FunctionId functionId = function.functionId;
+            final Set<String> allDirectCommitIds = getAllDirectCommitIds(functionId);
             final Set<String> directCommitIdsInSnapshot = new HashSet<>(allDirectCommitIds);
             directCommitIdsInSnapshot.retainAll(window.commits);
 
-            FunctionHistory history = moveResolver.getFunctionHistory(function, allDirectCommitIds);
+            FunctionHistory history = moveResolver.getFunctionHistory(functionId, allDirectCommitIds);
             history.setAgeRequestStats(ageRequestStats);
             if (history.knownAddsForFunction.isEmpty()) {
-                ageRequestStats.increaseFunctionsWithoutAnyKnownAddingCommits(function);
+                ageRequestStats.increaseFunctionsWithoutAnyKnownAddingCommits(functionId);
             }
 
-            FunctionFuture future = moveResolver.getFunctionFuture(function, directCommitIdsInSnapshot);
+            FunctionFuture future = moveResolver.getFunctionFuture(functionId, directCommitIdsInSnapshot);
             Set<FunctionChangeRow> changesToFunctionAndAliasesInSnapshot = future.getChangesFilteredByCommitIds(window.commits);
             AggregatedFunctionChangeStats changeStats = AggregatedFunctionChangeStats.fromChanges(changesToFunctionAndAliasesInSnapshot);
 
-            AgeAndDistanceStrings distanceStrings = AgeAndDistanceStrings.fromHistoryAndCommit(history, window.firstCommit);
+            String startHashOfFirstContainingSnapshot = function.getFirstSnapshotCommit();
+            AgeAndDistanceStrings distanceStrings = AgeAndDistanceStrings.fromHistoryAndCommit(history, startHashOfFirstContainingSnapshot);
 
             try {
-                csv.printRecord(function.signature, function.file, distanceStrings.ageString, distanceStrings.distanceString,
+                csv.printRecord(functionId.signature, functionId.file, distanceStrings.ageString, distanceStrings.distanceString,
                         changeStats.numCommits, changeStats.linesAdded, changeStats.linesDeleted, changeStats.linesChanged);
             } catch (IOException ioe) {
                 throw new RuntimeException(ioe);
@@ -366,7 +372,6 @@ public class AddChangeDistances {
         }
 
         public static AgeAndDistanceStrings fromHistoryAndCommit(FunctionHistory history, String currentCommit) {
-            AgeAndDistanceStrings distanceStrings;
             final int minDist = history.getMinDistToPreviousEdit(currentCommit);
             final String minDistStr = minDist < Integer.MAX_VALUE ? Integer.toString(minDist) : "";
 
