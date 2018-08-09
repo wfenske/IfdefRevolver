@@ -310,6 +310,24 @@ public class AddChangeDistances {
             super.processItems(entryIterator, numThreads);
         }
 
+        private class DistanceMemoizer {
+            Map<String, AgeAndDistanceStrings> knownDistancesCache = new HashMap<>();
+            final FunctionHistory history;
+
+            public DistanceMemoizer(FunctionHistory history) {
+                this.history = history;
+            }
+
+            public AgeAndDistanceStrings getDistanceStrings(String currentCommit) {
+                AgeAndDistanceStrings distanceStrings = knownDistancesCache.get(currentCommit);
+                if (distanceStrings == null) {
+                    distanceStrings = AgeAndDistanceStrings.fromHistoryAndCommit(history, currentCommit);
+                    knownDistancesCache.put(currentCommit, distanceStrings);
+                }
+                return distanceStrings;
+            }
+        }
+
         @Override
         protected void processItem(Map.Entry<FunctionId, List<FunctionChangeRow>> e) {
             final FunctionId function = e.getKey();
@@ -321,21 +339,13 @@ public class AddChangeDistances {
 
             FunctionHistory history = moveResolver.getFunctionHistory(function, directCommitIds);
             history.setAgeRequestStats(ageRequestStats);
+            DistanceMemoizer distanceMemoizer = new DistanceMemoizer(history);
 
-            if (history.knownAddsForFunction.isEmpty()) {
-                ageRequestStats.increaseFunctionsWithoutAnyKnownAddingCommits(function);
-                LOG.warn("No known creating commits for function '" + function + "'.");
-            }
-
-            Map<String, AgeAndDistanceStrings> knownDistancesCache = new HashMap<>();
+            checkForUnknownFunctionAge(function, history);
 
             for (FunctionChangeRow change : directChanges) {
                 final String currentCommit = change.commitId;
-                AgeAndDistanceStrings distanceStrings = knownDistancesCache.get(currentCommit);
-                if (distanceStrings == null) {
-                    distanceStrings = AgeAndDistanceStrings.fromHistoryAndCommit(history, currentCommit);
-                    knownDistancesCache.put(currentCommit, distanceStrings);
-                }
+                final AgeAndDistanceStrings distanceStrings = distanceMemoizer.getDistanceStrings(currentCommit);
 
                 String line = change.modType + ",\"" + function.signature + "\"," + function.file + "," + currentCommit + "," + distanceStrings.ageString + "," + distanceStrings.distanceString;
                 synchronized (System.out) {
@@ -343,6 +353,17 @@ public class AddChangeDistances {
                 }
             }
 
+            logEntriesProcessed();
+        }
+
+        private void checkForUnknownFunctionAge(FunctionId function, FunctionHistory history) {
+            if (history.knownAddsForFunction.isEmpty()) {
+                ageRequestStats.increaseFunctionsWithoutAnyKnownAddingCommits(function);
+                LOG.warn("No known creating commits for function '" + function + "'.");
+            }
+        }
+
+        private void logEntriesProcessed() {
             final int entriesProcessed = processingStats.increaseProcessed();
             int percentage = Math.round(entriesProcessed * 100.0f / processingStats.total);
             LOG.info("Processed entry " + entriesProcessed + "/" + processingStats.total + " (" +
