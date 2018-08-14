@@ -19,7 +19,7 @@ public class AddDelMergingConsumer implements Consumer<FunctionChangeHunk> {
     Map<String, LinkedList<FunctionChangeHunk>> delsByFunctionSignature = new LinkedHashMap<>();
     Map<String, LinkedList<FunctionChangeHunk>> addsByFunctionSignature = new LinkedHashMap<>();
     final Consumer<FunctionChangeHunk> parent;
-
+    Map<Method, Method> renamesByOldMethod = new HashMap<>();
 
     public AddDelMergingConsumer(Consumer<FunctionChangeHunk> parent) {
         this.parent = parent;
@@ -34,9 +34,56 @@ public class AddDelMergingConsumer implements Consumer<FunctionChangeHunk> {
             case DEL:
                 rememberHunk(delsByFunctionSignature, functionChangeHunk);
                 break;
+            case MOVE:
+                rememberPotentialRename(functionChangeHunk);
+                parent.accept(functionChangeHunk);
+                break;
             default:
                 LOG.debug("Passing on non-add, non-del type change.");
-                parent.accept(functionChangeHunk);
+                FunctionChangeHunk hunkAfterResolvingRenames = resolvePotentialRename(functionChangeHunk);
+                parent.accept(hunkAfterResolvingRenames);
+        }
+    }
+
+    private void rememberPotentialRename(FunctionChangeHunk functionChangeHunk) {
+        Method oldMethod = functionChangeHunk.getFunction();
+        String oldPath = oldMethod.filePath;
+
+        Method newMethod = functionChangeHunk.getNewFunction().get();
+        String newPath = newMethod.filePath;
+
+        if (!oldPath.equals(newPath)) {
+            LOG.debug("Ignoring " + oldMethod + " being moved to another file as " + newMethod);
+            return;
+        }
+
+        if (LOG.isDebugEnabled()) {
+            Method existingRenaming = renamesByOldMethod.get(oldMethod);
+            if (existingRenaming != null) {
+                LOG.debug(oldMethod + " has already been renamed once to " + existingRenaming + ". Replacing with new renaming to " + newMethod);
+            } else {
+                LOG.debug("Remembering renaming of " + oldMethod + " to " + newMethod);
+            }
+        }
+
+        renamesByOldMethod.put(oldMethod, newMethod);
+    }
+
+    private FunctionChangeHunk resolvePotentialRename(FunctionChangeHunk functionChangeHunk) {
+        Method originalMethod = functionChangeHunk.getFunction();
+        Method renamedMethod = renamesByOldMethod.get(originalMethod);
+        if (renamedMethod == null) {
+            if (LOG.isDebugEnabled()) {
+                LOG.debug(originalMethod + " has not been renamed. Passing change as is.");
+            }
+            return functionChangeHunk;
+        } else {
+            if (LOG.isDebugEnabled()) {
+                LOG.debug(originalMethod + " has been renamed to " + renamedMethod + ". Modifying change to refer to new function.");
+            }
+            FunctionChangeHunk modifiedHunk = new FunctionChangeHunk(renamedMethod, functionChangeHunk.getHunk(),
+                    functionChangeHunk.getModType());
+            return modifiedHunk;
         }
     }
 
