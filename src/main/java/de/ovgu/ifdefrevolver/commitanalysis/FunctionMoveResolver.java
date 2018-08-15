@@ -186,6 +186,10 @@ public class FunctionMoveResolver {
 
     public void putChange(FunctionChangeRow change) {
         changesByFunction.put(change.functionId, change);
+        Optional<FunctionId> newFunctionId = change.newFunctionId;
+        if (newFunctionId.isPresent()) {
+            changesByFunction.put(newFunctionId.get(), change);
+        }
         changesByCommit.put(change.commitId, change);
     }
 

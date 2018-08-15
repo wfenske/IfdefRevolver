@@ -208,7 +208,7 @@ public class CommitChangedFunctionLister {
         DEL {
             @Override
             public void handleZeroEdits(CommitChangedFunctionLister self, String oldPath, String newPath, List<Method> oldFunctions, List<Method> newFunctions) {
-                throw new RuntimeException("Didn't really expect a file deletions with zero edits. Commit: " + self.commitId + " old path: " + oldPath + " new path: " + newPath + " old functions: " + oldFunctions + " new functions: " + newFunctions);
+                throw new RuntimeException("Didn't really expect a file deletion with zero edits. Commit: " + self.commitId + " old path: " + oldPath + " new path: " + newPath + " old functions: " + oldFunctions + " new functions: " + newFunctions);
             }
         },
         RENAME {
@@ -299,9 +299,54 @@ public class CommitChangedFunctionLister {
         if (edits.isEmpty()) {
             diffType.handleZeroEdits(this, oldPath, newPath, oldFunctions, newFunctions);
         } else {
+            Map<Method, Method> movedMethods = new HashMap<>();
+            if (diffType == DiffType.RENAME) {
+                Map<String, Method> oldFunctionsBySignature = new HashMap<>();
+                Map<String, Method> newFunctionsBySignature = new HashMap<>();
+                oldFunctions.forEach((m) -> oldFunctionsBySignature.put(m.functionSignatureXml, m));
+                newFunctions.forEach((m) -> newFunctionsBySignature.put(m.functionSignatureXml, m));
+
+                Set<String> deletedSignatures = new HashSet<>(oldFunctionsBySignature.keySet());
+                Set<String> createdSignatures = new HashSet<>(newFunctionsBySignature.keySet());
+
+                Set<String> movedSignatures = new HashSet<>();
+                movedSignatures.addAll(oldFunctionsBySignature.keySet());
+                movedSignatures.retainAll(newFunctionsBySignature.keySet());
+
+                deletedSignatures.removeAll(movedSignatures);
+                createdSignatures.removeAll(movedSignatures);
+
+                for (String movedSignature : movedSignatures) {
+                    ChangeHunk ch = new ChangeHunk(commitId, oldPath, newPath, 0, 0, 0);
+                    Method oldFunc = oldFunctionsBySignature.get(movedSignature);
+                    Method newFunc = newFunctionsBySignature.get(movedSignature);
+                    FunctionChangeHunk fh = new FunctionChangeHunk(oldFunc, ch, FunctionChangeHunk.ModificationType.MOVE, newFunc);
+                    if (logDebug) {
+                        LOG.debug("Publishing inferred MOVE event for function " + movedSignature + " from file " + oldFunc.filePath + " to " + newFunc.filePath + ".");
+                    }
+                    changedFunctionConsumer.accept(fh);
+                    movedMethods.put(oldFunc, newFunc);
+                }
+
+                for (String signature : deletedSignatures) {
+                    Method func = oldFunctionsBySignature.get(signature);
+                    ChangeHunk ch = new ChangeHunk(commitId, oldPath, newPath, 0, func.getGrossLoc(), 0);
+                    FunctionChangeHunk fh = new FunctionChangeHunk(func, ch, FunctionChangeHunk.ModificationType.DEL);
+                    changedFunctionConsumer.accept(fh);
+                }
+
+                for (String signature : createdSignatures) {
+                    Method func = newFunctionsBySignature.get(signature);
+                    ChangeHunk ch = new ChangeHunk(commitId, oldPath, newPath, 0, 0, func.getGrossLoc());
+                    FunctionChangeHunk fh = new FunctionChangeHunk(func, ch, FunctionChangeHunk.ModificationType.ADD);
+                    changedFunctionConsumer.accept(fh);
+                }
+            }
+
             CommitHunkToFunctionLocationMapper editLocMapper = new CommitHunkToFunctionLocationMapper(commitId,
                     oldPath, oldFunctions,
                     newPath, newFunctions,
+                    movedMethods,
                     changedFunctionConsumer);
 
             for (Edit edit : edits) {

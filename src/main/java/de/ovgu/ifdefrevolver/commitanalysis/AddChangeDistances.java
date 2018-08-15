@@ -359,7 +359,6 @@ public class AddChangeDistances {
         private void checkForUnknownFunctionAge(FunctionId function, FunctionHistory history) {
             if (history.knownAddsForFunction.isEmpty()) {
                 ageRequestStats.increaseFunctionsWithoutAnyKnownAddingCommits(function);
-                LOG.warn("No known creating commits for function '" + function + "'.");
             }
         }
 

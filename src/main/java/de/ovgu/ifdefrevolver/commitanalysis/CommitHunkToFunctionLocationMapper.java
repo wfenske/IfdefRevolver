@@ -36,16 +36,19 @@ class CommitHunkToFunctionLocationMapper implements Consumer<Edit> {
     private Map<Method, List<FunctionChangeHunk>> hunksForCurrentEdit;
     private List<FunctionChangeHunk> possibleSignatureChangesASides;
     private List<FunctionChangeHunk> possibleSignatureChangesBSides;
+    private Map<Method, Method> movedMethodsDueToPathDifferences;
 
     public CommitHunkToFunctionLocationMapper(String commitId,
                                               String oldPath, Collection<Method> functionsInOldPathByOccurrence,
                                               String newPath, Collection<Method> functionsInNewPathByOccurrence,
+                                              Map<Method, Method> movedMethodsDueToPathDifferences,
                                               Consumer<FunctionChangeHunk> changedFunctionConsumer) {
         this.commitId = commitId;
         this.oldPath = oldPath;
         this.newPath = newPath;
         this.functionsInOldPathByOccurrence = new LinkedList<>(functionsInOldPathByOccurrence);
         this.functionsInNewPathByOccurrence = new LinkedList<>(functionsInNewPathByOccurrence);
+        this.movedMethodsDueToPathDifferences = movedMethodsDueToPathDifferences;
         this.changedFunctionConsumer = changedFunctionConsumer;
 
         if (oldPath.equals(newPath)) {
@@ -90,20 +93,27 @@ class CommitHunkToFunctionLocationMapper implements Consumer<Edit> {
 
     private void publishHunksForCurrentEdit() {
         processPossibleSignatureChanges();
+        for (Map.Entry<Method, Method> e : movedMethodsDueToPathDifferences.entrySet()) {
+            remapModsOfRenamedFunction(e.getKey(), e.getValue());
+        }
 
         for (List<FunctionChangeHunk> hunks : hunksForCurrentEdit.values()) {
             switch (hunks.size()) {
                 case 0: /* Can this even happen? */
                     break;
                 case 1: /* Expected case */
-                    //LOG.debug("Single hunk case");
-                    changedFunctionConsumer.accept(hunks.get(0));
+                    publishSingleHunk(hunks.get(0));
                     break;
                 default: /* May also happen if a delete and an add are right next to each other */
                     LOG.debug("Merging two or more hunks");
                     mergeAndPublishAAndBSideHunks(hunks);
             }
         }
+    }
+
+    private void publishSingleHunk(FunctionChangeHunk hunk) {
+        //LOG.debug("Single hunk case");
+        changedFunctionConsumer.accept(hunk);
     }
 
     private void processPossibleSignatureChanges() {
