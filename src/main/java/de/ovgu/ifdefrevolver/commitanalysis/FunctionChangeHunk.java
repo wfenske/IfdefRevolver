@@ -61,13 +61,13 @@ public class FunctionChangeHunk {
     }
 
     public static FunctionChangeHunk makePseudoAdd(String commitId, String oldPath, String newPath, Method func) {
-        ChangeHunk ch = new ChangeHunk(commitId, oldPath, newPath, -1, 0, 0);
+        ChangeHunk ch = new ChangeHunk(commitId, oldPath, newPath, -1, 0, func.getSignatureGrossLinesOfCode());
         FunctionChangeHunk fh = new FunctionChangeHunk(func, ch, FunctionChangeHunk.ModificationType.ADD);
         return fh;
     }
 
     public static FunctionChangeHunk makePseudoDel(String commitId, String oldPath, String newPath, Method func) {
-        ChangeHunk ch = new ChangeHunk(commitId, oldPath, newPath, -1, 0, 0);
+        ChangeHunk ch = new ChangeHunk(commitId, oldPath, newPath, -1, func.getSignatureGrossLinesOfCode(), 0);
         FunctionChangeHunk fh = new FunctionChangeHunk(func, ch, FunctionChangeHunk.ModificationType.ADD);
         return fh;
     }
