@@ -68,7 +68,7 @@ public class FunctionChangeHunk {
 
     public static FunctionChangeHunk makePseudoDel(String commitId, String oldPath, String newPath, Method func) {
         ChangeHunk ch = new ChangeHunk(commitId, oldPath, newPath, -1, func.getSignatureGrossLinesOfCode(), 0);
-        FunctionChangeHunk fh = new FunctionChangeHunk(func, ch, FunctionChangeHunk.ModificationType.ADD);
+        FunctionChangeHunk fh = new FunctionChangeHunk(func, ch, FunctionChangeHunk.ModificationType.DEL);
         return fh;
     }
 
