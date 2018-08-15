@@ -25,6 +25,8 @@ class CommitHunkToFunctionLocationMapper implements Consumer<Edit> {
 
     final Set<Method> appearedFunctions;
     final Set<Method> disappearedFunctions;
+    final Set<Method> untreatedAppearedFunctions;
+    final Set<Method> untreatedDisappearedFunctions;
 
     private final String commitId;
     private final Consumer<FunctionChangeHunk> changedFunctionConsumer;
@@ -68,6 +70,9 @@ class CommitHunkToFunctionLocationMapper implements Consumer<Edit> {
             appearedFunctions = Collections.emptySet();
             disappearedFunctions = Collections.emptySet();
         }
+
+        untreatedAppearedFunctions = new HashSet<>(appearedFunctions);
+        untreatedDisappearedFunctions = new HashSet<>(disappearedFunctions);
     }
 
     @Override
@@ -88,6 +93,20 @@ class CommitHunkToFunctionLocationMapper implements Consumer<Edit> {
             hunksForCurrentEdit = null;
             possibleSignatureChangesASides = null;
             possibleSignatureChangesBSides = null;
+        }
+    }
+
+    public void handleUntreatedAddedAndDeletedFunctions() {
+        for (Method f : untreatedDisappearedFunctions) {
+            LOG.info("Commit " + commitId + " deletes function: " + f + " but change has not been published!");
+            FunctionChangeHunk hunk = FunctionChangeHunk.makePseudoDel(commitId, oldPath, newPath, f);
+            changedFunctionConsumer.accept(hunk);
+        }
+
+        for (Method f : untreatedAppearedFunctions) {
+            LOG.info("Commit " + commitId + "    adds function: " + f + " but change has not been published!");
+            FunctionChangeHunk hunk = FunctionChangeHunk.makePseudoAdd(commitId, oldPath, newPath, f);
+            changedFunctionConsumer.accept(hunk);
         }
     }
 
@@ -113,7 +132,28 @@ class CommitHunkToFunctionLocationMapper implements Consumer<Edit> {
 
     private void publishSingleHunk(FunctionChangeHunk hunk) {
         //LOG.debug("Single hunk case");
+        markAddedAndDeletedFunctionsAsTreated(hunk);
         changedFunctionConsumer.accept(hunk);
+    }
+
+    private void markAddedAndDeletedFunctionsAsTreated(FunctionChangeHunk hunk) {
+        Method addFunction = null;
+        Method delFunction = null;
+        switch (hunk.getModType()) {
+            case ADD:
+                addFunction = hunk.getFunction();
+                break;
+            case DEL:
+                delFunction = hunk.getFunction();
+                break;
+            case MOVE:
+                delFunction = hunk.getFunction();
+                addFunction = hunk.getNewFunction().get();
+                break;
+        }
+
+        untreatedDisappearedFunctions.remove(delFunction);
+        untreatedAppearedFunctions.remove(addFunction);
     }
 
     private void processPossibleSignatureChanges() {
@@ -151,6 +191,8 @@ class CommitHunkToFunctionLocationMapper implements Consumer<Edit> {
             FunctionChangeHunk move = new FunctionChangeHunk(delFunction, mergedChangeHunk,
                     FunctionChangeHunk.ModificationType.MOVE, addFunction);
             changedFunctionConsumer.accept(move);
+            untreatedDisappearedFunctions.remove(delFunction);
+            untreatedAppearedFunctions.remove(addFunction);
             remapModsOfRenamedFunction(delFunction, addFunction);
         }
     }
@@ -211,6 +253,7 @@ class CommitHunkToFunctionLocationMapper implements Consumer<Edit> {
 
         for (FunctionChangeHunk fh : hunks) {
             if (fh.getModType() != FunctionChangeHunk.ModificationType.MOD) {
+                markAddedAndDeletedFunctionsAsTreated(fh);
                 changedFunctionConsumer.accept(fh);
                 continue;
             }

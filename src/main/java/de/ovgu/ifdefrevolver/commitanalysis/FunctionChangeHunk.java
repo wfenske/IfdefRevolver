@@ -30,9 +30,8 @@ public class FunctionChangeHunk {
          */
         ADD,
         /**
-         * if this change deletes the entire function (happens
-         * sometimes if a function is moved to another file or within the
-         * same file)
+         * if this change deletes the entire function (happens sometimes if a function is moved to another file or
+         * within the same file)
          */
         DEL,
         /**
@@ -59,6 +58,18 @@ public class FunctionChangeHunk {
         this.hunk = hunk;
         this.modType = modType;
         this.newFunction = Optional.of(newFunction);
+    }
+
+    public static FunctionChangeHunk makePseudoAdd(String commitId, String oldPath, String newPath, Method func) {
+        ChangeHunk ch = new ChangeHunk(commitId, oldPath, newPath, -1, 0, 0);
+        FunctionChangeHunk fh = new FunctionChangeHunk(func, ch, FunctionChangeHunk.ModificationType.ADD);
+        return fh;
+    }
+
+    public static FunctionChangeHunk makePseudoDel(String commitId, String oldPath, String newPath, Method func) {
+        ChangeHunk ch = new ChangeHunk(commitId, oldPath, newPath, -1, 0, 0);
+        FunctionChangeHunk fh = new FunctionChangeHunk(func, ch, FunctionChangeHunk.ModificationType.ADD);
+        return fh;
     }
 
     public Method getFunction() {

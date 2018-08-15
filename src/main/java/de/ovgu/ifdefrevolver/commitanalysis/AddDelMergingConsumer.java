@@ -15,9 +15,9 @@ import java.util.function.Consumer;
 public class AddDelMergingConsumer implements Consumer<FunctionChangeHunk> {
     private static final Logger LOG = Logger.getLogger(AddDelMergingConsumer.class);
 
-    Set<String> allSignatures = new LinkedHashSet<>();
-    Map<String, LinkedList<FunctionChangeHunk>> delsByFunctionSignature = new LinkedHashMap<>();
-    Map<String, LinkedList<FunctionChangeHunk>> addsByFunctionSignature = new LinkedHashMap<>();
+    Set<String> allAddedAndDeletedFunctionNames = new LinkedHashSet<>();
+    Map<String, LinkedList<FunctionChangeHunk>> delsByFunctionName = new LinkedHashMap<>();
+    Map<String, LinkedList<FunctionChangeHunk>> addsByFunctionName = new LinkedHashMap<>();
     final Consumer<FunctionChangeHunk> parent;
     Map<Method, Method> renamesByOldMethod = new HashMap<>();
 
@@ -29,10 +29,10 @@ public class AddDelMergingConsumer implements Consumer<FunctionChangeHunk> {
     public void accept(FunctionChangeHunk functionChangeHunk) {
         switch (functionChangeHunk.getModType()) {
             case ADD:
-                rememberHunk(addsByFunctionSignature, functionChangeHunk);
+                rememberHunk(addsByFunctionName, functionChangeHunk);
                 break;
             case DEL:
-                rememberHunk(delsByFunctionSignature, functionChangeHunk);
+                rememberHunk(delsByFunctionName, functionChangeHunk);
                 break;
             case MOVE:
                 rememberPotentialRename(functionChangeHunk);
@@ -88,34 +88,34 @@ public class AddDelMergingConsumer implements Consumer<FunctionChangeHunk> {
     }
 
     private void rememberHunk(Map<String, LinkedList<FunctionChangeHunk>> map, FunctionChangeHunk fh) {
-        String signature = fh.getFunction().functionSignatureXml;
-        allSignatures.add(signature);
-        LinkedList<FunctionChangeHunk> hunks = map.get(signature);
+        String functionName = fh.getFunction().functionName;
+        allAddedAndDeletedFunctionNames.add(functionName);
+        LinkedList<FunctionChangeHunk> hunks = map.get(functionName);
         if (hunks == null) {
             hunks = new LinkedList<>();
-            map.put(signature, hunks);
+            map.put(functionName, hunks);
         }
         hunks.add(fh);
     }
 
     public void mergeAndPublishRemainingHunks() {
-        for (final String signature : allSignatures) {
-            final LinkedList<FunctionChangeHunk> adds = addsByFunctionSignature.get(signature);
-            final LinkedList<FunctionChangeHunk> dels = delsByFunctionSignature.get(signature);
+        for (final String functionName : allAddedAndDeletedFunctionNames) {
+            final LinkedList<FunctionChangeHunk> adds = addsByFunctionName.get(functionName);
+            final LinkedList<FunctionChangeHunk> dels = delsByFunctionName.get(functionName);
             if (adds == null) {
                 if (dels == null) {
                     LOG.warn("This should never happen.");
                     continue;
                 } else {
-                    LOG.debug("Function was only deleted (but not moved): " + signature);
+                    LOG.debug("Function was only deleted (but not moved): " + functionName);
                     publishAll(dels);
                 }
             } else { // We have some adds. Let's see whether we also have dels.
                 if (dels == null) {
-                    LOG.debug("Function was newly added (but not moved): " + signature);
+                    LOG.debug("Function was newly added (but not moved): " + functionName);
                     publishAll(adds);
                 } else {
-                    LOG.debug("Merging additions and deletions for function into a move: " + signature);
+                    LOG.debug("Merging additions and deletions for function into a move: " + functionName);
                     mergeAndPublishHunks(dels, adds);
                 }
             }
