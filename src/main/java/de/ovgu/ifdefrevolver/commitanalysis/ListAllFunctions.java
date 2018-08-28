@@ -5,6 +5,8 @@ import de.ovgu.ifdefrevolver.bugs.correlate.data.Snapshot;
 import de.ovgu.ifdefrevolver.bugs.correlate.input.ProjectInformationReader;
 import de.ovgu.ifdefrevolver.bugs.correlate.main.ProjectInformationConfig;
 import de.ovgu.ifdefrevolver.bugs.createsnapshots.main.CreateSnapshots;
+import de.ovgu.ifdefrevolver.util.TerminableThread;
+import de.ovgu.ifdefrevolver.util.UncaughtWorkerThreadException;
 import de.ovgu.skunk.detection.data.Context;
 import de.ovgu.skunk.detection.data.Method;
 import de.ovgu.skunk.detection.input.SrcMlFolderReader;

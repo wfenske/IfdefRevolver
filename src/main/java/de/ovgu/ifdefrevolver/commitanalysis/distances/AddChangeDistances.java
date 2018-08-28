@@ -1,14 +1,15 @@
-package de.ovgu.ifdefrevolver.commitanalysis;
+package de.ovgu.ifdefrevolver.commitanalysis.distances;
 
-import de.ovgu.ifdefrevolver.bugs.correlate.data.IMinimalSnapshot;
 import de.ovgu.ifdefrevolver.bugs.correlate.data.Snapshot;
 import de.ovgu.ifdefrevolver.bugs.correlate.input.ProjectInformationReader;
 import de.ovgu.ifdefrevolver.bugs.correlate.main.ProjectInformationConfig;
 import de.ovgu.ifdefrevolver.bugs.createsnapshots.input.RevisionsCsvReader;
 import de.ovgu.ifdefrevolver.bugs.minecommits.CommitsDistanceDb;
 import de.ovgu.ifdefrevolver.bugs.minecommits.CommitsDistanceDbCsvReader;
+import de.ovgu.ifdefrevolver.commitanalysis.*;
 import de.ovgu.ifdefrevolver.util.LinkedGroupingListMap;
 import de.ovgu.ifdefrevolver.util.ThreadProcessor;
+import de.ovgu.ifdefrevolver.util.UncaughtWorkerThreadException;
 import de.ovgu.skunk.detection.output.CsvFileWriterHelper;
 import org.apache.commons.cli.*;
 import org.apache.commons.csv.CSVPrinter;
@@ -67,36 +68,6 @@ public class AddChangeDistances {
         }
     }
 
-    static class AggregatedFunctionChangeStats {
-        final int numCommits;
-        final int linesChanged, linesAdded, linesDeleted;
-
-        public AggregatedFunctionChangeStats(int numCommits, int linesAdded, int linesDeleted) {
-            this.numCommits = numCommits;
-            this.linesAdded = linesAdded;
-            this.linesDeleted = linesDeleted;
-            this.linesChanged = linesAdded + linesDeleted;
-        }
-
-        public static AggregatedFunctionChangeStats fromChanges(Set<FunctionChangeRow> changes) {
-            int linesAdded = 0;
-            int linesDeleted = 0;
-            Set<String> commits = new HashSet<>();
-            for (FunctionChangeRow change : changes) {
-                commits.add(change.commitId);
-                switch (change.modType) {
-                    case ADD:
-                    case DEL:
-                        continue;
-                }
-                linesAdded += change.linesAdded;
-                linesDeleted += change.linesDeleted;
-            }
-
-            return new AggregatedFunctionChangeStats(commits.size(), linesAdded, linesDeleted);
-        }
-    }
-
     ProcessingStats processingStats;
 
     private void execute() {
@@ -151,7 +122,7 @@ public class AddChangeDistances {
         LOG.info(ageRequestStats);
     }
 
-    private static class CommitWindow {
+    static class CommitWindow {
         public final Set<AllFunctionsRowInWindow> allFunctions;
         public final Set<String> commits;
         public final Date date;
@@ -164,7 +135,7 @@ public class AddChangeDistances {
     }
 
     private List<CommitWindow> groupSnapshots() {
-        LinkedGroupingListMap<Integer, Snapshot> snapshotsByBranch = new LinkedGroupingListMap();
+        LinkedGroupingListMap<Integer, Snapshot> snapshotsByBranch = new LinkedGroupingListMap<>();
         int totalSnapshots = 0;
         for (Snapshot s : projectInfo.getSnapshots().values()) {
             snapshotsByBranch.put(s.getBranch(), s);
@@ -221,16 +192,6 @@ public class AddChangeDistances {
         return new CommitWindow(snapshots.get(0).getSnapshotDate(), commits, allFunctions);
     }
 
-    private String getFirstCommitOfSnapshot(Date snapshotDate) {
-        Snapshot snapshot = projectInfo.getSnapshots().get(snapshotDate);
-        return snapshot.getStartHash();
-    }
-
-    private Set<String> getCommitsInSnapshot(Date snapshotDate) {
-        Snapshot snapshot = projectInfo.getSnapshots().get(snapshotDate);
-        return snapshot.getCommitHashes();
-    }
-
     private class AllFunctionsProcessor extends ThreadProcessor<CommitWindow> {
         @Override
         protected void processItem(CommitWindow window) {
@@ -262,8 +223,8 @@ public class AddChangeDistances {
         private void processFunction(final AllFunctionsRowInWindow function, final CommitWindow window, CSVPrinter csv) {
             final FunctionId functionId = function.functionId;
             final Set<String> allDirectCommitIds = getAllDirectCommitIds(functionId);
-            final Set<String> directCommitIdsInSnapshot = new HashSet<>(allDirectCommitIds);
-            directCommitIdsInSnapshot.retainAll(window.commits);
+            final Set<String> directCommitIdsInWindow = new HashSet<>(allDirectCommitIds);
+            directCommitIdsInWindow.retainAll(window.commits);
 
             FunctionHistory history = moveResolver.getFunctionHistory(functionId, allDirectCommitIds);
             history.setAgeRequestStats(ageRequestStats);
@@ -271,7 +232,7 @@ public class AddChangeDistances {
                 ageRequestStats.increaseFunctionsWithoutAnyKnownAddingCommits(functionId);
             }
 
-            FunctionFuture future = moveResolver.getFunctionFuture(functionId, directCommitIdsInSnapshot);
+            FunctionFuture future = moveResolver.getFunctionFuture(functionId, directCommitIdsInWindow);
             Set<FunctionChangeRow> changesToFunctionAndAliasesInSnapshot = future.getChangesFilteredByCommitIds(window.commits);
             AggregatedFunctionChangeStats changeStats = AggregatedFunctionChangeStats.fromChanges(changesToFunctionAndAliasesInSnapshot);
 
@@ -303,73 +264,6 @@ public class AddChangeDistances {
         }
     }
 
-    private class ChangeEntryProcessor extends ThreadProcessor<Map.Entry<FunctionId, List<FunctionChangeRow>>> {
-        @Override
-        public void processItems(Iterator<Map.Entry<FunctionId, List<FunctionChangeRow>>> entryIterator, int numThreads) throws UncaughtWorkerThreadException {
-            System.out.println("MOD_TYPE,FUNCTION_SIGNATURE,FILE,COMMIT,AGE,DIST");
-            super.processItems(entryIterator, numThreads);
-        }
-
-        private class DistanceMemoizer {
-            Map<String, AgeAndDistanceStrings> knownDistancesCache = new HashMap<>();
-            final FunctionHistory history;
-
-            public DistanceMemoizer(FunctionHistory history) {
-                this.history = history;
-            }
-
-            public AgeAndDistanceStrings getDistanceStrings(String currentCommit) {
-                AgeAndDistanceStrings distanceStrings = knownDistancesCache.get(currentCommit);
-                if (distanceStrings == null) {
-                    distanceStrings = AgeAndDistanceStrings.fromHistoryAndCommit(history, currentCommit);
-                    knownDistancesCache.put(currentCommit, distanceStrings);
-                }
-                return distanceStrings;
-            }
-        }
-
-        @Override
-        protected void processItem(Map.Entry<FunctionId, List<FunctionChangeRow>> e) {
-            final FunctionId function = e.getKey();
-            final List<FunctionChangeRow> directChanges = e.getValue();
-            final Set<String> directCommitIds = new HashSet<>();
-            for (FunctionChangeRow r : directChanges) {
-                directCommitIds.add(r.commitId);
-            }
-
-            FunctionHistory history = moveResolver.getFunctionHistory(function, directCommitIds);
-            history.setAgeRequestStats(ageRequestStats);
-            DistanceMemoizer distanceMemoizer = new DistanceMemoizer(history);
-
-            checkForUnknownFunctionAge(function, history);
-
-            for (FunctionChangeRow change : directChanges) {
-                final String currentCommit = change.commitId;
-                final AgeAndDistanceStrings distanceStrings = distanceMemoizer.getDistanceStrings(currentCommit);
-
-                String line = change.modType + ",\"" + function.signature + "\"," + function.file + "," + currentCommit + "," + distanceStrings.ageString + "," + distanceStrings.distanceString;
-                synchronized (System.out) {
-                    System.out.println(line);
-                }
-            }
-
-            logEntriesProcessed();
-        }
-
-        private void checkForUnknownFunctionAge(FunctionId function, FunctionHistory history) {
-            if (history.knownAddsForFunction.isEmpty()) {
-                ageRequestStats.increaseFunctionsWithoutAnyKnownAddingCommits(function);
-            }
-        }
-
-        private void logEntriesProcessed() {
-            final int entriesProcessed = processingStats.increaseProcessed();
-            int percentage = Math.round(entriesProcessed * 100.0f / processingStats.total);
-            LOG.info("Processed entry " + entriesProcessed + "/" + processingStats.total + " (" +
-                    percentage + "%).");
-        }
-    }
-
     private FunctionMoveResolver buildMoveResolver(Map<Date, List<FunctionChangeRow>> changesInSnapshots) {
         FunctionMoveResolver result = new FunctionMoveResolver(commitsDistanceDb);
         for (List<FunctionChangeRow> changes : changesInSnapshots.values()) {
@@ -382,26 +276,6 @@ public class AddChangeDistances {
     }
 
 
-    private static class AgeAndDistanceStrings {
-        final String ageString;
-        final String distanceString;
-
-        public AgeAndDistanceStrings(String ageString, String distanceString) {
-            this.ageString = ageString;
-            this.distanceString = distanceString;
-        }
-
-        public static AgeAndDistanceStrings fromHistoryAndCommit(FunctionHistory history, String currentCommit) {
-            final int minDist = history.getMinDistToPreviousEdit(currentCommit);
-            final String minDistStr = minDist < Integer.MAX_VALUE ? Integer.toString(minDist) : "";
-
-            final int age = history.getFunctionAgeAtCommit(currentCommit);
-            final String ageStr = age < Integer.MAX_VALUE ? Integer.toString(age) : "";
-
-            return new AgeAndDistanceStrings(ageStr, minDistStr);
-        }
-    }
-
     private Map<Date, List<FunctionChangeRow>> readChangesInSnapshots(Collection<Date> snapshotsToProcesses) {
         LOG.debug("Reading function changes for " + snapshotsToProcesses.size() + " snapshot(s).");
         int numChanges = 0;
@@ -412,7 +286,7 @@ public class AddChangeDistances {
             result.put(snapshotDate, functionChanges);
             numChanges += functionChanges.size();
         }
-        LOG.debug("Read " + numChanges + " function change(s).");
+        LOG.info("Read " + numChanges + " function change(s).");
         return result;
     }
 
@@ -427,7 +301,7 @@ public class AddChangeDistances {
             rememberFunctionsKnownToExistAt(snapshotDate, functions);
             numFunctionDefinitions += functions.size();
         }
-        LOG.debug("Read " + numFunctionDefinitions + " function definitions(s).");
+        LOG.info("Read " + numFunctionDefinitions + " function definitions(s).");
         return result;
     }
 
@@ -440,15 +314,6 @@ public class AddChangeDistances {
 //            if (startHash.equalsIgnoreCase("0098ed12c242cabb34646a4453f2c1b012c919c7")) {
 //                LOG.warn("XXX Exists at: " + startHash + "," + row.functionId);
 //            }
-        }
-    }
-
-    private void logSnapshotsToProcess(Collection<IMinimalSnapshot> snapshotsToProcesses) {
-        if (LOG.isDebugEnabled()) {
-            LOG.debug("The following snapshots will be processed:");
-            for (IMinimalSnapshot s : snapshotsToProcesses) {
-                LOG.debug("" + s);
-            }
         }
     }
 

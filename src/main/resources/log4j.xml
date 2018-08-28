@@ -74,7 +74,7 @@
         <level value="info"/>
     </logger>
 
-    <logger name="de.ovgu.ifdefrevolver.commitanalysis.AddChangeDistances">
+    <logger name="de.ovgu.ifdefrevolver.commitanalysis.distances.AddChangeDistances">
         <level value="debug"/>
     </logger>
 

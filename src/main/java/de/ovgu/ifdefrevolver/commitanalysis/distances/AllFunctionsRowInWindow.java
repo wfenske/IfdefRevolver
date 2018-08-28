@@ -1,6 +1,7 @@
-package de.ovgu.ifdefrevolver.commitanalysis;
+package de.ovgu.ifdefrevolver.commitanalysis.distances;
 
 import de.ovgu.ifdefrevolver.bugs.correlate.data.Snapshot;
+import de.ovgu.ifdefrevolver.commitanalysis.AllFunctionsRow;
 
 import java.util.List;
 

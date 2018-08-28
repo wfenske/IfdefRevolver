@@ -2,6 +2,7 @@ package de.ovgu.ifdefrevolver.commitanalysis;
 
 import de.ovgu.ifdefrevolver.bugs.correlate.main.IHasResultsDir;
 import de.ovgu.ifdefrevolver.util.SimpleCsvFileReader;
+import de.ovgu.skunk.detection.output.CsvEnumUtils;
 
 import java.io.File;
 import java.util.ArrayList;
@@ -21,17 +22,7 @@ public class AllFunctionsCsvReader extends SimpleCsvFileReader<List<AllFunctions
 
     @Override
     protected void processHeader(String[] headerLine) {
-        final int minCols = AllSnapshotFunctionsColumns.values().length;
-        if (headerLine.length < minCols) {
-            throw new RuntimeException("Not enough columns. Expected at least " + minCols + ", got " + headerLine.length);
-        }
-
-        for (int col = 0; col < minCols; col++) {
-            String expectedColName = AllSnapshotFunctionsColumns.values()[col].name();
-            if (!headerLine[col].equalsIgnoreCase(expectedColName)) {
-                throw new RuntimeException("Column name mismatch. Expected column " + col + " to be " + expectedColName + ", got: " + headerLine[col]);
-            }
-        }
+        CsvEnumUtils.validateHeaderRow(AllSnapshotFunctionsColumns.class, headerLine);
     }
 
     @Override

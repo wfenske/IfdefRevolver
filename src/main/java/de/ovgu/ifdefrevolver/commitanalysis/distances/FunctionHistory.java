@@ -1,6 +1,8 @@
-package de.ovgu.ifdefrevolver.commitanalysis;
+package de.ovgu.ifdefrevolver.commitanalysis.distances;
 
 import de.ovgu.ifdefrevolver.bugs.minecommits.CommitsDistanceDb;
+import de.ovgu.ifdefrevolver.commitanalysis.AgeRequestStats;
+import de.ovgu.ifdefrevolver.commitanalysis.FunctionId;
 import org.apache.log4j.Logger;
 
 import java.util.Collection;
@@ -104,7 +106,8 @@ public class FunctionHistory {
      * The time since the function was last edited before the current commit, measured in number of commits.
      *
      * @param currentCommit
-     * @return The age of the function's last edit or {@link Integer#MAX_VALUE} if the age cannot be determined or guessed.
+     * @return The age of the function's last edit or {@link Integer#MAX_VALUE} if the age cannot be determined or
+     * guessed.
      */
     public int getMinDistToPreviousEdit(String currentCommit) {
         if (knownAddsForFunction.contains(currentCommit)) {

@@ -1,6 +1,8 @@
 package de.ovgu.ifdefrevolver.commitanalysis;
 
 import de.ovgu.ifdefrevolver.bugs.correlate.data.IMinimalSnapshot;
+import de.ovgu.ifdefrevolver.util.TerminableThread;
+import de.ovgu.ifdefrevolver.util.UncaughtWorkerThreadException;
 import de.ovgu.skunk.detection.output.CsvFileWriterHelper;
 import de.ovgu.skunk.detection.output.CsvRowProvider;
 import org.apache.commons.csv.CSVPrinter;

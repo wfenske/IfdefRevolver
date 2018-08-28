@@ -1,6 +1,9 @@
-package de.ovgu.ifdefrevolver.commitanalysis;
+package de.ovgu.ifdefrevolver.commitanalysis.distances;
 
 import de.ovgu.ifdefrevolver.bugs.minecommits.CommitsDistanceDb;
+import de.ovgu.ifdefrevolver.commitanalysis.FunctionChangeHunk;
+import de.ovgu.ifdefrevolver.commitanalysis.FunctionChangeRow;
+import de.ovgu.ifdefrevolver.commitanalysis.FunctionId;
 import de.ovgu.ifdefrevolver.util.GroupingHashSetMap;
 import de.ovgu.ifdefrevolver.util.GroupingListMap;
 import org.apache.log4j.Logger;

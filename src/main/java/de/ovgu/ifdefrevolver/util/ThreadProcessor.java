@@ -1,7 +1,5 @@
 package de.ovgu.ifdefrevolver.util;
 
-import de.ovgu.ifdefrevolver.commitanalysis.TerminableThread;
-import de.ovgu.ifdefrevolver.commitanalysis.UncaughtWorkerThreadException;
 import org.apache.log4j.Logger;
 
 import java.util.ArrayList;

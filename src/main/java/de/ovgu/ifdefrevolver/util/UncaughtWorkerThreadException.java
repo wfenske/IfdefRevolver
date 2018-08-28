@@ -1,4 +1,4 @@
-package de.ovgu.ifdefrevolver.commitanalysis;
+package de.ovgu.ifdefrevolver.util;
 
 /**
  * <p>This exception is meant to be thrown when a worker thread is terminated abnormally, e.g., due to an out of memory

@@ -1,5 +1,7 @@
-package de.ovgu.ifdefrevolver.commitanalysis;
+package de.ovgu.ifdefrevolver.commitanalysis.distances;
 
+import de.ovgu.ifdefrevolver.commitanalysis.FunctionChangeRow;
+import de.ovgu.ifdefrevolver.commitanalysis.FunctionId;
 import org.apache.log4j.Logger;
 
 import java.util.LinkedHashSet;

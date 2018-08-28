@@ -10,4 +10,4 @@ me_dir=$(dirname -- "${real_me}")
 o_jvm="-Xms1g -Xmx4g"
 #o_jvm="-Xms32m -Xmx32m"
 
-exec java ${o_jvm} -cp "${CP:?}" de.ovgu.ifdefrevolver.commitanalysis.AddChangeDistances "$@"
+exec java ${o_jvm} -cp "${CP:?}" de.ovgu.ifdefrevolver.commitanalysis.distances.AddChangeDistances "$@"

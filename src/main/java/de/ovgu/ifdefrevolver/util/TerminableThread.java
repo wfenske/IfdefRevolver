@@ -1,4 +1,4 @@
-package de.ovgu.ifdefrevolver.commitanalysis;
+package de.ovgu.ifdefrevolver.util;
 
 /**
  * Thread with a flag that can be used in the run methods's main loop to check whether termination was requested.
