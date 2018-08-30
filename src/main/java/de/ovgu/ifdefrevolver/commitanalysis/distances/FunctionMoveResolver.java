@@ -136,6 +136,54 @@ public class FunctionMoveResolver {
         return done;
     }
 
+    private class FunctionIdWithCommit {
+        public final FunctionId functionId;
+
+        public final String commit;
+
+        public FunctionIdWithCommit(FunctionId functionId, String commit) {
+            this.functionId = functionId;
+            this.commit = commit;
+        }
+    }
+
+    private Set<FunctionIdWithCommit> getCurrentAndNewerFunctionIdsWithCommits(FunctionIdWithCommit id) {
+        Queue<FunctionIdWithCommit> todo = new LinkedList<>();
+        todo.add(id);
+        Set<FunctionIdWithCommit> done = new LinkedHashSet<>();
+        FunctionIdWithCommit needle;
+
+        Set<String> commitsSeen = new HashSet<>();
+
+        while ((needle = todo.poll()) != null) {
+            done.add(needle);
+            commitsSeen.add(needle.commit);
+
+            Set<FunctionChangeRow> moves = movesByOldFunctionId.get(needle.functionId);
+            if (moves == null) {
+//                LOG.debug("No moves whatsoever for " + needle);
+                continue;
+            }
+
+            for (FunctionChangeRow r : moves) {
+                final FunctionIdWithCommit fidWithCommit = new FunctionIdWithCommit(r.newFunctionId.get(), r.commitId);
+                if (todo.contains(fidWithCommit) || done.contains(fidWithCommit)) continue;
+                for (String ancestorCommit : commitsSeen) {
+                    if (commitsDistanceDb.isDescendant(r.commitId, ancestorCommit)) {
+                        todo.add(fidWithCommit);
+                        break;
+                    } else {
+//                        LOG.debug("Rejecting move " + r + ": not a descendant of " + ancestorCommit);
+                    }
+                }
+            }
+        }
+
+        //logAliases("getCurrentAndNewerFunctionIds", id, ancestorCommit, done);
+
+        return done;
+    }
+
     private Set<FunctionId> getCurrentAndNewerFunctionIds(FunctionId id, final String ancestorCommit) {
         Queue<FunctionId> todo = new LinkedList<>();
         todo.add(id);
