@@ -108,6 +108,22 @@ public class AddChangeDistances {
 
         allFunctionsInSnapshots = readAllFunctionsInSnapshots(realSnapshotDates);
 
+        Set<FunctionIdWithCommit> allFunctionsEver = new LinkedHashSet<>();
+        for (Map.Entry<Date, List<AllFunctionsRow>> snapshotEntry : allFunctionsInSnapshots.entrySet()) {
+            final Date snapshotDate = snapshotEntry.getKey();
+            final Snapshot snapshot = projectInfo.getSnapshots().get(snapshotDate);
+            if (snapshot == null) {
+                // dummy snapshot --> skip
+            }
+            final String startHash = snapshot.getStartHash();
+            for (AllFunctionsRow row : snapshotEntry.getValue()) {
+                FunctionIdWithCommit fidWithCommit = new FunctionIdWithCommit(row.functionId, startHash);
+                allFunctionsEver.add(fidWithCommit);
+            }
+        }
+
+        computeFunctionGenealogies(allFunctionsEver);
+
         List<CommitWindow> allWindows = groupSnapshots();
 
         try {
@@ -120,6 +136,39 @@ public class AddChangeDistances {
         }
 
         LOG.info(ageRequestStats);
+    }
+
+    private void computeFunctionGenealogies(Set<FunctionIdWithCommit> allFunctionsEver) {
+        LOG.info("Computing genealogies of all functions ...");
+        List<Set<FunctionIdWithCommit>> genealogies = moveResolver.computeFunctionGenealogies(allFunctionsEver);
+        LOG.info("Done computing genealogies of all functions");
+        reportFunctionGenealogies(genealogies);
+    }
+
+    private void reportFunctionGenealogies(List<Set<FunctionIdWithCommit>> genealogies) {
+        LOG.info("Found " + genealogies.size() + " distinct function genealogies:");
+        for (int ixGenealogy = 0; ixGenealogy < genealogies.size(); ixGenealogy++) {
+            Set<FunctionIdWithCommit> genealogy = genealogies.get(ixGenealogy);
+            reportFunctionGenealogy(ixGenealogy, genealogy);
+        }
+    }
+
+    private void reportFunctionGenealogy(int ixGenealogy, Set<FunctionIdWithCommit> genealogy) {
+        Set<FunctionId> distinctIds = new HashSet<>();
+
+        StringBuilder sb = new StringBuilder();
+        Iterator<FunctionIdWithCommit> it = genealogy.iterator();
+        FunctionIdWithCommit first = it.next();
+        sb.append(first.functionId);
+
+        distinctIds.add(first.functionId);
+
+        while (it.hasNext()) {
+            FunctionId id = it.next().functionId;
+            sb.append(" -> ").append(id);
+            distinctIds.add(id);
+        }
+        LOG.info(ixGenealogy + " (" + distinctIds.size() + " ID(s)): " + sb.toString());
     }
 
     static class CommitWindow {

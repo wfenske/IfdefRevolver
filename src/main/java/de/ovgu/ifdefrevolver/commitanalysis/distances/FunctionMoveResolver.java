@@ -136,46 +136,78 @@ public class FunctionMoveResolver {
         return done;
     }
 
-    private class FunctionIdWithCommit {
-        public final FunctionId functionId;
-
-        public final String commit;
-
-        public FunctionIdWithCommit(FunctionId functionId, String commit) {
-            this.functionId = functionId;
-            this.commit = commit;
+    public List<Set<FunctionIdWithCommit>> computeFunctionGenealogies(Collection<FunctionIdWithCommit> ids) {
+        List<Set<FunctionIdWithCommit>> result = new LinkedList<>();
+        final int total = ids.size();
+        int done = 0, lastPercentage = 0;
+        for (FunctionIdWithCommit id : ids) {
+            Set<FunctionIdWithCommit> currentAndNewerIds = getCurrentAndNewerFunctionIdsWithCommits1(id);
+            Optional<Set<FunctionIdWithCommit>> genealogyToMerge = findFirstSetWithCommonElement(currentAndNewerIds, result);
+            if (genealogyToMerge.isPresent()) {
+                genealogyToMerge.get().addAll(currentAndNewerIds);
+            } else {
+                result.add(currentAndNewerIds);
+            }
+            done++;
+            int newPercentage = Math.round(done * 100.0f / total);
+            if (newPercentage > lastPercentage) {
+                if (newPercentage < 100 || (done == total)) {
+                    LOG.info("Computed " + done + "/" + total + " genealogies (" + newPercentage + "%).");
+                    lastPercentage = newPercentage;
+                }
+            }
         }
+        return result;
     }
 
-    private Set<FunctionIdWithCommit> getCurrentAndNewerFunctionIdsWithCommits(FunctionIdWithCommit id) {
+    private static <T> Optional<Set<T>> findFirstSetWithCommonElement(Set<T> needles, Collection<Set<T>> haystacks) {
+        for (T needle : needles) {
+            for (Set<T> haystack : haystacks) {
+                if (haystack.contains(needle)) {
+                    return Optional.of(haystack);
+                }
+            }
+        }
+        return Optional.empty();
+    }
+
+    private Set<FunctionIdWithCommit> getCurrentAndNewerFunctionIdsWithCommits1(FunctionIdWithCommit id) {
         Queue<FunctionIdWithCommit> todo = new LinkedList<>();
         todo.add(id);
         Set<FunctionIdWithCommit> done = new LinkedHashSet<>();
-        FunctionIdWithCommit needle;
 
-        Set<String> commitsSeen = new HashSet<>();
+        while (true) {
+            final int doneSizeBefore = done.size();
 
-        while ((needle = todo.poll()) != null) {
-            done.add(needle);
-            commitsSeen.add(needle.commit);
+            FunctionIdWithCommit needle;
+            while ((needle = todo.poll()) != null) {
+                done.add(needle);
 
-            Set<FunctionChangeRow> moves = movesByOldFunctionId.get(needle.functionId);
-            if (moves == null) {
+                Set<FunctionChangeRow> moves = movesByOldFunctionId.get(needle.functionId);
+                if (moves == null) {
 //                LOG.debug("No moves whatsoever for " + needle);
-                continue;
-            }
+                    continue;
+                }
 
-            for (FunctionChangeRow r : moves) {
-                final FunctionIdWithCommit fidWithCommit = new FunctionIdWithCommit(r.newFunctionId.get(), r.commitId);
-                if (todo.contains(fidWithCommit) || done.contains(fidWithCommit)) continue;
-                for (String ancestorCommit : commitsSeen) {
-                    if (commitsDistanceDb.isDescendant(r.commitId, ancestorCommit)) {
-                        todo.add(fidWithCommit);
-                        break;
-                    } else {
+                for (FunctionChangeRow r : moves) {
+                    final FunctionIdWithCommit fidWithCommit = new FunctionIdWithCommit(r.newFunctionId.get(), r.commitId);
+                    if (done.contains(fidWithCommit) || todo.contains(fidWithCommit)) continue;
+                    for (FunctionIdWithCommit ancestorFid : done) {
+                        final String ancestorCommit = ancestorFid.commit;
+                        if (commitsDistanceDb.isDescendant(r.commitId, ancestorCommit)) {
+                            todo.add(fidWithCommit);
+                            break;
+                        } else {
 //                        LOG.debug("Rejecting move " + r + ": not a descendant of " + ancestorCommit);
+                        }
                     }
                 }
+            }
+
+            if (doneSizeBefore == done.size()) {
+                break;
+            } else {
+                todo.addAll(done);
             }
         }
 
