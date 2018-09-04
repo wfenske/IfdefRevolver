@@ -405,6 +405,32 @@ public class CommitsDistanceDb {
         return existingParents;
     }
 
+    public boolean areCommitsRelated(String c1, String c2) {
+        ensurePreprocessed();
+        if (c1 == null) {
+            throw new NullPointerException("Descendant commit must not be null");
+        }
+        if (c2 == null) {
+            throw new NullPointerException("Ancestor commit must not be null");
+        }
+
+        Integer c1Key = intsFromHashes.get(c1);
+        if (c1Key == null) {
+            LOG.warn("Unknown commit: `" + c1 + "'");
+            return false;
+        }
+        Integer c2Key = intsFromHashes.get(c2);
+        if (c2Key == null) {
+            LOG.warn("Unknown commit: `" + c2 + "'");
+            return false;
+        }
+
+        int i1 = c1Key;
+        int i2 = c2Key;
+
+        return reachables[i1][i2] || reachables[i2][i1];
+    }
+
     private static void main(String[] args) {
         CommitsDistanceDb db = new CommitsDistanceDb();
 //        db.put("D", "C");

@@ -78,6 +78,10 @@
         <level value="debug"/>
     </logger>
 
+    <logger name="de.ovgu.ifdefrevolver.commitanalysis.distances.FunctionMoveResolver">
+        <level value="info"/>
+    </logger>
+
     <!--logger name="de.ovgu.ifdefrevolver.commitanalysis.FunctionLocationProvider">
         <level value="debug"/>
     </logger-->

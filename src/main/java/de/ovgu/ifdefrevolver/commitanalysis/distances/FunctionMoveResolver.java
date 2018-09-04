@@ -136,20 +136,30 @@ public class FunctionMoveResolver {
         return done;
     }
 
-    public List<Set<FunctionIdWithCommit>> computeFunctionGenealogies(Collection<FunctionIdWithCommit> ids) {
-        List<Set<FunctionIdWithCommit>> result = new LinkedList<>();
+    public List<List<FunctionIdWithCommit>> computeFunctionGenealogies(Collection<FunctionIdWithCommit> ids) {
+        List<Set<FunctionIdWithCommit>> rawResult = new LinkedList<>();
+        Map<FunctionIdWithCommit, Set<FunctionIdWithCommit>> genealogiesById = new HashMap<>();
+
         final int total = ids.size();
         int done = 0, lastPercentage = 0;
         for (FunctionIdWithCommit id : ids) {
             Set<FunctionIdWithCommit> currentAndNewerIds = getCurrentAndNewerFunctionIdsWithCommits1(id);
-            Optional<Set<FunctionIdWithCommit>> genealogyToMerge = findFirstSetWithCommonElement(currentAndNewerIds, result);
+            final Set<FunctionIdWithCommit> genealogy;
+            Optional<Set<FunctionIdWithCommit>> genealogyToMerge = findFirstSetWithCommonElement(currentAndNewerIds, genealogiesById);
             if (genealogyToMerge.isPresent()) {
-                genealogyToMerge.get().addAll(currentAndNewerIds);
+                genealogy = genealogyToMerge.get();
+                genealogy.addAll(currentAndNewerIds);
             } else {
-                result.add(currentAndNewerIds);
+                genealogy = currentAndNewerIds;
+                rawResult.add(genealogy);
             }
+
+            for (FunctionIdWithCommit currentAndNewId : currentAndNewerIds) {
+                genealogiesById.put(currentAndNewId, genealogy);
+            }
+
             done++;
-            int newPercentage = Math.round(done * 100.0f / total);
+            int newPercentage = (int) Math.floor(done * 100.0 / total);
             if (newPercentage > lastPercentage) {
                 if (newPercentage < 100 || (done == total)) {
                     LOG.info("Computed " + done + "/" + total + " genealogies (" + newPercentage + "%).");
@@ -157,16 +167,46 @@ public class FunctionMoveResolver {
                 }
             }
         }
+
+        List<List<FunctionIdWithCommit>> result = sortGenealogies(rawResult);
         return result;
     }
 
-    private static <T> Optional<Set<T>> findFirstSetWithCommonElement(Set<T> needles, Collection<Set<T>> haystacks) {
-        for (T needle : needles) {
-            for (Set<T> haystack : haystacks) {
-                if (haystack.contains(needle)) {
-                    return Optional.of(haystack);
+    private List<List<FunctionIdWithCommit>> sortGenealogies(List<Set<FunctionIdWithCommit>> rawResult) {
+        LOG.info("Sorting " + rawResult.size() + " genealogies.");
+
+        List<List<FunctionIdWithCommit>> result = new ArrayList<>();
+
+        for (Set<FunctionIdWithCommit> genealogy : rawResult) {
+            //List<FunctionIdWithCommit> sorted = new ArrayList<>(genealogy);
+            //Collections.sort(sorted, cmp);
+            //result.add(sorted);
+            List<FunctionIdWithCommit> sorted = new ArrayList<>();
+            LinkedList<FunctionIdWithCommit> in = new LinkedList<>(genealogy);
+            //List<List<FunctionIdWithCommit>> branches = new ArrayList<>();
+            while (!in.isEmpty()) {
+                FunctionIdWithCommit first = in.removeFirst();
+                List<FunctionIdWithCommit> branch = new ArrayList<>();
+                branch.add(first);
+                for (Iterator<FunctionIdWithCommit> it = in.iterator(); it.hasNext(); ) {
+                    FunctionIdWithCommit next = it.next();
+                    if (commitsDistanceDb.areCommitsRelated(first.commit, next.commit)) {
+                        branch.add(next);
+                        it.remove();
+                    }
                 }
+                sorted.addAll(branch);
             }
+            result.add(sorted);
+        }
+
+        return result;
+    }
+
+    private static <T> Optional<Set<T>> findFirstSetWithCommonElement(Set<T> needles, Map<T, Set<T>> haystacks) {
+        for (T needle : needles) {
+            Set<T> haystack = haystacks.get(needle);
+            if (haystack != null) return Optional.of(haystack);
         }
         return Optional.empty();
     }
@@ -190,7 +230,7 @@ public class FunctionMoveResolver {
                 }
 
                 for (FunctionChangeRow r : moves) {
-                    final FunctionIdWithCommit fidWithCommit = new FunctionIdWithCommit(r.newFunctionId.get(), r.commitId);
+                    final FunctionIdWithCommit fidWithCommit = new FunctionIdWithCommit(r.newFunctionId.get(), r.commitId, true);
                     if (done.contains(fidWithCommit) || todo.contains(fidWithCommit)) continue;
                     for (FunctionIdWithCommit ancestorFid : done) {
                         final String ancestorCommit = ancestorFid.commit;

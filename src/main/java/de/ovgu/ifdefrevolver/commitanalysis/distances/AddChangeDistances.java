@@ -13,6 +13,10 @@ import de.ovgu.ifdefrevolver.util.UncaughtWorkerThreadException;
 import de.ovgu.skunk.detection.output.CsvFileWriterHelper;
 import org.apache.commons.cli.*;
 import org.apache.commons.csv.CSVPrinter;
+import org.apache.commons.math3.stat.descriptive.moment.Mean;
+import org.apache.commons.math3.stat.descriptive.rank.Max;
+import org.apache.commons.math3.stat.descriptive.rank.Median;
+import org.apache.commons.math3.stat.descriptive.rank.Min;
 import org.apache.log4j.Logger;
 
 import java.io.File;
@@ -117,7 +121,7 @@ public class AddChangeDistances {
             }
             final String startHash = snapshot.getStartHash();
             for (AllFunctionsRow row : snapshotEntry.getValue()) {
-                FunctionIdWithCommit fidWithCommit = new FunctionIdWithCommit(row.functionId, startHash);
+                FunctionIdWithCommit fidWithCommit = new FunctionIdWithCommit(row.functionId, startHash, false);
                 allFunctionsEver.add(fidWithCommit);
             }
         }
@@ -140,35 +144,48 @@ public class AddChangeDistances {
 
     private void computeFunctionGenealogies(Set<FunctionIdWithCommit> allFunctionsEver) {
         LOG.info("Computing genealogies of all functions ...");
-        List<Set<FunctionIdWithCommit>> genealogies = moveResolver.computeFunctionGenealogies(allFunctionsEver);
+        List<List<FunctionIdWithCommit>> genealogies = moveResolver.computeFunctionGenealogies(allFunctionsEver);
         LOG.info("Done computing genealogies of all functions");
         reportFunctionGenealogies(genealogies);
     }
 
-    private void reportFunctionGenealogies(List<Set<FunctionIdWithCommit>> genealogies) {
+    private void reportFunctionGenealogies(List<List<FunctionIdWithCommit>> genealogies) {
         LOG.info("Found " + genealogies.size() + " distinct function genealogies:");
+        double[] sizes = new double[genealogies.size()];
         for (int ixGenealogy = 0; ixGenealogy < genealogies.size(); ixGenealogy++) {
-            Set<FunctionIdWithCommit> genealogy = genealogies.get(ixGenealogy);
+            List<FunctionIdWithCommit> genealogy = genealogies.get(ixGenealogy);
             reportFunctionGenealogy(ixGenealogy, genealogy);
+            sizes[ixGenealogy] = genealogy.size();
         }
+
+        int minSize = (int) new Min().evaluate(sizes);
+        int maxSize = (int) new Max().evaluate(sizes);
+        double meanSize = new Mean().evaluate(sizes);
+        double medianSize = new Median().evaluate(sizes);
+
+        LOG.info("min/max/mean/median size of genealogies: " + minSize + "/" + maxSize + "/" + meanSize + "/" + medianSize);
     }
 
-    private void reportFunctionGenealogy(int ixGenealogy, Set<FunctionIdWithCommit> genealogy) {
-        Set<FunctionId> distinctIds = new HashSet<>();
+    private void reportFunctionGenealogy(int ixGenealogy, List<FunctionIdWithCommit> genealogy) {
+        //Set<FunctionId> distinctIds = new HashSet<>();
 
-        StringBuilder sb = new StringBuilder();
+        LOG.info("Genealogy " + ixGenealogy + ":");
+
+        //StringBuilder sb = new StringBuilder();
         Iterator<FunctionIdWithCommit> it = genealogy.iterator();
         FunctionIdWithCommit first = it.next();
-        sb.append(first.functionId);
+        //sb.append(first.functionId);
+        LOG.info("     " + first.functionId);
 
-        distinctIds.add(first.functionId);
+        //distinctIds.add(first.functionId);
 
         while (it.hasNext()) {
-            FunctionId id = it.next().functionId;
-            sb.append(" -> ").append(id);
-            distinctIds.add(id);
+            FunctionIdWithCommit next = it.next();
+            //sb.append(" -> ").append(id);
+            //distinctIds.add(id);
+            LOG.info("  -> " + next.functionId);
         }
-        LOG.info(ixGenealogy + " (" + distinctIds.size() + " ID(s)): " + sb.toString());
+        //LOG.info(ixGenealogy + " (" + distinctIds.size() + " ID(s)): " + sb.toString());
     }
 
     static class CommitWindow {

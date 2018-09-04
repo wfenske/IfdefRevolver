@@ -6,12 +6,13 @@ import java.util.Objects;
 
 public class FunctionIdWithCommit {
     public final FunctionId functionId;
-
     public final String commit;
+    public final boolean move;
 
-    public FunctionIdWithCommit(FunctionId functionId, String commit) {
+    public FunctionIdWithCommit(FunctionId functionId, String commit, boolean move) {
         this.functionId = functionId;
         this.commit = commit;
+        this.move = move;
     }
 
     @Override
