@@ -138,14 +138,33 @@ public class FunctionMoveResolver {
 
     public List<List<FunctionIdWithCommit>> computeFunctionGenealogies(Collection<FunctionIdWithCommit> ids) {
         List<Set<FunctionIdWithCommit>> rawResult = new LinkedList<>();
-        Map<FunctionIdWithCommit, Set<FunctionIdWithCommit>> genealogiesById = new HashMap<>();
+        Map<FunctionIdWithCommit, Set<FunctionIdWithCommit>> genealogiesByFunctionIdWithCommit = new HashMap<>();
+        Map<FunctionId, Set<FunctionIdWithCommit>> genealogiesByFunctionId = new HashMap<>();
 
         final int total = ids.size();
         int done = 0, lastPercentage = 0;
         for (FunctionIdWithCommit id : ids) {
+            Optional<Set<FunctionIdWithCommit>> genealogyToMerge = Optional.empty();
+            {
+                final FunctionId currentFunctionId = id.functionId;
+                final String currentCommit = id.commit;
+                Set<FunctionIdWithCommit> possiblyMatchingGenealogy = genealogiesByFunctionId.get(currentFunctionId);
+                boolean matches = false;
+                if (possiblyMatchingGenealogy != null) {
+                    for (FunctionIdWithCommit other : possiblyMatchingGenealogy) {
+                        if (other.functionId.equals(currentFunctionId) && commitsDistanceDb.areCommitsRelated(currentCommit, other.commit)) {
+                            genealogyToMerge = Optional.of(possiblyMatchingGenealogy);
+                            break;
+                        }
+                    }
+                }
+            }
+
             Set<FunctionIdWithCommit> currentAndNewerIds = getCurrentAndNewerFunctionIdsWithCommits1(id);
             final Set<FunctionIdWithCommit> genealogy;
-            Optional<Set<FunctionIdWithCommit>> genealogyToMerge = findFirstSetWithCommonElement(currentAndNewerIds, genealogiesById);
+            if (!genealogyToMerge.isPresent()) {
+                genealogyToMerge = findFirstSetWithCommonElement(currentAndNewerIds, genealogiesByFunctionIdWithCommit);
+            }
             if (genealogyToMerge.isPresent()) {
                 genealogy = genealogyToMerge.get();
                 genealogy.addAll(currentAndNewerIds);
@@ -155,7 +174,8 @@ public class FunctionMoveResolver {
             }
 
             for (FunctionIdWithCommit currentAndNewId : currentAndNewerIds) {
-                genealogiesById.put(currentAndNewId, genealogy);
+                genealogiesByFunctionIdWithCommit.put(currentAndNewId, genealogy);
+                genealogiesByFunctionId.put(currentAndNewId.functionId, genealogy);
             }
 
             done++;
