@@ -157,10 +157,10 @@ public class FunctionMoveResolver {
                                     genealogyToMerge = Optional.of(possiblyMatchingGenealogy);
                                     break;
                                 } else {
-                                    if (currentFunctionId.signature.equals("static int isvalidgroupname(struct berval * name)")) {
-                                        //LOG.info("Genealogies don't match. FunctionId=" + currentFunctionId + " but commits are unrelated: " + currentCommit + " vs. " + other.commit);
-                                        //AddChangeDistances.reportFunctionGenealogy(0, possiblyMatchingGenealogy);
-                                    }
+                                    //if (currentFunctionId.signature.equals("static int isvalidgroupname(struct berval * name)")) {
+                                    //LOG.info("Genealogies don't match. FunctionId=" + currentFunctionId + " but commits are unrelated: " + currentCommit + " vs. " + other.commit);
+                                    //AddChangeDistances.reportFunctionGenealogy(0, possiblyMatchingGenealogy);
+                                    //}
                                 }
                             }
                         }
