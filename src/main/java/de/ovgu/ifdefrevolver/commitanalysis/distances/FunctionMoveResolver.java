@@ -158,8 +158,8 @@ public class FunctionMoveResolver {
                                     break;
                                 } else {
                                     if (currentFunctionId.signature.equals("static int isvalidgroupname(struct berval * name)")) {
-                                        LOG.info("Genealogies don't match. FunctionId=" + currentFunctionId + " but commits are unrelated: " + currentCommit + " vs. " + other.commit);
-                                        AddChangeDistances.reportFunctionGenealogy(0, possiblyMatchingGenealogy);
+                                        //LOG.info("Genealogies don't match. FunctionId=" + currentFunctionId + " but commits are unrelated: " + currentCommit + " vs. " + other.commit);
+                                        //AddChangeDistances.reportFunctionGenealogy(0, possiblyMatchingGenealogy);
                                     }
                                 }
                             }
