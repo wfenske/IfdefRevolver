@@ -152,9 +152,16 @@ public class FunctionMoveResolver {
                 boolean matches = false;
                 if (possiblyMatchingGenealogy != null) {
                     for (FunctionIdWithCommit other : possiblyMatchingGenealogy) {
-                        if (other.functionId.equals(currentFunctionId) && commitsDistanceDb.areCommitsRelated(currentCommit, other.commit)) {
-                            genealogyToMerge = Optional.of(possiblyMatchingGenealogy);
-                            break;
+                        if (other.functionId.equals(currentFunctionId)) {
+                            if (commitsDistanceDb.areCommitsRelated(currentCommit, other.commit)) {
+                                genealogyToMerge = Optional.of(possiblyMatchingGenealogy);
+                                break;
+                            } else {
+                                if (currentFunctionId.signature.equals("static int isvalidgroupname(struct berval * name)")) {
+                                    LOG.info("Genealogies don't match. FunctionId=" + currentFunctionId + " but commits are unrelated: " + currentCommit + " vs. " + other.commit);
+                                    AddChangeDistances.reportFunctionGenealogy(0, possiblyMatchingGenealogy);
+                                }
+                            }
                         }
                     }
                 }

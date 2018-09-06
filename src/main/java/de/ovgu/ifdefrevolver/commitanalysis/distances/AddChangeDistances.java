@@ -166,7 +166,7 @@ public class AddChangeDistances {
         LOG.info("min/max/mean/median size of genealogies: " + minSize + "/" + maxSize + "/" + meanSize + "/" + medianSize);
     }
 
-    private void reportFunctionGenealogy(int ixGenealogy, List<FunctionIdWithCommit> genealogy) {
+    static void reportFunctionGenealogy(int ixGenealogy, Collection<FunctionIdWithCommit> genealogy) {
         //Set<FunctionId> distinctIds = new HashSet<>();
 
         LOG.info("Genealogy " + ixGenealogy + ":");
