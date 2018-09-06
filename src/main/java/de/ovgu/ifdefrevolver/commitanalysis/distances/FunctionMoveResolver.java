@@ -139,7 +139,7 @@ public class FunctionMoveResolver {
     public List<List<FunctionIdWithCommit>> computeFunctionGenealogies(Collection<FunctionIdWithCommit> ids) {
         List<Set<FunctionIdWithCommit>> rawResult = new LinkedList<>();
         Map<FunctionIdWithCommit, Set<FunctionIdWithCommit>> genealogiesByFunctionIdWithCommit = new HashMap<>();
-        Map<FunctionId, Set<FunctionIdWithCommit>> genealogiesByFunctionId = new HashMap<>();
+        GroupingListMap<FunctionId, Set<FunctionIdWithCommit>> genealogiesByFunctionId = new GroupingListMap<>();
 
         final int total = ids.size();
         int done = 0, lastPercentage = 0;
@@ -148,18 +148,19 @@ public class FunctionMoveResolver {
             {
                 final FunctionId currentFunctionId = id.functionId;
                 final String currentCommit = id.commit;
-                Set<FunctionIdWithCommit> possiblyMatchingGenealogy = genealogiesByFunctionId.get(currentFunctionId);
-                boolean matches = false;
-                if (possiblyMatchingGenealogy != null) {
-                    for (FunctionIdWithCommit other : possiblyMatchingGenealogy) {
-                        if (other.functionId.equals(currentFunctionId)) {
-                            if (commitsDistanceDb.areCommitsRelated(currentCommit, other.commit)) {
-                                genealogyToMerge = Optional.of(possiblyMatchingGenealogy);
-                                break;
-                            } else {
-                                if (currentFunctionId.signature.equals("static int isvalidgroupname(struct berval * name)")) {
-                                    LOG.info("Genealogies don't match. FunctionId=" + currentFunctionId + " but commits are unrelated: " + currentCommit + " vs. " + other.commit);
-                                    AddChangeDistances.reportFunctionGenealogy(0, possiblyMatchingGenealogy);
+                List<Set<FunctionIdWithCommit>> possiblyMatchingGenealogies = genealogiesByFunctionId.get(currentFunctionId);
+                if (possiblyMatchingGenealogies != null) {
+                    for (Set<FunctionIdWithCommit> possiblyMatchingGenealogy : possiblyMatchingGenealogies) {
+                        for (FunctionIdWithCommit other : possiblyMatchingGenealogy) {
+                            if (other.functionId.equals(currentFunctionId)) {
+                                if (commitsDistanceDb.areCommitsRelated(currentCommit, other.commit)) {
+                                    genealogyToMerge = Optional.of(possiblyMatchingGenealogy);
+                                    break;
+                                } else {
+                                    if (currentFunctionId.signature.equals("static int isvalidgroupname(struct berval * name)")) {
+                                        LOG.info("Genealogies don't match. FunctionId=" + currentFunctionId + " but commits are unrelated: " + currentCommit + " vs. " + other.commit);
+                                        AddChangeDistances.reportFunctionGenealogy(0, possiblyMatchingGenealogy);
+                                    }
                                 }
                             }
                         }
@@ -182,7 +183,11 @@ public class FunctionMoveResolver {
 
             for (FunctionIdWithCommit currentAndNewId : currentAndNewerIds) {
                 genealogiesByFunctionIdWithCommit.put(currentAndNewId, genealogy);
-                genealogiesByFunctionId.put(currentAndNewId.functionId, genealogy);
+                final FunctionId fid = currentAndNewId.functionId;
+                List<Set<FunctionIdWithCommit>> genealogies = genealogiesByFunctionId.get(fid);
+                if ((genealogies == null) || !genealogies.contains(genealogy)) {
+                    genealogiesByFunctionId.put(currentAndNewId.functionId, genealogy);
+                }
             }
 
             done++;
