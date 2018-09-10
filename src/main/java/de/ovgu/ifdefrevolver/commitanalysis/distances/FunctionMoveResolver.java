@@ -6,6 +6,10 @@ import de.ovgu.ifdefrevolver.commitanalysis.FunctionChangeRow;
 import de.ovgu.ifdefrevolver.commitanalysis.FunctionId;
 import de.ovgu.ifdefrevolver.util.GroupingHashSetMap;
 import de.ovgu.ifdefrevolver.util.GroupingListMap;
+import org.apache.commons.math3.stat.descriptive.moment.Mean;
+import org.apache.commons.math3.stat.descriptive.rank.Max;
+import org.apache.commons.math3.stat.descriptive.rank.Median;
+import org.apache.commons.math3.stat.descriptive.rank.Min;
 import org.apache.log4j.Logger;
 
 import java.util.*;
@@ -145,34 +149,16 @@ public class FunctionMoveResolver {
         int done = 0, lastPercentage = 0;
         for (FunctionIdWithCommit id : ids) {
             Optional<Set<FunctionIdWithCommit>> genealogyToMerge = Optional.empty();
-            {
-                final FunctionId currentFunctionId = id.functionId;
-                final String currentCommit = id.commit;
-                List<Set<FunctionIdWithCommit>> possiblyMatchingGenealogies = genealogiesByFunctionId.get(currentFunctionId);
-                if (possiblyMatchingGenealogies != null) {
-                    for (Set<FunctionIdWithCommit> possiblyMatchingGenealogy : possiblyMatchingGenealogies) {
-                        for (FunctionIdWithCommit other : possiblyMatchingGenealogy) {
-                            if (other.functionId.equals(currentFunctionId)) {
-                                if (commitsDistanceDb.areCommitsRelated(currentCommit, other.commit)) {
-                                    genealogyToMerge = Optional.of(possiblyMatchingGenealogy);
-                                    break;
-                                } else {
-                                    //if (currentFunctionId.signature.equals("static int isvalidgroupname(struct berval * name)")) {
-                                    //LOG.info("Genealogies don't match. FunctionId=" + currentFunctionId + " but commits are unrelated: " + currentCommit + " vs. " + other.commit);
-                                    //AddChangeDistances.reportFunctionGenealogy(0, possiblyMatchingGenealogy);
-                                    //}
-                                }
-                            }
-                        }
-                    }
-                }
-            }
 
             Set<FunctionIdWithCommit> currentAndNewerIds = getCurrentAndNewerFunctionIdsWithCommits1(id);
-            final Set<FunctionIdWithCommit> genealogy;
-            if (!genealogyToMerge.isPresent()) {
-                genealogyToMerge = findFirstSetWithCommonElement(currentAndNewerIds, genealogiesByFunctionIdWithCommit);
+
+            for (FunctionIdWithCommit currentAndNewId : currentAndNewerIds) {
+                genealogyToMerge = findMatchingGenealogyByFunctionId(currentAndNewId, genealogiesByFunctionId);
+                if (genealogyToMerge.isPresent()) break;
             }
+
+            final Set<FunctionIdWithCommit> genealogy;
+
             if (genealogyToMerge.isPresent()) {
                 genealogy = genealogyToMerge.get();
                 genealogy.addAll(currentAndNewerIds);
@@ -200,47 +186,140 @@ public class FunctionMoveResolver {
             }
         }
 
+        Set<Map.Entry<FunctionId, List<Set<FunctionIdWithCommit>>>> entries = genealogiesByFunctionId.getMap().entrySet();
+        final int uniqueFunctionIds = entries.size();
+        int numberOfUnambiguousGenealogies = 0;
+        int numberOfAmbiguousGenealogies = 0;
+        double[] numberOfGenealogiesPerFunctionId = new double[uniqueFunctionIds];
+        int ixGenealogySize = 0;
+
+        for (Map.Entry<FunctionId, List<Set<FunctionIdWithCommit>>> e : entries) {
+            FunctionId functionId = e.getKey();
+            List<Set<FunctionIdWithCommit>> genealogies = e.getValue();
+            int numberOfGenealogiesForFunctionId = genealogies.size();
+            numberOfGenealogiesPerFunctionId[ixGenealogySize++] = numberOfGenealogiesForFunctionId;
+            if (numberOfGenealogiesForFunctionId == 1) {
+                numberOfUnambiguousGenealogies++;
+            } else {
+                numberOfAmbiguousGenealogies++;
+            }
+        }
+
+        int minSize = (int) new Min().evaluate(numberOfGenealogiesPerFunctionId);
+        int maxSize = (int) new Max().evaluate(numberOfGenealogiesPerFunctionId);
+        double meanSize = new Mean().evaluate(numberOfGenealogiesPerFunctionId);
+        double medianSize = new Median().evaluate(numberOfGenealogiesPerFunctionId);
+
+        LOG.info("Number of unique genealogies: " + rawResult.size());
+        LOG.info("Number of unique function IDs: " + uniqueFunctionIds);
+        LOG.info("min/max/mean/median number of genealogies per function ID: " + minSize + "/" + maxSize + "/" + meanSize + "/" + medianSize);
+        LOG.info("Number of function IDs where number of genealogies =1/>1: " + numberOfUnambiguousGenealogies + "/" + numberOfAmbiguousGenealogies);
+
         List<List<FunctionIdWithCommit>> result = sortGenealogies(rawResult);
         return result;
     }
 
+    private Optional<Set<FunctionIdWithCommit>> findMatchingGenealogyByFunctionId(FunctionIdWithCommit id, GroupingListMap<FunctionId, Set<FunctionIdWithCommit>> genealogiesByFunctionId) {
+        final FunctionId currentFunctionId = id.functionId;
+        final String currentCommit = id.commit;
+        List<Set<FunctionIdWithCommit>> possiblyMatchingGenealogies = genealogiesByFunctionId.get(currentFunctionId);
+        if (possiblyMatchingGenealogies == null) {
+            return Optional.empty();
+        }
+
+        for (Set<FunctionIdWithCommit> possiblyMatchingGenealogy : possiblyMatchingGenealogies) {
+            for (FunctionIdWithCommit other : possiblyMatchingGenealogy) {
+                if (other.functionId.equals(currentFunctionId)) {
+                    if (commitsDistanceDb.areCommitsRelated(currentCommit, other.commit)) {
+                        return Optional.of(possiblyMatchingGenealogy);
+                    } else {
+                        //if (currentFunctionId.signature.equals("static int isvalidgroupname(struct berval * name)")) {
+                        //LOG.info("Genealogies don't match. FunctionId=" + currentFunctionId + " but commits are unrelated: " + currentCommit + " vs. " + other.commit);
+                        //AddChangeDistances.reportFunctionGenealogy(0, possiblyMatchingGenealogy);
+                        //}
+                    }
+                }
+            }
+        }
+
+        return Optional.empty();
+    }
+
     private List<List<FunctionIdWithCommit>> sortGenealogies(List<Set<FunctionIdWithCommit>> rawResult) {
-        LOG.info("Sorting " + rawResult.size() + " genealogies.");
+        final int total = rawResult.size();
+        LOG.info("Sorting " + total + " genealogies.");
 
         List<List<FunctionIdWithCommit>> result = new ArrayList<>();
 
+        int lastPercentage = 0, done = 0;
+
         for (Set<FunctionIdWithCommit> genealogy : rawResult) {
-            //List<FunctionIdWithCommit> sorted = new ArrayList<>(genealogy);
-            //Collections.sort(sorted, cmp);
-            //result.add(sorted);
-            List<FunctionIdWithCommit> sorted = new ArrayList<>();
-            LinkedList<FunctionIdWithCommit> in = new LinkedList<>(genealogy);
-            //List<List<FunctionIdWithCommit>> branches = new ArrayList<>();
-            while (!in.isEmpty()) {
-                FunctionIdWithCommit first = in.removeFirst();
-                List<FunctionIdWithCommit> branch = new ArrayList<>();
-                branch.add(first);
-                for (Iterator<FunctionIdWithCommit> it = in.iterator(); it.hasNext(); ) {
-                    FunctionIdWithCommit next = it.next();
-                    if (commitsDistanceDb.areCommitsRelated(first.commit, next.commit)) {
-                        branch.add(next);
-                        it.remove();
-                    }
-                }
-                sorted.addAll(branch);
-            }
+            List<FunctionIdWithCommit> sorted = sortGenealogy(genealogy);
             result.add(sorted);
+            done++;
+            int newPercentage = (int) Math.floor(done * 100.0 / total);
+            if (newPercentage > lastPercentage) {
+                if (newPercentage < 100 || (done == total)) {
+                    LOG.info("Sorted " + done + "/" + total + " genealogies (" + newPercentage + "%).");
+                    lastPercentage = newPercentage;
+                }
+            }
         }
 
         return result;
     }
 
-    private static <T> Optional<Set<T>> findFirstSetWithCommonElement(Set<T> needles, Map<T, Set<T>> haystacks) {
-        for (T needle : needles) {
-            Set<T> haystack = haystacks.get(needle);
-            if (haystack != null) return Optional.of(haystack);
+    private List<FunctionIdWithCommit> sortGenealogy(Set<FunctionIdWithCommit> unsortedGenealogy) {
+        List<FunctionIdWithCommit> sorted = new ArrayList<>();
+        LinkedList<FunctionIdWithCommit> in = new LinkedList<>(unsortedGenealogy);
+
+        class SortableFunctionIdWithCommit implements Comparable<SortableFunctionIdWithCommit> {
+            final FunctionIdWithCommit id;
+            int numberOfAncestors = 0;
+
+            SortableFunctionIdWithCommit(FunctionIdWithCommit id) {
+                this.id = id;
+            }
+
+            @Override
+            public int compareTo(SortableFunctionIdWithCommit other) {
+                return this.numberOfAncestors - other.numberOfAncestors;
+            }
         }
-        return Optional.empty();
+
+        while (!in.isEmpty()) {
+            final FunctionIdWithCommit first = in.removeFirst();
+            List<SortableFunctionIdWithCommit> branch = new ArrayList<>();
+            branch.add(new SortableFunctionIdWithCommit(first));
+
+            for (Iterator<FunctionIdWithCommit> it = in.iterator(); it.hasNext(); ) {
+                FunctionIdWithCommit next = it.next();
+                if (commitsDistanceDb.areCommitsRelated(first.commit, next.commit)) {
+                    branch.add(new SortableFunctionIdWithCommit(next));
+                    it.remove();
+                }
+            }
+
+            String[] allCommits = new String[branch.size()];
+            {
+                int ix = 0;
+                for (SortableFunctionIdWithCommit current : branch) {
+                    allCommits[ix++] = current.id.commit;
+                }
+            }
+
+            for (SortableFunctionIdWithCommit current : branch) {
+                current.numberOfAncestors = commitsDistanceDb.countAncestors(current.id.commit, allCommits);
+            }
+
+            Collections.sort(branch);
+
+            for (SortableFunctionIdWithCommit current : branch) {
+                sorted.add(current.id);
+            }
+        }
+
+        return sorted;
     }
 
     private Set<FunctionIdWithCommit> getCurrentAndNewerFunctionIdsWithCommits1(FunctionIdWithCommit id) {

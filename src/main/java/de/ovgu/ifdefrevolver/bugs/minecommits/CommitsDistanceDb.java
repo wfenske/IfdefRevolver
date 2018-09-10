@@ -58,6 +58,9 @@ public class CommitsDistanceDb {
     }
 
     Map<CacheKey, Integer> knownDistances = new HashMap<>();
+    /**
+     * Map from child commit (first dimension index) to ancestor commits (second dimension index)
+     */
     boolean[][] reachables;
 
     /**
@@ -311,6 +314,32 @@ public class CommitsDistanceDb {
         }
 
         return reachables[descendantKey][ancestorKey];
+    }
+
+    public int countAncestors(String descendant, String... ancestors) {
+        ensurePreprocessed();
+        if (descendant == null) {
+            throw new NullPointerException("Descendant commit must not be null");
+        }
+        Integer descendantKey = intsFromHashes.get(descendant);
+        if (descendantKey == null) {
+            LOG.warn("Unknown descendant commit: `" + descendant + "'");
+            return 0;
+        }
+        int numAncestors = 0;
+
+        for (String ancestor : ancestors) {
+            Integer ancestorKey = intsFromHashes.get(ancestor);
+            if (ancestorKey == null) {
+                LOG.warn("Unknown ancestor commit: `" + ancestor + "'");
+            } else {
+                if (reachables[descendantKey][ancestorKey]) {
+                    numAncestors++;
+                }
+            }
+        }
+
+        return numAncestors;
     }
 
     private void maybeStatPerformance() {

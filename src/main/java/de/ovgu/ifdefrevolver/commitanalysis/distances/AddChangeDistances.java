@@ -126,7 +126,7 @@ public class AddChangeDistances {
             }
         }
 
-        computeFunctionGenealogies(allFunctionsEver);
+        List<List<FunctionIdWithCommit>> functionGenealogies = computeFunctionGenealogies(allFunctionsEver);
 
         List<CommitWindow> allWindows = groupSnapshots();
 
@@ -142,11 +142,12 @@ public class AddChangeDistances {
         LOG.info(ageRequestStats);
     }
 
-    private void computeFunctionGenealogies(Set<FunctionIdWithCommit> allFunctionsEver) {
+    private List<List<FunctionIdWithCommit>> computeFunctionGenealogies(Set<FunctionIdWithCommit> allFunctionsEver) {
         LOG.info("Computing genealogies of all functions ...");
         List<List<FunctionIdWithCommit>> genealogies = moveResolver.computeFunctionGenealogies(allFunctionsEver);
         LOG.info("Done computing genealogies of all functions");
         reportFunctionGenealogies(genealogies);
+        return genealogies;
     }
 
     private void reportFunctionGenealogies(List<List<FunctionIdWithCommit>> genealogies) {
