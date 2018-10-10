@@ -31,8 +31,20 @@ options <- list(
                 , default = NULL
                 )
     
+    , make_option(c("--maxy")
+                , help="Absolute maximum value of values on the y-axis to display."
+                , type = "numeric",
+                , default = NULL
+                )
+    
     , make_option(c("-c", "--changed")
                 , help="Consider only the values of changed functions. [default: %default]"
+                , action = "store_true"
+                , default = FALSE
+                )
+    
+    , make_option(c("--logy")
+                , help="Use a log-10 scale for the Y-axis values. [default: %default]"
                 , action = "store_true"
                 , default = FALSE
                 )
@@ -126,18 +138,20 @@ ggplotHistDiscrete <- function(df, varName, titleExtra="") {
                              length.out=maxBins),
                          round)
     }
+
+    p <- (ggplot(df, aes(x=eval(varSymbolExpr(varName))))
+        + geom_histogram(color="black", bins=length(limits))
+        + scale_x_discrete(limits=limits,name=varName)
+        + ggtitle(mkTitle(titleExtra)))
+
+    if (opts$logy) {
+        p <- p + scale_y_log10()
+        p <- p + ylab("log10(#Functions)")
+    } else {
+        p <- p + ylab("#Functions")
+    }
     
-    return (ggplot(df, aes(x=eval(varSymbolExpr(varName))))
-            + geom_histogram(color="black"
-                             ##, fill="lightblue"
-                             ## , linetype="dashed"
-                           , bins=length(limits)
-                             )
-            ##+ geom_bar() # use this for NUM_WINDOWS, scale_x for other variables
-            + scale_x_discrete(limits=limits,name=varName)
-            ##+ scale_y_log10()
-            + ggtitle(mkTitle(titleExtra))
-            )
+    return (p)
 }
 
 ggplotHistContinuous <- function(df, varName, titleExtra="") {

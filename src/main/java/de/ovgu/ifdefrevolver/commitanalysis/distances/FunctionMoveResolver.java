@@ -142,8 +142,14 @@ public class FunctionMoveResolver {
 
     public List<List<FunctionIdWithCommit>> computeFunctionGenealogies(Collection<FunctionIdWithCommit> ids) {
         List<Set<FunctionIdWithCommit>> rawResult = new LinkedList<>();
-        Map<FunctionIdWithCommit, Set<FunctionIdWithCommit>> genealogiesByFunctionIdWithCommit = new HashMap<>();
         GroupingListMap<FunctionId, Set<FunctionIdWithCommit>> genealogiesByFunctionId = new GroupingListMap<>();
+
+//        for (Iterator<FunctionIdWithCommit> it = ids.iterator(); it.hasNext(); ) {
+//            FunctionIdWithCommit id = it.next();
+//            if (!id.functionId.signature.equals("char * mdb_strerror(int err)")) {
+//                it.remove();
+//            }
+//        }
 
         final int total = ids.size();
         int done = 0, lastPercentage = 0;
@@ -168,7 +174,6 @@ public class FunctionMoveResolver {
             }
 
             for (FunctionIdWithCommit currentAndNewId : currentAndNewerIds) {
-                genealogiesByFunctionIdWithCommit.put(currentAndNewId, genealogy);
                 final FunctionId fid = currentAndNewId.functionId;
                 List<Set<FunctionIdWithCommit>> genealogies = genealogiesByFunctionId.get(fid);
                 if ((genealogies == null) || !genealogies.contains(genealogy)) {
@@ -229,7 +234,8 @@ public class FunctionMoveResolver {
 
         for (Set<FunctionIdWithCommit> possiblyMatchingGenealogy : possiblyMatchingGenealogies) {
             for (FunctionIdWithCommit other : possiblyMatchingGenealogy) {
-                if (other.functionId.equals(currentFunctionId)) {
+                FunctionId otherFunctionId = other.functionId;
+                if (otherFunctionId.equals(currentFunctionId)) {
                     if (commitsDistanceDb.areCommitsRelated(currentCommit, other.commit)) {
                         return Optional.of(possiblyMatchingGenealogy);
                     } else {

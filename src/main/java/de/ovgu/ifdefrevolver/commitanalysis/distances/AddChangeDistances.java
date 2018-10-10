@@ -184,7 +184,7 @@ public class AddChangeDistances {
             FunctionIdWithCommit next = it.next();
             //sb.append(" -> ").append(id);
             //distinctIds.add(id);
-            LOG.info("  -> " + next.functionId);
+            LOG.info("  -> " + next.functionId + " @ " + next.commit);
         }
         //LOG.info(ixGenealogy + " (" + distinctIds.size() + " ID(s)): " + sb.toString());
     }
