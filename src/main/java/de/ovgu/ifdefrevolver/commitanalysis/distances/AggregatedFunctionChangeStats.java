@@ -1,5 +1,6 @@
 package de.ovgu.ifdefrevolver.commitanalysis.distances;
 
+import de.ovgu.ifdefrevolver.bugs.minecommits.CommitsDistanceDb.Commit;
 import de.ovgu.ifdefrevolver.commitanalysis.FunctionChangeRow;
 
 import java.util.HashSet;
@@ -19,9 +20,9 @@ class AggregatedFunctionChangeStats {
     public static AggregatedFunctionChangeStats fromChanges(Set<FunctionChangeRow> changes) {
         int linesAdded = 0;
         int linesDeleted = 0;
-        Set<String> commits = new HashSet<>();
+        Set<Commit> commits = new HashSet<>();
         for (FunctionChangeRow change : changes) {
-            commits.add(change.commitId);
+            commits.add(change.commit);
             switch (change.modType) {
                 case ADD:
                 case DEL:

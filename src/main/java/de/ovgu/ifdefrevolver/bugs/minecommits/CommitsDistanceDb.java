@@ -14,6 +14,31 @@ public class CommitsDistanceDb {
 
     private boolean preprocessed = false;
 
+    public static final class Commit {
+        private final CommitsDistanceDb db;
+        public final String commitHash;
+        public final int key;
+
+        private Commit(String commitHash, int key, CommitsDistanceDb db) {
+            this.db = db;
+            this.commitHash = commitHash;
+            this.key = key;
+        }
+
+        @Override
+        public String toString() {
+            final StringBuilder sb = new StringBuilder("Commit{");
+            sb.append("commitHash='").append(commitHash).append('\'');
+            sb.append(", key=").append(key);
+            sb.append('}');
+            return sb.toString();
+        }
+
+        public boolean isRelatedTo(Commit other) {
+            return db.areCommitsRelated(this, other);
+        }
+    }
+
     /**
      * Map from commit hashes to the (possibly empty) set of parent hashes
      */
@@ -28,6 +53,8 @@ public class CommitsDistanceDb {
      * Map of the integers that have been assigned to each hash.
      */
     Map<String, Integer> intsFromHashes = new HashMap<>();
+
+    private Map<String, Commit> commitsFromHashes = new HashMap<>();
 
     /**
      * Same as {@link #parents}, but the hashes have been encoded as integers.
@@ -141,6 +168,25 @@ public class CommitsDistanceDb {
 
     public Set<String> getCommits() {
         return allCommits;
+    }
+
+    public synchronized Commit internCommit(String commitHash) {
+        ensurePreprocessed();
+
+        Commit result = commitsFromHashes.get(commitHash);
+        if (result == null) {
+            if (commitHash == null) {
+                throw new NullPointerException("Commit must not be null");
+            }
+
+            Integer key = intsFromHashes.get(commitHash);
+            if (key == null) {
+                throw new IllegalArgumentException("Unknown commit: " + commitHash);
+            }
+            result = new Commit(commitHash, key, this);
+            commitsFromHashes.put(commitHash, result);
+        }
+        return result;
     }
 
     private void populateIntParents() {
@@ -258,15 +304,43 @@ public class CommitsDistanceDb {
             return Optional.empty();
         }
 
-        if (childKey == ancestorKey) {
+        final int iChildKey = childKey;
+        final int iAncestorKey = ancestorKey;
+
+        return minDistance(iChildKey, iAncestorKey);
+    }
+
+    /**
+     * Calculate the length of the shortest path from a child commit to its ancestor
+     *
+     * @param child    the child commit
+     * @param ancestor a preceding commit
+     * @return Minimum distance in terms of commits from child to ancestor if there is a path; {@link Optional#empty()}
+     * otherwise
+     */
+    public Optional<Integer> minDistance(Commit child, Commit ancestor) {
+        ensurePreprocessed();
+        validateCommit(child);
+        validateCommit(ancestor);
+        return minDistance(child.key, ancestor.key);
+    }
+
+    private void validateCommit(Commit commit) {
+        if (commit.db != this) {
+            throw new IllegalArgumentException("Unknown commit: " + commit);
+        }
+    }
+
+    private Optional<Integer> minDistance(int iChildKey, int iAncestorKey) {
+        if (iChildKey == iAncestorKey) {
             return DIST_ZERO;
         }
 
-        if (!reachables[childKey][ancestorKey]) {
+        if (!reachables[iChildKey][iAncestorKey]) {
             return Optional.empty();
         }
 
-        CacheKey cacheKey = new CacheKey(childKey, ancestorKey);
+        CacheKey cacheKey = new CacheKey(iChildKey, iAncestorKey);
         synchronized (knownDistances) {
             Integer cachedDist = knownDistances.get(cacheKey);
             if (cachedDist != null) {
@@ -275,9 +349,9 @@ public class CommitsDistanceDb {
         }
 
         final int dist;
-        if (reachables[childKey][ancestorKey]) {
+        if (reachables[iChildKey][iAncestorKey]) {
             maybeStatPerformance();
-            dist = minDistance1(childKey, ancestorKey, cacheKey);
+            dist = minDistance1(iChildKey, iAncestorKey, cacheKey);
         } else {
             dist = INFINITE_DISTANCE;
         }
@@ -286,7 +360,7 @@ public class CommitsDistanceDb {
     }
 
     /**
-     * Determine whether one commit is the descendant of another. Note that every commit is its own descendant.
+     * Determine whether the first commit is the descendant of the second. Note that every commit is its own descendant.
      *
      * @param descendant the descendant commit
      * @param ancestor   a preceding commit
@@ -316,6 +390,21 @@ public class CommitsDistanceDb {
         return reachables[descendantKey][ancestorKey];
     }
 
+    /**
+     * Determine whether the first commit is the descendant of the second. Note that every commit is its own descendant.
+     *
+     * @param descendant the descendant commit
+     * @param ancestor   a preceding commit
+     * @return <code>true</code> if the descendant commit actually has ancestor among its ancestors, <code>false</code>
+     * otherwise.
+     */
+    public boolean isDescendant(Commit descendant, Commit ancestor) {
+        ensurePreprocessed();
+        validateCommit(descendant);
+        validateCommit(ancestor);
+        return reachables[descendant.key][ancestor.key];
+    }
+
     public int countAncestors(String descendant, String... ancestors) {
         ensurePreprocessed();
         if (descendant == null) {
@@ -336,6 +425,21 @@ public class CommitsDistanceDb {
                 if (reachables[descendantKey][ancestorKey]) {
                     numAncestors++;
                 }
+            }
+        }
+
+        return numAncestors;
+    }
+
+    public int countAncestors(Commit descendant, Commit... ancestors) {
+        ensurePreprocessed();
+        validateCommit(descendant);
+        int numAncestors = 0;
+
+        for (Commit ancestor : ancestors) {
+            validateCommit(ancestor);
+            if (reachables[descendant.key][ancestor.key]) {
+                numAncestors++;
             }
         }
 
@@ -408,14 +512,20 @@ public class CommitsDistanceDb {
      * @return A subset of the original commits that only holds commits that are not descendants of other commits
      * within the original  set of commits.
      */
-    public Set<String> filterAncestorCommits(Collection<String> commits) {
+    public Set<Commit> filterAncestorCommits(Collection<Commit> commits) {
         ensurePreprocessed();
-        Set<String> commitsWithoutAncestors = new HashSet<>(commits);
-        for (Iterator<String> it = commitsWithoutAncestors.iterator(); it.hasNext(); ) {
-            final String descendant = it.next();
-            for (String ancestor : commits) {
-                if (ancestor.equals(descendant)) continue;
-                if (this.isDescendant(descendant, ancestor)) {
+
+        for (Commit c : commits) {
+            validateCommit(c);
+        }
+
+        Set<Commit> commitsWithoutAncestors = new HashSet<>(commits);
+
+        for (Iterator<Commit> it = commitsWithoutAncestors.iterator(); it.hasNext(); ) {
+            final Commit descendant = it.next();
+            for (Commit ancestor : commits) {
+                if (ancestor == descendant) continue;
+                if (reachables[descendant.key][ancestor.key]) {
                     it.remove();
                     break;
                 }
@@ -458,6 +568,13 @@ public class CommitsDistanceDb {
         int i2 = c2Key;
 
         return reachables[i1][i2] || reachables[i2][i1];
+    }
+
+    public boolean areCommitsRelated(Commit c1, Commit c2) {
+        ensurePreprocessed();
+        validateCommit(c1);
+        validateCommit(c2);
+        return reachables[c1.key][c2.key] || reachables[c2.key][c1.key];
     }
 
     private static void main(String[] args) {

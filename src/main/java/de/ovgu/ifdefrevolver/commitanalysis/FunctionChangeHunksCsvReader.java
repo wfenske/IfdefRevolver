@@ -1,6 +1,7 @@
 package de.ovgu.ifdefrevolver.commitanalysis;
 
 import de.ovgu.ifdefrevolver.bugs.correlate.main.IHasResultsDir;
+import de.ovgu.ifdefrevolver.bugs.minecommits.CommitsDistanceDb;
 import de.ovgu.ifdefrevolver.util.SimpleCsvFileReader;
 import de.ovgu.skunk.detection.output.CsvEnumUtils;
 
@@ -15,6 +16,11 @@ import java.util.Optional;
  */
 public class FunctionChangeHunksCsvReader extends SimpleCsvFileReader<List<FunctionChangeRow>> {
     List<FunctionChangeRow> results;
+    private CommitsDistanceDb commitsDistanceDb;
+
+    public FunctionChangeHunksCsvReader(CommitsDistanceDb commitsDistanceDb) {
+        this.commitsDistanceDb = commitsDistanceDb;
+    }
 
     @Override
     protected boolean hasHeader() {
@@ -33,7 +39,9 @@ public class FunctionChangeHunksCsvReader extends SimpleCsvFileReader<List<Funct
         String file = line[FunctionChangeHunksColumns.FILE.ordinal()];
         FunctionId functionId = new FunctionId(signature, file);
         result.functionId = functionId;
-        result.commitId = line[FunctionChangeHunksColumns.COMMIT_ID.ordinal()];
+        String commitId = line[FunctionChangeHunksColumns.COMMIT_ID.ordinal()];
+        CommitsDistanceDb.Commit commit = commitsDistanceDb.internCommit(commitId);
+        result.commit = commit;
         String modTypeName = line[FunctionChangeHunksColumns.MOD_TYPE.ordinal()];
 
         result.linesAdded = parseMandatoryInt(line, FunctionChangeHunksColumns.LINES_ADDED);

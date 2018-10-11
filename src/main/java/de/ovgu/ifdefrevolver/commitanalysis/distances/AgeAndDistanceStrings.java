@@ -1,5 +1,7 @@
 package de.ovgu.ifdefrevolver.commitanalysis.distances;
 
+import de.ovgu.ifdefrevolver.bugs.minecommits.CommitsDistanceDb.Commit;
+
 class AgeAndDistanceStrings {
     final String ageString;
     final String distanceString;
@@ -9,7 +11,7 @@ class AgeAndDistanceStrings {
         this.distanceString = distanceString;
     }
 
-    public static AgeAndDistanceStrings fromHistoryAndCommit(FunctionHistory history, String currentCommit) {
+    public static AgeAndDistanceStrings fromHistoryAndCommit(FunctionHistory history, Commit currentCommit) {
         final int minDist = history.getMinDistToPreviousEdit(currentCommit);
         final String minDistStr = minDist < Integer.MAX_VALUE ? Integer.toString(minDist) : "";
 

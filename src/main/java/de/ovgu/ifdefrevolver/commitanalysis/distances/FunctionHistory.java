@@ -1,6 +1,7 @@
 package de.ovgu.ifdefrevolver.commitanalysis.distances;
 
 import de.ovgu.ifdefrevolver.bugs.minecommits.CommitsDistanceDb;
+import de.ovgu.ifdefrevolver.bugs.minecommits.CommitsDistanceDb.Commit;
 import de.ovgu.ifdefrevolver.commitanalysis.AgeRequestStats;
 import de.ovgu.ifdefrevolver.commitanalysis.FunctionId;
 import org.apache.log4j.Logger;
@@ -17,21 +18,21 @@ public class FunctionHistory {
     /**
      * All the commits that have created this function or a previous version of it.
      */
-    public final Set<String> knownAddsForFunction;
+    public final Set<Commit> knownAddsForFunction;
 
-    public final Set<String> guessedAddsForFunction;
+    public final Set<Commit> guessedAddsForFunction;
 
-    public final Set<String> additionalGuessedAdds;
+    public final Set<Commit> additionalGuessedAdds;
 
-    public final Set<String> nonDeletingCommitsToFunctionAndAliases;
+    public final Set<Commit> nonDeletingCommitsToFunctionAndAliases;
 
     private final CommitsDistanceDb commitsDistanceDb;
 
     private AgeRequestStats ageRequestStats;
 
-    public FunctionHistory(FunctionId function, Set<FunctionId> olderFunctionIds, Set<String> knownAddsForFunction,
-                           Set<String> guessedAddsForFunction, Set<String> additionalGuessedAdds,
-                           Set<String> nonDeletingCommitsToFunctionAndAliases,
+    public FunctionHistory(FunctionId function, Set<FunctionId> olderFunctionIds, Set<Commit> knownAddsForFunction,
+                           Set<Commit> guessedAddsForFunction, Set<Commit> additionalGuessedAdds,
+                           Set<Commit> nonDeletingCommitsToFunctionAndAliases,
                            CommitsDistanceDb commitsDistanceDb) {
         this.function = function;
         this.olderFunctionIds = olderFunctionIds;
@@ -53,7 +54,7 @@ public class FunctionHistory {
      * @param currentCommit
      * @return The function's age or {@link Integer#MAX_VALUE} if the age cannot be determined or guessed.
      */
-    public int getFunctionAgeAtCommit(final String currentCommit) {
+    public int getFunctionAgeAtCommit(final Commit currentCommit) {
         ageRequestStats.increaseAgeRequests();
 
         if (this.knownAddsForFunction.contains(currentCommit)) {
@@ -109,7 +110,7 @@ public class FunctionHistory {
      * @return The age of the function's last edit or {@link Integer#MAX_VALUE} if the age cannot be determined or
      * guessed.
      */
-    public int getMinDistToPreviousEdit(String currentCommit) {
+    public int getMinDistToPreviousEdit(Commit currentCommit) {
         if (knownAddsForFunction.contains(currentCommit)) {
             return 0;
         }
@@ -145,12 +146,12 @@ public class FunctionHistory {
         }
     }
 
-    private Distances computeMinDistances(final String currentCommit, final Collection<String> otherCommits) {
+    private Distances computeMinDistances(final Commit currentCommit, final Collection<Commit> otherCommits) {
         int minDist = Integer.MAX_VALUE;
         int minDistIncluding0 = Integer.MAX_VALUE;
 
-        for (String otherCommit : otherCommits) {
-            if (currentCommit.equals(otherCommit)) {
+        for (Commit otherCommit : otherCommits) {
+            if (currentCommit == otherCommit) {
                 minDistIncluding0 = 0;
                 continue;
             }
@@ -168,10 +169,10 @@ public class FunctionHistory {
         return new Distances(minDist, minDistIncluding0);
     }
 
-    private Optional<Integer> computeMaxDistance(final String currentCommit, final Collection<String> otherCommits) {
+    private Optional<Integer> computeMaxDistance(final Commit currentCommit, final Collection<Commit> otherCommits) {
         int maxDist = Integer.MIN_VALUE;
 
-        for (String otherCommit : otherCommits) {
+        for (Commit otherCommit : otherCommits) {
             Optional<Integer> currentDist = commitsDistanceDb.minDistance(currentCommit, otherCommit);
             if (!currentDist.isPresent()) continue;
             final int currentDistValue = currentDist.get();

@@ -5,6 +5,7 @@ import de.ovgu.ifdefrevolver.bugs.correlate.input.ProjectInformationReader;
 import de.ovgu.ifdefrevolver.bugs.correlate.main.ProjectInformationConfig;
 import de.ovgu.ifdefrevolver.bugs.createsnapshots.input.RevisionsCsvReader;
 import de.ovgu.ifdefrevolver.bugs.minecommits.CommitsDistanceDb;
+import de.ovgu.ifdefrevolver.bugs.minecommits.CommitsDistanceDb.Commit;
 import de.ovgu.ifdefrevolver.bugs.minecommits.CommitsDistanceDbCsvReader;
 import de.ovgu.ifdefrevolver.commitanalysis.*;
 import de.ovgu.ifdefrevolver.util.LinkedGroupingListMap;
@@ -102,8 +103,8 @@ public class AddChangeDistances {
 
         LOG.debug("Reading all function changes.");
         this.changesInSnapshots = readChangesInSnapshots(allChangesSnapshotDates);
-        LOG.debug("Reading all function definitions.");
 
+        LOG.debug("Building move resolover.");
         this.moveResolver = buildMoveResolver(changesInSnapshots);
 
         final Set<Map.Entry<FunctionId, List<FunctionChangeRow>>> functionChangeEntries =
@@ -113,20 +114,34 @@ public class AddChangeDistances {
         allFunctionsInSnapshots = readAllFunctionsInSnapshots(realSnapshotDates);
 
         Set<FunctionIdWithCommit> allFunctionsEver = new LinkedHashSet<>();
+
+        Set<FunctionIdWithCommit> leftOverFunctionIdsWithCommits = new LinkedHashSet<>();
+        if (leftOverSnapshotDate.isPresent()) {
+            Date leftOverSnapshotDateValue = leftOverSnapshotDate.get();
+            List<FunctionChangeRow> changesInLeftOverSnapshot = changesInSnapshots.get(leftOverSnapshotDateValue);
+            for (FunctionChangeRow r : changesInLeftOverSnapshot) {
+                final FunctionIdWithCommit idWithCommit;
+                if (r.modType == FunctionChangeHunk.ModificationType.MOVE) {
+                    idWithCommit = new FunctionIdWithCommit(r.newFunctionId.get(), r.commit, true);
+                } else {
+                    idWithCommit = new FunctionIdWithCommit(r.functionId, r.commit, false);
+                }
+                leftOverFunctionIdsWithCommits.add(idWithCommit);
+            }
+        }
+
         for (Map.Entry<Date, List<AllFunctionsRow>> snapshotEntry : allFunctionsInSnapshots.entrySet()) {
             final Date snapshotDate = snapshotEntry.getKey();
             final Snapshot snapshot = projectInfo.getSnapshots().get(snapshotDate);
-            if (snapshot == null) {
-                // dummy snapshot --> skip
-            }
             final String startHash = snapshot.getStartHash();
+            Commit startCommit = commitsDistanceDb.internCommit(startHash);
             for (AllFunctionsRow row : snapshotEntry.getValue()) {
-                FunctionIdWithCommit fidWithCommit = new FunctionIdWithCommit(row.functionId, startHash, false);
+                FunctionIdWithCommit fidWithCommit = new FunctionIdWithCommit(row.functionId, startCommit, false);
                 allFunctionsEver.add(fidWithCommit);
             }
         }
 
-        List<List<FunctionIdWithCommit>> functionGenealogies = computeFunctionGenealogies(allFunctionsEver);
+        List<List<FunctionIdWithCommit>> functionGenealogies = computeFunctionGenealogies(allFunctionsEver, leftOverFunctionIdsWithCommits);
 
         List<CommitWindow> allWindows = groupSnapshots();
 
@@ -142,9 +157,14 @@ public class AddChangeDistances {
         LOG.info(ageRequestStats);
     }
 
-    private List<List<FunctionIdWithCommit>> computeFunctionGenealogies(Set<FunctionIdWithCommit> allFunctionsEver) {
+    private List<List<FunctionIdWithCommit>> computeFunctionGenealogies(Set<FunctionIdWithCommit> allFunctionsEver, Set<FunctionIdWithCommit> leftOverFunctionIdsWithCommits) {
         LOG.info("Computing genealogies of all functions ...");
-        List<List<FunctionIdWithCommit>> genealogies = moveResolver.computeFunctionGenealogies(allFunctionsEver);
+        Set<FunctionIdWithCommit> functionsToAnalyze = new HashSet<>(leftOverFunctionIdsWithCommits);
+        functionsToAnalyze.addAll(allFunctionsEver);
+        List<List<FunctionIdWithCommit>> genealogies = moveResolver.computeFunctionGenealogies(functionsToAnalyze);
+        for (List<FunctionIdWithCommit> genealogy : genealogies) {
+            genealogy.removeAll(leftOverFunctionIdsWithCommits);
+        }
         LOG.info("Done computing genealogies of all functions");
         reportFunctionGenealogies(genealogies);
         return genealogies;
@@ -176,7 +196,7 @@ public class AddChangeDistances {
         Iterator<FunctionIdWithCommit> it = genealogy.iterator();
         FunctionIdWithCommit first = it.next();
         //sb.append(first.functionId);
-        LOG.info("     " + first.functionId);
+        LOG.info("     " + first.functionId + " @ " + first.commit);
 
         //distinctIds.add(first.functionId);
 
@@ -289,8 +309,8 @@ public class AddChangeDistances {
 
         private void processFunction(final AllFunctionsRowInWindow function, final CommitWindow window, CSVPrinter csv) {
             final FunctionId functionId = function.functionId;
-            final Set<String> allDirectCommitIds = getAllDirectCommitIds(functionId);
-            final Set<String> directCommitIdsInWindow = new HashSet<>(allDirectCommitIds);
+            final Set<Commit> allDirectCommitIds = getAllDirectCommitIds(functionId);
+            final Set<Commit> directCommitIdsInWindow = new HashSet<>(allDirectCommitIds);
             directCommitIdsInWindow.retainAll(window.commits);
 
             FunctionHistory history = moveResolver.getFunctionHistory(functionId, allDirectCommitIds);
@@ -304,7 +324,8 @@ public class AddChangeDistances {
             AggregatedFunctionChangeStats changeStats = AggregatedFunctionChangeStats.fromChanges(changesToFunctionAndAliasesInSnapshot);
 
             String startHashOfFirstContainingSnapshot = function.getFirstSnapshotCommit();
-            AgeAndDistanceStrings distanceStrings = AgeAndDistanceStrings.fromHistoryAndCommit(history, startHashOfFirstContainingSnapshot);
+            Commit startCommitOfFirstContainingSnaphsot = commitsDistanceDb.internCommit(startHashOfFirstContainingSnapshot);
+            AgeAndDistanceStrings distanceStrings = AgeAndDistanceStrings.fromHistoryAndCommit(history, startCommitOfFirstContainingSnaphsot);
 
             try {
                 csv.printRecord(functionId.signature, functionId.file, distanceStrings.ageString, distanceStrings.distanceString,
@@ -314,7 +335,7 @@ public class AddChangeDistances {
             }
         }
 
-        private Set<String> getAllDirectCommitIds(FunctionId function) {
+        private Set<Commit> getAllDirectCommitIds(FunctionId function) {
             final List<FunctionChangeRow> directChanges = moveResolver.getChangesByFunction().get(function);
             if (directChanges == null) {
                 if (LOG.isDebugEnabled()) {
@@ -323,9 +344,9 @@ public class AddChangeDistances {
                 return Collections.emptySet();
             }
 
-            final Set<String> allDirectCommitIds = new LinkedHashSet<>(directChanges.size());
+            final Set<Commit> allDirectCommitIds = new LinkedHashSet<>(directChanges.size());
             for (FunctionChangeRow r : directChanges) {
-                allDirectCommitIds.add(r.commitId);
+                allDirectCommitIds.add(r.commit);
             }
             return allDirectCommitIds;
         }
@@ -346,7 +367,7 @@ public class AddChangeDistances {
     private Map<Date, List<FunctionChangeRow>> readChangesInSnapshots(Collection<Date> snapshotsToProcesses) {
         LOG.debug("Reading function changes for " + snapshotsToProcesses.size() + " snapshot(s).");
         int numChanges = 0;
-        FunctionChangeHunksCsvReader reader = new FunctionChangeHunksCsvReader();
+        FunctionChangeHunksCsvReader reader = new FunctionChangeHunksCsvReader(commitsDistanceDb);
         Map<Date, List<FunctionChangeRow>> result = new LinkedHashMap<>();
         for (Date snapshotDate : snapshotsToProcesses) {
             List<FunctionChangeRow> functionChanges = reader.readFile(config, snapshotDate);
@@ -376,8 +397,9 @@ public class AddChangeDistances {
         SortedMap<Date, Snapshot> snapshots = projectInfo.getSnapshots();
         Snapshot snapshot = snapshots.get(snapshotDate);
         String startHash = snapshot.getStartHash();
+        Commit startCommit = commitsDistanceDb.internCommit(startHash);
         for (AllFunctionsRow row : functions) {
-            moveResolver.putFunctionKnownToExistAt(row.functionId, startHash);
+            moveResolver.putFunctionKnownToExistAt(row.functionId, startCommit);
 //            if (startHash.equalsIgnoreCase("0098ed12c242cabb34646a4453f2c1b012c919c7")) {
 //                LOG.warn("XXX Exists at: " + startHash + "," + row.functionId);
 //            }

@@ -1,5 +1,6 @@
 package de.ovgu.ifdefrevolver.commitanalysis.distances;
 
+import de.ovgu.ifdefrevolver.bugs.minecommits.CommitsDistanceDb.Commit;
 import de.ovgu.ifdefrevolver.commitanalysis.FunctionChangeRow;
 import de.ovgu.ifdefrevolver.commitanalysis.FunctionId;
 import org.apache.log4j.Logger;
@@ -21,7 +22,7 @@ public class FunctionFuture {
     /**
      * Ids of the commits that changed this function or one of its aliases in {@link #currentAndNewerFunctionIds}
      */
-    public final Set<String> commitsToFunctionAndAliases;
+    public final Set<Commit> commitsToFunctionAndAliases;
 
     /**
      * All changes to this function or one of its aliases, including additions, deletions, moves
@@ -29,7 +30,7 @@ public class FunctionFuture {
     public final Set<FunctionChangeRow> changesToFunctionAndAliases;
 
     public FunctionFuture(FunctionId function, Set<FunctionId> currentAndNewerFunctionIds,
-                          Set<String> commitsToFunctionAndAliases, Set<FunctionChangeRow> changesToFunctionAndAliases) {
+                          Set<Commit> commitsToFunctionAndAliases, Set<FunctionChangeRow> changesToFunctionAndAliases) {
         this.function = function;
         this.currentAndNewerFunctionIds = currentAndNewerFunctionIds;
         this.commitsToFunctionAndAliases = commitsToFunctionAndAliases;
@@ -39,7 +40,7 @@ public class FunctionFuture {
     public Set<FunctionChangeRow> getChangesFilteredByCommitIds(Set<String> commitIds) {
         Set<FunctionChangeRow> relevantChanges = new LinkedHashSet<>();
         for (FunctionChangeRow change : changesToFunctionAndAliases) {
-            if (commitIds.contains(change.commitId)) {
+            if (commitIds.contains(change.commit)) {
                 relevantChanges.add(change);
             }
         }

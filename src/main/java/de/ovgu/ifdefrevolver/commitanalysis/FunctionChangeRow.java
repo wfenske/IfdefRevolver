@@ -1,5 +1,7 @@
 package de.ovgu.ifdefrevolver.commitanalysis;
 
+import de.ovgu.ifdefrevolver.bugs.minecommits.CommitsDistanceDb.Commit;
+
 import java.util.Optional;
 
 /**
@@ -7,7 +9,7 @@ import java.util.Optional;
  */
 public class FunctionChangeRow {
     public FunctionId functionId;
-    public String commitId;
+    public Commit commit;
     public int linesAdded;
     public int linesDeleted;
     public FunctionChangeHunk.ModificationType modType;
@@ -17,7 +19,7 @@ public class FunctionChangeRow {
     public String toString() {
         return "FunctionChangeRow{" +
                 "modType=" + modType +
-                ", commitId='" + commitId + '\'' +
+                ", commit='" + commit + '\'' +
                 ", functionId=" + functionId +
                 ", newFunctionId=" + (newFunctionId.isPresent() ? newFunctionId : "") +
                 '}';
