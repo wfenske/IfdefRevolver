@@ -138,8 +138,8 @@ public class FunctionMoveResolver {
     }
 
     public List<List<FunctionIdWithCommit>> computeFunctionGenealogies(Collection<FunctionIdWithCommit> ids) {
-        List<FunctionGenealogy> rawResult = new LinkedList<>();
-        GroupingListMap<FunctionId, FunctionGenealogy> genealogiesByFunctionId = new GroupingListMap<>();
+        Set<FunctionGenealogy> rawResult = new HashSet<>();
+        GroupingHashSetMap<FunctionId, FunctionGenealogy> genealogiesByFunctionId = new GroupingHashSetMap<>();
 
 //        for (Iterator<FunctionIdWithCommit> it = ids.iterator(); it.hasNext(); ) {
 //            FunctionIdWithCommit id = it.next();
@@ -177,7 +177,7 @@ public class FunctionMoveResolver {
                 Set<FunctionId> uniqueFunctionIds = genealogy.getUniqueFunctionIds();
 
                 for (FunctionId fId : uniqueFunctionIds) {
-                    List<FunctionGenealogy> existingGenealogies = genealogiesByFunctionId.get(fId);
+                    Collection<FunctionGenealogy> existingGenealogies = genealogiesByFunctionId.get(fId);
                     if (existingGenealogies == null) continue;
                     existingGenealogies.removeAll(genealogiesToMerge);
                     if (existingGenealogies.isEmpty()) {
@@ -252,9 +252,9 @@ public class FunctionMoveResolver {
         return result;
     }
 
-    private Set<FunctionGenealogy> findMatchingGenealogiesByFunctionId(FunctionIdWithCommit id, GroupingListMap<FunctionId, FunctionGenealogy> genealogiesByFunctionId) {
+    private Set<FunctionGenealogy> findMatchingGenealogiesByFunctionId(FunctionIdWithCommit id, GroupingHashSetMap<FunctionId, FunctionGenealogy> genealogiesByFunctionId) {
         final FunctionId currentFunctionId = id.functionId;
-        List<FunctionGenealogy> possiblyMatchingGenealogies = genealogiesByFunctionId.get(currentFunctionId);
+        Collection<FunctionGenealogy> possiblyMatchingGenealogies = genealogiesByFunctionId.get(currentFunctionId);
         if (possiblyMatchingGenealogies == null) {
             return Collections.emptySet();
         }

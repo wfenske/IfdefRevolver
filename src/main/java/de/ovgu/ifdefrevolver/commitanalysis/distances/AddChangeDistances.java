@@ -142,6 +142,7 @@ public class AddChangeDistances {
         }
 
         List<List<FunctionIdWithCommit>> functionGenealogies = computeFunctionGenealogies(allFunctionsEver, leftOverFunctionIdsWithCommits);
+        System.exit(0);
 
         List<CommitWindow> allWindows = groupSnapshots();
 
@@ -162,8 +163,12 @@ public class AddChangeDistances {
         Set<FunctionIdWithCommit> functionsToAnalyze = new HashSet<>(leftOverFunctionIdsWithCommits);
         functionsToAnalyze.addAll(allFunctionsEver);
         List<List<FunctionIdWithCommit>> genealogies = moveResolver.computeFunctionGenealogies(functionsToAnalyze);
-        for (List<FunctionIdWithCommit> genealogy : genealogies) {
+        for (Iterator<List<FunctionIdWithCommit>> genealogyIt = genealogies.iterator(); genealogyIt.hasNext(); ) {
+            List<FunctionIdWithCommit> genealogy = genealogyIt.next();
             genealogy.removeAll(leftOverFunctionIdsWithCommits);
+            if (genealogy.isEmpty()) {
+                genealogyIt.remove();
+            }
         }
         LOG.info("Done computing genealogies of all functions");
         reportFunctionGenealogies(genealogies);
