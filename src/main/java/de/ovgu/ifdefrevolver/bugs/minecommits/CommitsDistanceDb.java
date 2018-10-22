@@ -88,7 +88,31 @@ public class CommitsDistanceDb {
     /**
      * Map from child commit (first dimension index) to ancestor commits (second dimension index)
      */
-    boolean[][] reachables;
+    byte[][] reachables;
+
+    private boolean isReachable(int child, int ancestor) {
+        return isReachable(reachables[child], ancestor);
+    }
+
+    private static boolean isReachable(byte[] ancestors, int ancestor) {
+        return ancestors[ancestor] != 0;
+    }
+
+    private static void setReachable(byte[] ancestors, int ancestor) {
+        ancestors[ancestor] = 1;
+    }
+
+    private void setReachables(int child, byte[] ancestors) {
+        reachables[child] = ancestors;
+    }
+
+    private byte[] getReachables(int child) {
+        return reachables[child];
+    }
+
+    private byte[] newReachablesColumn() {
+        return new byte[intsFromHashes.size()];
+    }
 
     /**
      * Calculate the length of the shortest path from a child commit to its ancestor
@@ -122,7 +146,7 @@ public class CommitsDistanceDb {
         int winningDist = INFINITE_DISTANCE;
         for (int i = 0; i < currentParents.length; i++) {
             int currentParent = currentParents[i];
-            if (!reachables[currentParent][ancestor]) continue;
+            if (!isReachable(currentParent, ancestor)) continue;
 
             CacheKey localCacheKey = new CacheKey(currentParent, ancestor);
             Integer cachedDist;
@@ -219,47 +243,47 @@ public class CommitsDistanceDb {
     private void populateReachables() {
         LOG.debug("Computing reachable commits");
         final int numCommits = intsFromHashes.size();
-        this.reachables = new boolean[numCommits][];
+        this.reachables = new byte[numCommits][];
         for (int childCommit = 0; childCommit < numCommits; childCommit++) {
-            reachables[childCommit] = computeReachables(childCommit);
+            setReachables(childCommit, computeReachables(childCommit));
         }
         LOG.debug("Done computing reachable commits");
     }
 
-    private boolean[] computeReachables(int childCommit) {
-        if (reachables[childCommit] != null) {
-            return reachables[childCommit];
+    private byte[] computeReachables(int childCommit) {
+        if (getReachables(childCommit) != null) {
+            return getReachables(childCommit);
         }
 
         //LOG.debug("Computing reachable commit " + childCommit);
 
-        boolean[] reachableFromHere = new boolean[intsFromHashes.size()];
+        byte[] reachableFromHere = newReachablesColumn();
         // A commit can always reach itself.
-        reachableFromHere[childCommit] = true;
+        setReachable(reachableFromHere, childCommit);
 
         // Common case: Just a single parent
         int[] currentParents = intParents[childCommit];
         while (currentParents.length == 1) {
             int parent = currentParents[0];
-            reachableFromHere[parent] = true;
+            setReachable(reachableFromHere, parent);
             currentParents = intParents[parent];
         }
 
         // More than one parent case
         for (int parent : currentParents) {
-            reachableFromHere[parent] = true;
-            boolean[] parentReachables = reachables[parent];
+            setReachable(reachableFromHere, parent);
+            byte[] parentReachables = getReachables(parent);
             if (parentReachables == null) {
                 parentReachables = computeReachables(parent);
             }
             for (int i = 0; i < parentReachables.length; i++) {
-                if (parentReachables[i]) {
-                    reachableFromHere[i] = true;
+                if (isReachable(parentReachables, i)) {
+                    setReachable(reachableFromHere, i);
                 }
             }
         }
 
-        reachables[childCommit] = reachableFromHere;
+        setReachables(childCommit, reachableFromHere);
         return reachableFromHere;
     }
 
@@ -336,7 +360,7 @@ public class CommitsDistanceDb {
             return DIST_ZERO;
         }
 
-        if (!reachables[iChildKey][iAncestorKey]) {
+        if (!isReachable(iChildKey, iAncestorKey)) {
             return Optional.empty();
         }
 
@@ -349,7 +373,7 @@ public class CommitsDistanceDb {
         }
 
         final int dist;
-        if (reachables[iChildKey][iAncestorKey]) {
+        if (isReachable(iChildKey, iAncestorKey)) {
             maybeStatPerformance();
             dist = minDistance1(iChildKey, iAncestorKey, cacheKey);
         } else {
@@ -387,7 +411,7 @@ public class CommitsDistanceDb {
             return false;
         }
 
-        return reachables[descendantKey][ancestorKey];
+        return isReachable(descendantKey, ancestorKey);
     }
 
     /**
@@ -402,7 +426,7 @@ public class CommitsDistanceDb {
         ensurePreprocessed();
         validateCommit(descendant);
         validateCommit(ancestor);
-        return reachables[descendant.key][ancestor.key];
+        return isReachable(descendant.key, ancestor.key);
     }
 
     public int countAncestors(String descendant, String... ancestors) {
@@ -422,7 +446,7 @@ public class CommitsDistanceDb {
             if (ancestorKey == null) {
                 LOG.warn("Unknown ancestor commit: `" + ancestor + "'");
             } else {
-                if (reachables[descendantKey][ancestorKey]) {
+                if (isReachable(descendantKey, ancestorKey)) {
                     numAncestors++;
                 }
             }
@@ -438,7 +462,7 @@ public class CommitsDistanceDb {
 
         for (Commit ancestor : ancestors) {
             validateCommit(ancestor);
-            if (reachables[descendant.key][ancestor.key]) {
+            if (isReachable(descendant.key, ancestor.key)) {
                 numAncestors++;
             }
         }
@@ -525,7 +549,7 @@ public class CommitsDistanceDb {
             final Commit descendant = it.next();
             for (Commit ancestor : commits) {
                 if (ancestor == descendant) continue;
-                if (reachables[descendant.key][ancestor.key]) {
+                if (isReachable(descendant.key, ancestor.key)) {
                     it.remove();
                     break;
                 }
@@ -567,14 +591,14 @@ public class CommitsDistanceDb {
         int i1 = c1Key;
         int i2 = c2Key;
 
-        return reachables[i1][i2] || reachables[i2][i1];
+        return isReachable(i1, i2) || isReachable(i2, i1);
     }
 
     public boolean areCommitsRelated(Commit c1, Commit c2) {
         ensurePreprocessed();
         validateCommit(c1);
         validateCommit(c2);
-        return reachables[c1.key][c2.key] || reachables[c2.key][c1.key];
+        return isReachable(c1.key, c2.key) || isReachable(c2.key, c1.key);
     }
 
     private static void main(String[] args) {
