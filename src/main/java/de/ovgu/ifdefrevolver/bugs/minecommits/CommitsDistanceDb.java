@@ -88,30 +88,41 @@ public class CommitsDistanceDb {
     /**
      * Map from child commit (first dimension index) to ancestor commits (second dimension index)
      */
-    byte[][] reachables;
+    //long[][] reachables;
+    BitSet[] reachables;
 
     private boolean isReachable(int child, int ancestor) {
         return isReachable(reachables[child], ancestor);
     }
 
-    private static boolean isReachable(byte[] ancestors, int ancestor) {
-        return ancestors[ancestor] != 0;
+    private static boolean isReachable(BitSet ancestors, int ancestor) {
+        //return ancestors[ancestor] != 0;
+        //long mask = 1l << (ancestor & 63);
+        //long field = ancestors[ancestor >> 6];
+        //return ((field & mask) != 0);
+        return ancestors.get(ancestor);
     }
 
-    private static void setReachable(byte[] ancestors, int ancestor) {
-        ancestors[ancestor] = 1;
+    private static void setReachable(BitSet ancestors, int ancestor) {
+//        long mask = 1l << (ancestor & 63);
+//        long field = ancestors[ancestor >> 6];
+//        ancestors[ancestor >> 6] = (field | mask);
+        ancestors.set(ancestor);
     }
 
-    private void setReachables(int child, byte[] ancestors) {
+    private void setReachables(int child, BitSet ancestors) {
         reachables[child] = ancestors;
     }
 
-    private byte[] getReachables(int child) {
+    private BitSet getReachables(int child) {
         return reachables[child];
     }
 
-    private byte[] newReachablesColumn() {
-        return new byte[intsFromHashes.size()];
+    private BitSet newReachablesColumn() {
+        int sz = intsFromHashes.size();
+        //int szAdj = sz >> 6;
+        //return new long[szAdj + 1];
+        return new BitSet(sz);
     }
 
     /**
@@ -243,21 +254,21 @@ public class CommitsDistanceDb {
     private void populateReachables() {
         LOG.debug("Computing reachable commits");
         final int numCommits = intsFromHashes.size();
-        this.reachables = new byte[numCommits][];
+        this.reachables = new BitSet[numCommits];
         for (int childCommit = 0; childCommit < numCommits; childCommit++) {
             setReachables(childCommit, computeReachables(childCommit));
         }
         LOG.debug("Done computing reachable commits");
     }
 
-    private byte[] computeReachables(int childCommit) {
+    private BitSet computeReachables(int childCommit) {
         if (getReachables(childCommit) != null) {
             return getReachables(childCommit);
         }
 
         //LOG.debug("Computing reachable commit " + childCommit);
 
-        byte[] reachableFromHere = newReachablesColumn();
+        BitSet reachableFromHere = newReachablesColumn();
         // A commit can always reach itself.
         setReachable(reachableFromHere, childCommit);
 
@@ -272,11 +283,11 @@ public class CommitsDistanceDb {
         // More than one parent case
         for (int parent : currentParents) {
             setReachable(reachableFromHere, parent);
-            byte[] parentReachables = getReachables(parent);
+            BitSet parentReachables = getReachables(parent);
             if (parentReachables == null) {
                 parentReachables = computeReachables(parent);
             }
-            for (int i = 0; i < parentReachables.length; i++) {
+            for (int i = 0; i < parentReachables.length(); i++) {
                 if (isReachable(parentReachables, i)) {
                     setReachable(reachableFromHere, i);
                 }
