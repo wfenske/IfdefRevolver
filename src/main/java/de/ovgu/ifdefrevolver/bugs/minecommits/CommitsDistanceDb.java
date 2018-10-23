@@ -50,18 +50,11 @@ public class CommitsDistanceDb {
     /**
      * Map from commit hashes to the (possibly empty) set of parent hashes
      */
-    private Map<String, Set<String>> parents = new HashMap<>();
+    private Map<Commit, Set<Commit>> parents = new HashMap<>();
 
     /**
-     * Simply all commits, in order of appearance
+     * Map of the commit objects that have been assigned to each hash.
      */
-    private Set<String> allCommits = new LinkedHashSet<>();
-
-    /**
-     * Map of the integers that have been assigned to each hash.
-     */
-    private Map<String, Integer> intsFromHashes = new HashMap<>();
-
     private Map<String, Commit> commitsFromHashes = new HashMap<>();
 
     /**
@@ -120,7 +113,7 @@ public class CommitsDistanceDb {
     }
 
     private BitSet newReachablesColumn() {
-        int sz = intsFromHashes.size();
+        int sz = commitsFromHashes.size();
         return new BitSet(sz);
     }
 
@@ -192,20 +185,20 @@ public class CommitsDistanceDb {
         return result;
     }
 
-    private void encodeHashesAsInts() {
-        int intKey = 0;
-        for (String hash : parents.keySet()) {
-            intsFromHashes.put(hash, intKey);
-            intKey++;
-        }
+    public Set<String> getCommits() {
+        return new HashSet<>(commitsFromHashes.keySet());
     }
 
-    public Set<String> getCommits() {
-        return allCommits;
+    private synchronized Commit findCommitOrDie(String commitHash) {
+        Commit result = commitsFromHashes.get(commitHash);
+        if (result == null) {
+            throw new IllegalArgumentException("Unknown commit: " + commitHash);
+        }
+        return result;
     }
 
     public synchronized Commit internCommit(String commitHash) {
-        ensurePreprocessed();
+        //ensurePreprocessed();
 
         Commit result = commitsFromHashes.get(commitHash);
         if (result == null) {
@@ -213,10 +206,12 @@ public class CommitsDistanceDb {
                 throw new NullPointerException("Commit must not be null");
             }
 
-            Integer key = intsFromHashes.get(commitHash);
-            if (key == null) {
-                throw new IllegalArgumentException("Unknown commit: " + commitHash);
-            }
+//            Integer key = intsFromHashes.get(commitHash);
+//            if (key == null) {
+//                throw new IllegalArgumentException("Unknown commit: " + commitHash);
+//            }
+            int key = commitsFromHashes.size();
+
             result = new Commit(commitHash, key, this);
             commitsFromHashes.put(commitHash, result);
         }
@@ -225,21 +220,13 @@ public class CommitsDistanceDb {
 
     private void populateIntParents() {
         intParents = new int[parents.size()][];
-        for (Map.Entry<String, Set<String>> e : parents.entrySet()) {
-            Integer childKey = intsFromHashes.get(e.getKey());
-            if (childKey == null) {
-                throw new IllegalStateException("Unknown child commit: `" + e.getKey() + "'");
+        for (Map.Entry<Commit, Set<Commit>> e : parents.entrySet()) {
+            final int childKey = e.getKey().key;
+            int[] existingParentsArray = new int[e.getValue().size()];
+            int ixInsert = 0;
+            for (Commit parent : e.getValue()) {
+                existingParentsArray[ixInsert++] = parent.key;
             }
-            Set<Integer> existingParents = new HashSet<>();
-            for (String parentHash : e.getValue()) {
-                Integer parentKey = intsFromHashes.get(parentHash);
-                if (parentKey == null) {
-                    LOG.info("Unknown parent commit: `" + parentHash + "'");
-                } else {
-                    existingParents.add(parentKey);
-                }
-            }
-            int[] existingParentsArray = toIntArray(existingParents);
             intParents[childKey] = existingParentsArray;
         }
 //        LOG.warn("Remove the following code!");
@@ -252,7 +239,7 @@ public class CommitsDistanceDb {
 
     private void populateReachables() {
         LOG.debug("Computing reachable commits");
-        final int numCommits = intsFromHashes.size();
+        final int numCommits = commitsFromHashes.size();
 
         ProgressMonitor pm = new ProgressMonitor(numCommits) {
             @Override
@@ -314,7 +301,6 @@ public class CommitsDistanceDb {
 
     public synchronized void ensurePreprocessed() {
         if (!preprocessed) {
-            encodeHashesAsInts();
             populateIntParents();
             populateReachables();
             preprocessed = true;
@@ -342,21 +328,10 @@ public class CommitsDistanceDb {
             throw new NullPointerException("Ancestor commit must not be null");
         }
 
-        Integer childKey = intsFromHashes.get(child);
-        if (childKey == null) {
-            LOG.warn("Unknown child commit: `" + child + "'");
-            return Optional.empty();
-        }
-        Integer ancestorKey = intsFromHashes.get(ancestor);
-        if (ancestorKey == null) {
-            LOG.warn("Unknown ancestor commit: `" + ancestor + "'");
-            return Optional.empty();
-        }
+        final int childKey = findCommitOrDie(child).key;
+        final int ancestorKey = findCommitOrDie(ancestor).key;
 
-        final int iChildKey = childKey;
-        final int iAncestorKey = ancestorKey;
-
-        return minDistance(iChildKey, iAncestorKey);
+        return minDistance(childKey, ancestorKey);
     }
 
     /**
@@ -416,68 +391,11 @@ public class CommitsDistanceDb {
      * @return <code>true</code> if the descendant commit actually has ancestor among its ancestors, <code>false</code>
      * otherwise.
      */
-    public boolean isDescendant(String descendant, String ancestor) {
-        ensurePreprocessed();
-        if (descendant == null) {
-            throw new NullPointerException("Descendant commit must not be null");
-        }
-        if (ancestor == null) {
-            throw new NullPointerException("Ancestor commit must not be null");
-        }
-
-        Integer descendantKey = intsFromHashes.get(descendant);
-        if (descendantKey == null) {
-            LOG.warn("Unknown descendant commit: `" + descendant + "'");
-            return false;
-        }
-        Integer ancestorKey = intsFromHashes.get(ancestor);
-        if (ancestorKey == null) {
-            LOG.warn("Unknown ancestor commit: `" + ancestor + "'");
-            return false;
-        }
-
-        return isReachable(descendantKey, ancestorKey);
-    }
-
-    /**
-     * Determine whether the first commit is the descendant of the second. Note that every commit is its own descendant.
-     *
-     * @param descendant the descendant commit
-     * @param ancestor   a preceding commit
-     * @return <code>true</code> if the descendant commit actually has ancestor among its ancestors, <code>false</code>
-     * otherwise.
-     */
     public boolean isDescendant(Commit descendant, Commit ancestor) {
         ensurePreprocessed();
         validateCommit(descendant);
         validateCommit(ancestor);
         return isReachable(descendant.key, ancestor.key);
-    }
-
-    public int countAncestors(String descendant, String... ancestors) {
-        ensurePreprocessed();
-        if (descendant == null) {
-            throw new NullPointerException("Descendant commit must not be null");
-        }
-        Integer descendantKey = intsFromHashes.get(descendant);
-        if (descendantKey == null) {
-            LOG.warn("Unknown descendant commit: `" + descendant + "'");
-            return 0;
-        }
-        int numAncestors = 0;
-
-        for (String ancestor : ancestors) {
-            Integer ancestorKey = intsFromHashes.get(ancestor);
-            if (ancestorKey == null) {
-                LOG.warn("Unknown ancestor commit: `" + ancestor + "'");
-            } else {
-                if (isReachable(descendantKey, ancestorKey)) {
-                    numAncestors++;
-                }
-            }
-        }
-
-        return numAncestors;
     }
 
     public int countAncestors(Commit descendant, Commit... ancestors) {
@@ -523,29 +441,24 @@ public class CommitsDistanceDb {
         }
     }
 
-    private static int[] toIntArray(Collection<Integer> integers) {
-        int[] result = new int[integers.size()];
-        int insertPos = 0;
-        for (Integer v : integers) {
-            result[insertPos++] = v;
-        }
-        return result;
-    }
-
     public synchronized void put(String commit, String... parents) {
         assertNotPreprocessed();
-        this.allCommits.add(commit);
-        Set<String> existingParents = ensureExistingParentsSet(commit);
-        for (String parent : parents) {
+        internCommit(commit);
+        Set<Commit> existingParents = ensureExistingParentsSet(commit);
+        for (String parentHash : parents) {
+            Commit parent = internCommit(parentHash);
             existingParents.add(parent);
         }
     }
 
     public synchronized void put(String commit, Set<String> parents) {
         assertNotPreprocessed();
-        this.allCommits.add(commit);
-        Set<String> existingParents = ensureExistingParentsSet(commit);
-        existingParents.addAll(parents);
+        internCommit(commit);
+        Set<Commit> existingParents = ensureExistingParentsSet(commit);
+        for (String parentHash : parents) {
+            Commit parent = internCommit(parentHash);
+            existingParents.add(parent);
+        }
     }
 
     private synchronized void assertNotPreprocessed() {
@@ -584,8 +497,9 @@ public class CommitsDistanceDb {
         return commitsWithoutAncestors;
     }
 
-    private Set<String> ensureExistingParentsSet(String commit) {
-        Set<String> existingParents = this.parents.get(commit);
+    private Set<Commit> ensureExistingParentsSet(String commitHash) {
+        Commit commit = internCommit(commitHash);
+        Set<Commit> existingParents = this.parents.get(commit);
         if (existingParents == null) {
             existingParents = new HashSet<>();
             this.parents.put(commit, existingParents);
@@ -602,16 +516,8 @@ public class CommitsDistanceDb {
             throw new NullPointerException("Ancestor commit must not be null");
         }
 
-        Integer c1Key = intsFromHashes.get(c1);
-        if (c1Key == null) {
-            LOG.warn("Unknown commit: `" + c1 + "'");
-            return false;
-        }
-        Integer c2Key = intsFromHashes.get(c2);
-        if (c2Key == null) {
-            LOG.warn("Unknown commit: `" + c2 + "'");
-            return false;
-        }
+        int c1Key = findCommitOrDie(c1).key;
+        int c2Key = findCommitOrDie(c2).key;
 
         int i1 = c1Key;
         int i2 = c2Key;
