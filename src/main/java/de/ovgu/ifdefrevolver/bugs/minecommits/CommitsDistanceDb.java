@@ -1,5 +1,6 @@
 package de.ovgu.ifdefrevolver.bugs.minecommits;
 
+import de.ovgu.ifdefrevolver.util.ProgressMonitor;
 import org.apache.log4j.Logger;
 
 import java.util.*;
@@ -42,17 +43,17 @@ public class CommitsDistanceDb {
     /**
      * Map from commit hashes to the (possibly empty) set of parent hashes
      */
-    Map<String, Set<String>> parents = new HashMap<>();
+    private Map<String, Set<String>> parents = new HashMap<>();
 
     /**
      * Simply all commits, in order of appearance
      */
-    Set<String> allCommits = new LinkedHashSet<>();
+    private Set<String> allCommits = new LinkedHashSet<>();
 
     /**
      * Map of the integers that have been assigned to each hash.
      */
-    Map<String, Integer> intsFromHashes = new HashMap<>();
+    private Map<String, Integer> intsFromHashes = new HashMap<>();
 
     private Map<String, Commit> commitsFromHashes = new HashMap<>();
 
@@ -85,10 +86,10 @@ public class CommitsDistanceDb {
     }
 
     Map<CacheKey, Integer> knownDistances = new HashMap<>();
+
     /**
      * Map from child commit (first dimension index) to ancestor commits (second dimension index)
      */
-    //long[][] reachables;
     BitSet[] reachables;
 
     private boolean isReachable(int child, int ancestor) {
@@ -96,17 +97,10 @@ public class CommitsDistanceDb {
     }
 
     private static boolean isReachable(BitSet ancestors, int ancestor) {
-        //return ancestors[ancestor] != 0;
-        //long mask = 1l << (ancestor & 63);
-        //long field = ancestors[ancestor >> 6];
-        //return ((field & mask) != 0);
         return ancestors.get(ancestor);
     }
 
     private static void setReachable(BitSet ancestors, int ancestor) {
-//        long mask = 1l << (ancestor & 63);
-//        long field = ancestors[ancestor >> 6];
-//        ancestors[ancestor >> 6] = (field | mask);
         ancestors.set(ancestor);
     }
 
@@ -120,8 +114,6 @@ public class CommitsDistanceDb {
 
     private BitSet newReachablesColumn() {
         int sz = intsFromHashes.size();
-        //int szAdj = sz >> 6;
-        //return new long[szAdj + 1];
         return new BitSet(sz);
     }
 
@@ -254,11 +246,24 @@ public class CommitsDistanceDb {
     private void populateReachables() {
         LOG.debug("Computing reachable commits");
         final int numCommits = intsFromHashes.size();
+
+        ProgressMonitor pm = new ProgressMonitor(numCommits) {
+            @Override
+            protected void reportIntermediateProgress() {
+                LOG.debug("Computed reachable commit " + ticksDone + "/" + ticksTotal + "(" + this.numberOfCurrentReport + "%)");
+            }
+
+            @Override
+            protected void reportFinished() {
+                LOG.debug("Done computing " + ticksTotal + " reachable commits");
+            }
+        };
+
         this.reachables = new BitSet[numCommits];
         for (int childCommit = 0; childCommit < numCommits; childCommit++) {
             setReachables(childCommit, computeReachables(childCommit));
+            pm.increaseDone();
         }
-        LOG.debug("Done computing reachable commits");
     }
 
     private BitSet computeReachables(int childCommit) {
@@ -283,10 +288,12 @@ public class CommitsDistanceDb {
         // More than one parent case
         for (int parent : currentParents) {
             setReachable(reachableFromHere, parent);
+
             BitSet parentReachables = getReachables(parent);
             if (parentReachables == null) {
                 parentReachables = computeReachables(parent);
             }
+
             for (int i = 0; i < parentReachables.length(); i++) {
                 if (isReachable(parentReachables, i)) {
                     setReachable(reachableFromHere, i);

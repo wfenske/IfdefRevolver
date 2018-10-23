@@ -7,6 +7,7 @@ import de.ovgu.ifdefrevolver.commitanalysis.FunctionChangeRow;
 import de.ovgu.ifdefrevolver.commitanalysis.FunctionId;
 import de.ovgu.ifdefrevolver.util.GroupingHashSetMap;
 import de.ovgu.ifdefrevolver.util.GroupingListMap;
+import de.ovgu.ifdefrevolver.util.ProgressMonitor;
 import org.apache.log4j.Logger;
 
 import java.util.*;
@@ -149,7 +150,20 @@ public class FunctionMoveResolver {
 //        }
 
         final int total = ids.size();
-        int done = 0, lastPercentage = 0;
+
+        ProgressMonitor pm = new ProgressMonitor(total) {
+            @Override
+            protected void reportIntermediateProgress() {
+                LOG.info("Computed " + ticksDone + "/" + ticksTotal +
+                        " genealogies (" + this.numberOfCurrentReport + "%)");
+            }
+
+            @Override
+            protected void reportFinished() {
+                LOG.info("Done " + ticksTotal + " genealogies");
+            }
+        };
+
         for (FunctionIdWithCommit id : ids) {
             Set<FunctionGenealogy> genealogiesToMerge = new HashSet<>();
 
@@ -202,14 +216,7 @@ public class FunctionMoveResolver {
                 genealogiesByFunctionId.put(fId, genealogy);
             }
 
-            done++;
-            int newPercentage = (int) Math.floor(done * 100.0 / total);
-            if (newPercentage > lastPercentage) {
-                if (newPercentage < 100 || (done == total)) {
-                    LOG.info("Computed " + done + "/" + total + " genealogies (" + newPercentage + "%).");
-                    lastPercentage = newPercentage;
-                }
-            }
+            pm.increaseDone();
         }
 
 //        Set<Map.Entry<FunctionId, List<FunctionGenealogy>>> entries = genealogiesByFunctionId.getMap().entrySet();
@@ -276,19 +283,22 @@ public class FunctionMoveResolver {
 
         List<List<FunctionIdWithCommit>> result = new ArrayList<>();
 
-        int lastPercentage = 0, done = 0;
+        ProgressMonitor pm = new ProgressMonitor(total) {
+            @Override
+            protected void reportIntermediateProgress() {
+                LOG.info("Sorted " + ticksDone + "/" + ticksTotal + " genealogies (" + numberOfCurrentReport + "%).");
+            }
+
+            @Override
+            protected void reportFinished() {
+                LOG.info("Done sorting " + ticksTotal + " genealogies.");
+            }
+        };
 
         for (Set<FunctionIdWithCommit> genealogy : rawResult) {
             List<FunctionIdWithCommit> sorted = sortGenealogy(genealogy);
             result.add(sorted);
-            done++;
-            int newPercentage = (int) Math.floor(done * 100.0 / total);
-            if (newPercentage > lastPercentage) {
-                if (newPercentage < 100 || (done == total)) {
-                    LOG.info("Sorted " + done + "/" + total + " genealogies (" + newPercentage + "%).");
-                    lastPercentage = newPercentage;
-                }
-            }
+            pm.increaseDone();
         }
 
         return result;
