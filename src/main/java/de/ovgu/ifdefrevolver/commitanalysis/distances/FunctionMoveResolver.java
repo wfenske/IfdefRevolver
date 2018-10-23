@@ -138,7 +138,10 @@ public class FunctionMoveResolver {
         return done;
     }
 
-    public List<List<FunctionIdWithCommit>> computeFunctionGenealogies(Collection<FunctionIdWithCommit> ids) {
+    public List<List<FunctionIdWithCommit>> computeFunctionGenealogies(Collection<FunctionIdWithCommit> unsortedIds) {
+        List<FunctionIdWithCommit> ids = new ArrayList<>(unsortedIds);
+        Collections.sort(ids, FunctionIdWithCommit.BY_FUNCTION_ID_AND_COMMIT_HASH);
+
         Set<FunctionGenealogy> rawResult = new HashSet<>();
         GroupingHashSetMap<FunctionId, FunctionGenealogy> genealogiesByFunctionId = new GroupingHashSetMap<>();
 
@@ -322,6 +325,7 @@ public class FunctionMoveResolver {
 
     private List<FunctionIdWithCommit> sortGenealogy(Set<FunctionIdWithCommit> unsortedGenealogy) {
         LinkedList<FunctionIdWithCommit> in = new LinkedList<>(unsortedGenealogy);
+        Collections.sort(in, FunctionIdWithCommit.BY_FUNCTION_ID_AND_COMMIT_HASH);
 
         class SortableFunctionIdWithCommit implements Comparable<SortableFunctionIdWithCommit> {
             final FunctionIdWithCommit id;

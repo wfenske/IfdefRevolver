@@ -205,6 +205,7 @@ public class AddChangeDistances {
         double meanSize = new Mean().evaluate(sizes);
         double medianSize = new Median().evaluate(sizes);
 
+        LOG.info("Number of genealogies: " + genealogies.size());
         LOG.info("min/max/mean/median size of genealogies: " + minSize + "/" + maxSize + "/" + meanSize + "/" + medianSize);
     }
 
@@ -217,7 +218,7 @@ public class AddChangeDistances {
         Iterator<FunctionIdWithCommit> it = genealogy.iterator();
         FunctionIdWithCommit first = it.next();
         //sb.append(first.functionId);
-        LOG.info("     " + first.functionId + " @ " + first.commit);
+        LOG.info("  -> " + first.functionId + " @ " + first.commit);
 
         //distinctIds.add(first.functionId);
 
