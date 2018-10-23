@@ -301,11 +301,26 @@ public class FunctionMoveResolver {
             pm.increaseDone();
         }
 
+        class GenealogyComparator implements Comparator<List<FunctionIdWithCommit>> {
+            @Override
+            public int compare(List<FunctionIdWithCommit> o1, List<FunctionIdWithCommit> o2) {
+                int len = Math.min(o1.size(), o2.size());
+                for (int i = 0; i < len; i++) {
+                    FunctionIdWithCommit f1 = o1.get(i);
+                    FunctionIdWithCommit f2 = o2.get(i);
+                    int r = FunctionIdWithCommit.BY_FUNCTION_ID_AND_COMMIT_HASH.compare(f1, f2);
+                    if (r != 0) return r;
+                }
+                return o2.size() - o1.size();
+            }
+        }
+
+        Collections.sort(result, new GenealogyComparator());
+
         return result;
     }
 
     private List<FunctionIdWithCommit> sortGenealogy(Set<FunctionIdWithCommit> unsortedGenealogy) {
-        List<FunctionIdWithCommit> sorted = new ArrayList<>();
         LinkedList<FunctionIdWithCommit> in = new LinkedList<>(unsortedGenealogy);
 
         class SortableFunctionIdWithCommit implements Comparable<SortableFunctionIdWithCommit> {
@@ -318,9 +333,27 @@ public class FunctionMoveResolver {
 
             @Override
             public int compareTo(SortableFunctionIdWithCommit other) {
-                return this.numberOfAncestors - other.numberOfAncestors;
+                int r = this.numberOfAncestors - other.numberOfAncestors;
+                if (r != 0) return r;
+                return FunctionIdWithCommit.BY_FUNCTION_ID_AND_COMMIT_HASH.compare(this.id, other.id);
             }
         }
+
+        class BranchComparator implements Comparator<List<SortableFunctionIdWithCommit>> {
+            @Override
+            public int compare(List<SortableFunctionIdWithCommit> o1, List<SortableFunctionIdWithCommit> o2) {
+                int o1Size = o1.size();
+                int r = o2.size() - o1Size;
+                if (r != 0) return r;
+                for (int i = 0; i < o1Size; i++) {
+                    r = o1.get(i).compareTo(o2.get(i));
+                    if (r != 0) return r;
+                }
+                return 0;
+            }
+        }
+
+        List<List<SortableFunctionIdWithCommit>> branches = new ArrayList<>();
 
         while (!in.isEmpty()) {
             final FunctionIdWithCommit first = in.removeFirst();
@@ -348,9 +381,15 @@ public class FunctionMoveResolver {
             }
 
             Collections.sort(branch);
+            branches.add(branch);
+        }
 
-            for (SortableFunctionIdWithCommit current : branch) {
-                sorted.add(current.id);
+        Collections.sort(branches, new BranchComparator());
+
+        List<FunctionIdWithCommit> sorted = new ArrayList<>();
+        for (List<SortableFunctionIdWithCommit> branch : branches) {
+            for (SortableFunctionIdWithCommit s : branch) {
+                sorted.add(s.id);
             }
         }
 

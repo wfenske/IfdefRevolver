@@ -1,16 +1,26 @@
 package de.ovgu.ifdefrevolver.commitanalysis.distances;
 
-import de.ovgu.ifdefrevolver.bugs.minecommits.CommitsDistanceDb;
+import de.ovgu.ifdefrevolver.bugs.minecommits.CommitsDistanceDb.Commit;
 import de.ovgu.ifdefrevolver.commitanalysis.FunctionId;
 
+import java.util.Comparator;
 import java.util.Objects;
 
 public class FunctionIdWithCommit {
     public final FunctionId functionId;
-    public final CommitsDistanceDb.Commit commit;
+    public final Commit commit;
     public final boolean move;
 
-    public FunctionIdWithCommit(FunctionId functionId, CommitsDistanceDb.Commit commit, boolean move) {
+    public static final Comparator<FunctionIdWithCommit> BY_FUNCTION_ID_AND_COMMIT_HASH = new Comparator<FunctionIdWithCommit>() {
+        @Override
+        public int compare(FunctionIdWithCommit o1, FunctionIdWithCommit o2) {
+            int r = FunctionId.BY_FILE_AND_SIGNATURE_ID.compare(o1.functionId, o2.functionId);
+            if (r != 0) return r;
+            return Commit.BY_HASH.compare(o1.commit, o2.commit);
+        }
+    };
+
+    public FunctionIdWithCommit(FunctionId functionId, Commit commit, boolean move) {
         this.functionId = functionId;
         this.commit = commit;
         this.move = move;

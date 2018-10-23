@@ -5,6 +5,7 @@ import de.ovgu.ifdefrevolver.commitanalysis.FunctionId;
 import de.ovgu.ifdefrevolver.util.GroupingHashSetMap;
 import org.apache.log4j.Logger;
 
+import java.util.Collection;
 import java.util.Set;
 
 public class FunctionGenealogy {
@@ -48,7 +49,7 @@ public class FunctionGenealogy {
         return false;
     }
 
-    public Set<FunctionIdWithCommit> mergeInto(Set<FunctionIdWithCommit> target) {
+    public <T extends Collection<FunctionIdWithCommit>> T mergeInto(T target) {
         target.addAll(functionIdsWithCommits);
         return target;
     }

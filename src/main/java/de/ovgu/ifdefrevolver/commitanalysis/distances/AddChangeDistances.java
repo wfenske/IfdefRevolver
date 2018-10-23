@@ -198,6 +198,8 @@ public class AddChangeDistances {
             sizes[ixGenealogy] = genealogy.size();
         }
 
+        Arrays.sort(sizes);
+
         int minSize = (int) new Min().evaluate(sizes);
         int maxSize = (int) new Max().evaluate(sizes);
         double meanSize = new Mean().evaluate(sizes);

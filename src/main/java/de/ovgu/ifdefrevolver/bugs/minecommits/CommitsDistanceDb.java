@@ -20,6 +20,13 @@ public class CommitsDistanceDb {
         public final String commitHash;
         public final int key;
 
+        public static final Comparator<Commit> BY_HASH = new Comparator<Commit>() {
+            @Override
+            public int compare(Commit o1, Commit o2) {
+                return o1.commitHash.compareTo(o2.commitHash);
+            }
+        };
+
         private Commit(String commitHash, int key, CommitsDistanceDb db) {
             this.db = db;
             this.commitHash = commitHash;
@@ -30,7 +37,7 @@ public class CommitsDistanceDb {
         public String toString() {
             final StringBuilder sb = new StringBuilder("Commit{");
             sb.append("commitHash='").append(commitHash).append('\'');
-            sb.append(", key=").append(key);
+            //sb.append(", key=").append(key);
             sb.append('}');
             return sb.toString();
         }
