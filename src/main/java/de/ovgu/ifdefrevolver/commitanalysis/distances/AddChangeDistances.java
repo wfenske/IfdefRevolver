@@ -119,7 +119,7 @@ public class AddChangeDistances {
         LOG.debug("Reading all function changes.");
         this.changesInSnapshots = readChangesInSnapshots(allChangesSnapshotDates);
 
-        LOG.debug("Building move resolover.");
+        LOG.debug("Building move resolver.");
         this.moveResolver = buildMoveResolver(changesInSnapshots);
 
         final Set<Map.Entry<FunctionId, List<FunctionChangeRow>>> functionChangeEntries =
@@ -248,8 +248,10 @@ public class AddChangeDistances {
             }
 
             Set<FunctionId> allDefinitions = new LinkedHashSet<>();
+            FunctionId lastFunctionId = null;
             for (FunctionIdWithCommit f : cutDownToSnapshot) {
                 allDefinitions.add(f.functionId);
+                lastFunctionId = f.functionId;
             }
 
             Set<FunctionChangeRow> changes = new LinkedHashSet<>();
@@ -259,12 +261,14 @@ public class AddChangeDistances {
             }
 
             SnapshotFunctionGenealogy sfg = new SnapshotFunctionGenealogy();
-            sfg.age = -1;
+            sfg.ageAtStart = -1;
+            sfg.commitsSinceLastEdit = -1;
             sfg.allFunctionsRow = allFunctionsByFunctionId.get(functionId);
             sfg.annotationData = abResByFunctionId.get(functionId);
             sfg.definitions = allDefinitions;
             sfg.snapshot = s;
             sfg.changes = changes;
+            sfg.functionIdAtEnd = lastFunctionId;
 
             genealogiesByFunctionId.put(functionId, sfg);
         }
@@ -297,11 +301,13 @@ public class AddChangeDistances {
     }
 
     private static class SnapshotFunctionGenealogy {
-        int age;
+        int ageAtStart;
+        int commitsSinceLastEdit;
         Snapshot snapshot;
         Set<FunctionId> definitions;
         Set<FunctionChangeRow> changes;
         AllFunctionsRow allFunctionsRow;
+        FunctionId functionIdAtEnd;
         AbResRow annotationData;
     }
 
