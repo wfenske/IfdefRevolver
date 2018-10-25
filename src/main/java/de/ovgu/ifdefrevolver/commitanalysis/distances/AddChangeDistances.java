@@ -1,5 +1,6 @@
 package de.ovgu.ifdefrevolver.commitanalysis.distances;
 
+import com.google.common.collect.Ordering;
 import de.ovgu.ifdefrevolver.bugs.correlate.data.Snapshot;
 import de.ovgu.ifdefrevolver.bugs.correlate.input.ProjectInformationReader;
 import de.ovgu.ifdefrevolver.bugs.correlate.main.ProjectInformationConfig;
@@ -8,9 +9,7 @@ import de.ovgu.ifdefrevolver.bugs.minecommits.CommitsDistanceDb;
 import de.ovgu.ifdefrevolver.bugs.minecommits.CommitsDistanceDb.Commit;
 import de.ovgu.ifdefrevolver.bugs.minecommits.CommitsDistanceDbCsvReader;
 import de.ovgu.ifdefrevolver.commitanalysis.*;
-import de.ovgu.ifdefrevolver.util.LinkedGroupingListMap;
-import de.ovgu.ifdefrevolver.util.ThreadProcessor;
-import de.ovgu.ifdefrevolver.util.UncaughtWorkerThreadException;
+import de.ovgu.ifdefrevolver.util.*;
 import de.ovgu.skunk.detection.output.CsvFileWriterHelper;
 import org.apache.commons.cli.*;
 import org.apache.commons.csv.CSVPrinter;
@@ -38,6 +37,8 @@ public class AddChangeDistances {
     private Map<Date, List<FunctionChangeRow>> changesInSnapshots;
     private ProjectInformationReader<ListChangedFunctionsConfig> projectInfo;
     private Map<Date, List<AllFunctionsRow>> allFunctionsInSnapshots;
+    private Map<Date, List<AbResRow>> annotationDataInSnapshots;
+    private List<List<FunctionIdWithCommit>> functionGenealogies;
 
     /**
      * Number of commit snapshots per commit window
@@ -126,12 +127,14 @@ public class AddChangeDistances {
         LOG.debug("Done reading all function changes. Number of distinct changed functions: " + functionChangeEntries.size());
 
         allFunctionsInSnapshots = readAllFunctionsInSnapshots(realSnapshotDates);
+        annotationDataInSnapshots = readAllAbResInSnapshots(realSnapshotDates);
 
         Set<FunctionIdWithCommit> allFunctionsEver = getFunctionIdsWithCommitFromRegularSnapshots();
         Set<FunctionIdWithCommit> leftOverFunctionIdsWithCommits = getFunctionIdsWithCommitFromLeftOverSnapshot(leftOverSnapshotDate);
         Set<FunctionIdWithCommit> functionsAddedInBetween = getFunctionIdsWithCommitsAddedInBetween();
 
-        List<List<FunctionIdWithCommit>> functionGenealogies = computeFunctionGenealogies(allFunctionsEver, leftOverFunctionIdsWithCommits, functionsAddedInBetween);
+        functionGenealogies = computeFunctionGenealogies(allFunctionsEver, leftOverFunctionIdsWithCommits, functionsAddedInBetween);
+        List<SnapshotWithFunctions> snapshotsWithFunctions = mergeGenealogiesWithSnapshotData();
         System.exit(0);
 
         List<CommitWindow> allWindows = groupSnapshots();
@@ -146,6 +149,165 @@ public class AddChangeDistances {
         }
 
         LOG.info(ageRequestStats);
+    }
+
+    private List<SnapshotWithFunctions> mergeGenealogiesWithSnapshotData() {
+        List<SnapshotWithFunctions> result = new ArrayList<>();
+
+        GroupingListMap<Commit, List<FunctionIdWithCommit>> genealogiesByStartHash = groupFunctionGenealogiesBySnapshortStartHash();
+
+        ProgressMonitor pm = new ProgressMonitor(projectInfo.getSnapshots().size()) {
+            @Override
+            protected void reportIntermediateProgress() {
+                LOG.info("Merged genealogies into " + this.ticksDone + "/" + this.ticksTotal + " snapshots (" + this.numberOfCurrentReport + "%)");
+            }
+
+            @Override
+            protected void reportFinished() {
+                LOG.info("Merged all " + this.ticksTotal + " genealogies into  snapshots.");
+            }
+        };
+
+        for (Snapshot s : projectInfo.getSnapshots().values()) {
+            Commit startHash = commitsDistanceDb.internCommit(s.getStartHash());
+            List<List<FunctionIdWithCommit>> genealogiesForSnapshot = genealogiesByStartHash.get(startHash);
+            SnapshotWithFunctions swf = mergeGenealogiesWithSnapshotData(s, genealogiesForSnapshot);
+            result.add(swf);
+            pm.increaseDone();
+        }
+
+        return result;
+    }
+
+    private GroupingListMap<Commit, List<FunctionIdWithCommit>> groupFunctionGenealogiesBySnapshortStartHash() {
+        Set<Commit> startCommits = new HashSet<>();
+        for (Snapshot s : projectInfo.getSnapshots().values()) {
+            Commit startCommit = commitsDistanceDb.internCommit(s.getStartHash());
+            startCommits.add(startCommit);
+        }
+
+        GroupingListMap<Commit, List<FunctionIdWithCommit>> genealogiesByStartHash = new GroupingListMap<>();
+        for (List<FunctionIdWithCommit> genealogy : this.functionGenealogies) {
+            Set<Commit> startHashesInGenealogy = new HashSet<>();
+            for (FunctionIdWithCommit f : genealogy) {
+                Commit c = f.commit;
+                if (startCommits.contains(c)) {
+                    startHashesInGenealogy.add(c);
+                }
+            }
+
+            for (Commit startHash : startHashesInGenealogy) {
+                genealogiesByStartHash.put(startHash, genealogy);
+            }
+        }
+        return genealogiesByStartHash;
+    }
+
+    private SnapshotWithFunctions mergeGenealogiesWithSnapshotData(Snapshot s, List<List<FunctionIdWithCommit>> genealogiesForSnapshot) {
+        Date snapshotDate = s.getSnapshotDate();
+
+        Map<FunctionId, AllFunctionsRow> allFunctionsByFunctionId = new HashMap<>();
+        for (AllFunctionsRow r : allFunctionsInSnapshots.get(snapshotDate)) {
+            allFunctionsByFunctionId.put(r.functionId, r);
+        }
+
+        Map<FunctionId, AbResRow> abResByFunctionId = new HashMap<>();
+        for (AbResRow r : annotationDataInSnapshots.get(snapshotDate)) {
+            abResByFunctionId.put(r.getFunctionId(), r);
+        }
+
+        GroupingListMap<FunctionId, FunctionChangeRow> changesByFunctionId = new GroupingListMap<>();
+        for (FunctionChangeRow r : changesInSnapshots.get(snapshotDate)) {
+            changesByFunctionId.put(r.functionId, r);
+        }
+
+        Commit startCommit = commitsDistanceDb.internCommit(s.getStartHash());
+
+        Set<Commit> commitsInSnapshot = new LinkedHashSet<>();
+        for (String h : s.getCommitHashes()) {
+            commitsInSnapshot.add(commitsDistanceDb.internCommit(h));
+        }
+
+        Comparator<FunctionIdWithCommit> bySnapshotComparator = getBySnapshotCommitOrderComparator(commitsInSnapshot);
+
+        Map<FunctionId, SnapshotFunctionGenealogy> genealogiesByFunctionId = new HashMap<>();
+        for (List<FunctionIdWithCommit> genealogy : genealogiesForSnapshot) {
+            List<FunctionIdWithCommit> cutDownToSnapshot = limitGenealogyToSnapshot(genealogy, commitsInSnapshot);
+            Collections.sort(cutDownToSnapshot, bySnapshotComparator);
+
+            FunctionIdWithCommit firstFunctionIdWithCommit = cutDownToSnapshot.get(0);
+            if (!firstFunctionIdWithCommit.commit.equals(startCommit)) {
+                LOG.warn("First function id with commit does not match snapshot start hash: " + firstFunctionIdWithCommit + " vs. " + startCommit);
+                continue;
+            }
+
+            FunctionId functionId = firstFunctionIdWithCommit.functionId;
+            if (genealogiesByFunctionId.containsKey(functionId)) {
+                LOG.warn("Snapshot already contains the same function id: " + functionId);
+                continue;
+            }
+
+            Set<FunctionId> allDefinitions = new LinkedHashSet<>();
+            for (FunctionIdWithCommit f : cutDownToSnapshot) {
+                allDefinitions.add(f.functionId);
+            }
+
+            Set<FunctionChangeRow> changes = new LinkedHashSet<>();
+            for (FunctionId id : allDefinitions) {
+                List<FunctionChangeRow> changesForId = changesByFunctionId.get(id);
+                changes.addAll(changesForId);
+            }
+
+            SnapshotFunctionGenealogy sfg = new SnapshotFunctionGenealogy();
+            sfg.age = -1;
+            sfg.allFunctionsRow = allFunctionsByFunctionId.get(functionId);
+            sfg.annotationData = abResByFunctionId.get(functionId);
+            sfg.definitions = allDefinitions;
+            sfg.snapshot = s;
+            sfg.changes = changes;
+
+            genealogiesByFunctionId.put(functionId, sfg);
+        }
+
+        SnapshotWithFunctions result = new SnapshotWithFunctions();
+        result.snapshot = s;
+        result.functions = genealogiesByFunctionId;
+
+        return result;
+    }
+
+    private Comparator<FunctionIdWithCommit> getBySnapshotCommitOrderComparator(Set<Commit> commitsInSnapshot) {
+        Ordering<Commit> commitsInSnapshotOrdering = Ordering.explicit(new ArrayList<>(commitsInSnapshot));
+        return new Comparator<FunctionIdWithCommit>() {
+            @Override
+            public int compare(FunctionIdWithCommit o1, FunctionIdWithCommit o2) {
+                return commitsInSnapshotOrdering.compare(o1.commit, o2.commit);
+            }
+        };
+    }
+
+    private List<FunctionIdWithCommit> limitGenealogyToSnapshot(List<FunctionIdWithCommit> genealogy, Set<Commit> commitsInSnapshot) {
+        List<FunctionIdWithCommit> cutDownToSnapshot = new ArrayList<>();
+        for (FunctionIdWithCommit f : genealogy) {
+            if (commitsInSnapshot.contains(f.commit)) {
+                cutDownToSnapshot.add(f);
+            }
+        }
+        return cutDownToSnapshot;
+    }
+
+    private static class SnapshotFunctionGenealogy {
+        int age;
+        Snapshot snapshot;
+        Set<FunctionId> definitions;
+        Set<FunctionChangeRow> changes;
+        AllFunctionsRow allFunctionsRow;
+        AbResRow annotationData;
+    }
+
+    private static class SnapshotWithFunctions {
+        Snapshot snapshot;
+        Map<FunctionId, SnapshotFunctionGenealogy> functions;
     }
 
     private Set<FunctionIdWithCommit> getFunctionIdsWithCommitsAddedInBetween() {
@@ -228,7 +390,9 @@ public class AddChangeDistances {
         double[] sizes = new double[genealogies.size()];
         for (int ixGenealogy = 0; ixGenealogy < genealogies.size(); ixGenealogy++) {
             List<FunctionIdWithCommit> genealogy = genealogies.get(ixGenealogy);
-            reportFunctionGenealogy(ixGenealogy, genealogy);
+            if (LOG.isDebugEnabled()) {
+                reportFunctionGenealogy(ixGenealogy, genealogy);
+            }
             sizes[ixGenealogy] = genealogy.size();
         }
 
@@ -446,6 +610,20 @@ public class AddChangeDistances {
             numFunctionDefinitions += functions.size();
         }
         LOG.info("Read " + numFunctionDefinitions + " function definitions(s).");
+        return result;
+    }
+
+    private Map<Date, List<AbResRow>> readAllAbResInSnapshots(Collection<Date> snapshotsToProcesses) {
+        LOG.debug("Reading annotation data of functions defined in " + snapshotsToProcesses.size() + " snapshot(s).");
+        int numFunctionDefinitions = 0;
+        AbResCsvReader reader = new AbResCsvReader();
+        Map<Date, List<AbResRow>> result = new LinkedHashMap<>();
+        for (Date snapshotDate : snapshotsToProcesses) {
+            List<AbResRow> functions = reader.readFile(config, snapshotDate);
+            result.put(snapshotDate, functions);
+            numFunctionDefinitions += functions.size();
+        }
+        LOG.info("Read annotation data for " + numFunctionDefinitions + " function(s).");
         return result;
     }
 
