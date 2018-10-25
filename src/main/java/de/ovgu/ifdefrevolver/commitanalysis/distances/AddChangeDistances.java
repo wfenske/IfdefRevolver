@@ -171,6 +171,10 @@ public class AddChangeDistances {
         for (Snapshot s : projectInfo.getSnapshots().values()) {
             Commit startHash = commitsDistanceDb.internCommit(s.getStartHash());
             List<List<FunctionIdWithCommit>> genealogiesForSnapshot = genealogiesByStartHash.get(startHash);
+            if (genealogiesForSnapshot == null) {
+                LOG.warn("No genealogy for snapshot " + s);
+                genealogiesForSnapshot = Collections.emptyList();
+            }
             SnapshotWithFunctions swf = mergeGenealogiesWithSnapshotData(s, genealogiesForSnapshot);
             result.add(swf);
             pm.increaseDone();
