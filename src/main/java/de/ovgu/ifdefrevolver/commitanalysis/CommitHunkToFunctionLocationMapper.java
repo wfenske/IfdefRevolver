@@ -1,6 +1,7 @@
 package de.ovgu.ifdefrevolver.commitanalysis;
 
 import de.ovgu.skunk.detection.data.Method;
+import org.apache.commons.text.similarity.LevenshteinDistance;
 import org.apache.log4j.Logger;
 import org.eclipse.jgit.diff.Edit;
 
@@ -98,13 +99,13 @@ class CommitHunkToFunctionLocationMapper implements Consumer<Edit> {
 
     public void handleUntreatedAddedAndDeletedFunctions() {
         for (Method f : untreatedDisappearedFunctions) {
-            LOG.info("Commit " + commitId + " deletes function: " + f + " but change has not been published!");
+            LOG.info("Commit " + commitId + " deletes function: " + f + " but change has not been published. Publishing now.");
             FunctionChangeHunk hunk = FunctionChangeHunk.makePseudoDel(commitId, oldPath, newPath, f);
             changedFunctionConsumer.accept(hunk);
         }
 
         for (Method f : untreatedAppearedFunctions) {
-            LOG.info("Commit " + commitId + "    adds function: " + f + " but change has not been published!");
+            LOG.info("Commit " + commitId + "    adds function: " + f + " but change has not been published. Publishing now.");
             FunctionChangeHunk hunk = FunctionChangeHunk.makePseudoAdd(commitId, oldPath, newPath, f);
             changedFunctionConsumer.accept(hunk);
         }
@@ -164,37 +165,85 @@ class CommitHunkToFunctionLocationMapper implements Consumer<Edit> {
         ChangeHunk delChangeHunk = del.getHunk();
         ChangeHunk addChangeHunk = add.getHunk();
 
-        ChangeHunk mergedChangeHunk = new ChangeHunk(delChangeHunk,
-                delChangeHunk.getLinesDeleted() + addChangeHunk.getLinesDeleted(),
-                delChangeHunk.getLinesAdded() + addChangeHunk.getLinesAdded()
-        );
-
         final Method delFunction = del.getFunction();
         final Method addFunction = add.getFunction();
 
 
         // Test the (unlikely) case that the signature didn't change
+        final boolean logIsDebug = LOG.isDebugEnabled();
+
         if (delFunction.equals(addFunction)) { // same signature, same file
-            if (LOG.isDebugEnabled()) {
+            if (logIsDebug) {
                 LOG.debug("Suspected signature change was a false alarm: " + del + " -> " + add);
             }
             forgetHunk(del);
             forgetHunk(add);
+            ChangeHunk mergedChangeHunk = mergeDelAndAddChangeHunk(delChangeHunk, addChangeHunk);
             rememberHunk(delFunction, FunctionChangeHunk.ModificationType.MOD, mergedChangeHunk);
-        } else {
+        } else if (isPlausibleRename(del, add)) {
             // Signature did change!
-            if (LOG.isDebugEnabled()) {
+            if (logIsDebug) {
                 LOG.debug("Detected function signature change: " + del + " -> " + add);
             }
             forgetHunk(del);
             forgetHunk(add);
+
+            ChangeHunk mergedChangeHunk = mergeDelAndAddChangeHunk(delChangeHunk, addChangeHunk);
             FunctionChangeHunk move = new FunctionChangeHunk(delFunction, mergedChangeHunk,
                     FunctionChangeHunk.ModificationType.MOVE, addFunction);
-            changedFunctionConsumer.accept(move);
             untreatedDisappearedFunctions.remove(delFunction);
             untreatedAppearedFunctions.remove(addFunction);
             remapModsOfRenamedFunction(delFunction, addFunction);
+            changedFunctionConsumer.accept(move);
+        } else {
+            LOG.info("Treating signature change as separate del and add since the difference is too great: " + del + " -> " + add);
         }
+    }
+
+    private boolean isPlausibleRename(FunctionChangeHunk del, FunctionChangeHunk add) {
+        Method delFunction = del.getFunction();
+        Method addFunction = add.getFunction();
+        String delName = delFunction.functionName;
+        String addName = addFunction.functionName;
+        if (delName.equals(addName)) {
+            return true;
+        }
+
+        int threshold = (Math.min(delName.length(), addName.length()) * 3) / 4;
+        threshold = Math.max(threshold, 1);
+        LevenshteinDistance distMeasure = new LevenshteinDistance();
+        // If initialized with a threshold, apply will return -1 if the threshold is exceeded.
+        int dist = distMeasure.apply(delName, addName);
+        if (dist < threshold) {
+            LOG.debug("Function names are similar enough for a rename: " + delName + " -> " + addName);
+            return true;
+        } else {
+            LOG.debug("Function names are too dissimilar enough for a rename: " + delName + " -> " + addName);
+        }
+
+//        String delSignature = delFunction.functionSignatureXml;
+//        String addSignature = addFunction.functionSignatureXml;
+//
+//        threshold = (Math.min(delSignature.length(), addSignature.length()) * 4) / 5;
+//        threshold = Math.max(threshold, 1);
+//        distMeasure = new LevenshteinDistance();
+//        // If initialized with a threshold, apply will return -1 if the threshold is exceeded.
+//        dist = distMeasure.apply(delSignature, addSignature);
+//        if (dist < threshold) {
+//            LOG.debug("Function signatures are similar enough for a rename: " + delSignature + " -> " + addSignature);
+//            return true;
+//        } else {
+//            LOG.debug("Function signatures are too dissimilar enough for a rename: " + delSignature + " -> " + addSignature);
+//        }
+
+        return false;
+    }
+
+    private ChangeHunk mergeDelAndAddChangeHunk(ChangeHunk delChangeHunk, ChangeHunk addChangeHunk) {
+        return new ChangeHunk(delChangeHunk,
+                delChangeHunk.getLinesDeleted() + addChangeHunk.getLinesDeleted(),
+                delChangeHunk.getLinesAdded() + addChangeHunk.getLinesAdded()
+        );
     }
 
     private void remapModsOfRenamedFunction(Method delFunction, Method addFunction) {

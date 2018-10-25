@@ -35,6 +35,9 @@ add_to_cp "${maven_repo}"/commons-cli/commons-cli/1.3/commons-cli-1.3.jar
 # commons-math3
 add_to_cp "${maven_repo}"/org/apache/commons/commons-math3/3.6.1/commons-math3-3.6.1.jar
 
+# commons-text
+add_to_cp "${maven_repo}"/org/apache/commons/commons-text/1.6/commons-text-1.6.jar
+
 # open-csv
 add_to_cp "${maven_repo}"/com/opencsv/opencsv/3.8/opencsv-3.8.jar
 

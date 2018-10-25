@@ -44,6 +44,14 @@
             <artifactId>commons-cli</artifactId>
             <version>1.3</version>
         </dependency>
+
+        <!-- https://mvnrepository.com/artifact/org.apache.commons/commons-text -->
+        <dependency>
+            <groupId>org.apache.commons</groupId>
+            <artifactId>commons-text</artifactId>
+            <version>1.6</version>
+        </dependency>
+
         <!-- https://mvnrepository.com/artifact/com.opencsv/opencsv -->
         <dependency>
             <groupId>com.opencsv</groupId>
@@ -90,8 +98,8 @@
                 <configuration>
                     <source>1.8</source>
                     <target>1.8</target>
-		    <fork>true</fork>
-		    <executable>javac</executable>
+                    <fork>true</fork>
+                    <executable>javac</executable>
                 </configuration>
             </plugin>
             <!-- maven-assembly-plugin is used for creating a single jar containing all dependencies -->

@@ -1,5 +1,6 @@
 package de.ovgu.ifdefrevolver.commitanalysis;
 
+import de.ovgu.ifdefrevolver.util.GroupingListMap;
 import de.ovgu.skunk.detection.data.Method;
 import org.apache.log4j.Logger;
 
@@ -124,6 +125,31 @@ public class AddDelMergingConsumer implements Consumer<FunctionChangeHunk> {
 
     private void mergeAndPublishHunks(LinkedList<FunctionChangeHunk> dels, LinkedList<FunctionChangeHunk> adds) {
         int count = 0;
+
+        GroupingListMap<String, FunctionChangeHunk> addsByPath = new GroupingListMap<>();
+        for (FunctionChangeHunk h : adds) {
+            addsByPath.put(h.getFunction().filePath, h);
+        }
+
+        for (Iterator<FunctionChangeHunk> delIt = dels.iterator(); delIt.hasNext(); ) {
+            FunctionChangeHunk del = delIt.next();
+            String delPath = del.getFunction().filePath;
+            List<FunctionChangeHunk> addsInSameFile = addsByPath.get(delPath);
+            if (addsInSameFile != null) {
+                FunctionChangeHunk add = addsInSameFile.get(0);
+
+                delIt.remove();
+                adds.remove(add);
+                addsInSameFile.remove(add);
+                if (addsInSameFile.isEmpty()) {
+                    addsByPath.getMap().remove(delPath);
+                }
+
+                FunctionChangeHunk move = mergeDelAndAddToMove(del, add);
+                parent.accept(move);
+            }
+        }
+
         while (!dels.isEmpty() && !adds.isEmpty()) {
             if (count > 0) {
                 LOG.debug("More than one pair of adds and deletes.");

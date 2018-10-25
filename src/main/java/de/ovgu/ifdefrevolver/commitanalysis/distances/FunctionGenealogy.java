@@ -24,13 +24,17 @@ public class FunctionGenealogy {
     }
 
     public boolean isRelatedTo(FunctionIdWithCommit id) {
-        FunctionId currentFunctionId = id.functionId;
-        Commit currentCommit = id.commit;
-
-        Set<Commit> otherCommits = commitsByFunctionId.get(currentFunctionId);
+        Set<Commit> otherCommits = commitsByFunctionId.get(id.functionId);
         if (otherCommits == null) return false;
 
-//        for (Commit otherCommit : otherCommits) {
+        final Commit currentCommit = id.commit;
+        for (Commit otherCommit : otherCommits) {
+            if (currentCommit.isRelatedTo(otherCommit)) {
+                return true;
+            }
+        }
+
+        //        for (Commit otherCommit : otherCommits) {
 //            if (currentCommit.isRelatedTo(otherCommit)) {
 //                return true;
 //            } else {
@@ -40,11 +44,12 @@ public class FunctionGenealogy {
 //                //}
 //            }
 //        }
-        for (FunctionIdWithCommit otherFunctionIdWithCommit : functionIdsWithCommits) {
-            if (otherFunctionIdWithCommit.commit.isRelatedTo(currentCommit)) {
-                return true;
-            }
-        }
+
+//        for (FunctionIdWithCommit otherFunctionIdWithCommit : functionIdsWithCommits) {
+//            if (otherFunctionIdWithCommit.commit.isRelatedTo(currentCommit)) {
+//                return true;
+//            }
+//        }
 
         return false;
     }

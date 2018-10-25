@@ -138,12 +138,74 @@ public class FunctionMoveResolver {
         return done;
     }
 
+    private static class GenealogySet {
+        Set<FunctionGenealogy> rawResult = new HashSet<>();
+        GroupingHashSetMap<FunctionId, FunctionGenealogy> genealogiesByFunctionId = new GroupingHashSetMap<>();
+
+        public Set<FunctionGenealogy> findMatchingGenealogies(FunctionIdWithCommit id) {
+            Collection<FunctionGenealogy> possiblyMatchingGenealogies = genealogiesByFunctionId.get(id.functionId);
+            if (possiblyMatchingGenealogies == null) {
+                return Collections.emptySet();
+            }
+
+            Set<FunctionGenealogy> result = new HashSet<>();
+
+            for (FunctionGenealogy possiblyMatchingGenealogy : possiblyMatchingGenealogies) {
+                if (possiblyMatchingGenealogy.isRelatedTo(id)) {
+                    result.add(possiblyMatchingGenealogy);
+                }
+            }
+
+            return result;
+        }
+
+        public void removeGenealogies(Collection<FunctionGenealogy> genealogies) {
+            Set<FunctionId> uniqueFunctionIds = new HashSet<>();
+
+            for (FunctionGenealogy g : genealogies) {
+                uniqueFunctionIds.addAll(g.getUniqueFunctionIds());
+            }
+
+            for (FunctionId fId : uniqueFunctionIds) {
+                Collection<FunctionGenealogy> existingGenealogies = genealogiesByFunctionId.get(fId);
+                if (existingGenealogies == null) continue;
+                existingGenealogies.removeAll(genealogies);
+                if (existingGenealogies.isEmpty()) {
+                    genealogiesByFunctionId.getMap().remove(fId);
+                }
+            }
+
+            rawResult.removeAll(genealogies);
+        }
+
+        public void putNewGenealogy(FunctionGenealogy genealogy) {
+            rawResult.add(genealogy);
+
+            Set<FunctionId> uniqueFunctionIds = genealogy.getUniqueFunctionIds();
+            for (FunctionId fId : uniqueFunctionIds) {
+                genealogiesByFunctionId.put(fId, genealogy);
+            }
+        }
+
+        public void putMergegedGenealogy(Set<FunctionGenealogy> genealogiesToMerge, Set<FunctionIdWithCommit> additionalIds) {
+            Set<FunctionIdWithCommit> allIds = new HashSet<>(additionalIds);
+            for (FunctionGenealogy merge : genealogiesToMerge) {
+                merge.mergeInto(allIds);
+            }
+            final FunctionGenealogy genealogy = new FunctionGenealogy(allIds);
+            removeGenealogies(genealogiesToMerge);
+            putNewGenealogy(genealogy);
+        }
+
+        public void putMergegedGenealogy(Set<FunctionGenealogy> genealogiesToMerge) {
+            putMergegedGenealogy(genealogiesToMerge, Collections.emptySet());
+        }
+    }
+
     public List<List<FunctionIdWithCommit>> computeFunctionGenealogies(Collection<FunctionIdWithCommit> unsortedIds) {
         List<FunctionIdWithCommit> ids = new ArrayList<>(unsortedIds);
         Collections.sort(ids, FunctionIdWithCommit.BY_FUNCTION_ID_AND_COMMIT_HASH);
-
-        Set<FunctionGenealogy> rawResult = new HashSet<>();
-        GroupingHashSetMap<FunctionId, FunctionGenealogy> genealogiesByFunctionId = new GroupingHashSetMap<>();
+        GenealogySet result = new GenealogySet();
 
 //        for (Iterator<FunctionIdWithCommit> it = ids.iterator(); it.hasNext(); ) {
 //            FunctionIdWithCommit id = it.next();
@@ -168,89 +230,54 @@ public class FunctionMoveResolver {
         };
 
         for (FunctionIdWithCommit id : ids) {
-            Set<FunctionGenealogy> genealogiesToMerge = new HashSet<>();
-
             Set<FunctionIdWithCommit> otherIds = new LinkedHashSet<>();
-            //Set<FunctionIdWithCommit> currentAndOlderIds = getCurrentAndOlderFunctionIdsWithCommits1(id);
-            //otherIds.addAll(currentAndOlderIds);
             Set<FunctionIdWithCommit> currentAndNewerIds = getCurrentAndNewerFunctionIdsWithCommits1(id);
             otherIds.addAll(currentAndNewerIds);
 
+            Set<FunctionGenealogy> genealogiesToMerge = new HashSet<>();
             for (FunctionIdWithCommit otherId : otherIds) {
-                Set<FunctionGenealogy> matches = findMatchingGenealogiesByFunctionId(otherId, genealogiesByFunctionId);
+                Set<FunctionGenealogy> matches = result.findMatchingGenealogies(otherId);
                 genealogiesToMerge.addAll(matches);
             }
 
-            final FunctionGenealogy genealogy;
-
             if (genealogiesToMerge.isEmpty()) {
-                genealogy = new FunctionGenealogy(otherIds);
+                final FunctionGenealogy genealogy = new FunctionGenealogy(otherIds);
+                result.putNewGenealogy(genealogy);
             } else {
-                for (FunctionGenealogy merge : genealogiesToMerge) {
-                    merge.mergeInto(otherIds);
-                }
-                genealogy = new FunctionGenealogy(otherIds);
-
-                Set<FunctionId> uniqueFunctionIds = genealogy.getUniqueFunctionIds();
-
-                for (FunctionId fId : uniqueFunctionIds) {
-                    Collection<FunctionGenealogy> existingGenealogies = genealogiesByFunctionId.get(fId);
-                    if (existingGenealogies == null) continue;
-                    existingGenealogies.removeAll(genealogiesToMerge);
-                    if (existingGenealogies.isEmpty()) {
-                        genealogiesByFunctionId.getMap().remove(fId);
-                    }
-                }
-
-                rawResult.removeAll(genealogiesToMerge);
-            }
-
-            rawResult.add(genealogy);
-
-//            for (FunctionIdWithCommit currentAndNewId : currentAndNewerIds) {
-//                final FunctionId fid = currentAndNewId.functionId;
-//                List<Set<FunctionIdWithCommit>> genealogies = genealogiesByFunctionId.get(fid);
-//                if ((genealogies == null) || !genealogies.contains(genealogy)) {
-//                    genealogiesByFunctionId.put(currentAndNewId.functionId, genealogy);
-//                }
-//            }
-            Set<FunctionId> uniqueFunctionIds = genealogy.getUniqueFunctionIds();
-            for (FunctionId fId : uniqueFunctionIds) {
-                genealogiesByFunctionId.put(fId, genealogy);
+                result.putMergegedGenealogy(genealogiesToMerge, otherIds);
             }
 
             pm.increaseDone();
         }
 
-//        Set<Map.Entry<FunctionId, List<FunctionGenealogy>>> entries = genealogiesByFunctionId.getMap().entrySet();
-//        //final int uniqueFunctionIds = entries.size();
-//        //int numberOfUnambiguousGenealogies = 0;
-//        //int numberOfAmbiguousGenealogies = 0;
-//        double[] numberOfGenealogiesPerFunctionId = new double[uniqueFunctionIds];
-//        int ixGenealogySize = 0;
+//        while (true) {
+//            boolean merged = false;
 //
-//        for (Map.Entry<FunctionId, List<FunctionGenealogy>> e : entries) {
-//            FunctionId functionId = e.getKey();
-//            List<FunctionGenealogy> genealogies = e.getValue();
-//            //int numberOfGenealogiesForFunctionId = genealogies.size();
-//            numberOfGenealogiesPerFunctionId[ixGenealogySize++] = numberOfGenealogiesForFunctionId;
-////            if (numberOfGenealogiesForFunctionId == 1) {
-////                numberOfUnambiguousGenealogies++;
-////            } else {
-////                numberOfAmbiguousGenealogies++;
-////            }
+//            for (FunctionGenealogy g : result.rawResult) {
+//                Collection<FunctionIdWithCommit> genealogyIds = g.mergeInto(new ArrayList<>());
+//
+//                Set<FunctionGenealogy> genealogiesToMerge = new HashSet<>();
+//                genealogiesToMerge.add(g);
+//
+//                for (FunctionIdWithCommit id : genealogyIds) {
+//                    Set<FunctionGenealogy> matches = result.findMatchingGenealogies(id);
+//                    genealogiesToMerge.addAll(matches);
+//                }
+//
+//                if (genealogiesToMerge.size() == 1) continue;
+//                result.putMergegedGenealogy(genealogiesToMerge);
+//                merged = true;
+//                break;
+//            }
+//
+//            if (!merged) break;
 //        }
-//
-//        int minSize = (int) new Min().evaluate(numberOfGenealogiesPerFunctionId);
-//        int maxSize = (int) new Max().evaluate(numberOfGenealogiesPerFunctionId);
-//        double meanSize = new Mean().evaluate(numberOfGenealogiesPerFunctionId);
-//        double medianSize = new Median().evaluate(numberOfGenealogiesPerFunctionId);
-//
-//        LOG.info("Number of unique genealogies: " + rawResult.size());
-//        LOG.info("Number of unique function IDs: " + uniqueFunctionIds);
-//        LOG.info("min/max/mean/median number of genealogies per function ID: " + minSize + "/" + maxSize + "/" + meanSize + "/" + medianSize);
-//        LOG.info("Number of function IDs where number of genealogies =1/>1: " + numberOfUnambiguousGenealogies + "/" + numberOfAmbiguousGenealogies);
 
+        List<List<FunctionIdWithCommit>> sortedResult = sortGenealogies(result.rawResult);
+        return sortedResult;
+    }
+
+    private List<List<FunctionIdWithCommit>> sortGenealogies(Set<FunctionGenealogy> rawResult) {
         List<Set<FunctionIdWithCommit>> rawRawResult = new ArrayList<>();
         for (FunctionGenealogy g : rawResult) {
             Set<FunctionIdWithCommit> gSet = new HashSet<>();
@@ -258,26 +285,7 @@ public class FunctionMoveResolver {
             rawRawResult.add(gSet);
         }
 
-        List<List<FunctionIdWithCommit>> result = sortGenealogies(rawRawResult);
-        return result;
-    }
-
-    private Set<FunctionGenealogy> findMatchingGenealogiesByFunctionId(FunctionIdWithCommit id, GroupingHashSetMap<FunctionId, FunctionGenealogy> genealogiesByFunctionId) {
-        final FunctionId currentFunctionId = id.functionId;
-        Collection<FunctionGenealogy> possiblyMatchingGenealogies = genealogiesByFunctionId.get(currentFunctionId);
-        if (possiblyMatchingGenealogies == null) {
-            return Collections.emptySet();
-        }
-
-        Set<FunctionGenealogy> result = new HashSet<>();
-
-        for (FunctionGenealogy possiblyMatchingGenealogy : possiblyMatchingGenealogies) {
-            if (possiblyMatchingGenealogy.isRelatedTo(id)) {
-                result.add(possiblyMatchingGenealogy);
-            }
-        }
-
-        return result;
+        return sortGenealogies(rawRawResult);
     }
 
     private List<List<FunctionIdWithCommit>> sortGenealogies(List<Set<FunctionIdWithCommit>> rawResult) {
@@ -337,9 +345,9 @@ public class FunctionMoveResolver {
 
             @Override
             public int compareTo(SortableFunctionIdWithCommit other) {
-                int r = this.numberOfAncestors - other.numberOfAncestors;
+                int r = FunctionIdWithCommit.BY_FUNCTION_ID_AND_COMMIT_HASH.compare(this.id, other.id);
                 if (r != 0) return r;
-                return FunctionIdWithCommit.BY_FUNCTION_ID_AND_COMMIT_HASH.compare(this.id, other.id);
+                return this.numberOfAncestors - other.numberOfAncestors;
             }
         }
 
@@ -418,12 +426,12 @@ public class FunctionMoveResolver {
                     continue;
                 }
 
-                for (FunctionChangeRow r : moves) {
-                    final FunctionIdWithCommit fidWithCommit = new FunctionIdWithCommit(r.newFunctionId.get(), r.commit, true);
+                for (FunctionChangeRow move : moves) {
+                    final FunctionIdWithCommit fidWithCommit = new FunctionIdWithCommit(move.newFunctionId.get(), move.commit, true);
                     if (done.contains(fidWithCommit) || todo.contains(fidWithCommit)) continue;
                     for (FunctionIdWithCommit ancestorFid : done) {
                         final Commit ancestorCommit = ancestorFid.commit;
-                        if (commitsDistanceDb.isDescendant(r.commit, ancestorCommit)) {
+                        if (commitsDistanceDb.isDescendant(move.commit, ancestorCommit)) {
                             todo.add(fidWithCommit);
                             break;
                         } else {
