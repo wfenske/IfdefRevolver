@@ -261,7 +261,9 @@ public class AddChangeDistances {
             Set<FunctionChangeRow> changes = new LinkedHashSet<>();
             for (FunctionId id : allDefinitions) {
                 List<FunctionChangeRow> changesForId = changesByFunctionId.get(id);
-                changes.addAll(changesForId);
+                if (changesForId != null) {
+                    changes.addAll(changesForId);
+                }
             }
 
             SnapshotFunctionGenealogy sfg = new SnapshotFunctionGenealogy();
