@@ -32,12 +32,13 @@ public class FunctionIdWithCommit {
         if (!(o instanceof FunctionIdWithCommit)) return false;
         FunctionIdWithCommit that = (FunctionIdWithCommit) o;
         return Objects.equals(functionId, that.functionId) &&
-                Objects.equals(commit, that.commit);
+                Objects.equals(commit, that.commit) &&
+                Objects.equals(move, that.move);
     }
 
     @Override
     public int hashCode() {
-        return Objects.hash(functionId, commit);
+        return Objects.hash(functionId, commit, move);
     }
 
     @Override

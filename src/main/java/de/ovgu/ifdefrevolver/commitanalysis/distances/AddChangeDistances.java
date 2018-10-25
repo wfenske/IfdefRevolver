@@ -127,35 +127,11 @@ public class AddChangeDistances {
 
         allFunctionsInSnapshots = readAllFunctionsInSnapshots(realSnapshotDates);
 
-        Set<FunctionIdWithCommit> allFunctionsEver = new LinkedHashSet<>();
+        Set<FunctionIdWithCommit> allFunctionsEver = getFunctionIdsWithCommitFromRegularSnapshots();
+        Set<FunctionIdWithCommit> leftOverFunctionIdsWithCommits = getFunctionIdsWithCommitFromLeftOverSnapshot(leftOverSnapshotDate);
+        Set<FunctionIdWithCommit> functionsAddedInBetween = getFunctionIdsWithCommitsAddedInBetween();
 
-        Set<FunctionIdWithCommit> leftOverFunctionIdsWithCommits = new LinkedHashSet<>();
-        if (leftOverSnapshotDate.isPresent()) {
-            Date leftOverSnapshotDateValue = leftOverSnapshotDate.get();
-            List<FunctionChangeRow> changesInLeftOverSnapshot = changesInSnapshots.get(leftOverSnapshotDateValue);
-            for (FunctionChangeRow r : changesInLeftOverSnapshot) {
-                final FunctionIdWithCommit idWithCommit;
-                if (r.modType == FunctionChangeHunk.ModificationType.MOVE) {
-                    idWithCommit = new FunctionIdWithCommit(r.newFunctionId.get(), r.commit, true);
-                } else {
-                    idWithCommit = new FunctionIdWithCommit(r.functionId, r.commit, false);
-                }
-                leftOverFunctionIdsWithCommits.add(idWithCommit);
-            }
-        }
-
-        for (Map.Entry<Date, List<AllFunctionsRow>> snapshotEntry : allFunctionsInSnapshots.entrySet()) {
-            final Date snapshotDate = snapshotEntry.getKey();
-            final Snapshot snapshot = projectInfo.getSnapshots().get(snapshotDate);
-            final String startHash = snapshot.getStartHash();
-            Commit startCommit = commitsDistanceDb.internCommit(startHash);
-            for (AllFunctionsRow row : snapshotEntry.getValue()) {
-                FunctionIdWithCommit fidWithCommit = new FunctionIdWithCommit(row.functionId, startCommit, false);
-                allFunctionsEver.add(fidWithCommit);
-            }
-        }
-
-        List<List<FunctionIdWithCommit>> functionGenealogies = computeFunctionGenealogies(allFunctionsEver, leftOverFunctionIdsWithCommits);
+        List<List<FunctionIdWithCommit>> functionGenealogies = computeFunctionGenealogies(allFunctionsEver, leftOverFunctionIdsWithCommits, functionsAddedInBetween);
         System.exit(0);
 
         List<CommitWindow> allWindows = groupSnapshots();
@@ -172,14 +148,72 @@ public class AddChangeDistances {
         LOG.info(ageRequestStats);
     }
 
-    private List<List<FunctionIdWithCommit>> computeFunctionGenealogies(Set<FunctionIdWithCommit> allFunctionsEver, Set<FunctionIdWithCommit> leftOverFunctionIdsWithCommits) {
+    private Set<FunctionIdWithCommit> getFunctionIdsWithCommitsAddedInBetween() {
+        Set<FunctionIdWithCommit> functionIdsAddedInBetween = new LinkedHashSet<>();
+        for (List<FunctionChangeRow> changesInSnapshot : changesInSnapshots.values()) {
+            for (FunctionChangeRow r : changesInSnapshot) {
+                final FunctionIdWithCommit idWithCommit;
+                switch (r.modType) {
+                    case ADD:
+                        idWithCommit = new FunctionIdWithCommit(r.functionId, r.commit, false);
+                        break;
+                    default:
+                        continue;
+                }
+                functionIdsAddedInBetween.add(idWithCommit);
+            }
+        }
+        return functionIdsAddedInBetween;
+    }
+
+    private Set<FunctionIdWithCommit> getFunctionIdsWithCommitFromLeftOverSnapshot(Optional<Date> leftOverSnapshotDate) {
+        if (!leftOverSnapshotDate.isPresent()) return Collections.emptySet();
+        Set<FunctionIdWithCommit> leftOverFunctionIdsWithCommits = new LinkedHashSet<>();
+        Date leftOverSnapshotDateValue = leftOverSnapshotDate.get();
+        List<FunctionChangeRow> changesInLeftOverSnapshot = changesInSnapshots.get(leftOverSnapshotDateValue);
+        for (FunctionChangeRow r : changesInLeftOverSnapshot) {
+            final FunctionIdWithCommit idWithCommit;
+            switch (r.modType) {
+                case MOVE:
+                    idWithCommit = new FunctionIdWithCommit(r.newFunctionId.get(), r.commit, true);
+                    break;
+                case ADD:
+                case MOD:
+                    idWithCommit = new FunctionIdWithCommit(r.functionId, r.commit, false);
+                    break;
+                default:
+                    continue;
+            }
+            leftOverFunctionIdsWithCommits.add(idWithCommit);
+        }
+        return leftOverFunctionIdsWithCommits;
+    }
+
+    private Set<FunctionIdWithCommit> getFunctionIdsWithCommitFromRegularSnapshots() {
+        Set<FunctionIdWithCommit> allFunctionsEver = new LinkedHashSet<>();
+        for (Map.Entry<Date, List<AllFunctionsRow>> snapshotEntry : allFunctionsInSnapshots.entrySet()) {
+            final Date snapshotDate = snapshotEntry.getKey();
+            final Snapshot snapshot = projectInfo.getSnapshots().get(snapshotDate);
+            final String startHash = snapshot.getStartHash();
+            Commit startCommit = commitsDistanceDb.internCommit(startHash);
+            for (AllFunctionsRow row : snapshotEntry.getValue()) {
+                FunctionIdWithCommit fidWithCommit = new FunctionIdWithCommit(row.functionId, startCommit, false);
+                allFunctionsEver.add(fidWithCommit);
+            }
+        }
+        return allFunctionsEver;
+    }
+
+    private List<List<FunctionIdWithCommit>> computeFunctionGenealogies(Set<FunctionIdWithCommit> allFunctionsEver, Set<FunctionIdWithCommit> leftOverFunctionIdsWithCommits, Set<FunctionIdWithCommit> functionsAddedInBetween) {
         LOG.info("Computing genealogies of all functions ...");
         Set<FunctionIdWithCommit> functionsToAnalyze = new HashSet<>(leftOverFunctionIdsWithCommits);
         functionsToAnalyze.addAll(allFunctionsEver);
+        functionsToAnalyze.addAll(functionsAddedInBetween);
         List<List<FunctionIdWithCommit>> genealogies = moveResolver.computeFunctionGenealogies(functionsToAnalyze);
         for (Iterator<List<FunctionIdWithCommit>> genealogyIt = genealogies.iterator(); genealogyIt.hasNext(); ) {
             List<FunctionIdWithCommit> genealogy = genealogyIt.next();
             genealogy.removeAll(leftOverFunctionIdsWithCommits);
+            genealogy.removeAll(functionsAddedInBetween);
             if (genealogy.isEmpty()) {
                 genealogyIt.remove();
             }
