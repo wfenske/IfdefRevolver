@@ -30,6 +30,8 @@ public class FunctionHistory {
 
     private AgeRequestStats ageRequestStats;
 
+    private static final Optional<Integer> ZERO_AGE = Optional.of(0);
+
     public FunctionHistory(FunctionId function, Set<FunctionId> olderFunctionIds, Set<Commit> knownAddsForFunction,
                            Set<Commit> guessedAddsForFunction, Set<Commit> additionalGuessedAdds,
                            Set<Commit> nonDeletingCommitsToFunctionAndAliases,
@@ -54,22 +56,22 @@ public class FunctionHistory {
      * @param currentCommit
      * @return The function's age or {@link Integer#MAX_VALUE} if the age cannot be determined or guessed.
      */
-    public int getFunctionAgeAtCommit(final Commit currentCommit) {
+    public Optional<Integer> getFunctionAgeAtCommit(final Commit currentCommit) {
         ageRequestStats.increaseAgeRequests();
 
         if (this.knownAddsForFunction.contains(currentCommit)) {
             ageRequestStats.increaseActualAge();
-            return 0;
+            return ZERO_AGE;
         }
 
         final Optional<Integer> ageAmongKnownAdds = computeMaxDistance(currentCommit, knownAddsForFunction);
         if (ageAmongKnownAdds.isPresent()) {
             ageRequestStats.increaseActualAge();
-            return ageAmongKnownAdds.get();
+            return ageAmongKnownAdds;
         }
 
-        LOG.warn("Forced to assume alternative adding commit. Function: " + this.function +
-                " Current commit: " + currentCommit);
+//        LOG.warn("Forced to assume alternative adding commit. Function: " + this.function +
+//                " Current commit: " + currentCommit);
 //        if (this.guessedAddsForFunction.contains(currentCommit)) {
 //            ageRequestStats.increaseGuessed0Age();
 //            return 0;
@@ -81,26 +83,27 @@ public class FunctionHistory {
         if (guessedAge.isPresent()) {
             if (additionalGuessedAge.isPresent()) {
                 final int winner = Math.max(guessedAge.get(), additionalGuessedAge.get());
-                return useGuessedAge(winner);
+                useGuessedAge(winner);
+                return Optional.of(winner);
+            } else {
+                useGuessedAge(guessedAge.get());
+                return guessedAge;
             }
-            return useGuessedAge(guessedAge.get());
         } else if (additionalGuessedAge.isPresent()) {
-            return useGuessedAge(additionalGuessedAge.get());
+            useGuessedAge(additionalGuessedAge.get());
+            return additionalGuessedAge;
         }
 
-        LOG.warn("No age at all! Function: " + this.function + " Current commit: " + currentCommit);
-
-        ageRequestStats.increaseNoAgeAtAll();
-        return Integer.MAX_VALUE;
+        ageRequestStats.increaseNoAgeAtAll(this.function, currentCommit);
+        return Optional.empty();
     }
 
-    private int useGuessedAge(int age) {
+    private void useGuessedAge(int age) {
         if (age == 0) {
             ageRequestStats.increaseGuessed0Age();
         } else {
             ageRequestStats.increaseGuessedOtherAge();
         }
-        return age;
     }
 
     /**
@@ -110,21 +113,21 @@ public class FunctionHistory {
      * @return The age of the function's last edit or {@link Integer#MAX_VALUE} if the age cannot be determined or
      * guessed.
      */
-    public int getMinDistToPreviousEdit(Commit currentCommit) {
+    public Optional<Integer> getMinDistToPreviousEdit(Commit currentCommit) {
         if (knownAddsForFunction.contains(currentCommit)) {
-            return 0;
+            return ZERO_AGE;
         }
 
         if (guessedAddsForFunction.contains(currentCommit)) {
             LOG.warn("Forced to assume 0 edit distance because the commit has no known ancestors among the"
                     + " function's edits. Function: " + function + " Current commit: " + currentCommit);
-            return 0;
+            return ZERO_AGE;
         }
 
         final Distances nonDelEditDist = computeMinDistances(currentCommit, nonDeletingCommitsToFunctionAndAliases);
-        final int nonDelEditWinner = nonDelEditDist.getWinner();
+        final Optional<Integer> nonDelEditWinner = nonDelEditDist.getWinner();
 
-        if (nonDelEditWinner == 0) {
+        if (nonDelEditWinner.isPresent() && (nonDelEditWinner.get() == 0)) {
             LOG.warn("Distance to most recent commits is 0, although it is not an adding commit. Function: "
                     + function + " Commit: " + currentCommit);
         }
@@ -133,16 +136,27 @@ public class FunctionHistory {
     }
 
     private static class Distances {
-        final int dist;
-        final int distIncluding0;
+        final Optional<Integer> dist;
+        final Optional<Integer> distIncluding0;
 
         public Distances(int dist, int distIncluding0) {
-            this.dist = dist;
-            this.distIncluding0 = distIncluding0;
+            this.dist = optionalizeInt(dist);
+            this.distIncluding0 = optionalizeInt(distIncluding0);
         }
 
-        public int getWinner() {
-            return (dist < Integer.MAX_VALUE) ? dist : distIncluding0;
+        private static Optional<Integer> optionalizeInt(int i) {
+            if (i < Integer.MAX_VALUE) return Optional.of(i);
+            else return Optional.empty();
+        }
+
+        public Optional<Integer> getWinner() {
+            if (dist.isPresent()) {
+                return dist;
+            } else if (distIncluding0.isPresent()) {
+                return distIncluding0;
+            } else {
+                return Optional.empty();
+            }
         }
     }
 

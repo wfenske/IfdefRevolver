@@ -1,5 +1,6 @@
 package de.ovgu.ifdefrevolver.commitanalysis;
 
+import de.ovgu.ifdefrevolver.bugs.minecommits.CommitsDistanceDb;
 import org.apache.log4j.Logger;
 
 import java.util.HashSet;
@@ -12,6 +13,8 @@ public class AgeRequestStats {
     private int functionsWithoutAnyKnownAddingCommits = 0;
     private int uniqueFunctionsWithoutAnyKnownAddingCommits = 0;
     private Set<FunctionId> functionsWithoutAnyKnownAddingCommitsNames = new HashSet<>();
+    private Set<FunctionId> functionsWithoutAnyAgeAtAll = new HashSet<>();
+
 
     public synchronized void increaseAgeRequests() {
         this.ageRequests++;
@@ -29,19 +32,28 @@ public class AgeRequestStats {
         this.guessedOtherAge++;
     }
 
-    public synchronized void increaseNoAgeAtAll() {
+    public synchronized void increaseNoAgeAtAll(FunctionId function, CommitsDistanceDb.Commit currentCommit) {
         this.noAgeAtAll++;
+
+        boolean weKnowThisAlready = functionsWithoutAnyAgeAtAll.contains(function);
+
+        if (weKnowThisAlready) {
+            LOG.info("No age at all! Function: " + function + " (repeated entry for this function).  Current commit: " + currentCommit);
+        } else {
+            functionsWithoutAnyAgeAtAll.add(function);
+            LOG.warn("No age at all! Function: " + function + " Current commit: " + currentCommit);
+        }
     }
 
     public synchronized void increaseFunctionsWithoutAnyKnownAddingCommits(FunctionId function) {
         this.functionsWithoutAnyKnownAddingCommits++;
 
         boolean weKnowThisAlready = functionsWithoutAnyKnownAddingCommitsNames.contains(function);
-        functionsWithoutAnyKnownAddingCommitsNames.add(function);
 
         if (weKnowThisAlready) {
             LOG.info("No known creating commits for function " + function + " (repeated entry for this function).");
         } else {
+            functionsWithoutAnyKnownAddingCommitsNames.add(function);
             LOG.warn("No known creating commits for function " + function + " (first entry for this function).");
             this.uniqueFunctionsWithoutAnyKnownAddingCommits++;
         }

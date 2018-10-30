@@ -5,13 +5,13 @@ import de.ovgu.skunk.detection.output.MethodMetricsColumns;
 public class AbResRow {
     private FunctionId functionId;
     private int loc;
-    private int loac;
-    private int lofc;
-    private int noFl;
-    private int noFcDup;
-    private int noFcNonDup;
-    private int noNest;
-    private int noNeg;
+    private int loac = 0;
+    private int lofc = 0;
+    private int noFl = 0;
+    private int noFcDup = 0;
+    private int noFcNonDup = 0;
+    private int noNest = 0;
+    private int noNeg = 0;
 
     public static AbResRow fromAbResCsvLine(String[] csvLine) {
         AbResRow r = new AbResRow();
@@ -29,6 +29,13 @@ public class AbResRow {
         r.noNest = parse(csvLine, MethodMetricsColumns.NONEST);
         r.noNeg = parse(csvLine, MethodMetricsColumns.NONEG);
 
+        return r;
+    }
+
+    public static AbResRow dummyRow(FunctionId id, int loc) {
+        AbResRow r = new AbResRow();
+        r.functionId = id;
+        r.loc = loc;
         return r;
     }
 

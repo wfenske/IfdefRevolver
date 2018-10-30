@@ -15,7 +15,7 @@ import java.util.Set;
  * @author wfenske
  */
 public class Snapshot implements Comparable<Snapshot>, IMinimalSnapshot {
-    private final SimpleDateFormat dateFormatter = new SimpleDateFormat("yyyy-MM-dd");
+    private static final SimpleDateFormat dateFormatter = new SimpleDateFormat("yyyy-MM-dd");
 
     private final int snapshotIndex;
     private final int branch;
@@ -34,9 +34,13 @@ public class Snapshot implements Comparable<Snapshot>, IMinimalSnapshot {
         this.snapshotDir = snapshotDir;
     }
 
+    public synchronized String getFormattedSnapshotDate() {
+        return dateFormatter.format(snapshotDate);
+    }
+
     /**
-     * @return The (unique) sort index of this snapshot. Earlier snapshots have
-     * smaller sort indices than later snapshots.
+     * @return The (unique) sort index of this snapshot. Earlier snapshots have smaller sort indices than later
+     * snapshots.
      */
     public int getSnapshotIndex() {
         return snapshotIndex;
@@ -66,7 +70,7 @@ public class Snapshot implements Comparable<Snapshot>, IMinimalSnapshot {
     @Override
     public String toString() {
         return String.format("Snapshot [index=%s, date=%s, startHash=%s]", snapshotIndex,
-                dateFormatter.format(snapshotDate), startHash);
+                getFormattedSnapshotDate(), startHash);
     }
 
     /*

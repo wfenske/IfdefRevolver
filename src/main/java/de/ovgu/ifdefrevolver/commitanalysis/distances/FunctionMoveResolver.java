@@ -230,6 +230,10 @@ public class FunctionMoveResolver {
         };
 
         for (FunctionIdWithCommit id : ids) {
+//            if (id.functionId.signature.equals("static IDList * subtree_candidates(Backend * be, Connection * conn, Operation * op, char * base, Filter * filter, char * * attrs, int attrsonly, char * * matched, Entry * e, int * err, int lookupbase)") && id.functionId.file.equals("servers/slapd/back-ldbm/search.c") && id.commit.commitHash.equals("42e0d83cb3a1a1c5b25183f1ab74ce7edbe25de7")) {
+//                LOG.info("ID is " + id);
+//            }
+
             Set<FunctionIdWithCommit> otherIds = new LinkedHashSet<>();
             Set<FunctionIdWithCommit> currentAndNewerIds = getCurrentAndNewerFunctionIdsWithCommits1(id);
             otherIds.addAll(currentAndNewerIds);
@@ -598,8 +602,24 @@ public class FunctionMoveResolver {
         return commitIds;
     }
 
-    public FunctionHistory getFunctionHistory(final FunctionId function,
-                                              final Set<Commit> directCommitsToThisFunction) {
+    public Set<Commit> getCommitIdsOfChangesToThisFunction(FunctionId function) {
+        final List<FunctionChangeRow> directChanges = getChangesByFunction().get(function);
+        if (directChanges == null) {
+            if (LOG.isDebugEnabled()) {
+                LOG.debug(function + " is never changed.");
+            }
+            return Collections.emptySet();
+        }
+
+        final Set<Commit> allDirectCommitIds = new LinkedHashSet<>(directChanges.size());
+        for (FunctionChangeRow r : directChanges) {
+            allDirectCommitIds.add(r.commit);
+        }
+        return allDirectCommitIds;
+    }
+
+    public FunctionHistory getFunctionHistory(final FunctionId function) {
+        final Set<Commit> directCommitsToThisFunction = getCommitIdsOfChangesToThisFunction(function);
         final Set<FunctionId> functionAliases = this.getCurrentAndOlderFunctionIds(function, directCommitsToThisFunction);
         // All the commits that have created this function or a previous version of it.
         final Set<FunctionChangeRow> knownAddsForFunction = this.getAddingCommitsToFunctionIncludingAliases(functionAliases);
