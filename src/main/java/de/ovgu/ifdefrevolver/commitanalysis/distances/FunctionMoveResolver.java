@@ -417,38 +417,48 @@ public class FunctionMoveResolver {
         todo.add(id);
         Set<FunctionIdWithCommit> done = new LinkedHashSet<>();
 
-        while (true) {
-            final int doneSizeBefore = done.size();
+        FunctionIdWithCommit needle;
+        while ((needle = todo.poll()) != null) {
+            done.add(needle);
 
-            FunctionIdWithCommit needle;
-            while ((needle = todo.poll()) != null) {
-                done.add(needle);
-
-                Set<FunctionChangeRow> moves = movesByOldFunctionId.get(needle.functionId);
-                if (moves == null) {
+            Set<FunctionChangeRow> moves = movesByOldFunctionId.get(needle.functionId);
+            if (moves == null) {
 //                LOG.debug("No moves whatsoever for " + needle);
-                    continue;
-                }
-
-                for (FunctionChangeRow move : moves) {
-                    final FunctionIdWithCommit fidWithCommit = new FunctionIdWithCommit(move.newFunctionId.get(), move.commit, true);
-                    if (done.contains(fidWithCommit) || todo.contains(fidWithCommit)) continue;
-                    for (FunctionIdWithCommit ancestorFid : done) {
-                        final Commit ancestorCommit = ancestorFid.commit;
-                        if (commitsDistanceDb.isDescendant(move.commit, ancestorCommit)) {
-                            todo.add(fidWithCommit);
-                            break;
-                        } else {
-//                        LOG.debug("Rejecting move " + r + ": not a descendant of " + ancestorCommit);
-                        }
-                    }
-                }
+                continue;
             }
 
-            if (doneSizeBefore == done.size()) {
-                break;
-            } else {
-                todo.addAll(done);
+            FunctionIdWithCommit nextTodo = null;
+            int nextTodoDistance = Integer.MAX_VALUE;
+            for (FunctionChangeRow move : moves) {
+                final FunctionIdWithCommit moveWithCommit = new FunctionIdWithCommit(move.newFunctionId.get(), move.commit, true);
+                if (done.contains(moveWithCommit) || todo.contains(moveWithCommit)) continue;
+                Optional<Integer> dist = commitsDistanceDb.minDistance(move.commit, needle.commit);
+                if (!dist.isPresent()) {
+                    LOG.debug("Rejecting move " + move + ": not a descendant of " + needle);
+                    continue;
+                }
+                int distValue = dist.get();
+                if (distValue < nextTodoDistance) {
+                    if (nextTodo != null) {
+                        LOG.debug("Replacing move " + nextTodo + " (distance=" + nextTodoDistance + ") with " +
+                                moveWithCommit + " (distance=" + distValue + ")");
+                    }
+                    nextTodo = moveWithCommit;
+                    nextTodoDistance = distValue;
+                }
+//                    for (FunctionIdWithCommit ancestorFid : done) {
+//                        final Commit ancestorCommit = ancestorFid.commit;
+//                        if (commitsDistanceDb.isDescendant(move.commit, ancestorCommit)) {
+//                            todo.add(fidWithCommit);
+//                            break;
+//                        } else {
+////                        LOG.debug("Rejecting move " + r + ": not a descendant of " + ancestorCommit);
+//                        }
+//                    }
+            }
+
+            if (nextTodo != null) {
+                todo.add(nextTodo);
             }
         }
 
