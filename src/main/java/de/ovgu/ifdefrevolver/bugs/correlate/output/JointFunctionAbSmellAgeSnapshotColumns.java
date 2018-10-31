@@ -6,6 +6,7 @@ import de.ovgu.ifdefrevolver.commitanalysis.distances.AddChangeDistances;
 import de.ovgu.skunk.detection.output.CsvColumnValueProvider;
 
 import java.util.HashSet;
+import java.util.Optional;
 import java.util.Set;
 
 public enum JointFunctionAbSmellAgeSnapshotColumns implements CsvColumnValueProvider<AddChangeDistances.SnapshotFunctionGenealogy, Void> {
@@ -57,6 +58,23 @@ public enum JointFunctionAbSmellAgeSnapshotColumns implements CsvColumnValueProv
             return in.getAnnotationData().getLoc();
         }
     },
+    AGE {
+        @Override
+        public String csvColumnValue(AddChangeDistances.SnapshotFunctionGenealogy in, Void ctx) {
+            Optional<Integer> v = in.getCommitsSinceCreation();
+            if (v.isPresent()) return Integer.toString(v.get());
+            else return "";
+        }
+    },
+    LAST_EDIT {
+        @Override
+        public String csvColumnValue(AddChangeDistances.SnapshotFunctionGenealogy in, Void ctx) {
+            Optional<Integer> v = in.getCommitsSinceLastEdit();
+            if (v.isPresent()) return Integer.toString(v.get());
+            else return "";
+        }
+    },
+
     //HUNKS,
     COMMITS {
         @Override
@@ -139,7 +157,7 @@ public enum JointFunctionAbSmellAgeSnapshotColumns implements CsvColumnValueProv
             return in.getAnnotationData().getNoFcNonDup();
         }
     },
-    NEST {
+    ND {
         @Override
         public Object csvColumnValue(AddChangeDistances.SnapshotFunctionGenealogy in, Void ctx) {
             return in.getAnnotationData().getNoNest();
