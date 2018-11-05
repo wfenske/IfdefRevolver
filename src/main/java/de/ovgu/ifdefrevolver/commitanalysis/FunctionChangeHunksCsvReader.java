@@ -43,6 +43,8 @@ public class FunctionChangeHunksCsvReader extends SimpleCsvFileReader<List<Funct
         CommitsDistanceDb.Commit commit = commitsDistanceDb.internCommit(commitId);
         result.commit = commit;
         String modTypeName = line[FunctionChangeHunksColumns.MOD_TYPE.ordinal()];
+        String hunkS = line[FunctionChangeHunksColumns.HUNK.ordinal()];
+        result.hunk = Integer.parseInt(hunkS);
 
         result.linesAdded = parseMandatoryInt(line, FunctionChangeHunksColumns.LINES_ADDED);
         result.linesDeleted = parseMandatoryInt(line, FunctionChangeHunksColumns.LINES_DELETED);

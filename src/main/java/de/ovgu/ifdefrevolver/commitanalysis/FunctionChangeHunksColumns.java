@@ -31,7 +31,7 @@ public enum FunctionChangeHunksColumns implements CsvColumnValueProvider<Functio
         }
     },
     /**
-     * cppstats-normalized LOC of the function
+     * LOC of the function (incl. whitespace &amp; comments)
      */
     FUNCTION_GROSS_LOC {
         @Override
@@ -108,7 +108,8 @@ public enum FunctionChangeHunksColumns implements CsvColumnValueProvider<Functio
         }
     },
     /**
-     * New signature of the function. Will be different from FUNCTION_SIGNATURE if the signature was modified (e.g., new names, changes to parameter list)
+     * New signature of the function. Will be different from FUNCTION_SIGNATURE if the signature was modified (e.g., new
+     * names, changes to parameter list)
      */
     NEW_FUNCTION_SIGNATURE {
         @Override

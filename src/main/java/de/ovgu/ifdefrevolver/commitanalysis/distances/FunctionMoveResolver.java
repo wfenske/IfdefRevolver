@@ -42,14 +42,29 @@ public class FunctionMoveResolver {
      */
     private GroupingHashSetMap<FunctionId, Commit> commitsWhereFunctionIsKnownToExitsByFunctionId = new GroupingHashSetMap<>();
 
-    private Set<FunctionChangeRow> getCommitsToFunctionIncludingAliasesConformingTo(Set<FunctionId> functionAliases,
-                                                                                    Predicate<FunctionChangeRow> predicate) {
+    private Set<FunctionChangeRow> getPriorCommitsToFunctionIncludingAliasesConformingTo(Set<FunctionIdWithCommit> functionAliases,
+                                                                                         Predicate<FunctionChangeRow> predicate) {
         Set<FunctionChangeRow> result = new LinkedHashSet<>();
-        for (FunctionId alias : functionAliases) {
-            List<FunctionChangeRow> aliasChanges = changesByFunction.get(alias);
+        for (FunctionIdWithCommit alias : functionAliases) {
+            List<FunctionChangeRow> aliasChanges = changesByFunction.get(alias.functionId);
             if (aliasChanges == null) continue;
             for (FunctionChangeRow change : aliasChanges) {
-                if (predicate.test(change)) {
+                if (predicate.test(change) && alias.commit.isDescendant(change.commit)) {
+                    result.add(change);
+                }
+            }
+        }
+        return result;
+    }
+
+    private Set<FunctionChangeRow> getFutureCommitsToFunctionIncludingAliasesConformingTo(Set<FunctionIdWithCommit> functionAliases,
+                                                                                          Predicate<FunctionChangeRow> predicate) {
+        Set<FunctionChangeRow> result = new LinkedHashSet<>();
+        for (FunctionIdWithCommit alias : functionAliases) {
+            List<FunctionChangeRow> aliasChanges = changesByFunction.get(alias.functionId);
+            if (aliasChanges == null) continue;
+            for (FunctionChangeRow change : aliasChanges) {
+                if (predicate.test(change) && change.commit.isDescendant(alias.commit)) {
                     result.add(change);
                 }
             }
@@ -78,127 +93,287 @@ public class FunctionMoveResolver {
         }
     };
 
-    private Set<FunctionChangeRow> getNonDeletingCommitsToFunctionIncludingAliases(Set<FunctionId> functionAliases) {
-        return getCommitsToFunctionIncludingAliasesConformingTo(functionAliases, NON_DELETING_CHANGE);
+    private Set<FunctionChangeRow> getNonDeletingPriorCommitsToFunctionIncludingAliases(Set<FunctionIdWithCommit> functionAliases) {
+        return getPriorCommitsToFunctionIncludingAliasesConformingTo(functionAliases, NON_DELETING_CHANGE);
     }
 
-    private Set<FunctionChangeRow> getAddingCommitsToFunctionIncludingAliases(Set<FunctionId> functionAliases) {
-        return getCommitsToFunctionIncludingAliasesConformingTo(functionAliases, ADDING_CHANGE);
+    private Set<FunctionChangeRow> getAddingCommitsToFunctionIncludingAliases(Set<FunctionIdWithCommit> functionAliases) {
+        return getPriorCommitsToFunctionIncludingAliasesConformingTo(functionAliases, ADDING_CHANGE);
     }
 
-    private Set<FunctionChangeRow> getAllCommitsToFunctionIncludingAliases(Set<FunctionId> functionAliases) {
-        return getCommitsToFunctionIncludingAliasesConformingTo(functionAliases, ANY_CHANGE);
+    private Set<FunctionChangeRow> getAllFutureCommitsToFunctionIncludingAliases(Set<FunctionIdWithCommit> functionAliases) {
+        return getFutureCommitsToFunctionIncludingAliasesConformingTo(functionAliases, ANY_CHANGE);
     }
 
-    private Set<FunctionId> getCurrentAndOlderFunctionIds(FunctionId function, Set<Commit> directCommitIds) {
-        Set<FunctionId> functionAliases = new HashSet<>();
+    private Set<FunctionIdWithCommit> getCurrentAndOlderFunctionIds(FunctionId function, Set<Commit> directCommitIds) {
+        Set<FunctionIdWithCommit> functionAliases = new HashSet<>();
         for (Commit commit : directCommitIds) {
-            Set<FunctionId> currentAliases = getCurrentAndOlderFunctionIds(function, commit);
+            Set<FunctionIdWithCommit> currentAliases = getCurrentAndOlderFunctionIds(function, commit);
             functionAliases.addAll(currentAliases);
         }
         return functionAliases;
     }
 
-    private Set<FunctionId> getCurrentAndNewerFunctionIds(FunctionId function, Set<Commit> directCommitIds) {
-        Set<FunctionId> functionAliases = new HashSet<>();
+    private Set<FunctionIdWithCommit> getCurrentAndNewerFunctionIds(FunctionId function, Set<Commit> directCommitIds) {
+        Set<FunctionIdWithCommit> functionAliases = new HashSet<>();
         for (Commit commit : directCommitIds) {
-            Set<FunctionId> currentAliases = getCurrentAndNewerFunctionIds(function, commit);
+            Set<FunctionIdWithCommit> currentAliases = getCurrentAndNewerFunctionIds(function, commit);
             functionAliases.addAll(currentAliases);
         }
         return functionAliases;
     }
 
-    private Set<FunctionId> getCurrentAndOlderFunctionIds(FunctionId id, final Commit descendantCommit) {
-        Queue<FunctionId> todo = new LinkedList<>();
-        todo.add(id);
-        Set<FunctionId> done = new LinkedHashSet<>();
-        FunctionId needle;
+    private Set<FunctionIdWithCommit> getCurrentAndOlderFunctionIds(FunctionId id, final Commit descendantCommit) {
+        Queue<FunctionIdWithCommit> todo = new LinkedList<>();
+        todo.add(new FunctionIdWithCommit(id, descendantCommit, false));
+        Set<FunctionIdWithCommit> done = new LinkedHashSet<>();
+        FunctionIdWithCommit needle;
         while ((needle = todo.poll()) != null) {
             done.add(needle);
 
-            Set<FunctionChangeRow> moves = movesByNewFunctionId.get(needle);
+            Set<FunctionChangeRow> moves = movesByNewFunctionId.get(needle.functionId);
             if (moves == null) {
 //                LOG.debug("No moves whatsoever for " + needle);
                 continue;
             }
 
             for (FunctionChangeRow r : moves) {
-                final FunctionId oldId = r.functionId;
-                if (todo.contains(oldId) || done.contains(oldId)) continue;
-                if (commitsDistanceDb.isDescendant(descendantCommit, r.commit)) {
-                    todo.add(oldId);
+                final FunctionIdWithCommit move = new FunctionIdWithCommit(r.functionId, r.commit, true);
+                if (todo.contains(move) || done.contains(move)) continue;
+                if (needle.commit.isDescendant(move.commit)) {
+                    todo.add(move);
                 } else {
 //                        LOG.debug("Rejecting move " + r + ": not an ancestor of " + commit);
                 }
             }
         }
 
-        logAliases("getCurrentAndOlderFunctionIds", id, descendantCommit, done);
+//        Set<FunctionId> result = new LinkedHashSet<>();
+//        for (FunctionIdWithCommit idWithCommit : done) {
+//            result.add(idWithCommit.functionId);
+//        }
+//
+//        logAliases("getCurrentAndOlderFunctionIds", id, descendantCommit, result);
 
         return done;
     }
+
+    private Set<FunctionIdWithCommit> getCurrentAndNewerFunctionIds(FunctionId id, final Commit ancestorCommit) {
+        Queue<FunctionIdWithCommit> todo = new LinkedList<>();
+        todo.add(new FunctionIdWithCommit(id, ancestorCommit, false));
+        Set<FunctionIdWithCommit> done = new LinkedHashSet<>();
+        FunctionIdWithCommit needle;
+        while ((needle = todo.poll()) != null) {
+            done.add(needle);
+
+            Set<FunctionChangeRow> moves = movesByOldFunctionId.get(needle.functionId);
+            if (moves == null) {
+//                LOG.debug("No moves whatsoever for " + needle);
+                continue;
+            }
+
+            for (FunctionChangeRow r : moves) {
+                final FunctionIdWithCommit move = new FunctionIdWithCommit(r.newFunctionId.get(), r.commit, true);
+                if (todo.contains(move) || done.contains(move)) continue;
+                if (move.commit.isDescendant(needle.commit)) {
+                    todo.add(move);
+                } else {
+//                        LOG.debug("Rejecting move " + r + ": not a descendant of " + ancestorCommit);
+                }
+            }
+        }
+
+        //logAliases("getCurrentAndNewerFunctionIds", id, ancestorCommit, done);
+
+        return done;
+    }
+
 
     private static class GenealogySet {
         Set<FunctionGenealogy> rawResult = new HashSet<>();
         GroupingHashSetMap<FunctionId, FunctionGenealogy> genealogiesByFunctionId = new GroupingHashSetMap<>();
 
-        public Set<FunctionGenealogy> findMatchingGenealogies(FunctionIdWithCommit id) {
-            Collection<FunctionGenealogy> possiblyMatchingGenealogies = genealogiesByFunctionId.get(id.functionId);
-            if (possiblyMatchingGenealogies == null) {
-                return Collections.emptySet();
-            }
+//        public Set<FunctionGenealogy> findMatchingGenealogies(FunctionIdWithCommit id) {
+//            Collection<FunctionGenealogy> possiblyMatchingGenealogies = genealogiesByFunctionId.get(id.functionId);
+//            if (possiblyMatchingGenealogies == null) {
+//                return Collections.emptySet();
+//            }
+//
+//            Set<FunctionGenealogy> result = new HashSet<>();
+//
+//            for (FunctionGenealogy possiblyMatchingGenealogy : possiblyMatchingGenealogies) {
+//                if (possiblyMatchingGenealogy.isRelatedTo(id)) {
+//                    result.add(possiblyMatchingGenealogy);
+//                }
+//            }
+//
+//            return result;
+//        }
 
-            Set<FunctionGenealogy> result = new HashSet<>();
-
-            for (FunctionGenealogy possiblyMatchingGenealogy : possiblyMatchingGenealogies) {
-                if (possiblyMatchingGenealogy.isRelatedTo(id)) {
-                    result.add(possiblyMatchingGenealogy);
-                }
-            }
-
-            return result;
-        }
-
-        public void removeGenealogies(Collection<FunctionGenealogy> genealogies) {
-            Set<FunctionId> uniqueFunctionIds = new HashSet<>();
-
-            for (FunctionGenealogy g : genealogies) {
-                uniqueFunctionIds.addAll(g.getUniqueFunctionIds());
-            }
-
-            for (FunctionId fId : uniqueFunctionIds) {
+        private void removeGenealogy(FunctionGenealogy genealogy) {
+            for (FunctionId fId : genealogy.getUniqueFunctionIds()) {
                 Collection<FunctionGenealogy> existingGenealogies = genealogiesByFunctionId.get(fId);
                 if (existingGenealogies == null) continue;
-                existingGenealogies.removeAll(genealogies);
+                existingGenealogies.remove(genealogy);
                 if (existingGenealogies.isEmpty()) {
                     genealogiesByFunctionId.getMap().remove(fId);
                 }
             }
 
-            rawResult.removeAll(genealogies);
+            rawResult.remove(genealogy);
         }
 
-        public void putNewGenealogy(FunctionGenealogy genealogy) {
+        private void putNewGenealogy1(FunctionGenealogy genealogy) {
             rawResult.add(genealogy);
-
-            Set<FunctionId> uniqueFunctionIds = genealogy.getUniqueFunctionIds();
-            for (FunctionId fId : uniqueFunctionIds) {
+            for (FunctionId fId : genealogy.getUniqueFunctionIds()) {
                 genealogiesByFunctionId.put(fId, genealogy);
             }
         }
 
-        public void putMergegedGenealogy(Set<FunctionGenealogy> genealogiesToMerge, Set<FunctionIdWithCommit> additionalIds) {
-            Set<FunctionIdWithCommit> allIds = new HashSet<>(additionalIds);
-            for (FunctionGenealogy merge : genealogiesToMerge) {
-                merge.mergeInto(allIds);
+        public int putNewGenealogy(FunctionGenealogy later) {
+            int merges = 0;
+            while (true) {
+                FunctionGenealogy merged = tryMergeNewGenealogy(later);
+                if (merged != null) {
+                    merges++;
+                    later = merged;
+                } else break;
             }
-            final FunctionGenealogy genealogy = new FunctionGenealogy(allIds);
-            removeGenealogies(genealogiesToMerge);
-            putNewGenealogy(genealogy);
+
+            if (merges == 0) {
+                putNewGenealogy1(later);
+            }
+
+            return merges;
         }
 
-        public void putMergegedGenealogy(Set<FunctionGenealogy> genealogiesToMerge) {
-            putMergegedGenealogy(genealogiesToMerge, Collections.emptySet());
+        private FunctionGenealogy tryMergeNewGenealogy(FunctionGenealogy later) {
+            Set<FunctionGenealogy> earlierGenealogies = this.genealogiesByFunctionId.get(later.firstId.functionId);
+            if (earlierGenealogies != null) {
+                for (FunctionGenealogy earlier : earlierGenealogies) {
+                    if (earlier == later) continue;
+                    int successorDistance = later.isSuccessor(earlier);
+                    if (successorDistance == 0) {
+                        return mergeGenealogies(earlier, later);
+                    }
+                }
+            }
+            return null;
+        }
+
+        private FunctionGenealogy mergeGenealogies(FunctionGenealogy earlier, FunctionGenealogy later) {
+            FunctionGenealogy merged = FunctionGenealogy.merge(earlier, later);
+            removeGenealogy(earlier);
+            removeGenealogy(later);
+            putNewGenealogy1(merged);
+            return merged;
+        }
+
+        public void mergeGenealogies() {
+            ProgressMonitor pm = new ProgressMonitor(rawResult.size(), 1) {
+                @Override
+                protected void reportIntermediateProgress() {
+                    LOG.info("Merged " + this.ticksDone + "/" + this.ticksTotal + " genealogies.");
+                }
+
+                @Override
+                protected void reportFinished() {
+                    reportIntermediateProgress();
+                }
+            };
+
+//            tryPerfectMerges(pm);
+            doImperfectMerges(pm);
+        }
+
+        protected void tryPerfectMerges(ProgressMonitor pm) {
+            while (true) {
+                boolean merged = tryPerfectMerge(pm);
+                if (!merged) break;
+            }
+        }
+
+        private boolean tryPerfectMerge(ProgressMonitor pm) {
+            for (FunctionGenealogy later : rawResult) {
+                Set<FunctionGenealogy> earlierGenealogies = this.genealogiesByFunctionId.get(later.firstId.functionId);
+                if (earlierGenealogies == null) continue;
+                for (FunctionGenealogy earlier : earlierGenealogies) {
+                    if (earlier == later) continue;
+                    int successorDistance = later.isSuccessor(earlier);
+                    if (successorDistance == 0) {
+                        mergeGenealogies(earlier, later);
+                        pm.increaseDone();
+                        return true;
+                    }
+                }
+            }
+            return false;
+        }
+
+        private void doImperfectMerges(ProgressMonitor pm) {
+            class MergePair implements Comparable<MergePair> {
+                int successorDistance;
+                FunctionGenealogy earlier;
+                FunctionGenealogy later;
+
+                @Override
+                public int compareTo(MergePair o) {
+                    return successorDistance - o.successorDistance;
+                }
+            }
+
+            while (true) {
+                ProgressMonitor testMonitor = new ProgressMonitor(rawResult.size()) {
+                    @Override
+                    protected void reportIntermediateProgress() {
+                        LOG.info("Tested " + this.ticksDone + "/" + this.ticksTotal + " merges (" + this.numberOfCurrentReport + "%)");
+                    }
+
+                    @Override
+                    protected void reportFinished() {
+                        LOG.info("Tested all " + this.ticksTotal + " merges");
+
+                    }
+                };
+
+                Set<FunctionGenealogy> merged = new HashSet<>();
+
+                boolean didMerge = false;
+                for (FunctionGenealogy later : new ArrayList<>(rawResult)) {
+                    MergePair winnerMerge = null;
+
+                    Set<FunctionGenealogy> earlierGenealogies = this.genealogiesByFunctionId.get(later.firstId.functionId);
+                    if (earlierGenealogies == null) continue;
+
+                    for (FunctionGenealogy earlier : earlierGenealogies) {
+                        if (earlier == later) continue;
+                        int successorDistance = later.isSuccessor(earlier);
+                        if (successorDistance < 0) continue;
+
+                        MergePair p = new MergePair();
+                        p.earlier = earlier;
+                        p.later = later;
+                        p.successorDistance = successorDistance;
+
+                        if ((winnerMerge == null) || (winnerMerge.successorDistance > successorDistance)) {
+                            if (successorDistance == 0) break;
+                            winnerMerge = p;
+                        }
+                    }
+
+                    if ((winnerMerge != null) && !merged.contains(winnerMerge.earlier) && !merged.contains(winnerMerge.later)) {
+                        mergeGenealogies(winnerMerge.earlier, winnerMerge.later);
+                        merged.add(winnerMerge.earlier);
+                        merged.add(winnerMerge.later);
+                        pm.increaseDone();
+                        didMerge = true;
+                    }
+
+                    testMonitor.increaseDone();
+                }
+
+                if (!didMerge) break;
+            }
         }
     }
 
@@ -216,16 +391,19 @@ public class FunctionMoveResolver {
 
         final int total = ids.size();
 
+        int[] merges = new int[1];
+        merges[0] = 0;
+
         ProgressMonitor pm = new ProgressMonitor(total) {
             @Override
             protected void reportIntermediateProgress() {
-                LOG.info("Computed " + ticksDone + "/" + ticksTotal +
-                        " genealogies (" + this.numberOfCurrentReport + "%)");
+                LOG.info("Computed genealogies of " + ticksDone + "/" + ticksTotal +
+                        " ids (" + this.numberOfCurrentReport + "%). Number of genealogies = " + result.rawResult.size() + " #merges=" + merges[0]);
             }
 
             @Override
             protected void reportFinished() {
-                LOG.info("Done " + ticksTotal + " genealogies");
+                LOG.info("Done computing " + ticksTotal + " genealogies");
             }
         };
 
@@ -237,22 +415,19 @@ public class FunctionMoveResolver {
             Set<FunctionIdWithCommit> otherIds = new LinkedHashSet<>();
             Set<FunctionIdWithCommit> currentAndNewerIds = getCurrentAndNewerFunctionIdsWithCommits1(id);
             otherIds.addAll(currentAndNewerIds);
+            FunctionGenealogy currentGenealogy = new FunctionGenealogy(otherIds);
+            merges[0] += result.putNewGenealogy(currentGenealogy);
 
-            Set<FunctionGenealogy> genealogiesToMerge = new HashSet<>();
-            for (FunctionIdWithCommit otherId : otherIds) {
-                Set<FunctionGenealogy> matches = result.findMatchingGenealogies(otherId);
-                genealogiesToMerge.addAll(matches);
-            }
-
-            if (genealogiesToMerge.isEmpty()) {
-                final FunctionGenealogy genealogy = new FunctionGenealogy(otherIds);
-                result.putNewGenealogy(genealogy);
-            } else {
-                result.putMergegedGenealogy(genealogiesToMerge, otherIds);
-            }
+//            while (true) {
+//                FunctionGenealogy mergedGenealogy = result.tryMerge(currentGenealogy);
+//                if (mergedGenealogy == null) break;
+//                else currentGenealogy = mergedGenealogy;
+//            }
 
             pm.increaseDone();
         }
+
+        result.mergeGenealogies();
 
 //        while (true) {
 //            boolean merged = false;
@@ -467,81 +642,6 @@ public class FunctionMoveResolver {
         return done;
     }
 
-    private Set<FunctionIdWithCommit> getCurrentAndOlderFunctionIdsWithCommits1(FunctionIdWithCommit id) {
-        Queue<FunctionIdWithCommit> todo = new LinkedList<>();
-        todo.add(id);
-        Set<FunctionIdWithCommit> done = new LinkedHashSet<>();
-
-        while (true) {
-            final int doneSizeBefore = done.size();
-
-            FunctionIdWithCommit needle;
-            while ((needle = todo.poll()) != null) {
-                done.add(needle);
-
-                Set<FunctionChangeRow> moves = movesByNewFunctionId.get(needle.functionId);
-                if (moves == null) {
-//                LOG.debug("No moves whatsoever for " + needle);
-                    continue;
-                }
-
-                for (FunctionChangeRow r : moves) {
-                    final FunctionIdWithCommit fidWithCommit = new FunctionIdWithCommit(r.functionId, r.commit, false);
-                    if (done.contains(fidWithCommit) || todo.contains(fidWithCommit)) continue;
-                    for (FunctionIdWithCommit descendantFid : done) {
-                        final Commit descendantCommit = descendantFid.commit;
-                        if (commitsDistanceDb.isDescendant(descendantCommit, r.commit)) {
-                            todo.add(fidWithCommit);
-                            break;
-                        } else {
-//                        LOG.debug("Rejecting move " + r + ": not a descendant of " + ancestorCommit);
-                        }
-                    }
-                }
-            }
-
-            if (doneSizeBefore == done.size()) {
-                break;
-            } else {
-                todo.addAll(done);
-            }
-        }
-
-        //logAliases("getCurrentAndNewerFunctionIds", id, ancestorCommit, done);
-
-        return done;
-    }
-
-    private Set<FunctionId> getCurrentAndNewerFunctionIds(FunctionId id, final Commit ancestorCommit) {
-        Queue<FunctionId> todo = new LinkedList<>();
-        todo.add(id);
-        Set<FunctionId> done = new LinkedHashSet<>();
-        FunctionId needle;
-        while ((needle = todo.poll()) != null) {
-            done.add(needle);
-
-            Set<FunctionChangeRow> moves = movesByOldFunctionId.get(needle);
-            if (moves == null) {
-//                LOG.debug("No moves whatsoever for " + needle);
-                continue;
-            }
-
-            for (FunctionChangeRow r : moves) {
-                final FunctionId newId = r.newFunctionId.get();
-                if (todo.contains(newId) || done.contains(newId)) continue;
-                if (commitsDistanceDb.isDescendant(r.commit, ancestorCommit)) {
-                    todo.add(newId);
-                } else {
-//                        LOG.debug("Rejecting move " + r + ": not a descendant of " + ancestorCommit);
-                }
-            }
-        }
-
-        logAliases("getCurrentAndNewerFunctionIds", id, ancestorCommit, done);
-
-        return done;
-    }
-
     private void logAliases(String logFunName, FunctionId id, Commit commit, Set<FunctionId> result) {
         if (!LOG.isDebugEnabled()) return;
 
@@ -628,13 +728,13 @@ public class FunctionMoveResolver {
         return allDirectCommitIds;
     }
 
-    public FunctionHistory getFunctionHistory(final FunctionId function) {
-        final Set<Commit> directCommitsToThisFunction = getCommitIdsOfChangesToThisFunction(function);
-        final Set<FunctionId> functionAliases = this.getCurrentAndOlderFunctionIds(function, directCommitsToThisFunction);
+    public FunctionHistory getFunctionHistory(final FunctionId function, final Commit beforeCommit) {
+//        final Set<Commit> directCommitsToThisFunction = getCommitIdsOfChangesToThisFunction(function);
+        final Set<FunctionIdWithCommit> functionAliases = this.getCurrentAndOlderFunctionIds(function, Collections.singleton(beforeCommit));
         // All the commits that have created this function or a previous version of it.
         final Set<FunctionChangeRow> knownAddsForFunction = this.getAddingCommitsToFunctionIncludingAliases(functionAliases);
         final Set<FunctionChangeRow> nonDeletingChangesToFunctionAndAliases =
-                this.getNonDeletingCommitsToFunctionIncludingAliases(functionAliases);
+                this.getNonDeletingPriorCommitsToFunctionIncludingAliases(functionAliases);
         final Set<Commit> knownAddingCommitsForFunction = commitIdsFromChanges(knownAddsForFunction);
         final Set<Commit> nonDeletingCommitsToFunctionAndAliases = commitIdsFromChanges(nonDeletingChangesToFunctionAndAliases);
 
@@ -650,12 +750,16 @@ public class FunctionMoveResolver {
                 additionalGuessedAdds, nonDeletingCommitsToFunctionAndAliases, commitsDistanceDb);
     }
 
-    private Set<Commit> getCommitsWhereFunctionIsKnownToExist(Set<FunctionId> functionAliases) {
+    private Set<Commit> getCommitsWhereFunctionIsKnownToExist(Set<FunctionIdWithCommit> functionAliases) {
         Set<Commit> result = new HashSet<>();
-        for (FunctionId function : functionAliases) {
-            Set<Commit> commits = commitsWhereFunctionIsKnownToExitsByFunctionId.get(function);
+        for (FunctionIdWithCommit alias : functionAliases) {
+            Set<Commit> commits = commitsWhereFunctionIsKnownToExitsByFunctionId.get(alias.functionId);
             if (commits != null) {
-                result.addAll(commits);
+                for (Commit c : commits) {
+                    if (alias.commit.isDescendant(c)) {
+                        result.add(c);
+                    }
+                }
             }
         }
         return result;
@@ -663,9 +767,9 @@ public class FunctionMoveResolver {
 
     public FunctionFuture getFunctionFuture(final FunctionId function,
                                             final Set<Commit> directCommitsToThisFunction) {
-        final Set<FunctionId> functionAliases = this.getCurrentAndNewerFunctionIds(function, directCommitsToThisFunction);
+        final Set<FunctionIdWithCommit> functionAliases = this.getCurrentAndNewerFunctionIds(function, directCommitsToThisFunction);
         final Set<FunctionChangeRow> changesToFunctionAndAliases =
-                this.getAllCommitsToFunctionIncludingAliases(functionAliases);
+                this.getAllFutureCommitsToFunctionIncludingAliases(functionAliases);
         final Set<Commit> commitsToFunctionAndAliases = commitIdsFromChanges(changesToFunctionAndAliases);
         return new FunctionFuture(function, functionAliases, commitsToFunctionAndAliases, changesToFunctionAndAliases);
     }

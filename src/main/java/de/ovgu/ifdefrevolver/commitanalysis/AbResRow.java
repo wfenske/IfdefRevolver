@@ -2,7 +2,10 @@ package de.ovgu.ifdefrevolver.commitanalysis;
 
 import de.ovgu.skunk.detection.output.MethodMetricsColumns;
 
-public class AbResRow {
+import java.util.Collection;
+import java.util.Collections;
+
+public class AbResRow implements IAbResRow {
     private FunctionId functionId;
     private int loc;
     private int loac = 0;
@@ -44,39 +47,53 @@ public class AbResRow {
         return column.parseCsvColumnValue(val);
     }
 
+    @Override
     public FunctionId getFunctionId() {
         return functionId;
     }
 
+    @Override
     public int getLoc() {
         return loc;
     }
 
+    @Override
     public int getLoac() {
         return loac;
     }
 
+    @Override
     public int getLofc() {
         return lofc;
     }
 
+    @Override
     public int getNoFl() {
         return noFl;
     }
 
+    @Override
     public int getNoFcDup() {
         return noFcDup;
     }
 
+    @Override
     public int getNoFcNonDup() {
         return noFcNonDup;
     }
 
+    @Override
     public int getNoNest() {
         return noNest;
     }
 
+    @Override
     public int getNoNeg() {
         return noNeg;
+    }
+
+    @Override
+    public Collection<AbResRow> getContainedRows() {
+        return Collections.singleton(this);
     }
 }

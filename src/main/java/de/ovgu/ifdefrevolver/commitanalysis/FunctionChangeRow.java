@@ -10,6 +10,7 @@ import java.util.Optional;
 public class FunctionChangeRow {
     public FunctionId functionId;
     public Commit commit;
+    public int hunk;
     public int linesAdded;
     public int linesDeleted;
     public FunctionChangeHunk.ModificationType modType;

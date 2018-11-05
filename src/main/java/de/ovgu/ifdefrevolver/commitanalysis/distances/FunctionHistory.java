@@ -14,7 +14,7 @@ public class FunctionHistory {
     private static final Logger LOG = Logger.getLogger(FunctionHistory.class);
 
     public final FunctionId function;
-    public final Set<FunctionId> olderFunctionIds;
+    public final Set<FunctionIdWithCommit> olderFunctionIds;
     /**
      * All the commits that have created this function or a previous version of it.
      */
@@ -32,7 +32,7 @@ public class FunctionHistory {
 
     private static final Optional<Integer> ZERO_AGE = Optional.of(0);
 
-    public FunctionHistory(FunctionId function, Set<FunctionId> olderFunctionIds, Set<Commit> knownAddsForFunction,
+    public FunctionHistory(FunctionId function, Set<FunctionIdWithCommit> olderFunctionIds, Set<Commit> knownAddsForFunction,
                            Set<Commit> guessedAddsForFunction, Set<Commit> additionalGuessedAdds,
                            Set<Commit> nonDeletingCommitsToFunctionAndAliases,
                            CommitsDistanceDb commitsDistanceDb) {

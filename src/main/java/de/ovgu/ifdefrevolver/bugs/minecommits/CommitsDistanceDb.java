@@ -45,6 +45,19 @@ public class CommitsDistanceDb {
         public boolean isRelatedTo(Commit other) {
             return db.areCommitsRelated(this, other);
         }
+
+        public boolean isDescendant(Commit possibleAncestor) {
+            return db.isDescendant(this, possibleAncestor);
+        }
+
+        /**
+         * @param child A commit of which <code>this</code> commit is supposed to be an ancestor
+         * @return distance from this commit to the child commit; or {@link Optional#empty()} if there is no possible
+         * path
+         */
+        public Optional<Integer> minDistance(Commit child) {
+            return db.minDistance(child, this);
+        }
     }
 
     /**
@@ -384,7 +397,8 @@ public class CommitsDistanceDb {
     }
 
     /**
-     * Determine whether the first commit is the descendant of the second. Note that every commit is its own descendant.
+     * Determine whether the first commit is the descendant of the second. Note that every commit is its own
+     * descendant.
      *
      * @param descendant the descendant commit
      * @param ancestor   a preceding commit
@@ -471,8 +485,8 @@ public class CommitsDistanceDb {
      * Determine all commits that are not a descendant of another commit.
      *
      * @param commits A set of commit hashes
-     * @return A subset of the original commits that only holds commits that are not descendants of other commits
-     * within the original  set of commits.
+     * @return A subset of the original commits that only holds commits that are not descendants of other commits within
+     * the original  set of commits.
      */
     public Set<Commit> filterAncestorCommits(Collection<Commit> commits) {
         ensurePreprocessed();

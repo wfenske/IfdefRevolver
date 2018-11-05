@@ -18,7 +18,7 @@ public class FunctionFuture {
     /**
      * Future ids of the same function, including the original id (the value of {@link #function})
      */
-    public final Set<FunctionId> currentAndNewerFunctionIds;
+    public final Set<FunctionIdWithCommit> currentAndNewerFunctionIds;
     /**
      * Ids of the commits that changed this function or one of its aliases in {@link #currentAndNewerFunctionIds}
      */
@@ -29,7 +29,7 @@ public class FunctionFuture {
      */
     public final Set<FunctionChangeRow> changesToFunctionAndAliases;
 
-    public FunctionFuture(FunctionId function, Set<FunctionId> currentAndNewerFunctionIds,
+    public FunctionFuture(FunctionId function, Set<FunctionIdWithCommit> currentAndNewerFunctionIds,
                           Set<Commit> commitsToFunctionAndAliases, Set<FunctionChangeRow> changesToFunctionAndAliases) {
         this.function = function;
         this.currentAndNewerFunctionIds = currentAndNewerFunctionIds;

@@ -3,16 +3,16 @@ package de.ovgu.ifdefrevolver.util;
 public abstract class ProgressMonitor {
     protected final int ticksTotal;
     protected int ticksDone = 0;
-    protected final int ticksPerReport;
+    protected final float ticksPerReport;
     protected int numberOfCurrentReport = 0;
 
-    public ProgressMonitor(int ticksTotal, int ticksPerReport) {
+    public ProgressMonitor(int ticksTotal, float ticksPerReport) {
         this.ticksTotal = ticksTotal;
-        this.ticksPerReport = Math.max(ticksPerReport, 1);
+        this.ticksPerReport = Math.max(ticksPerReport, 1.0f);
     }
 
     public ProgressMonitor(int ticksTotal) {
-        this(ticksTotal, Math.round(ticksTotal / 100.0f));
+        this(ticksTotal, ticksTotal / 100.0f);
     }
 
     public void increaseDone() {
@@ -31,7 +31,12 @@ public abstract class ProgressMonitor {
     protected abstract void reportFinished();
 
     protected boolean needIntermediateReport() {
-        return ((ticksDone % ticksPerReport) == 0);
+        int numNextReport = Math.round(ticksDone / ticksPerReport);
+        return (numNextReport > numberOfCurrentReport);
+    }
+
+    protected int percentage() {
+        return Math.round(100.0f * ticksDone / Math.max(ticksTotal, 1));
     }
 
 }

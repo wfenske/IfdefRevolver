@@ -18,43 +18,43 @@ public enum JointFunctionAbSmellAgeSnapshotColumns implements CsvColumnValueProv
     },
     SNAPSHOT_INDEX {
         @Override
-        public Object csvColumnValue(AddChangeDistances.SnapshotFunctionGenealogy in, Void ctx) {
+        public Integer csvColumnValue(AddChangeDistances.SnapshotFunctionGenealogy in, Void ctx) {
             return in.getSnapshot().getSnapshotIndex();
         }
     },
     SNAPSHOT_BRANCH {
         @Override
-        public Object csvColumnValue(AddChangeDistances.SnapshotFunctionGenealogy in, Void ctx) {
+        public Integer csvColumnValue(AddChangeDistances.SnapshotFunctionGenealogy in, Void ctx) {
             return in.getSnapshot().getBranch();
         }
     },
     START_FUNCTION_SIGNATURE {
         @Override
-        public Object csvColumnValue(AddChangeDistances.SnapshotFunctionGenealogy in, Void ctx) {
+        public String csvColumnValue(AddChangeDistances.SnapshotFunctionGenealogy in, Void ctx) {
             return in.getFunctionIdAtStart().signature;
         }
     },
     START_FILE {
         @Override
-        public Object csvColumnValue(AddChangeDistances.SnapshotFunctionGenealogy in, Void ctx) {
+        public String csvColumnValue(AddChangeDistances.SnapshotFunctionGenealogy in, Void ctx) {
             return in.getFunctionIdAtStart().file;
         }
     },
     END_FUNCTION_SIGNATURE {
         @Override
-        public Object csvColumnValue(AddChangeDistances.SnapshotFunctionGenealogy in, Void ctx) {
+        public String csvColumnValue(AddChangeDistances.SnapshotFunctionGenealogy in, Void ctx) {
             return in.getFunctionIdAtEnd().signature;
         }
     },
     END_FILE {
         @Override
-        public Object csvColumnValue(AddChangeDistances.SnapshotFunctionGenealogy in, Void ctx) {
+        public String csvColumnValue(AddChangeDistances.SnapshotFunctionGenealogy in, Void ctx) {
             return in.getFunctionIdAtEnd().file;
         }
     },
     FUNCTION_LOC {
         @Override
-        public Object csvColumnValue(AddChangeDistances.SnapshotFunctionGenealogy in, Void ctx) {
+        public Integer csvColumnValue(AddChangeDistances.SnapshotFunctionGenealogy in, Void ctx) {
             return in.getAnnotationData().getLoc();
         }
     },
@@ -78,7 +78,7 @@ public enum JointFunctionAbSmellAgeSnapshotColumns implements CsvColumnValueProv
     //HUNKS,
     COMMITS {
         @Override
-        public Object csvColumnValue(AddChangeDistances.SnapshotFunctionGenealogy in, Void ctx) {
+        public Integer csvColumnValue(AddChangeDistances.SnapshotFunctionGenealogy in, Void ctx) {
             Set<CommitsDistanceDb.Commit> distinctCommits = new HashSet<>();
             for (FunctionChangeRow r : in.getChanges()) {
                 distinctCommits.add(r.commit);
@@ -90,7 +90,7 @@ public enum JointFunctionAbSmellAgeSnapshotColumns implements CsvColumnValueProv
 
     LINES_CHANGED {
         @Override
-        public Object csvColumnValue(AddChangeDistances.SnapshotFunctionGenealogy in, Void ctx) {
+        public Integer csvColumnValue(AddChangeDistances.SnapshotFunctionGenealogy in, Void ctx) {
             int result = 0;
             for (FunctionChangeRow r : in.getChanges()) {
                 if (isLineChangeCountable(r)) {
@@ -104,7 +104,7 @@ public enum JointFunctionAbSmellAgeSnapshotColumns implements CsvColumnValueProv
     //LINE_DELTA,
     LINES_DELETED {
         @Override
-        public Object csvColumnValue(AddChangeDistances.SnapshotFunctionGenealogy in, Void ctx) {
+        public Integer csvColumnValue(AddChangeDistances.SnapshotFunctionGenealogy in, Void ctx) {
             int result = 0;
             for (FunctionChangeRow r : in.getChanges()) {
                 if (isLineChangeCountable(r)) {
@@ -116,7 +116,7 @@ public enum JointFunctionAbSmellAgeSnapshotColumns implements CsvColumnValueProv
     },
     LINES_ADDED {
         @Override
-        public Object csvColumnValue(AddChangeDistances.SnapshotFunctionGenealogy in, Void ctx) {
+        public Integer csvColumnValue(AddChangeDistances.SnapshotFunctionGenealogy in, Void ctx) {
             int result = 0;
             for (FunctionChangeRow r : in.getChanges()) {
                 if (isLineChangeCountable(r)) {
@@ -129,37 +129,37 @@ public enum JointFunctionAbSmellAgeSnapshotColumns implements CsvColumnValueProv
     //ABSmell,LocationSmell,ConstantsSmell,NestingSmell,
     LOAC {
         @Override
-        public Object csvColumnValue(AddChangeDistances.SnapshotFunctionGenealogy in, Void ctx) {
+        public Integer csvColumnValue(AddChangeDistances.SnapshotFunctionGenealogy in, Void ctx) {
             return in.getAnnotationData().getLoac();
         }
     },
     LOFC {
         @Override
-        public Object csvColumnValue(AddChangeDistances.SnapshotFunctionGenealogy in, Void ctx) {
+        public Integer csvColumnValue(AddChangeDistances.SnapshotFunctionGenealogy in, Void ctx) {
             return in.getAnnotationData().getLofc();
         }
     },
     FL {
         @Override
-        public Object csvColumnValue(AddChangeDistances.SnapshotFunctionGenealogy in, Void ctx) {
+        public Integer csvColumnValue(AddChangeDistances.SnapshotFunctionGenealogy in, Void ctx) {
             return in.getAnnotationData().getNoFl();
         }
     },
     FC_Dup {
         @Override
-        public Object csvColumnValue(AddChangeDistances.SnapshotFunctionGenealogy in, Void ctx) {
+        public Integer csvColumnValue(AddChangeDistances.SnapshotFunctionGenealogy in, Void ctx) {
             return in.getAnnotationData().getNoFcDup();
         }
     },
     FC_NonDup {
         @Override
-        public Object csvColumnValue(AddChangeDistances.SnapshotFunctionGenealogy in, Void ctx) {
+        public Integer csvColumnValue(AddChangeDistances.SnapshotFunctionGenealogy in, Void ctx) {
             return in.getAnnotationData().getNoFcNonDup();
         }
     },
-    ND {
+    CND {
         @Override
-        public Object csvColumnValue(AddChangeDistances.SnapshotFunctionGenealogy in, Void ctx) {
+        public Integer csvColumnValue(AddChangeDistances.SnapshotFunctionGenealogy in, Void ctx) {
             return in.getAnnotationData().getNoNest();
         }
     },

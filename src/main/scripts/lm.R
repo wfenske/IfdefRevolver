@@ -48,7 +48,7 @@ readData <- function(commandLineArgs) {
         if ( is.null(opts$project) ) {
             stop("Missing input files.  Either specify explicit input files or specify the name of the project the `--project' option (`-p' for short).")
         }
-        dataFn <-  file.path("results", opts$project, "allData.rdata")
+        dataFn <-  file.path("results", opts$project, "allDataAge.rdata")
         sysname <<- opts$project
     }
     eprintf("DEBUG: Reading data from %s\n", dataFn)
@@ -368,8 +368,8 @@ tryZeroInflModel <- function(indeps, dep, data, csvOut=FALSE,csvHeader=FALSE) {
     ##
     ## Probably, the intercept of the zero model is significant if
     ## there are mode zeros than expected for a Poisson distribution.
-    formulaStringIntercept <- paste(dep, " ~ ", indepsStr, "|1", sep="")
-    formulaIntercept <- as.formula(formulaStringIntercept)
+    formulaString <- paste(dep, " ~ ", indepsStr, "|log2AGE + log2LAST_EDIT", sep="")
+    formula <- as.formula(formulaString)
 
     ## Step 2: Fit a zero-inflated model to test a treatment effect
     ## for both the counts and the zeros (with '~ x|x') and check
@@ -402,7 +402,7 @@ tryZeroInflModel <- function(indeps, dep, data, csvOut=FALSE,csvHeader=FALSE) {
 ##        cat("***************************\n")
 ##        cat("*** "); cat(modelName1); cat(" ***\n")
 ##        
-##        model.poisson1 <- zeroinfl(formulaIntercept, data = data)
+##        model.poisson1 <- zeroinfl(formula, data = data)
 ##        print(summary(model.poisson1))
 ##        
 ##        modelName2 <- paste("zero-inflated:", formulaString2)
@@ -417,13 +417,13 @@ tryZeroInflModel <- function(indeps, dep, data, csvOut=FALSE,csvHeader=FALSE) {
     ## indicates that the zero-inflated Poisson model is more
     ## appropriate than the neg-bin model.
 
-    modelNameInterceptnegbin <- paste("zero-inflated negative binomial:", formulaStringIntercept)
+    modelNameNegbin <- paste("zero-inflated negative binomial:", formulaString)
     eprintf("\n\n")
     eprintf("***************************\n")
-    eprintf("*** %s ***\n", modelNameInterceptnegbin)
-    model.negbinIntercept <- zeroinfl(formulaIntercept, data = data, dist = "negbin")
-    m <- model.negbinIntercept
-    mName <- modelNameInterceptnegbin
+    eprintf("*** %s ***\n", modelNameNegbin)
+    model.negbin <- zeroinfl(formula, data = data, dist = "negbin")
+    m <- model.negbin
+    mName <- modelNameNegbin
     ##print(summary(model.negbinIntercept))
     if (csvOut) {
         if (csvHeader) {
@@ -447,7 +447,7 @@ tryZeroInflModel <- function(indeps, dep, data, csvOut=FALSE,csvHeader=FALSE) {
         ## NOTE: Smaller values of AIC are better.  (Cf. https://ncss-wpengine.netdna-ssl.com/wp-content/themes/ncss/pdf/Procedures/NCSS/Negative_Binomial_Regression.pdf)
     } else {
         print(summary(m))
-        reportModel(m, mName)
+        reportModel(m, mName, -1, csvOut=csvOut,csvHeader=csvHeader, warnings=0, warningMessages="")
     }
 
 
@@ -460,7 +460,7 @@ tryZeroInflModel <- function(indeps, dep, data, csvOut=FALSE,csvHeader=FALSE) {
 ##    print(summary(model.negbin2))
 ##    }
     
-    return (model.negbinIntercept)
+    return (model.negbin)
 }
 
 plotResiduals <- function(model) {
@@ -523,7 +523,7 @@ sampleDf <- function(df, sz) {
 ## LOFC,logLOFC,LOFCratio,
 ## FL (NOFL), FLratio (FL per LOC)
 ## FC (from NOFC_NonDup), FCratio (FC per LOC)
-## ND (from NONEST), NDratio (ND per LOC)
+## CND (from NONEST), CNDratio (CND per LOC)
 
 ### Dependent variables
 ## HUNKS, HUNKSratio (HUNKS per LOC)
@@ -537,24 +537,30 @@ sampleDf <- function(df, sz) {
 
 allData$FLratio  <- allData$FL  / allData$LOC
 allData$FCratio  <- allData$FC  / allData$LOC
-allData$NDratio  <- allData$ND  / allData$LOC
+allData$CNDratio  <- allData$CND  / allData$LOC
 allData$NEGratio <- allData$NEG / allData$LOC
 
 allData$sqrtLOC <- sqrt(allData$LOC)
 allData$sqrtFL <- sqrt(allData$FL)
 allData$sqrtFC <- sqrt(allData$FC)
-allData$sqrtND <- sqrt(allData$ND)
+allData$sqrtCND <- sqrt(allData$CND)
 
 allData$log2FL  <- log2(allData$FL + 1)
 allData$log2FC  <- log2(allData$FC + 1)
-allData$log2ND  <- log2(allData$ND + 1)
+allData$log2CND  <- log2(allData$CND + 1)
 allData$log2NEG <- log2(allData$NEG + 1)
 
 allData$log2LOC <- log2(allData$LOC)
 
+allData$log2AGE <- log2(allData$AGE + 1)
+allData$log2LAST_EDIT <- log2(allData$LAST_EDIT + 1)
+
 ## Some artificial dependent variables
 allData$logLINES_CHANGED <- log(allData$LINES_CHANGED + 1)
 allData$sqrtLINES_CHANGED <- sqrt(allData$LINES_CHANGED)
+
+allData$LCH <- allData$LINES_CHANGED
+allData$LCHratio <- allData$LCH / allData$LOC
 
 ##allData$sqrtLogLINES_CHANGED <- sqrt(allData$logLINES_CHANGED)
 ##allData$logLogLINES_CHANGED <- log(allData$logLINES_CHANGED)
@@ -564,10 +570,18 @@ medianLCHratio <- median(changedData0$LCHratio)
 
 ##cat("Median changed lines/LOC for all changed functions: ", medianLCHratio, "\n", sep="")
 
-eprintf("Median COMMITS/HUNKS/LCHG of changed functions:\n%.2g,%.2g,%.2g\n"
+eprintf("Median COMMITS/LCHG of changed functions:\n%.2g,%.2g\n"
       , median(changedData0$COMMITS)
-      , median(changedData0$HUNKS)
+      ##, median(changedData0$HUNKS)
       , median(changedData0$LCH))
+
+eprintf("Median AGE/LAST_EDIT of all functions:\n%.0f,%.0f\n"
+      , median(allData$AGE)
+      , median(allData$LAST_EDIT))
+
+eprintf("Mean AGE/LAST_EDIT of all functions:\n%.0f,%.0f\n"
+      , mean(allData$AGE)
+      , mean(allData$LAST_EDIT))
 
 allData$CHURN_PRONE <- allData$LCHratio > medianLCHratio
 
@@ -590,11 +604,18 @@ changedPercent <- nrow(changedData0) * 100 / allNRow
 ##nrow(subset(allData, is.na(LOC) || !is.finite(LOC)))
 ##nrow(subset(allData, is.na(FL) || !is.finite(FL)))
 ##nrow(subset(allData, is.na(FC) || !is.finite(FC)))
-##nrow(subset(allData, is.na(ND) || !is.finite(ND)))
+##nrow(subset(allData, is.na(CND) || !is.finite(CND)))
 
 ##sampleChangedSize <- 10000
 ##negBinData <- sampleDf(changedData, sampleChangedSize)
 negBinData <- allData
+
+negBinData <- subset(negBinData, !is.na(AGE))
+negBinData <- subset(negBinData, is.finite(AGE))
+
+negBinData <- subset(negBinData, !is.na(LAST_EDIT))
+negBinData <- subset(negBinData, is.finite(LAST_EDIT))
+
 if (opts$annotated) {
     eprintf("DEBUG: Creating models for just the annotated functions.\n")
     negBinData <- subset(negBinData, FL > 0)
@@ -614,7 +635,7 @@ if (opts$noTestCode) {
     tGroup <- negBinTestData # only test code
     cGroup <- negBinData     # no test code
 
-    for (v in c("COMMITS", "LCH", "FL", "FC", "ND", "NEG", "LOACratio")) {
+    for (v in c("COMMITS", "LCH", "FL", "FC", "CND", "NEG", "LOACratio")) {
         mwuResult <- wilcox.test(tGroup[,v], cGroup[,v])
         cliffRes <- cliff.delta(tGroup[,v], cGroup[,v])
         eprintf("DEBUG: Comparing %s of test code and non-test code: delta=%.3f (%s), p=%.3g\n",
@@ -630,35 +651,35 @@ ziData <- allData
 
 ## last variable is the independent control variable
 ##indeps <- c(
-    ##"FLratio", "FCratio", "NDratio",
-    ##"FL", "FC", "ND", "LOC"
+    ##"FLratio", "FCratio", "CNDratio",
+    ##"FL", "FC", "CND", "LOC"
     ##, "LOACratio",
-##    "logFL", "logFC", "logND", "logLOC"
-    ##"sqrtFL", "sqrtFC", "sqrtND", "sqrtLOC"
+##    "logFL", "logFC", "logCND", "logLOC"
+    ##"sqrtFL", "sqrtFC", "sqrtCND", "sqrtLOC"
 ##)
 ##FLratio + #
 ##FCratio + #
-##NDratio + #
+##CNDratio + #
 ##LOFCratio + #
 ##logLOAC + #
 ##logLOFC +
 
-##model.linear.orig <- tryLinearModel2(indeps=c("FL", "FC", "ND", "LOC"), dep="LINES_CHANGED", data=sampleChangedData)
-##model.linear.log <- tryLinearModel2(indeps=c("logFL", "logFC", "logND", "logLOC"), dep="logLINES_CHANGED", data=sampleChangedData)
+##model.linear.orig <- tryLinearModel2(indeps=c("FL", "FC", "CND", "LOC"), dep="LINES_CHANGED", data=sampleChangedData)
+##model.linear.log <- tryLinearModel2(indeps=c("logFL", "logFC", "logCND", "logLOC"), dep="logLINES_CHANGED", data=sampleChangedData)
 ##modelOnSample <- tryGlmModel2(binomial(link='logit'), indeps, dep="CHURN_PRONE", sampleChangedData)
-##model.poisson.orig <- tryGlmModel2("poisson", indeps=c("FL", "FC", "ND", "LOC"), dep="LINES_CHANGED", data=sampleChangedData)
+##model.poisson.orig <- tryGlmModel2("poisson", indeps=c("FL", "FC", "CND", "LOC"), dep="LINES_CHANGED", data=sampleChangedData)
 ##model.poisson.orig <- tryGlmModel2("poisson", indeps=c("LOC"), dep="LINES_CHANGED", data=sampleChangedData)
-##model.poisson.log <- tryGlmModel2("poisson", indeps=c("logFL", "logFC", "logND", "logLOC"), dep="logLINES_CHANGED", data=sampleChangedData)
+##model.poisson.log <- tryGlmModel2("poisson", indeps=c("logFL", "logFC", "logCND", "logLOC"), dep="logLINES_CHANGED", data=sampleChangedData)
 ##nbIndeps <- c("FL"
 ##            , "FC"
-##            , "ND"
+##            , "CND"
 ##            , "LOAC"
 ##            , "LOFC"
 ##            , "LOC"
 ##              )
 ##ziIndeps <- c("FL"
 ##            , "FC"
-##            , "ND"
+##            , "CND"
 ##            , "LOFC"
 ##            , "LOC"
 ##              )
@@ -677,12 +698,12 @@ header <- function() {
     }
 }
 
-negbinCsvModel <- function(dep, indeps, header=FALSE) {
+negbinCsvModel <- function(dep, indeps) {
     model <- tryNbModel(indeps=indeps, dep=dep, data=negBinData, csvOut=TRUE, csvHeader=header())
     return (model)
 }
 
-zeroinflNegbinCsvModel <- function(dep, indeps, header=FALSE) {
+zeroinflNegbinCsvModel <- function(dep, indeps) {
     model <- tryZeroInflModel(indeps=indeps, dep=dep, data=ziData, csvOut=TRUE, csvHeader=header())
     return (model)
 }
@@ -692,48 +713,49 @@ csvModel <- negbinCsvModel
 
 for (dep in c("COMMITS"
               ##, "HUNKS"
-              , "LCH"
-              )) {
-##    dummy <- csvModel(dep, c("LOC"), header=header)
-##    header <<- FALSE
-##
-##    dummy <- csvModel(dep, c("FL"))
-##    dummy <- csvModel(dep, c("FC"))
-##    dummy <- csvModel(dep, c("ND"))
-##    dummy <- csvModel(dep, c("NEG"))
-##    
-##    ##dummy <- csvModel(dep, c("LOAC"))
-##    ##dummy <- csvModel(dep, c("LOFC"))
-##    dummy <- csvModel(dep, c("LOACratio"))
-##    ##dummy <- csvModel(dep, c("LOFCratio"))
-##
-##    dummy <- csvModel(dep, c("FL", "FC", "ND", "LOC"))
-##    dummy <- csvModel(dep, c("FL", "FC", "ND", "NEG", "LOC"))
-##    
-##    ##dummy <- csvModel(dep, c("FL", "FC", "ND", "LOAC", "LOC"))
-    ##    ##dummy <- csvModel(dep, c("FL", "FC", "ND", "LOFC", "LOC"))
+##              , "LCH"
+              )) { 
     dummy <- csvModel(dep, c("log2LOC"))
-    ##dummy <- csvModel(dep, c("FL", "FC", "ND", "NEG", "LOC"))
-    dummy <- csvModel(dep, c("FL", "FC", "ND", "NEG", "LOACratio", "log2LOC"))
-    ##dummy <- csvModel(dep, c("FLratio", "FCratio", "NDratio", "NEGratio", "LOC"))
-    ##dummy <- csvModel(dep, c("FLratio", "FCratio", "NDratio", "NEGratio", "LOACratio", "LOC"))
+    dummy <- csvModel(dep, c("log2LOC", "AGE"))
+##    dummy <- csvModel(dep, c("log2LOC", "log2AGE"))
+##    dummy <- csvModel(dep, c("log2LOC", "LAST_EDIT"))
+    dummy <- csvModel(dep, c("log2LOC", "log2LAST_EDIT"))
+##    dummy <- csvModel(dep, c("log2LOC", "AGE", "LAST_EDIT"))
+##    dummy <- csvModel(dep, c("log2LOC", "log2AGE", "LAST_EDIT"))
+    dummy <- csvModel(dep, c("log2LOC", "AGE", "log2LAST_EDIT"))
+##    dummy <- csvModel(dep, c("log2LOC", "log2AGE", "log2LAST_EDIT"))
+    dummy <- csvModel(dep, c("FL", "FC", "CND", "NEG", "LOACratio", "log2LOC"))
+    ##dummy <- csvModel(dep, c("FL", "FC", "CND", "NEG", "LOACratio", "log2LOC", "AGE", "LAST_EDIT"))
+    dummy <- csvModel(dep, c("FL", "FC", "CND", "NEG", "LOACratio", "log2LOC", "AGE", "log2LAST_EDIT"))
 }
+
+##haveHeader <<- FALSE
+##csvModel <- zeroinflNegbinCsvModel
+##for (dep in c("COMMITS"
+##              ##, "HUNKS"
+##              ##, "LCH"
+##              )) {
+##    dummy <- csvModel(dep, c("log2LOC"))
+##    print(summary(dummy))
+##    dummy <- csvModel(dep, c("FL", "FC", "CND", "NEG", "LOACratio", "log2LOC"))
+##    print(summary(dummy))
+##}
 
 ##model.zip.COMMITS <- tryZeroInflModel(indeps=ziIndeps, dep="COMMITS", data=ziData)
 
 ##model.zip.HUNKS   <- tryZeroInflModel(indeps=ziIndeps, dep="HUNKS",   data=ziData)
 
 ##model.nb.LCHG <- tryNbModel(indeps=c(#"FL", "FC",
-##                                "ND"
+##                                "CND"
 ##                                        #, "LOFC", "LOC"
 ##                            ), dep="LINES_CHANGED", data=negBinData)
-##model.nb.LCHGratio <- tryNbModel(indeps=c("FL", "FC", "ND", "LOC"), dep="LCHratio", data=negBinData)
+##model.nb.LCHGratio <- tryNbModel(indeps=c("FL", "FC", "CND", "LOC"), dep="LCHratio", data=negBinData)
 ##model.nb.orig <- tryNbModel(indeps=c("LOC"), dep="LINES_CHANGED", data=negBinData)
 
 
 ##model.zip.LCH = tryZeroInflModel(indeps=c(
 ##                                     ##"FL", "FC",
-##                                     "ND"
+##                                     "CND"
 ##                                        #, "LOC"
 ##                                 ), dep="LINES_CHANGED", data=ziSampleData)
 
