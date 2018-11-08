@@ -40,17 +40,34 @@ public class ListChangedFunctions {
         LOG.debug("Reading project information");
         projectInfo.readSnapshotsAndRevisionsFile();
         LOG.debug("Done reading project information");
-        Collection<IMinimalSnapshot> snapshotsToProcesses = new LinkedHashSet<>();
-        snapshotsToProcesses.addAll(projectInfo.getSnapshotsFiltered(config));
+        Collection<IMinimalSnapshot> snapshotsToProcess = new LinkedHashSet<>();
 
-        if (!config.getSnapshotFilter().isPresent()) {
-            LOG.debug("Creating dummy snapshot to cover the remaining commits.");
-            IMinimalSnapshot dummySnapshotToCoverRemainingCommits = createDummySnapshotToCoverRemainingCommits(snapshotsToProcesses);
-            ensureSnapshotDirectoryOrDie(dummySnapshotToCoverRemainingCommits);
-            snapshotsToProcesses.add(dummySnapshotToCoverRemainingCommits);
+        if (config.getSnapshotFilter().isPresent()) {
+            // Will add only add selected snapshots since the filter *is* present.
+            snapshotsToProcess.addAll(projectInfo.getSnapshotsFiltered(config));
+            if (config.isListLeftoverChanges()) {
+                addLeftoverSnapshot(snapshotsToProcess);
+            }
+        } else {
+            if (config.isListLeftoverChanges()) {
+                // *Only* analyse the leftover changes.
+                addLeftoverSnapshot(snapshotsToProcess);
+            } else {
+                // Will add all snapshots since the filter is *not* present.
+                snapshotsToProcess.addAll(projectInfo.getSnapshotsFiltered(config));
+                // Also analyse the leftover changes.
+                addLeftoverSnapshot(snapshotsToProcess);
+            }
         }
 
-        listFunctionsInSnapshots(snapshotsToProcesses);
+        listFunctionsInSnapshots(snapshotsToProcess);
+    }
+
+    private void addLeftoverSnapshot(Collection<IMinimalSnapshot> snapshotsToProcess) {
+        LOG.debug("Creating dummy snapshot to cover the remaining commits.");
+        IMinimalSnapshot dummySnapshotToCoverRemainingCommits = createDummySnapshotToCoverRemainingCommits(snapshotsToProcess);
+        ensureSnapshotDirectoryOrDie(dummySnapshotToCoverRemainingCommits);
+        snapshotsToProcess.add(dummySnapshotToCoverRemainingCommits);
     }
 
     private IMinimalSnapshot createDummySnapshotToCoverRemainingCommits(Collection<? extends IMinimalSnapshot> snapshotsToProcesses) {
@@ -248,6 +265,10 @@ public class ListChangedFunctions {
             config.setNumThreads(numThreads);
         }
 
+        if (line.hasOption(ListChangedFunctionsConfig.OPT_LIST_LEFTOVER_CHANGES)) {
+            config.setListLeftOverChanges(true);
+        }
+
         List<String> snapshotDateNames = line.getArgList();
         if (!snapshotDateNames.isEmpty()) {
             ListChangedFunctionsConfig.parseSnapshotFilterDates(snapshotDateNames, config);
@@ -276,13 +297,19 @@ public class ListChangedFunctions {
                 //.required(required)
                 .build());
 
-        // --threads=1 options
+        // --threads=1 option
         options.addOption(Option.builder(String.valueOf(ListChangedFunctionsConfig.OPT_THREADS))
                 .longOpt(ListChangedFunctionsConfig.OPT_THREADS_L)
                 .desc("Number of parallel analysis threads. Must be at least 1." + " [Default="
                         + ListChangedFunctionsConfig.DEFAULT_NUM_THREADS + "]")
                 .hasArg().argName("NUM")
                 .type(Integer.class)
+                .build());
+
+        // --list-leftover-changes option
+        options.addOption(Option.builder(String.valueOf(ListChangedFunctionsConfig.OPT_LIST_LEFTOVER_CHANGES))
+                .longOpt(ListChangedFunctionsConfig.OPT_LIST_LEFTOVER_CHANGES_L)
+                .desc("Analyze only commits that are not covered by any snapshot. If no explicit snapshots are given (as positional arguments), then only those leftover commits are analyzed. Otherwise, they are analyzed in addition to the explicitly listed snapshots.")
                 .build());
 
         // @formatter:on

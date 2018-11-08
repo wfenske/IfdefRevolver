@@ -19,11 +19,13 @@ public class ListChangedFunctionsConfig extends ProjectInformationConfig impleme
     public static final char OPT_THREADS = 't';
     public static final String OPT_THREADS_L = "threads";
 
+    public static final char OPT_LIST_LEFTOVER_CHANGES = 'l';
+    public static final String OPT_LIST_LEFTOVER_CHANGES_L = "list-leftover-changes";
+
     /**
      * <p>
-     * Maximum size of binary files, in KB, to consider when analyzing commits.
-     * Since we don't particularly care about binary files, we set this limit
-     * pretty low.
+     * Maximum size of binary files, in KB, to consider when analyzing commits. Since we don't particularly care about
+     * binary files, we set this limit pretty low.
      * </p>
      * <p>
      * 1024 means 1 mb max a file.
@@ -35,6 +37,7 @@ public class ListChangedFunctionsConfig extends ProjectInformationConfig impleme
     public static final int DEFAULT_MAX_SIZE_OF_DIFF_SOURCE = 1024 * 1024;
     public static final String DEFAULT_REPOS_DIR_NAME = "repos";
     public static final int DEFAULT_NUM_THREADS = 4;
+    public static final boolean DEFAULT_LEFT_OVER_CHANGES = false;
     private String repoDir = null;
 
     /**
@@ -46,6 +49,7 @@ public class ListChangedFunctionsConfig extends ProjectInformationConfig impleme
     public int maxSizeOfDiffSource = DEFAULT_MAX_SIZE_OF_DIFF_SOURCE;
     public int binaryFileSizeThresholdInKb = DEFAULT_BINARY_FILE_SIZE_THRESHOLD_IN_KB;
     private int numThreads = DEFAULT_NUM_THREADS;
+    private boolean listLeftOverChanges = DEFAULT_LEFT_OVER_CHANGES;
 
     @Override
     public void validateRepoDir() {
@@ -86,5 +90,13 @@ public class ListChangedFunctionsConfig extends ProjectInformationConfig impleme
             }
         }
         return Optional.empty();
+    }
+
+    public boolean isListLeftoverChanges() {
+        return this.listLeftOverChanges;
+    }
+
+    public void setListLeftOverChanges(boolean listLeftOverChanges) {
+        this.listLeftOverChanges = listLeftOverChanges;
     }
 }

@@ -139,7 +139,7 @@ public class AddChangeDistances {
         Set<FunctionIdWithCommit> leftOverFunctionIdsWithCommits = getFunctionIdsWithCommitFromLeftOverSnapshot(leftOverSnapshotDate);
         Set<FunctionIdWithCommit> functionsAddedInBetween = getFunctionIdsWithCommitsAddedInBetween();
 
-        trackGenealogies();
+        //trackGenealogies();
 
 //        functionGenealogies = computeFunctionGenealogies(allFunctionsEver, leftOverFunctionIdsWithCommits, functionsAddedInBetween);
         List<SnapshotWithFunctions> snapshotsWithFunctions = mergeGenealogiesWithSnapshotData();
