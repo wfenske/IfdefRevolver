@@ -25,12 +25,17 @@ public abstract class GroupingMap<K, V, C extends Collection<V>> {
     }
 
     public void put(K key, V value) {
+        C valuesForKey = ensureMapping(key);
+        valuesForKey.add(value);
+    }
+
+    public C ensureMapping(K key) {
         C valuesForKey = map.get(key);
         if (valuesForKey == null) {
             valuesForKey = newCollection();
             map.put(key, valuesForKey);
         }
-        valuesForKey.add(value);
+        return valuesForKey;
     }
 
     public C get(K key) {

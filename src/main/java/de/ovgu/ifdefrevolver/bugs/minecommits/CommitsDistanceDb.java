@@ -1,5 +1,6 @@
 package de.ovgu.ifdefrevolver.bugs.minecommits;
 
+import de.ovgu.ifdefrevolver.util.GroupingHashSetMap;
 import de.ovgu.ifdefrevolver.util.ProgressMonitor;
 import org.apache.log4j.Logger;
 
@@ -15,10 +16,25 @@ public class CommitsDistanceDb {
 
     private boolean preprocessed = false;
 
+    public Set<Commit> getRoots() {
+        ensurePreprocessed();
+        Set<Commit> roots = new HashSet<>();
+        for (Commit c : commitsFromHashes.values()) {
+            if (c.parents().length == 0) {
+                roots.add(c);
+            }
+        }
+        return roots;
+    }
+
     public static final class Commit {
+        private static final Commit[] EMPTY_COMMITS_ARRAY = new Commit[0];
+
         private final CommitsDistanceDb db;
         public final String commitHash;
         public final int key;
+        private Commit[] parents = EMPTY_COMMITS_ARRAY;
+        private Commit[] children = EMPTY_COMMITS_ARRAY;
 
         public static final Comparator<Commit> BY_HASH = new Comparator<Commit>() {
             @Override
@@ -42,9 +58,9 @@ public class CommitsDistanceDb {
             return sb.toString();
         }
 
-        public boolean isRelatedTo(Commit other) {
-            return db.areCommitsRelated(this, other);
-        }
+//        public boolean isRelatedTo(Commit other) {
+//            return db.areCommitsRelated(this, other);
+//        }
 
         public boolean isDescendant(Commit possibleAncestor) {
             return db.isDescendant(this, possibleAncestor);
@@ -58,12 +74,25 @@ public class CommitsDistanceDb {
         public Optional<Integer> minDistance(Commit child) {
             return db.minDistance(child, this);
         }
+
+        public Commit[] parents() {
+            return this.parents;
+        }
+
+        public Commit[] children() {
+            return this.children;
+        }
     }
 
     /**
-     * Map from commit hashes to the (possibly empty) set of parent hashes
+     * Map from commit to the (possibly empty) set of parent commits
      */
-    private Map<Commit, Set<Commit>> parents = new HashMap<>();
+    private GroupingHashSetMap<Commit, Commit> parents = new GroupingHashSetMap<>();
+
+    /**
+     * Map from commit to the (possibly empty) set of child commits
+     */
+    private GroupingHashSetMap<Commit, Commit> children = new GroupingHashSetMap<>();
 
     /**
      * Map of the commit objects that have been assigned to each hash.
@@ -198,8 +227,16 @@ public class CommitsDistanceDb {
         return result;
     }
 
-    public Set<String> getCommits() {
+    public Set<String> getCommitHashes() {
         return new HashSet<>(commitsFromHashes.keySet());
+    }
+
+    public Set<Commit> getCommits() {
+        return new HashSet<>(commitsFromHashes.values());
+    }
+
+    public int getNumCommits() {
+        return commitsFromHashes.size();
     }
 
     private synchronized Commit findCommitOrDie(String commitHash) {
@@ -232,8 +269,8 @@ public class CommitsDistanceDb {
     }
 
     private void populateIntParents() {
-        intParents = new int[parents.size()][];
-        for (Map.Entry<Commit, Set<Commit>> e : parents.entrySet()) {
+        intParents = new int[parents.getMap().size()][];
+        for (Map.Entry<Commit, HashSet<Commit>> e : parents.getMap().entrySet()) {
             final int childKey = e.getKey().key;
             int[] existingParentsArray = new int[e.getValue().size()];
             int ixInsert = 0;
@@ -248,6 +285,32 @@ public class CommitsDistanceDb {
 //                throw new NullPointerException("No parents for commit " + i);
 //            }
 //        }
+    }
+
+    private void populateCommitParents() {
+        for (Map.Entry<Commit, HashSet<Commit>> e : parents.getMap().entrySet()) {
+            Commit[] parents = new Commit[e.getValue().size()];
+            int ixInsert = 0;
+            for (Commit parent : e.getValue()) {
+                parents[ixInsert++] = parent;
+            }
+            Commit c = e.getKey();
+            c.parents = parents;
+        }
+    }
+
+    private void populateCommitChildren() {
+        for (Map.Entry<Commit, HashSet<Commit>> e : children.getMap().entrySet()) {
+            Set<Commit> childrenSet = e.getValue();
+            if (childrenSet == null) childrenSet = Collections.emptySet();
+            Commit[] children = new Commit[childrenSet.size()];
+            int ixInsert = 0;
+            for (Commit child : childrenSet) {
+                children[ixInsert++] = child;
+            }
+            Commit c = e.getKey();
+            c.children = children;
+        }
     }
 
     private void populateReachables() {
@@ -316,6 +379,8 @@ public class CommitsDistanceDb {
         if (!preprocessed) {
             populateIntParents();
             populateReachables();
+            populateCommitParents();
+            populateCommitChildren();
             preprocessed = true;
         }
     }
@@ -455,23 +520,25 @@ public class CommitsDistanceDb {
         }
     }
 
-    public synchronized void put(String commit, String... parents) {
+    public synchronized void put(String commitHash, String... parents) {
         assertNotPreprocessed();
-        internCommit(commit);
-        Set<Commit> existingParents = ensureExistingParentsSet(commit);
+        Commit commit = internCommit(commitHash);
+        this.parents.ensureMapping(commit);
         for (String parentHash : parents) {
             Commit parent = internCommit(parentHash);
-            existingParents.add(parent);
+            this.parents.put(commit, parent);
+            this.children.put(parent, commit);
         }
     }
 
-    public synchronized void put(String commit, Set<String> parents) {
+    public synchronized void put(String commitHash, Set<String> parents) {
         assertNotPreprocessed();
-        internCommit(commit);
-        Set<Commit> existingParents = ensureExistingParentsSet(commit);
+        Commit commit = internCommit(commitHash);
+        this.parents.ensureMapping(commit);
         for (String parentHash : parents) {
             Commit parent = internCommit(parentHash);
-            existingParents.add(parent);
+            this.parents.put(commit, parent);
+            this.children.put(parent, commit);
         }
     }
 
@@ -509,16 +576,6 @@ public class CommitsDistanceDb {
         }
 
         return commitsWithoutAncestors;
-    }
-
-    private Set<Commit> ensureExistingParentsSet(String commitHash) {
-        Commit commit = internCommit(commitHash);
-        Set<Commit> existingParents = this.parents.get(commit);
-        if (existingParents == null) {
-            existingParents = new HashSet<>();
-            this.parents.put(commit, existingParents);
-        }
-        return existingParents;
     }
 
     public boolean areCommitsRelated(String c1, String c2) {

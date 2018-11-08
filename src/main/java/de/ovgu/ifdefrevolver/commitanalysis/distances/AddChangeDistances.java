@@ -139,6 +139,8 @@ public class AddChangeDistances {
         Set<FunctionIdWithCommit> leftOverFunctionIdsWithCommits = getFunctionIdsWithCommitFromLeftOverSnapshot(leftOverSnapshotDate);
         Set<FunctionIdWithCommit> functionsAddedInBetween = getFunctionIdsWithCommitsAddedInBetween();
 
+        trackGenealogies();
+
 //        functionGenealogies = computeFunctionGenealogies(allFunctionsEver, leftOverFunctionIdsWithCommits, functionsAddedInBetween);
         List<SnapshotWithFunctions> snapshotsWithFunctions = mergeGenealogiesWithSnapshotData();
         List<SnapshotWithFunctions> commitWindowsWithFunctions = formCommitWindows(snapshotsWithFunctions);
@@ -157,6 +159,51 @@ public class AddChangeDistances {
         }
 
         LOG.info(ageRequestStats);
+    }
+
+    private void trackGenealogies() {
+        List<FunctionChangeRow>[] changesByCommitKey = groupChangesByCommitKey();
+        Map<Commit, List<AllFunctionsRow>> allFunctionsBySnapshotStartCommit = groupAllFunctionsBySnapshotStartCommit();
+
+        GenealogyTracker gt = new GenealogyTracker(commitsDistanceDb, allFunctionsBySnapshotStartCommit, changesByCommitKey);
+        gt.main();
+        System.exit(0);
+    }
+
+    private Map<Commit, List<AllFunctionsRow>> groupAllFunctionsBySnapshotStartCommit() {
+        Map<Commit, List<AllFunctionsRow>> result = new HashMap<>();
+        for (Snapshot s : projectInfo.getSnapshots().values()) {
+            Commit startCommit = commitsDistanceDb.internCommit(s.getStartHash());
+            List<AllFunctionsRow> funcs = allFunctionsInSnapshots.get(s.getSnapshotDate());
+            result.put(startCommit, funcs);
+        }
+        return result;
+    }
+
+    private List<FunctionChangeRow>[] groupChangesByCommitKey() {
+        final int numCommits = commitsDistanceDb.getNumCommits();
+        List<FunctionChangeRow>[] changesByCommitKey = new List[numCommits];
+        for (List<FunctionChangeRow> rows : changesInSnapshots.values()) {
+            for (FunctionChangeRow row : rows) {
+                final int key = row.commit.key;
+                List<FunctionChangeRow> changesForKey = changesByCommitKey[key];
+                if (changesForKey == null) {
+                    changesForKey = new ArrayList<>();
+                    changesByCommitKey[key] = changesForKey;
+                }
+                changesForKey.add(row);
+            }
+        }
+
+        final List<FunctionChangeRow> NO_COMMITS = Collections.emptyList();
+        for (int i = 0; i < numCommits; i++) {
+            if (changesByCommitKey[i] == null) {
+                changesByCommitKey[i] = NO_COMMITS;
+            } else {
+                Collections.sort(changesByCommitKey[i], FunctionChangeRow.BY_HUNK_AND_MOD_TYPE);
+            }
+        }
+        return changesByCommitKey;
     }
 
     private void writeAbSmellAgeSnapshotCsv(List<SnapshotWithFunctions> snapshotsWithFunctions) {
@@ -216,7 +263,7 @@ public class AddChangeDistances {
         };
 
         for (Snapshot s : projectInfo.getSnapshots().values()) {
-            Commit startCommit = commitsDistanceDb.internCommit(s.getStartHash());
+//            Commit startCommit = commitsDistanceDb.internCommit(s.getStartHash());
 //            List<List<FunctionIdWithCommit>> genealogiesForSnapshot = genealogiesByStartCommit.get(startCommit);
 //            if (genealogiesForSnapshot == null) {
 //                LOG.warn("No genealogy for snapshot " + s);

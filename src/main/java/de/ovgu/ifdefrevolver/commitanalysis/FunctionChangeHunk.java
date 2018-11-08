@@ -30,18 +30,18 @@ public class FunctionChangeHunk {
          */
         ADD,
         /**
-         * if this change deletes the entire function (happens sometimes if a function is moved to another file or
-         * within the same file)
+         * if this change moved a function to another place
          */
-        DEL,
+        MOVE,
         /**
          * if this change neither adds nor deletes the entire function but simply modifies parts of it
          */
         MOD,
         /**
-         * if this change moved a function to another place
+         * if this change deletes the entire function (happens sometimes if a function is moved to another file or
+         * within the same file)
          */
-        MOVE
+        DEL
     }
 
     private ModificationType modType;

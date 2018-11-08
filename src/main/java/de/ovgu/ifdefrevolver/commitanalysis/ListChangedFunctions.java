@@ -97,7 +97,7 @@ public class ListChangedFunctions {
         LOG.debug("Reading information about commit parent-child relationships from " + commitParentsFile);
         CommitsDistanceDbCsvReader distanceReader = new CommitsDistanceDbCsvReader();
         CommitsDistanceDb commitsDistanceDb = distanceReader.dbFromCsv(commitParentsFile);
-        return commitsDistanceDb.getCommits();
+        return commitsDistanceDb.getCommitHashes();
     }
 
     private void listFunctionsInSnapshots(Collection<? extends IMinimalSnapshot> snapshots) {

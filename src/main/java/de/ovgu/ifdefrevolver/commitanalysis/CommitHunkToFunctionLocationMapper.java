@@ -114,7 +114,7 @@ class CommitHunkToFunctionLocationMapper implements Consumer<Edit> {
     private void publishHunksForCurrentEdit() {
         processPossibleSignatureChanges();
         for (Map.Entry<Method, Method> e : movedMethodsDueToPathDifferences.entrySet()) {
-            remapModsOfRenamedFunction(e.getKey(), e.getValue());
+            remapModsOfRenamedFunction(e.getKey(), e.getValue(), Optional.empty());
         }
 
         for (List<FunctionChangeHunk> hunks : hunksForCurrentEdit.values()) {
@@ -193,7 +193,7 @@ class CommitHunkToFunctionLocationMapper implements Consumer<Edit> {
                     FunctionChangeHunk.ModificationType.MOVE, addFunction);
             untreatedDisappearedFunctions.remove(delFunction);
             untreatedAppearedFunctions.remove(addFunction);
-            remapModsOfRenamedFunction(delFunction, addFunction);
+            remapModsOfRenamedFunction(delFunction, addFunction, Optional.of(mergedChangeHunk.getHunkNo()));
             changedFunctionConsumer.accept(move);
         } else {
             LOG.info("Treating signature change as separate del and add since the difference is too great: " + del + " -> " + add);
@@ -246,20 +246,40 @@ class CommitHunkToFunctionLocationMapper implements Consumer<Edit> {
         );
     }
 
-    private void remapModsOfRenamedFunction(Method delFunction, Method addFunction) {
+    private void remapModsOfRenamedFunction(Method delFunction, Method addFunction, Optional<Integer> moveHunkNo) {
         // Remap all MODs to the old function so they become MODs of the new function
         List<FunctionChangeHunk> hunksForDelFunction = hunksForCurrentEdit.get(delFunction);
-        if ((hunksForDelFunction == null) || hunksForDelFunction.isEmpty()) {
+        List<FunctionChangeHunk> hunksForAddFunction = hunksForCurrentEdit.get(addFunction);
+        if ((hunksForDelFunction == null) && (hunksForAddFunction == null)) {
             return;
         }
 
-        hunksForDelFunction = new ArrayList<>(hunksForDelFunction);
         int numRemappedMods = 0;
-        for (FunctionChangeHunk fHunk : hunksForDelFunction) {
-            if (fHunk.getModType() != FunctionChangeHunk.ModificationType.MOD) continue;
-            forgetHunk(fHunk);
-            rememberHunk(addFunction, FunctionChangeHunk.ModificationType.MOD, fHunk.getHunk());
-            numRemappedMods++;
+
+        if (hunksForDelFunction != null) {
+            hunksForDelFunction = new ArrayList<>(hunksForDelFunction);
+            for (FunctionChangeHunk fHunk : hunksForDelFunction) {
+                if (fHunk.getModType() != FunctionChangeHunk.ModificationType.MOD) continue;
+                if (moveHunkNo.isPresent()) {
+                    if (fHunk.getHunk().getHunkNo() <= moveHunkNo.get()) continue;
+                }
+                forgetHunk(fHunk);
+                rememberHunk(addFunction, FunctionChangeHunk.ModificationType.MOD, fHunk.getHunk());
+                numRemappedMods++;
+            }
+        }
+
+        if (hunksForAddFunction != null) {
+            hunksForAddFunction = new ArrayList<>(hunksForAddFunction);
+            for (FunctionChangeHunk fHunk : hunksForAddFunction) {
+                if (fHunk.getModType() != FunctionChangeHunk.ModificationType.MOD) continue;
+                if (moveHunkNo.isPresent()) {
+                    if (fHunk.getHunk().getHunkNo() >= moveHunkNo.get()) continue;
+                }
+                forgetHunk(fHunk);
+                rememberHunk(delFunction, FunctionChangeHunk.ModificationType.MOD, fHunk.getHunk());
+                numRemappedMods++;
+            }
         }
 
         if (LOG.isDebugEnabled() && (numRemappedMods > 0)) {
