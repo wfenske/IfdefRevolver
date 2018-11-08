@@ -1,7 +1,7 @@
 #!/usr/bin/env sh
 p=${1:?"Missing project name (first positional argument)"}
 dir_me=$(dirname -- "$0")
-cd -- "$dir_me" || exit $?
+##cd -- "$dir_me" || exit $?
 
 # Enter results directory for project.
 dir_old="$PWD"

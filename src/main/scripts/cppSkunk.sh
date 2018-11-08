@@ -10,6 +10,14 @@ PATH=$HOME/bin:$PATH
 
 echo "Starting cppstats in $PWD ..." >&2
 
+case "x$cppstatsLazyOpt" in
+    x--prepareFrom=*)
+	prepFromDir=${cppstatsLazyOpt#--prepareFrom=}
+	prepFromDir=${prepFromDir%/cppstats_input.txt}
+	prepare-from-previous-checkout.sh "$prepFromDir" "$source" || exit $?
+	;;
+esac
+
 general_opts='--nobak --kind general'
 featurelocations_opts='--nobak --kind featurelocations'
 if [ -n "$cppstatsLazyOpt" ]
