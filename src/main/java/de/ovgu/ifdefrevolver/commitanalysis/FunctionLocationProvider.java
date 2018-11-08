@@ -78,14 +78,21 @@ public class FunctionLocationProvider {
 
     private Map<String, List<Method>> listFunctionsInFiles(RevCommit stateBeforeCommit, TreeFilter pathFilter) throws IOException {
         final Map<String, List<Method>> functionsByFilename = new HashMap<>();
-        Consumer<Method> changedFunctionHandler = method -> {
-            String filePath = method.filePath;
-            List<Method> functions = functionsByFilename.get(filePath);
-            if (functions == null) {
-                functions = new ArrayList<>();
-                functionsByFilename.put(filePath, functions);
+        Consumer<Method> changedFunctionHandler = new Consumer<Method>() {
+            @Override
+            public void accept(Method method) {
+                String filePath = method.filePath;
+                List<Method> functions = functionsByFilename.get(filePath);
+                if (functions == null) {
+                    functions = new ArrayList<>();
+                    functionsByFilename.put(filePath, functions);
+                    functions.add(method);
+                } else {
+                    Method previousMethod = functions.get(functions.size() - 1);
+                    previousMethod.maybeAdjustMethodEndBasedOnNextFunction(method);
+                    functions.add(method);
+                }
             }
-            functions.add(method);
         };
 
         listFunctionsInFiles(stateBeforeCommit, pathFilter, changedFunctionHandler);

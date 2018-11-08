@@ -52,6 +52,10 @@ public class FunctionChangeHunksCsvReader extends SimpleCsvFileReader<List<Funct
         result.modType = FunctionChangeHunk.ModificationType.valueOf(modTypeName);
         result.newFunctionId = parseNewFunctionId(line);
 
+//        if (commitId.equals("3b15c6f10fe0c205a6a2c263483eb896e13cc79d") && signature.equals("void ldbm_datum_free(LDBM ldbm, Datum data)")) {
+//            System.out.println(result);
+//        }
+
         results.add(result);
     }
 

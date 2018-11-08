@@ -29,7 +29,7 @@ public class GenealogyTracker {
         }
 
         public void markSameAs(FunctionInBranch function) {
-            LOG.debug("Marking " + this + " to be the same function as " + function);
+            LOG.debug("Marking as the same function: " + function + " and " + this);
             Set<FunctionInBranch> allSameFunctions = new HashSet<>();
             allSameFunctions.addAll(this.sameAs);
             allSameFunctions.addAll(function.sameAs);
@@ -46,14 +46,21 @@ public class GenealogyTracker {
     }
 
     private static class FunctionsInBranch {
+        private final Branch branch;
+
         private Map<FunctionId, FunctionInBranch> functionsById = new HashMap<>();
         private Map<FunctionId, FunctionInBranch> added = new HashMap<>();
         private Map<FunctionId, FunctionInBranch> deleted = new HashMap<>();
+        private Set<FunctionId> deletedInThisBranch = new HashSet<>();
         private GroupingListMap<FunctionId, FunctionId> moved = new GroupingListMap<>();
         /**
          * Where we save functions that have somehow been replaced because we parsed the changes wrong.
          */
         private Set<FunctionInBranch> overwritten = new HashSet<>();
+
+        public FunctionsInBranch(Branch branch) {
+            this.branch = branch;
+        }
 
         public void putAdd(FunctionChangeRow change) {
             final FunctionId id = change.functionId;
@@ -76,13 +83,33 @@ public class GenealogyTracker {
 
         public void putMod(FunctionChangeRow change) {
             final FunctionId id = change.functionId;
+            if (deletedInThisBranch.contains(id)) {
+                LOG.info("Ignoring mod to function that was deleted by a previous commit in this branch. change=" + change + " branch=" + branch);
+                return;
+            }
+
             FunctionInBranch function = functionsById.get(id);
             if (function == null) {
                 function = findRenamedFunction(id);
             }
+
+            if (function == null) {
+                function = findFunctionInParentBranches(id);
+                if (function != null) {
+                    functionsById.put(id, function);
+                    FunctionInBranch zombie = deleted.remove(id);
+                    if (zombie != function) {
+                        overwritten.add(zombie);
+                    }
+                }
+            }
+
             if (function == null) {
                 function = findDeletedFunction(id);
+                // Apparently, the function is not deleted after all.
+                deleted.remove(id);
             }
+
             if (function == null) {
                 LOG.info("Modified function does not exist: " + id);
                 function = new FunctionInBranch();
@@ -90,6 +117,32 @@ public class GenealogyTracker {
                 added.put(id, function);
             }
             function.addChange(change);
+        }
+
+        private FunctionInBranch findFunctionInParentBranches(FunctionId id) {
+            Collection<Branch> seen = new ArrayList<>();
+            Queue<Branch> parentBranches = new LinkedList<>();
+            for (Branch parent : this.branch.parentBranches) {
+                parentBranches.offer(parent);
+            }
+
+            Branch b;
+            while ((b = parentBranches.poll()) != null) {
+                if (seen.contains(b)) continue;
+
+                FunctionInBranch f = b.functions.functionsById.get(id);
+                if (f != null) {
+                    LOG.info("Remapping change to a function in a parent branch: " + id + " current branch=" + this.branch + " parent branch=" + b);
+                    return f;
+                }
+
+                for (Branch parent : b.parentBranches) {
+                    parentBranches.offer(parent);
+                }
+                seen.add(b);
+            }
+
+            return null;
         }
 
         private FunctionInBranch findRenamedFunction(FunctionId id) {
@@ -100,7 +153,7 @@ public class GenealogyTracker {
             while (reverseIter.hasPrevious()) {
                 FunctionId newId = reverseIter.previous();
                 FunctionInBranch newFunction = functionsById.get(newId);
-                LOG.debug("Remapping change for " + id + " to a new ID " + newId);
+                LOG.debug("Remapping change to a renamed function: oldId=" + id + " newId=" + newId + " branch=" + branch);
                 if (newFunction != null) return newFunction;
             }
             return null;
@@ -109,7 +162,7 @@ public class GenealogyTracker {
         private FunctionInBranch findDeletedFunction(FunctionId id) {
             FunctionInBranch deletedFunction = deleted.get(id);
             if (deletedFunction == null) return null;
-            LOG.debug("Remapping change for " + id + " to a deleted function.");
+            LOG.debug("Remapping change to a deleted function: id=" + id + " branch=" + branch);
             return deletedFunction;
         }
 
@@ -176,15 +229,28 @@ public class GenealogyTracker {
 
         public void putDel(FunctionChangeRow change) {
             final FunctionId functionId = change.functionId;
-            FunctionInBranch oldFunction = functionsById.remove(functionId);
-            if (oldFunction == null) {
-                LOG.warn("Deleted function did not even exist: " + functionId);
-                oldFunction = new FunctionInBranch();
-            }
+            deletedInThisBranch.add(functionId);
 
             FunctionInBranch overwrittenAdd = added.remove(functionId);
             if (overwrittenAdd != null) {
                 overwritten.add(overwrittenAdd);
+            }
+
+            FunctionInBranch oldFunction = functionsById.remove(functionId);
+            if ((oldFunction == null) && deleted.containsKey(functionId)) {
+                if (LOG.isInfoEnabled()) {
+                    if (deletedInThisBranch.contains(functionId)) {
+                        LOG.info("Deleted function was already deleted in this branch. change=" + change);
+                    } else {
+                        LOG.info("Deleted function was already deleted in a parent branch. change=" + change);
+                    }
+                }
+                return;
+            }
+
+            if (oldFunction == null) {
+                oldFunction = new FunctionInBranch();
+                LOG.info("Deleted function did not exist.  Created new dummy function. change=" + change);
             }
 
             FunctionInBranch overwrittenDel = deleted.put(functionId, oldFunction);
@@ -253,14 +319,14 @@ public class GenealogyTracker {
     }
 
     private static class Branch {
-        private final Branch[] parentBranches;
+        public final Branch[] parentBranches;
         private final Commit firstCommit;
         private FunctionsInBranch functions;
 
         public Branch(Branch[] parentBranches, Commit firstCommit) {
             this.parentBranches = parentBranches;
             this.firstCommit = firstCommit;
-            this.functions = new FunctionsInBranch();
+            this.functions = new FunctionsInBranch(this);
         }
 
         @Override
@@ -303,6 +369,7 @@ public class GenealogyTracker {
         public void split(Branch parentBranch) {
             this.functions.inherit(parentBranch.functions);
         }
+
     }
 
     private Branch[] branchIdsByCommitKey;
@@ -536,18 +603,57 @@ public class GenealogyTracker {
 //    }
 
     private void processChangesOfCurrentCommit() {
-        Collection<FunctionChangeRow> changes = getChangesOfCurrent();
+        Collection<FunctionChangeRow> changes = getChangesOfCurrentCommit();
         assignChangesToFunctions(changes);
     }
 
-    private Collection<FunctionChangeRow> getChangesOfCurrent() {
+    private Collection<FunctionChangeRow> getChangesOfCurrentCommit() {
         return changesByCommitKey[currentCommit.key];
     }
 
+    private int numSkippedModsOfDeletedFunctions = 0;
+
     private void assignChangesToFunctions(Collection<FunctionChangeRow> changes) {
+        GroupingListMap<FunctionId, FunctionChangeRow> deletions = new GroupingListMap<>();
         for (FunctionChangeRow r : changes) {
-            assignChangeToFunction(r);
+            switch (r.modType) {
+                case DEL:
+                    deletions.put(r.functionId, r);
+                    break;
+            }
         }
+
+        for (FunctionChangeRow r : changes) {
+            boolean isModOfDeletedFunction = isModOfDeletedFunction(deletions, r);
+
+            if (isModOfDeletedFunction) {
+                numSkippedModsOfDeletedFunctions++;
+                LOG.debug("Skipping mod/move of deleted function: " + r);
+            } else {
+                assignChangeToFunction(r);
+            }
+        }
+    }
+
+    private boolean isModOfDeletedFunction(GroupingListMap<FunctionId, FunctionChangeRow> deletions, FunctionChangeRow r) {
+        switch (r.modType) {
+            case MOD:
+            case MOVE:
+                break;
+            default:
+                return false;
+        }
+
+        List<FunctionChangeRow> deletionsForSameFunction = deletions.get(r.functionId);
+        if (deletionsForSameFunction == null) return false;
+
+        for (FunctionChangeRow del : deletionsForSameFunction) {
+            if (del.hunk < r.hunk) {
+                return true;
+            }
+        }
+
+        return false;
     }
 
     private int changesProcessed = 0;

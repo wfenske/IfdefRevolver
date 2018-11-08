@@ -399,8 +399,7 @@ public class CommitChangedFunctionLister {
         };
 
 
-        IFunctionLocationProvider functionLocationProvider = new CachingFunctionLocationProvider(
-                new EagerFunctionLocationProvider(repo));
+        IFunctionLocationProvider functionLocationProvider = new EagerFunctionLocationProvider(repo);
 
         for (String commitId : args) {
             CommitChangedFunctionLister lister = new CommitChangedFunctionLister(repo, commitId,

@@ -152,8 +152,7 @@ public class SnapshotChangedFunctionLister {
                             break;
                         }
 
-                        final IFunctionLocationProvider functionLocationProvider =
-                                new CachingFunctionLocationProvider(new EagerFunctionLocationProvider(repo));
+                        final IFunctionLocationProvider functionLocationProvider = new EagerFunctionLocationProvider(repo);
                         for (String nextCommitId : nextCommitIds) {
                             if (terminationRequested) {
                                 break;
