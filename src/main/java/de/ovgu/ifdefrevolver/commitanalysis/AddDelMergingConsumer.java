@@ -16,11 +16,13 @@ import java.util.function.Consumer;
 public class AddDelMergingConsumer implements Consumer<FunctionChangeHunk> {
     private static final Logger LOG = Logger.getLogger(AddDelMergingConsumer.class);
 
-    Set<String> allAddedAndDeletedFunctionNames = new LinkedHashSet<>();
-    Map<String, LinkedList<FunctionChangeHunk>> delsByFunctionName = new LinkedHashMap<>();
-    Map<String, LinkedList<FunctionChangeHunk>> addsByFunctionName = new LinkedHashMap<>();
-    final Consumer<FunctionChangeHunk> parent;
-    Map<Method, Method> renamesByOldMethod = new HashMap<>();
+    private Set<String> allAddedAndDeletedFunctionNames = new LinkedHashSet<>();
+    private Map<String, LinkedList<FunctionChangeHunk>> delsByFunctionName = new LinkedHashMap<>();
+    private Map<String, LinkedList<FunctionChangeHunk>> addsByFunctionName = new LinkedHashMap<>();
+    private List<FunctionChangeHunk> rememberedMoves = new ArrayList<>();
+    private GroupingListMap<Method, FunctionChangeHunk> retainedMods = new GroupingListMap<>();
+
+    private final Consumer<FunctionChangeHunk> parent;
 
     public AddDelMergingConsumer(Consumer<FunctionChangeHunk> parent) {
         this.parent = parent;
@@ -30,65 +32,34 @@ public class AddDelMergingConsumer implements Consumer<FunctionChangeHunk> {
     public void accept(FunctionChangeHunk functionChangeHunk) {
         switch (functionChangeHunk.getModType()) {
             case ADD:
-                rememberHunk(addsByFunctionName, functionChangeHunk);
+                retainAddOrDelHunk(addsByFunctionName, functionChangeHunk);
                 break;
             case DEL:
-                rememberHunk(delsByFunctionName, functionChangeHunk);
+                retainAddOrDelHunk(delsByFunctionName, functionChangeHunk);
                 break;
             case MOVE:
-                rememberPotentialRename(functionChangeHunk);
-                parent.accept(functionChangeHunk);
+                //rememberPotentialRename(functionChangeHunk);
+                publishMove(functionChangeHunk);
                 break;
             default:
-                LOG.debug("Passing on non-add, non-del type change.");
-                FunctionChangeHunk hunkAfterResolvingRenames = resolvePotentialRename(functionChangeHunk);
-                parent.accept(hunkAfterResolvingRenames);
+                retainMod(functionChangeHunk);
         }
     }
 
-    private void rememberPotentialRename(FunctionChangeHunk functionChangeHunk) {
-        Method oldMethod = functionChangeHunk.getFunction();
-        String oldPath = oldMethod.filePath;
-
-        Method newMethod = functionChangeHunk.getNewFunction().get();
-        String newPath = newMethod.filePath;
-
-        if (!oldPath.equals(newPath)) {
-            LOG.debug("Ignoring " + oldMethod + " being moved to another file as " + newMethod);
-            return;
-        }
-
-        if (LOG.isDebugEnabled()) {
-            Method existingRenaming = renamesByOldMethod.get(oldMethod);
-            if (existingRenaming != null) {
-                LOG.debug(oldMethod + " has already been renamed once to " + existingRenaming + ". Replacing with new renaming to " + newMethod);
-            } else {
-                LOG.debug("Remembering renaming of " + oldMethod + " to " + newMethod);
-            }
-        }
-
-        renamesByOldMethod.put(oldMethod, newMethod);
+    protected void publishMove(FunctionChangeHunk moveHunk) {
+        rememberMove(moveHunk);
+        parent.accept(moveHunk);
     }
 
-    private FunctionChangeHunk resolvePotentialRename(FunctionChangeHunk functionChangeHunk) {
-        Method originalMethod = functionChangeHunk.getFunction();
-        Method renamedMethod = renamesByOldMethod.get(originalMethod);
-        if (renamedMethod == null) {
-            if (LOG.isDebugEnabled()) {
-                LOG.debug(originalMethod + " has not been renamed. Passing change as is.");
-            }
-            return functionChangeHunk;
-        } else {
-            if (LOG.isDebugEnabled()) {
-                LOG.debug(originalMethod + " has been renamed to " + renamedMethod + ". Modifying change to refer to new function.");
-            }
-            FunctionChangeHunk modifiedHunk = new FunctionChangeHunk(renamedMethod, functionChangeHunk.getHunk(),
-                    functionChangeHunk.getModType());
-            return modifiedHunk;
-        }
+    private void rememberMove(FunctionChangeHunk move) {
+        rememberedMoves.add(move);
     }
 
-    private void rememberHunk(Map<String, LinkedList<FunctionChangeHunk>> map, FunctionChangeHunk fh) {
+    private void retainMod(FunctionChangeHunk functionChangeHunk) {
+        retainedMods.put(functionChangeHunk.getFunction(), functionChangeHunk);
+    }
+
+    private void retainAddOrDelHunk(Map<String, LinkedList<FunctionChangeHunk>> map, FunctionChangeHunk fh) {
         String functionName = fh.getFunction().functionName;
         allAddedAndDeletedFunctionNames.add(functionName);
         LinkedList<FunctionChangeHunk> hunks = map.get(functionName);
@@ -100,6 +71,11 @@ public class AddDelMergingConsumer implements Consumer<FunctionChangeHunk> {
     }
 
     public void mergeAndPublishRemainingHunks() {
+        mergeAndPublishAddsAndDels();
+        remapAndPublishMods();
+    }
+
+    private void mergeAndPublishAddsAndDels() {
         for (final String functionName : allAddedAndDeletedFunctionNames) {
             final LinkedList<FunctionChangeHunk> adds = addsByFunctionName.get(functionName);
             final LinkedList<FunctionChangeHunk> dels = delsByFunctionName.get(functionName);
@@ -121,6 +97,50 @@ public class AddDelMergingConsumer implements Consumer<FunctionChangeHunk> {
                 }
             }
         }
+    }
+
+    private void remapAndPublishMods() {
+        Set<FunctionChangeHunk> unpublishedMods = new HashSet<>();
+        for (List<FunctionChangeHunk> mods : retainedMods.getMap().values()) {
+            unpublishedMods.addAll(mods);
+        }
+
+        for (FunctionChangeHunk move : rememberedMoves) {
+            final int moveHunkNo = move.getHunk().getHunkNo();
+            final Method oldFunction = move.getFunction();
+            final Method newFunction = move.getNewFunction().get();
+
+            List<FunctionChangeHunk> modsForOldFunction = retainedMods.get(oldFunction);
+            if (modsForOldFunction != null) {
+                for (FunctionChangeHunk mod : modsForOldFunction) {
+                    if (mod.getHunk().getHunkNo() > moveHunkNo) {
+                        publishAsModForFunction(mod, newFunction);
+                        unpublishedMods.remove(mod);
+                    }
+                }
+            }
+
+            List<FunctionChangeHunk> modsForNewFunction = retainedMods.get(newFunction);
+            if (modsForNewFunction != null) {
+                for (FunctionChangeHunk mod : modsForNewFunction) {
+                    if (mod.getHunk().getHunkNo() < moveHunkNo) {
+                        publishAsModForFunction(mod, oldFunction);
+                        unpublishedMods.remove(mod);
+                    }
+                }
+            }
+        }
+
+        publishAll(unpublishedMods);
+    }
+
+    private void publishAsModForFunction(FunctionChangeHunk mod, Method alternativeFunction) {
+        FunctionChangeHunk remappedMod = new FunctionChangeHunk(alternativeFunction, mod.getHunk(),
+                mod.getModType());
+        if (LOG.isDebugEnabled()) {
+            LOG.debug("Remapped modification " + mod + " to " + remappedMod);
+        }
+        parent.accept(remappedMod);
     }
 
     private void mergeAndPublishHunks(LinkedList<FunctionChangeHunk> dels, LinkedList<FunctionChangeHunk> adds) {
@@ -146,7 +166,7 @@ public class AddDelMergingConsumer implements Consumer<FunctionChangeHunk> {
                 }
 
                 FunctionChangeHunk move = mergeDelAndAddToMove(del, add);
-                parent.accept(move);
+                publishMove(move);
             }
         }
 
@@ -158,7 +178,7 @@ public class AddDelMergingConsumer implements Consumer<FunctionChangeHunk> {
             FunctionChangeHunk add = adds.pop();
 
             FunctionChangeHunk move = mergeDelAndAddToMove(del, add);
-            parent.accept(move);
+            publishMove(move);
 
             count++;
         }
@@ -184,7 +204,7 @@ public class AddDelMergingConsumer implements Consumer<FunctionChangeHunk> {
         return new FunctionChangeHunk(delFunc, moveHunk, FunctionChangeHunk.ModificationType.MOVE, addFunc);
     }
 
-    private void publishAll(List<FunctionChangeHunk> hs) {
+    private void publishAll(Collection<FunctionChangeHunk> hs) {
         for (FunctionChangeHunk h : hs) {
             parent.accept(h);
         }
