@@ -216,22 +216,8 @@ public class SnapshotChangedFunctionLister {
     }
 
     private void closeRepo() {
-        if (repo != null) {
-            try {
-                repo.close();
-            } finally {
-                try {
-                    if (git != null) {
-                        try {
-                            git.close();
-                        } finally {
-                            git = null;
-                        }
-                    }
-                } finally {
-                    repo = null;
-                }
-            }
-        }
+        GitUtil.silentlyCloseGitAndRepo(git, repo);
+        git = null;
+        repo = null;
     }
 }

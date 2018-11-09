@@ -21,14 +21,6 @@ import java.util.function.Consumer;
 public class CommitChangedFunctionLister {
     private static final Logger LOG = Logger.getLogger(CommitChangedFunctionLister.class);
 
-    private static final Set<String> C_FILE_EXTENSIONS;
-
-    static {
-        C_FILE_EXTENSIONS = new HashSet<>();
-        C_FILE_EXTENSIONS.add(".c");
-        C_FILE_EXTENSIONS.add(".C");
-    }
-
     private final Repository repo;
     private final String commitId;
     private final AddDelMergingConsumer changedFunctionConsumer;
@@ -74,35 +66,41 @@ public class CommitChangedFunctionLister {
                 }
 
                 if (parentCount > 1) {
-                    LOG.debug("Ignoring merge commit " + commitId + ": expected exactly one parent, got " + parentCount);
-                    return;
+                    LOG.debug("Merge commit: " + commitId);
                 }
 
-                ObjectId parentCommitId = commit.getParent(0).getId();
-                RevCommit parent = rw.parseCommit(parentCommitId);
-                formatter = getDiffFormatterInstance();
-                diffs = formatter.scan(parent.getTree(), commit.getTree());
-                LOG.debug(parentCommitId.name() + " ... " + commitId);
+                for (int iParent = 0; iParent < parentCount; iParent++) {
+                    try {
+                        ObjectId parentCommitId = commit.getParent(iParent).getId();
+                        RevCommit parent = rw.parseCommit(parentCommitId);
+                        formatter = getDiffFormatterInstance();
+                        diffs = formatter.scan(parent.getTree(), commit.getTree());
+                        LOG.debug(parentCommitId.name() + " ... " + commitId);
 
-                Set<String> aSideCFilePaths = getFilenamesOfCFilesModifiedByDiffs(diffs, DiffEntry.Side.OLD);
-                allASideFunctions = listAllFunctionsInModifiedFiles(parent, aSideCFilePaths);
+                        Set<String> aSideCFilePaths = getFilenamesOfCFilesModifiedByDiffs(diffs, DiffEntry.Side.OLD);
+                        allASideFunctions = listAllFunctionsInModifiedFiles(parent, aSideCFilePaths);
 
-                Set<String> bSideCFilePaths = getFilenamesOfCFilesModifiedByDiffs(diffs, DiffEntry.Side.NEW);
-                allBSideFunctions = listAllFunctionsInModifiedFiles(commit, bSideCFilePaths);
+                        Set<String> bSideCFilePaths = getFilenamesOfCFilesModifiedByDiffs(diffs, DiffEntry.Side.NEW);
+                        allBSideFunctions = listAllFunctionsInModifiedFiles(commit, bSideCFilePaths);
 
-                logFilesAndFunctions("A-side", aSideCFilePaths, allASideFunctions);
-                logFilesAndFunctions("B-side", bSideCFilePaths, allBSideFunctions);
-
+                        logFilesAndFunctions("A-side", aSideCFilePaths, allASideFunctions);
+                        logFilesAndFunctions("B-side", bSideCFilePaths, allBSideFunctions);
+                        mapEditsFunctionLocations(diffs);
+                        changedFunctionConsumer.mergeAndPublishRemainingHunks();
+                    } catch (RuntimeException re) {
+                        LOG.warn("Error analyzing diffs for parent " + iParent + " of commit " + commitId, re);
+                        continue;
+                    } finally {
+                        releaseFormatter();
+                    }
+                }
             } catch (RuntimeException re) {
                 LOG.warn("Error analyzing commit " + commitId, re);
                 return;
             }
-            mapEditsFunctionLocations(diffs);
-            changedFunctionConsumer.mergeAndPublishRemainingHunks();
         } catch (IOException ioe) {
             throw new RuntimeException("I/O exception parsing files changed by commit " + commitId, ioe);
         } finally {
-            releaseFormatter();
             releaseRevisionWalker(rw);
         }
     }
@@ -110,7 +108,7 @@ public class CommitChangedFunctionLister {
     private void addFunctionsOfParentLessCommit(RevCommit commit) throws IOException {
         final boolean logDebug = LOG.isDebugEnabled();
         FunctionLocationProvider p = new FunctionLocationProvider(repo, commitId);
-        allBSideFunctions = p.listFunctionsInFilesWithExtension(commit, C_FILE_EXTENSIONS);
+        allBSideFunctions = p.listFunctionsInDotCFiles(commit);
 
         for (Map.Entry<String, List<Method>> e : allBSideFunctions.entrySet()) {
             String newPath = e.getKey();
@@ -164,7 +162,7 @@ public class CommitChangedFunctionLister {
         }
     }
 
-    private Set<String> getFilenamesOfCFilesModifiedByDiffs(List<DiffEntry> diffs, DiffEntry.Side side) {
+    private static Set<String> getFilenamesOfCFilesModifiedByDiffs(List<DiffEntry> diffs, DiffEntry.Side side) {
         Set<String> filePaths = new HashSet<>();
         for (DiffEntry diff : diffs) {
             String path = diff.getPath(side);
@@ -407,22 +405,6 @@ public class CommitChangedFunctionLister {
             lister.listChangedFunctions();
         }
 
-        if (repo != null) {
-            try {
-                repo.close();
-            } finally {
-                try {
-                    if (git != null) {
-                        try {
-                            git.close();
-                        } finally {
-                            git = null;
-                        }
-                    }
-                } finally {
-                    repo = null;
-                }
-            }
-        }
+        GitUtil.silentlyCloseGitAndRepo(git, repo);
     }
 }

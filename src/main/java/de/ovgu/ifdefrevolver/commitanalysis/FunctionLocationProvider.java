@@ -32,7 +32,7 @@ public class FunctionLocationProvider {
     private final Repository repository;
     private final String commitId;
 
-    public FunctionLocationProvider(Repository repository, String commitId) throws IOException {
+    public FunctionLocationProvider(Repository repository, String commitId) {
         this.repository = repository;
         this.commitId = commitId;
         this.ctx = new Context(null);
@@ -59,6 +59,15 @@ public class FunctionLocationProvider {
     public Map<String, List<Method>> listFunctionsInFilesWithExtension(RevCommit state, Set<String> extensions) throws IOException {
         final TreeFilter effectiveFilter = treeFilterFromFileExtensions(extensions);
         return listFunctionsInFiles(state, effectiveFilter);
+    }
+
+    /**
+     * @param state
+     * @return A map from filename to the (ordered list of) functions in that file
+     * @throws IOException
+     */
+    public Map<String, List<Method>> listFunctionsInDotCFiles(RevCommit state) throws IOException {
+        return listFunctionsInFilesWithExtension(state, IFunctionLocationProvider.C_FILE_EXTENSIONS);
     }
 
     protected TreeFilter treeFilterFromFileExtensions(Set<String> extensions) {

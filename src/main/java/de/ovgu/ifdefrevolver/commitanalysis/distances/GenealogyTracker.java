@@ -5,7 +5,9 @@ import de.ovgu.ifdefrevolver.bugs.minecommits.CommitsDistanceDb.Commit;
 import de.ovgu.ifdefrevolver.commitanalysis.AllFunctionsRow;
 import de.ovgu.ifdefrevolver.commitanalysis.FunctionChangeRow;
 import de.ovgu.ifdefrevolver.commitanalysis.FunctionId;
+import de.ovgu.ifdefrevolver.commitanalysis.GitUtil;
 import de.ovgu.ifdefrevolver.util.GroupingListMap;
+import de.ovgu.skunk.detection.data.Method;
 import org.apache.log4j.Logger;
 
 import java.util.*;
@@ -13,6 +15,7 @@ import java.util.*;
 public class GenealogyTracker {
     private static Logger LOG = Logger.getLogger(GenealogyTracker.class);
     private final List<FunctionChangeRow>[] changesByCommitKey;
+    private final String repoDir;
 
     private CommitsDistanceDb commitsDistanceDb;
     private Queue<Commit> next;
@@ -374,9 +377,10 @@ public class GenealogyTracker {
 
     private Branch[] branchIdsByCommitKey;
 
-    public GenealogyTracker(CommitsDistanceDb commitsDistanceDb, Map<Commit, List<AllFunctionsRow>> allFunctionsBySnapshotStartCommit, List<FunctionChangeRow>[] changesByCommitKey) {
+    public GenealogyTracker(CommitsDistanceDb commitsDistanceDb, Map<Commit, List<AllFunctionsRow>> allFunctionsBySnapshotStartCommit, List<FunctionChangeRow>[] changesByCommitKey, String repoDir) {
         this.commitsDistanceDb = commitsDistanceDb;
         this.changesByCommitKey = changesByCommitKey;
+        this.repoDir = repoDir;
     }
 
     public void main() {
@@ -472,10 +476,68 @@ public class GenealogyTracker {
         }
         processChangesOfCurrentCommit();
 
+        if ((currentBranch.getFirstCommit() == currentCommit) && (currentBranch.parentBranches.length > 1)) {
+            validateComputedFunctionsAfterMerge();
+        }
+
         Commit[] children = currentCommit.children();
         for (Commit child : children) {
             offerIfNew(child);
         }
+    }
+
+    private void validateComputedFunctionsAfterMerge() {
+        final Set<FunctionId> actualIds = getActualFunctionIdsAtCurrentCommit();
+        final Set<FunctionId> computedIds = new HashSet<>(this.currentBranch.functions.functionsById.keySet());
+
+        final Set<FunctionId> identicalFunctions = new HashSet<>(actualIds);
+        identicalFunctions.retainAll(computedIds);
+
+        final Set<FunctionId> functionsThatShouldNotExist = new HashSet<>(computedIds);
+        functionsThatShouldNotExist.removeAll(actualIds);
+
+        final Set<FunctionId> functionsThatAreMissing = new HashSet<>(actualIds);
+        functionsThatAreMissing.removeAll(computedIds);
+
+        if (functionsThatAreMissing.isEmpty() && functionsThatShouldNotExist.isEmpty()) {
+            LOG.info("After merge: Computed and actual function ids match exactly. " + this.currentBranch);
+            return;
+        }
+
+        LOG.warn("After merge: # actual function ids: " + actualIds.size() + " " + this.currentBranch);
+        LOG.warn("After merge: # computed function ids: " + computedIds.size() + " " + this.currentBranch);
+        LOG.warn("After merge: # identical function ids: " + identicalFunctions.size() + " " + this.currentBranch);
+        LOG.warn("After merge: # missing function ids: " + functionsThatAreMissing.size() + " " + this.currentBranch);
+        LOG.warn("After merge: # superfluous function ids: " + functionsThatShouldNotExist.size() + " " + this.currentBranch);
+
+        if (!functionsThatAreMissing.isEmpty()) {
+            List<FunctionId> missing = new ArrayList<>(functionsThatAreMissing);
+            Collections.sort(missing, FunctionId.BY_FILE_AND_SIGNATURE_ID);
+            for (FunctionId id : missing) {
+                LOG.warn("After merge: missing: " + id + " " + this.currentBranch);
+            }
+        }
+
+        if (!functionsThatShouldNotExist.isEmpty()) {
+            List<FunctionId> superfluous = new ArrayList<>(functionsThatShouldNotExist);
+            Collections.sort(superfluous, FunctionId.BY_FILE_AND_SIGNATURE_ID);
+            for (FunctionId id : superfluous) {
+                LOG.warn("After merge: superfluous: " + id + " " + this.currentBranch);
+            }
+        }
+    }
+
+    private Set<FunctionId> getActualFunctionIdsAtCurrentCommit() {
+        Map<String, List<Method>> actualFunctionsByPath = GitUtil.listFunctionsAtCurrentCommit(this.repoDir, this.currentCommit.commitHash);
+        final Set<FunctionId> actualIds = new LinkedHashSet<>();
+        for (Map.Entry<String, List<Method>> functionsInPath : actualFunctionsByPath.entrySet()) {
+            String path = functionsInPath.getKey();
+            for (Method f : functionsInPath.getValue()) {
+                FunctionId id = new FunctionId(f.functionSignatureXml, path);
+                actualIds.add(id);
+            }
+        }
+        return actualIds;
     }
 
     private void offerIfNew(Commit commit) {
@@ -551,56 +613,6 @@ public class GenealogyTracker {
     private void createNewBranchForBranchSplit(Branch branch, Branch parentBranch) {
         branch.split(parentBranch);
     }
-
-//    private void walkBranch(Commit parentBranch, Commit branchStart) {
-//        onEnterBranch(parentBranch, branchStart);
-//        Commit current = branchStart;
-//        while (true) {
-//            onProcessingCommit(current);
-//            processChanges(current);
-//            Commit[] children = current.children();
-//
-//            if ((children == null) || (children.length == 0)) {
-//                onCommitProcessed(current);
-//                onBranchEnd(branchStart);
-//                break;
-//            } else if (children.length == 1) {
-//                Commit child = children[0];
-//                if (!child.isOnlyChildOf(current)) {
-//                    processAndMergeOtherParentsOfChildCommit(branchStart, current, child);
-//                    continueInBranch(branchStart);
-//                }
-//
-//                onCommitProcessed(current);
-//                current = child;
-//            } else {
-//                // multiple children
-//
-//                // Beware, there are also cases where a commit has multiple parents *and* multiple children!
-//
-//                for (Commit child : children) {
-//                    if (!child.isOnlyChildOf(current)) {
-//                        processAndMergeOtherParentsOfChildCommit(branchStart, current, child);
-//                    }
-//                }
-//            }
-//        }
-//    }
-//
-//    private void processAndMergeOtherParentsOfChildCommit(Commit branchStart, Commit current, Commit child) {
-//        // Child commit has multiple parents --> is a merge commit
-//        Set<Commit> branches = new HashSet<>();
-//        branches.add(branchStart);
-//        for (Commit otherParent : child.parents()) {
-//            if (branchStart == current) {
-//                continue;
-//            } else {
-//                Commit otherBranch = ensureProcessedUpUntil(otherParent);
-//                branches.add(otherBranch);
-//            }
-//        }
-//        mergeProcessedBranches(branches);
-//    }
 
     private void processChangesOfCurrentCommit() {
         Collection<FunctionChangeRow> changes = getChangesOfCurrentCommit();

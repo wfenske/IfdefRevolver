@@ -139,7 +139,7 @@ public class AddChangeDistances {
         Set<FunctionIdWithCommit> leftOverFunctionIdsWithCommits = getFunctionIdsWithCommitFromLeftOverSnapshot(leftOverSnapshotDate);
         Set<FunctionIdWithCommit> functionsAddedInBetween = getFunctionIdsWithCommitsAddedInBetween();
 
-        //trackGenealogies();
+//        trackGenealogies();
 
 //        functionGenealogies = computeFunctionGenealogies(allFunctionsEver, leftOverFunctionIdsWithCommits, functionsAddedInBetween);
         List<SnapshotWithFunctions> snapshotsWithFunctions = mergeGenealogiesWithSnapshotData();
@@ -165,7 +165,8 @@ public class AddChangeDistances {
         List<FunctionChangeRow>[] changesByCommitKey = groupChangesByCommitKey();
         Map<Commit, List<AllFunctionsRow>> allFunctionsBySnapshotStartCommit = groupAllFunctionsBySnapshotStartCommit();
 
-        GenealogyTracker gt = new GenealogyTracker(commitsDistanceDb, allFunctionsBySnapshotStartCommit, changesByCommitKey);
+        GenealogyTracker gt = new GenealogyTracker(commitsDistanceDb, allFunctionsBySnapshotStartCommit, changesByCommitKey,
+                config.getRepoDir());
         gt.main();
         System.exit(0);
     }
