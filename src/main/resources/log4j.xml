@@ -59,7 +59,7 @@
     </logger>
 
     <logger name="de.ovgu.ifdefrevolver.commitanalysis.CommitHunkToFunctionLocationMapper">
-        <level value="info"/>
+        <level value="debug"/>
     </logger>
 
     <logger name="de.ovgu.ifdefrevolver.commitanalysis.AddDelMergingConsumer">

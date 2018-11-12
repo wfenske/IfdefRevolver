@@ -232,7 +232,7 @@ public class CommitChangedFunctionLister {
         for (int i = 0; i < numFunctions; i++) {
             Method oldFunc = oldFunctions.get(i);
             Method newFunc = newFunctions.get(i);
-            if (!oldFunc.functionSignatureXml.equals(newFunc.functionSignatureXml)) {
+            if (!oldFunc.uniqueFunctionSignature.equals(newFunc.uniqueFunctionSignature)) {
                 throw new RuntimeException("Expected the same functions in the same order during file rename, but signatures don't match. Commit: " + commitId +
                         " old function: " + oldFunc + " new function: " + newFunc);
             }
@@ -325,8 +325,8 @@ public class CommitChangedFunctionLister {
 
         Map<String, Method> oldFunctionsBySignature = new HashMap<>();
         Map<String, Method> newFunctionsBySignature = new HashMap<>();
-        oldFunctions.forEach((m) -> oldFunctionsBySignature.put(m.functionSignatureXml, m));
-        newFunctions.forEach((m) -> newFunctionsBySignature.put(m.functionSignatureXml, m));
+        oldFunctions.forEach((m) -> oldFunctionsBySignature.put(m.uniqueFunctionSignature, m));
+        newFunctions.forEach((m) -> newFunctionsBySignature.put(m.uniqueFunctionSignature, m));
 
         Set<String> deletedSignatures = new HashSet<>(oldFunctionsBySignature.keySet());
         Set<String> createdSignatures = new HashSet<>(newFunctionsBySignature.keySet());

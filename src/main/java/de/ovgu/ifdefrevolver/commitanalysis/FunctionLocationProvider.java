@@ -15,8 +15,6 @@ import org.eclipse.jgit.treewalk.filter.PathFilterGroup;
 import org.eclipse.jgit.treewalk.filter.PathSuffixFilter;
 import org.eclipse.jgit.treewalk.filter.TreeFilter;
 import org.w3c.dom.Document;
-import org.w3c.dom.Node;
-import org.w3c.dom.NodeList;
 
 import java.io.*;
 import java.util.*;
@@ -95,12 +93,8 @@ public class FunctionLocationProvider {
                 if (functions == null) {
                     functions = new ArrayList<>();
                     functionsByFilename.put(filePath, functions);
-                    functions.add(method);
-                } else {
-                    Method previousMethod = functions.get(functions.size() - 1);
-                    previousMethod.maybeAdjustMethodEndBasedOnNextFunction(method);
-                    functions.add(method);
                 }
+                functions.add(method);
             }
         };
 
@@ -147,14 +141,12 @@ public class FunctionLocationProvider {
     private void readFileForPath(ObjectLoader loader, String filePath, Consumer<Method> functionHandler) {
         LOG.debug("Parsing functions in " + filePath);
         Document doc = getSrcMlDoc(loader, filePath);
-        NodeList functions = doc.getElementsByTagName("function");
-        int numFunctions = functions.getLength();
-        LOG.debug("Found " + numFunctions + " functions in `" + filePath + "'.");
-        for (int i = 0; i < numFunctions; i++) {
-            Node funcNode = functions.item(i);
-            Method func = folderReader.parseFunction(funcNode, filePath);
+        Method[] functions = folderReader.parseAllFunctionsInFile(doc, filePath);
+
+        LOG.debug("Found " + functions.length + " functions in `" + filePath + "'.");
+        for (Method f : functions) {
             //LOG.debug("\t" + func.toString());
-            functionHandler.accept(func);
+            functionHandler.accept(f);
         }
     }
 

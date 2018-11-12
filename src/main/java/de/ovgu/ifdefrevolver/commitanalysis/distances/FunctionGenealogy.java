@@ -2,7 +2,7 @@ package de.ovgu.ifdefrevolver.commitanalysis.distances;
 
 import de.ovgu.ifdefrevolver.bugs.minecommits.CommitsDistanceDb.Commit;
 import de.ovgu.ifdefrevolver.commitanalysis.FunctionId;
-import de.ovgu.ifdefrevolver.util.GroupingHashSetMap;
+import de.ovgu.skunk.util.GroupingHashSetMap;
 import org.apache.log4j.Logger;
 
 import java.util.*;

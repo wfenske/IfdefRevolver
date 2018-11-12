@@ -18,7 +18,7 @@ public enum FunctionChangeHunksColumns implements CsvColumnValueProvider<Functio
     FUNCTION_SIGNATURE {
         @Override
         public String csvColumnValue(FunctionChangeHunk changedFunc, IMinimalSnapshot snapshot) {
-            return changedFunc.getFunction().functionSignatureXml;
+            return changedFunc.getFunction().uniqueFunctionSignature;
         }
     },
     /**
@@ -116,7 +116,7 @@ public enum FunctionChangeHunksColumns implements CsvColumnValueProvider<Functio
         public String csvColumnValue(FunctionChangeHunk changedFunc, IMinimalSnapshot snapshot) {
             Optional<Method> newFunction = changedFunc.getNewFunction();
             if (newFunction.isPresent()) {
-                return newFunction.get().functionSignatureXml;
+                return newFunction.get().uniqueFunctionSignature;
             } else return "";
         }
     },

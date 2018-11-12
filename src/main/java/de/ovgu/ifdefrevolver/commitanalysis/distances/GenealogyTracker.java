@@ -6,8 +6,8 @@ import de.ovgu.ifdefrevolver.commitanalysis.AllFunctionsRow;
 import de.ovgu.ifdefrevolver.commitanalysis.FunctionChangeRow;
 import de.ovgu.ifdefrevolver.commitanalysis.FunctionId;
 import de.ovgu.ifdefrevolver.commitanalysis.GitUtil;
-import de.ovgu.ifdefrevolver.util.GroupingListMap;
 import de.ovgu.skunk.detection.data.Method;
+import de.ovgu.skunk.util.GroupingListMap;
 import org.apache.log4j.Logger;
 
 import java.util.*;
@@ -232,6 +232,7 @@ public class GenealogyTracker {
 
         public void putDel(FunctionChangeRow change) {
             final FunctionId functionId = change.functionId;
+            LOG.debug("DEL " + functionId + " by " + change.commit.commitHash + " in " + this.branch);
             deletedInThisBranch.add(functionId);
 
             FunctionInBranch overwrittenAdd = added.remove(functionId);
@@ -319,6 +320,24 @@ public class GenealogyTracker {
             this.added.putAll(parentFunctions.added);
             this.deleted.putAll(parentFunctions.deleted);
         }
+
+        public void logOccurrenceOfFunction(FunctionId id) {
+            if (functionsById.containsKey(id)) {
+                LOG.warn(id + " is in functionsById in " + this.branch);
+            }
+            if (deletedInThisBranch.contains(id)) {
+                LOG.warn(id + " was deletedInThisBranch in " + this.branch);
+            }
+            if (added.containsKey(id)) {
+                LOG.warn(id + " was added in " + this.branch);
+            }
+            if (deleted.containsKey(id)) {
+                LOG.warn(id + " was deleted in " + this.branch);
+            }
+            if (overwritten.contains(id)) {
+                LOG.warn(id + " was overwritten in " + this.branch);
+            }
+        }
     }
 
     private static class Branch {
@@ -330,6 +349,26 @@ public class GenealogyTracker {
             this.parentBranches = parentBranches;
             this.firstCommit = firstCommit;
             this.functions = new FunctionsInBranch(this);
+        }
+
+        public List<Branch> parentsInLevelOrder() {
+            List<Branch> seen = new ArrayList<>();
+            Queue<Branch> parentBranches = new LinkedList<>();
+            for (Branch parent : this.parentBranches) {
+                parentBranches.offer(parent);
+            }
+
+            Branch b;
+            while ((b = parentBranches.poll()) != null) {
+                for (Branch parent : b.parentBranches) {
+                    if (!seen.contains(parent)) {
+                        parentBranches.offer(parent);
+                    }
+                }
+                seen.add(b);
+            }
+
+            return seen;
         }
 
         @Override
@@ -373,6 +412,17 @@ public class GenealogyTracker {
             this.functions.inherit(parentBranch.functions);
         }
 
+        public void logOccurrenceOfFunction(FunctionId id) {
+            this.functions.logOccurrenceOfFunction(id);
+        }
+
+
+        public void logOccurrenceOfFunctionInSelfAndParentBranches(FunctionId id) {
+            logOccurrenceOfFunction(id);
+            for (Branch b : this.parentsInLevelOrder()) {
+                b.logOccurrenceOfFunction(id);
+            }
+        }
     }
 
     private Branch[] branchIdsByCommitKey;
@@ -515,6 +565,7 @@ public class GenealogyTracker {
             Collections.sort(missing, FunctionId.BY_FILE_AND_SIGNATURE_ID);
             for (FunctionId id : missing) {
                 LOG.warn("After merge: missing: " + id + " " + this.currentBranch);
+                currentBranch.logOccurrenceOfFunctionInSelfAndParentBranches(id);
             }
         }
 
@@ -523,8 +574,11 @@ public class GenealogyTracker {
             Collections.sort(superfluous, FunctionId.BY_FILE_AND_SIGNATURE_ID);
             for (FunctionId id : superfluous) {
                 LOG.warn("After merge: superfluous: " + id + " " + this.currentBranch);
+                currentBranch.logOccurrenceOfFunctionInSelfAndParentBranches(id);
             }
         }
+
+        return;
     }
 
     private Set<FunctionId> getActualFunctionIdsAtCurrentCommit() {
@@ -533,7 +587,7 @@ public class GenealogyTracker {
         for (Map.Entry<String, List<Method>> functionsInPath : actualFunctionsByPath.entrySet()) {
             String path = functionsInPath.getKey();
             for (Method f : functionsInPath.getValue()) {
-                FunctionId id = new FunctionId(f.functionSignatureXml, path);
+                FunctionId id = new FunctionId(f.uniqueFunctionSignature, path);
                 actualIds.add(id);
             }
         }

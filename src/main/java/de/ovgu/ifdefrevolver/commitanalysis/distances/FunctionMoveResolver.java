@@ -5,8 +5,8 @@ import de.ovgu.ifdefrevolver.bugs.minecommits.CommitsDistanceDb.Commit;
 import de.ovgu.ifdefrevolver.commitanalysis.FunctionChangeHunk;
 import de.ovgu.ifdefrevolver.commitanalysis.FunctionChangeRow;
 import de.ovgu.ifdefrevolver.commitanalysis.FunctionId;
-import de.ovgu.ifdefrevolver.util.GroupingHashSetMap;
-import de.ovgu.ifdefrevolver.util.GroupingListMap;
+import de.ovgu.skunk.util.GroupingHashSetMap;
+import de.ovgu.skunk.util.GroupingListMap;
 import de.ovgu.ifdefrevolver.util.ProgressMonitor;
 import org.apache.log4j.Logger;
 

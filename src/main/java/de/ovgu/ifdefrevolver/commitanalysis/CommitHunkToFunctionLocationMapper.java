@@ -590,12 +590,19 @@ class CommitHunkToFunctionLocationMapper implements Consumer<Edit> {
         // numbers because function line numbers are 1-based, whereas edit
         // line numbers are 0-based.
 
-        // NOTE, 2018-03-15, wf: The end of an edit is actually the first
-        // line *not* edited.  Thus, we need to compare the end with '>',
-        // not '>='.
+        // NOTE, 2018-11-11, wf: For reasons I don't understand, edits on the
+        // A side that should exactly cover a function sometimes start one
+        // line before a function start and sometimes end one line after the
+        // function end (but never both).  On the B side, the edit begin always
+        // matches exactly with our locations, but the end is
+        // consistently one line after the end of the function.  Hence, we use
+        // <= and >= to compare, although it is not 100% correct.
+
+        //  See e.g. the commit f214bb2115994cc6b4123f3d06db0452f17f2e99
+        // in OpenVPN and the changes to base64.c
         int fBegin = func.start1 - 1;
         int fEnd = func.end1 - 1;
-        return ((editBegin <= fBegin) && (editEnd > fEnd));
+        return ((editBegin <= fBegin) && (editEnd >= fEnd));
 //
 //        if (result) {
 //            LOG.debug("Delete/add detected. Edit end: " + editEnd + "; function end: " + fEnd);

@@ -1,6 +1,6 @@
 package de.ovgu.ifdefrevolver.bugs.minecommits;
 
-import de.ovgu.ifdefrevolver.util.GroupingHashSetMap;
+import de.ovgu.skunk.util.GroupingHashSetMap;
 import de.ovgu.ifdefrevolver.util.ProgressMonitor;
 import org.apache.log4j.Logger;
 

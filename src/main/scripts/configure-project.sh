@@ -46,12 +46,12 @@ done
 
 if ! $have_snapshot_results_dir
 then
-    echo "No snapshot results directories found in \`$PROJECT_RESULTS_DIR'" >&2
-    exit 1
+    echo "WARN: No snapshot results directories found in \`$PROJECT_RESULTS_DIR'" >&2
+    #exit 1
 fi
 
 printf 'PROJECT = %s\nSMELL_CONFIGS_DIR = %s\n\n### Top rule\nall: %s\n\n### Rules for individual snapshots\n%s\n' \
        "${PROJECT:?}" \
        "${SMELL_CONFIGS_DIR}" \
        "${all_deps}" \
-       "${all_snapshot_rules:?}"
+       "${all_snapshot_rules}"

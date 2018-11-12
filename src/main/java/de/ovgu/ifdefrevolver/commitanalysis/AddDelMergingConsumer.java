@@ -1,6 +1,6 @@
 package de.ovgu.ifdefrevolver.commitanalysis;
 
-import de.ovgu.ifdefrevolver.util.GroupingListMap;
+import de.ovgu.skunk.util.GroupingListMap;
 import de.ovgu.skunk.detection.data.Method;
 import org.apache.log4j.Logger;
 

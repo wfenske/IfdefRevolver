@@ -30,7 +30,7 @@ public enum AllSnapshotFunctionsColumns implements CsvColumnValueProvider<Method
     FUNCTION_SIGNATURE {
         @Override
         public String csvColumnValue(Method func, IMinimalSnapshot snapshot) {
-            return func.functionSignatureXml;
+            return func.uniqueFunctionSignature;
         }
     },
     /**
