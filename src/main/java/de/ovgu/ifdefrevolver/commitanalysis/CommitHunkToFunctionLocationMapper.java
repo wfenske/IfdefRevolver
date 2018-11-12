@@ -218,7 +218,7 @@ class CommitHunkToFunctionLocationMapper implements Consumer<Edit> {
             LOG.debug("Function names are similar enough for a rename: " + delName + " -> " + addName);
             return true;
         } else {
-            LOG.debug("Function names are too dissimilar enough for a rename: " + delName + " -> " + addName);
+            LOG.debug("Function names are too dissimilar for a rename: " + delName + " -> " + addName);
         }
 
 //        String delSignature = delFunction.functionSignatureXml;

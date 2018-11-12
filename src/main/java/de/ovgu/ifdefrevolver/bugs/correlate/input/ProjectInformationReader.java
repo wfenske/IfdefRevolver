@@ -186,6 +186,13 @@ public class ProjectInformationReader<TConfig extends IHasProjectInfoFile & IHas
     }
 
     /**
+     * @return Snapshots, ordered by date
+     */
+    public Collection<Snapshot> getAllSnapshots() {
+        return this.getSnapshots().values();
+    }
+
+    /**
      * @param snapshotFilteringConfig
      * @return A fresh list of the dates of the requested snapshots
      */

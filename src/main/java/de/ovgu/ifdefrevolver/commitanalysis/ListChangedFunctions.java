@@ -1,6 +1,7 @@
 package de.ovgu.ifdefrevolver.commitanalysis;
 
 import de.ovgu.ifdefrevolver.bugs.correlate.data.IMinimalSnapshot;
+import de.ovgu.ifdefrevolver.bugs.correlate.data.Snapshot;
 import de.ovgu.ifdefrevolver.bugs.correlate.input.ProjectInformationReader;
 import de.ovgu.ifdefrevolver.bugs.correlate.main.ProjectInformationConfig;
 import de.ovgu.ifdefrevolver.bugs.minecommits.CommitsDistanceDb;
@@ -17,6 +18,7 @@ public class ListChangedFunctions {
     private static final Logger LOG = Logger.getLogger(ListChangedFunctions.class);
     private ListChangedFunctionsConfig config;
     private int errors;
+    private ProjectInformationReader<ListChangedFunctionsConfig> projectInfo;
 
     public static void main(String[] args) {
         ListChangedFunctions main = new ListChangedFunctions();
@@ -36,7 +38,7 @@ public class ListChangedFunctions {
     private void execute() {
         LOG.debug("Listing changed functions in snapshots in " + config.projectSnapshotsDir() + " and repo " + config.getRepoDir());
         this.errors = 0;
-        ProjectInformationReader<ListChangedFunctionsConfig> projectInfo = new ProjectInformationReader<>(config);
+        this.projectInfo = new ProjectInformationReader<>(config);
         LOG.debug("Reading project information");
         projectInfo.readSnapshotsAndRevisionsFile();
         LOG.debug("Done reading project information");
@@ -46,33 +48,34 @@ public class ListChangedFunctions {
             // Will add only add selected snapshots since the filter *is* present.
             snapshotsToProcess.addAll(projectInfo.getSnapshotsFiltered(config));
             if (config.isListLeftoverChanges()) {
-                addLeftoverSnapshot(snapshotsToProcess);
+                snapshotsToProcess.add(getLeftoverSnapshot());
             }
         } else {
             if (config.isListLeftoverChanges()) {
                 // *Only* analyse the leftover changes.
-                addLeftoverSnapshot(snapshotsToProcess);
+                snapshotsToProcess.add(getLeftoverSnapshot());
             } else {
                 // Will add all snapshots since the filter is *not* present.
-                snapshotsToProcess.addAll(projectInfo.getSnapshotsFiltered(config));
+                snapshotsToProcess.addAll(projectInfo.getAllSnapshots());
                 // Also analyse the leftover changes.
-                addLeftoverSnapshot(snapshotsToProcess);
+                snapshotsToProcess.add(getLeftoverSnapshot());
             }
         }
 
         listFunctionsInSnapshots(snapshotsToProcess);
     }
 
-    private void addLeftoverSnapshot(Collection<IMinimalSnapshot> snapshotsToProcess) {
+    private IMinimalSnapshot getLeftoverSnapshot() {
         LOG.debug("Creating dummy snapshot to cover the remaining commits.");
-        IMinimalSnapshot dummySnapshotToCoverRemainingCommits = createDummySnapshotToCoverRemainingCommits(snapshotsToProcess);
+        IMinimalSnapshot dummySnapshotToCoverRemainingCommits = createDummySnapshotToCoverRemainingCommits();
         ensureSnapshotDirectoryOrDie(dummySnapshotToCoverRemainingCommits);
-        snapshotsToProcess.add(dummySnapshotToCoverRemainingCommits);
+        return dummySnapshotToCoverRemainingCommits;
     }
 
-    private IMinimalSnapshot createDummySnapshotToCoverRemainingCommits(Collection<? extends IMinimalSnapshot> snapshotsToProcesses) {
+    private IMinimalSnapshot createDummySnapshotToCoverRemainingCommits() {
+        Collection<Snapshot> allActualSnapshots = projectInfo.getAllSnapshots();
         final Set<String> remainingCommits = new HashSet<>(readAllCommits(config));
-        for (IMinimalSnapshot actualSnapshot : snapshotsToProcesses) {
+        for (IMinimalSnapshot actualSnapshot : allActualSnapshots) {
             remainingCommits.removeAll(actualSnapshot.getCommitHashes());
         }
 
