@@ -16,7 +16,9 @@ import org.eclipse.jgit.treewalk.filter.PathSuffixFilter;
 import org.eclipse.jgit.treewalk.filter.TreeFilter;
 import org.w3c.dom.Document;
 
-import java.io.*;
+import java.io.IOException;
+import java.io.InputStream;
+import java.io.OutputStream;
 import java.util.*;
 import java.util.function.Consumer;
 
@@ -150,18 +152,6 @@ public class FunctionLocationProvider {
         }
     }
 
-    private String getSrcMl(ObjectLoader loader) {
-        final StringBuilder resBuilder = new StringBuilder();
-        getSrcMlByLine(loader, new Consumer<String>() {
-            @Override
-            public void accept(String line) {
-                resBuilder.append(line);
-                resBuilder.append("\n");
-            }
-        });
-        return resBuilder.toString();
-    }
-
 
     private Document getSrcMlDoc(ObjectLoader loader, String path) {
         LOG.debug("Getting SrcML of " + path + " at " + commitId);
@@ -198,19 +188,6 @@ public class FunctionLocationProvider {
             }
         });
         return doc[0];
-    }
-
-    private void getSrcMlByLine(ObjectLoader loader, Consumer<String> srcmlLineConsumer) {
-        getSrcMlStdoutStream(loader, new Consumer<InputStream>() {
-            @Override
-            public void accept(InputStream procStdout) {
-                try (BufferedReader stdOutReader = new BufferedReader(new InputStreamReader(procStdout))) {
-                    stdOutReader.lines().forEach(srcmlLineConsumer);
-                } catch (IOException e) {
-                    throw new RuntimeException("I/O error reading src2srcml output", e);
-                }
-            }
-        });
     }
 
     private void getSrcMlStdoutStream(ObjectLoader loader, final Consumer<InputStream> srcmlStdoutConsumer) {
