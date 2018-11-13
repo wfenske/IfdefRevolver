@@ -1,7 +1,7 @@
 package de.ovgu.ifdefrevolver.commitanalysis;
 
-import de.ovgu.skunk.util.GroupingListMap;
 import de.ovgu.skunk.detection.data.Method;
+import de.ovgu.skunk.util.GroupingListMap;
 import org.apache.log4j.Logger;
 
 import java.util.*;
@@ -143,6 +143,32 @@ public class AddDelMergingConsumer implements Consumer<FunctionChangeHunk> {
         parent.accept(remappedMod);
     }
 
+    private interface IAddForDelMatchingStrategy {
+        FunctionChangeHunk pickAddForDel(List<FunctionChangeHunk> addsInSameFile, FunctionChangeHunk del);
+    }
+
+    private static final IAddForDelMatchingStrategy ADD_FOR_DEL_PERFECT_MATCH = new IAddForDelMatchingStrategy() {
+        @Override
+        public FunctionChangeHunk pickAddForDel(List<FunctionChangeHunk> addsInSameFile, FunctionChangeHunk del) {
+            final int delStart = del.getFunction().start1;
+            for (FunctionChangeHunk add : addsInSameFile) {
+                final int addStart = add.getASideStartLocation();
+                if (delStart == addStart) {
+                    return add;
+                }
+            }
+
+            return null;
+        }
+    };
+
+    private static final IAddForDelMatchingStrategy ADD_FOR_DEL_FIRST_MATCH = new IAddForDelMatchingStrategy() {
+        @Override
+        public FunctionChangeHunk pickAddForDel(List<FunctionChangeHunk> addsInSameFile, FunctionChangeHunk del) {
+            return addsInSameFile.get(0);
+        }
+    };
+
     private void mergeAndPublishHunks(LinkedList<FunctionChangeHunk> dels, LinkedList<FunctionChangeHunk> adds) {
         int count = 0;
 
@@ -151,24 +177,8 @@ public class AddDelMergingConsumer implements Consumer<FunctionChangeHunk> {
             addsByPath.put(h.getFunction().filePath, h);
         }
 
-        for (Iterator<FunctionChangeHunk> delIt = dels.iterator(); delIt.hasNext(); ) {
-            FunctionChangeHunk del = delIt.next();
-            String delPath = del.getFunction().filePath;
-            List<FunctionChangeHunk> addsInSameFile = addsByPath.get(delPath);
-            if (addsInSameFile != null) {
-                FunctionChangeHunk add = addsInSameFile.get(0);
-
-                delIt.remove();
-                adds.remove(add);
-                addsInSameFile.remove(add);
-                if (addsInSameFile.isEmpty()) {
-                    addsByPath.getMap().remove(delPath);
-                }
-
-                FunctionChangeHunk move = mergeDelAndAddToMove(del, add);
-                publishMove(move);
-            }
-        }
+        publishMovesUsingStrategy(dels, adds, addsByPath, ADD_FOR_DEL_PERFECT_MATCH);
+        publishMovesUsingStrategy(dels, adds, addsByPath, ADD_FOR_DEL_FIRST_MATCH);
 
         while (!dels.isEmpty() && !adds.isEmpty()) {
             if (count > 0) {
@@ -191,6 +201,28 @@ public class AddDelMergingConsumer implements Consumer<FunctionChangeHunk> {
         if (!adds.isEmpty()) {
             LOG.debug("Publishing some left-over additions.");
             publishAll(adds);
+        }
+    }
+
+    private void publishMovesUsingStrategy(LinkedList<FunctionChangeHunk> dels, LinkedList<FunctionChangeHunk> adds, GroupingListMap<String, FunctionChangeHunk> addsByPath, IAddForDelMatchingStrategy matchingStrategy) {
+        for (Iterator<FunctionChangeHunk> delIt = dels.iterator(); delIt.hasNext(); ) {
+            FunctionChangeHunk del = delIt.next();
+            String delPath = del.getFunction().filePath;
+            List<FunctionChangeHunk> addsInSameFile = addsByPath.get(delPath);
+            if (addsInSameFile == null) continue;
+
+            FunctionChangeHunk add = matchingStrategy.pickAddForDel(addsInSameFile, del);
+            if (add == null) continue;
+
+            delIt.remove();
+            adds.remove(add);
+            addsInSameFile.remove(add);
+            if (addsInSameFile.isEmpty()) {
+                addsByPath.getMap().remove(delPath);
+            }
+
+            FunctionChangeHunk move = mergeDelAndAddToMove(del, add);
+            publishMove(move);
         }
     }
 

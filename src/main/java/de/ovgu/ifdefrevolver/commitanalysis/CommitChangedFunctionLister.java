@@ -284,6 +284,9 @@ public class CommitChangedFunctionLister {
             newFunctions = Collections.emptyList();
         }
 
+        DiffASideFunctionList aSideFunctionList = new DiffASideFunctionList(oldPath, oldFunctions);
+        DiffBSideFunctionList bSideFunctionList = new DiffBSideFunctionList(newPath, newFunctions);
+
         final boolean logDebug = LOG.isDebugEnabled();
 
         if (logDebug) {
@@ -303,8 +306,8 @@ public class CommitChangedFunctionLister {
             }
 
             CommitHunkToFunctionLocationMapper editLocMapper = new CommitHunkToFunctionLocationMapper(commitId,
-                    oldPath, oldFunctions,
-                    newPath, newFunctions,
+                    aSideFunctionList,
+                    bSideFunctionList,
                     movedMethods,
                     changedFunctionConsumer);
 
@@ -358,7 +361,7 @@ public class CommitChangedFunctionLister {
 
         for (String signature : createdSignatures) {
             Method func = newFunctionsBySignature.get(signature);
-            FunctionChangeHunk fh = FunctionChangeHunk.makePseudoAdd(commitId, oldPath, newPath, func);
+            FunctionChangeHunk fh = FunctionChangeHunk.makePseudoAdd(commitId, oldPath, newPath, func, Optional.empty());
             changedFunctionConsumer.accept(fh);
         }
     }

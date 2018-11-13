@@ -24,6 +24,8 @@ public class FunctionChangeHunk {
      */
     private Optional<Method> newFunction;
 
+    private int aSideStartLocation;
+
     public static enum ModificationType {
         /**
          * if this change adds the entire function
@@ -46,23 +48,32 @@ public class FunctionChangeHunk {
 
     private ModificationType modType;
 
-    public FunctionChangeHunk(Method function, ChangeHunk hunk, ModificationType modType) {
-        this.function = function;
-        this.hunk = hunk;
-        this.modType = modType;
-        this.newFunction = Optional.empty();
-    }
-
     public FunctionChangeHunk(Method function, ChangeHunk hunk, ModificationType modType, Method newFunction) {
         this.function = function;
         this.hunk = hunk;
         this.modType = modType;
         this.newFunction = Optional.of(newFunction);
+        this.aSideStartLocation = function.start1;
     }
 
-    public static FunctionChangeHunk makePseudoAdd(String commitId, String oldPath, String newPath, Method func) {
+    public FunctionChangeHunk(Method function, ChangeHunk hunk, ModificationType modType) {
+        this.function = function;
+        this.hunk = hunk;
+        this.modType = modType;
+        this.newFunction = Optional.empty();
+        this.aSideStartLocation = function.start1;
+    }
+
+    public FunctionChangeHunk(Method function, ChangeHunk hunk, ModificationType modType, Optional<Integer> aSideStartLocation) {
+        this(function, hunk, modType);
+        if (aSideStartLocation.isPresent()) {
+            this.aSideStartLocation = aSideStartLocation.get();
+        }
+    }
+
+    public static FunctionChangeHunk makePseudoAdd(String commitId, String oldPath, String newPath, Method func, Optional<Integer> aSideStartLocation) {
         ChangeHunk ch = new ChangeHunk(commitId, oldPath, newPath, -1, 0, func.getSignatureGrossLinesOfCode());
-        FunctionChangeHunk fh = new FunctionChangeHunk(func, ch, FunctionChangeHunk.ModificationType.ADD);
+        FunctionChangeHunk fh = new FunctionChangeHunk(func, ch, FunctionChangeHunk.ModificationType.ADD, aSideStartLocation);
         return fh;
     }
 
@@ -88,6 +99,10 @@ public class FunctionChangeHunk {
         return modType;
     }
 
+    public int getASideStartLocation() {
+        return aSideStartLocation;
+    }
+
     @Override
     public String toString() {
         final String newFuncText;
@@ -96,8 +111,16 @@ public class FunctionChangeHunk {
         } else {
             newFuncText = "";
         }
+        final String aSideStartText;
+        if (aSideStartLocation != function.start1) {
+            aSideStartText = ", aSideStart=" + aSideStartLocation;
+        } else {
+            aSideStartText = "";
+        }
+
         return this.getClass().getSimpleName() + "{" +
                 "f=" + function + newFuncText +
+                aSideStartText +
                 ", hunk=" + hunk +
                 ", modificationType=" + modType +
                 '}';

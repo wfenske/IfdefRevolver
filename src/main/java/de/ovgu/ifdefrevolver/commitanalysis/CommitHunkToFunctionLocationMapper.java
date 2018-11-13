@@ -24,13 +24,211 @@ class CommitHunkToFunctionLocationMapper implements Consumer<Edit> {
     final String newPath;
     final List<Method> functionsInNewPathByOccurrence;
 
-    final Set<Method> appearedFunctions;
-    final Set<Method> disappearedFunctions;
-    final Set<Method> untreatedAppearedFunctions;
-    final Set<Method> untreatedDisappearedFunctions;
+    private static abstract class AppearedAndDisappearedFunctionHandler {
+        final String commitId;
+        final DiffASideFunctionList aSideFunctionList;
+        final DiffBSideFunctionList bSideFunctionList;
+
+        public AppearedAndDisappearedFunctionHandler(String commitId, DiffASideFunctionList aSideFunctionList, DiffBSideFunctionList bSideFunctionList) {
+            this.commitId = commitId;
+            this.aSideFunctionList = aSideFunctionList;
+            this.bSideFunctionList = bSideFunctionList;
+        }
+
+        void initialize() {
+            // hook method
+        }
+
+        public abstract Set<Method> getUntreatedAppearedFunctions();
+
+        public abstract Set<Method> getUntreatedDisappearedFunctions();
+
+        public abstract void markFunctionAsDeleted(Method delFunction);
+
+        public abstract void markFunctionAsAdded(Method addFunction);
+
+        public abstract boolean isAppearedFunction(Method f);
+
+        public abstract boolean isDisappearedFunction(Method f);
+
+        public abstract void adjustAppearedFunctionASideStartLocations(Edit edit);
+
+        public abstract int getASideStartLocationOfAppearedFunction(Method f);
+    }
+
+    private static class NullAppearedAndDisappearedFunctionHandler extends AppearedAndDisappearedFunctionHandler {
+        public NullAppearedAndDisappearedFunctionHandler(String commitId, DiffASideFunctionList aSideFunctionList, DiffBSideFunctionList bSideFunctionList) {
+            super(commitId, aSideFunctionList, bSideFunctionList);
+        }
+
+        @Override
+        public Set<Method> getUntreatedAppearedFunctions() {
+            return Collections.emptySet();
+        }
+
+        @Override
+        public Set<Method> getUntreatedDisappearedFunctions() {
+            return Collections.emptySet();
+        }
+
+        @Override
+        public void markFunctionAsDeleted(Method delFunction) {
+            return;
+        }
+
+        @Override
+        public void markFunctionAsAdded(Method addFunction) {
+            return;
+        }
+
+        @Override
+        public boolean isAppearedFunction(Method f) {
+            return false;
+        }
+
+        @Override
+        public boolean isDisappearedFunction(Method f) {
+            return false;
+        }
+
+        @Override
+        public void adjustAppearedFunctionASideStartLocations(Edit edit) {
+            // nothing to do
+        }
+
+        @Override
+        public int getASideStartLocationOfAppearedFunction(Method f) {
+            return f.start1;
+        }
+    }
+
+    private static class SimpleAppearedAndDisappearedFunctionHandler extends AppearedAndDisappearedFunctionHandler {
+        private Set<Method> appearedFunctions;
+        private Set<Method> disappearedFunctions;
+        private Set<Method> untreatedAppearedFunctions;
+        private Set<Method> untreatedDisappearedFunctions;
+        private Map<Method, Integer> appearedFunctionASideStartLocation;
+
+        public SimpleAppearedAndDisappearedFunctionHandler(String commitId, DiffASideFunctionList aSideFunctionList, DiffBSideFunctionList bSideFunctionList) {
+            super(commitId, aSideFunctionList, bSideFunctionList);
+        }
+
+        @Override
+        public void initialize() {
+            appearedFunctions = new LinkedHashSet<>(bSideFunctionList.getFunctionsByOccurrence());
+            appearedFunctions.removeAll(aSideFunctionList.getFunctionsByOccurrence());
+            disappearedFunctions = new LinkedHashSet<>(aSideFunctionList.getFunctionsByOccurrence());
+            disappearedFunctions.removeAll(bSideFunctionList.getFunctionsByOccurrence());
+
+            appearedFunctionASideStartLocation = new LinkedHashMap<>();
+            for (Method f : appearedFunctions) {
+                appearedFunctionASideStartLocation.put(f, f.start1);
+            }
+
+            untreatedAppearedFunctions = new HashSet<>(appearedFunctions);
+            untreatedDisappearedFunctions = new HashSet<>(disappearedFunctions);
+
+            logAfterInit();
+        }
+
+        private void logAfterInit() {
+            if (LOG.isDebugEnabled()) {
+                for (Method m : appearedFunctions) {
+                    LOG.debug("Commit " + commitId + "    adds function: " + m);
+                }
+                for (Method m : disappearedFunctions) {
+                    LOG.debug("Commit " + commitId + " deletes function: " + m);
+                }
+            }
+        }
+
+        @Override
+        public Set<Method> getUntreatedAppearedFunctions() {
+            return untreatedAppearedFunctions;
+        }
+
+        @Override
+        public Set<Method> getUntreatedDisappearedFunctions() {
+            return untreatedDisappearedFunctions;
+        }
+
+        @Override
+        public void markFunctionAsDeleted(Method delFunction) {
+            if (delFunction == null) return;
+            untreatedDisappearedFunctions.remove(delFunction);
+        }
+
+        @Override
+        public void markFunctionAsAdded(Method addFunction) {
+            if (addFunction == null) return;
+            untreatedAppearedFunctions.remove(addFunction);
+        }
+
+        @Override
+        public boolean isAppearedFunction(Method f) {
+            return appearedFunctions.contains(f);
+        }
+
+        @Override
+        public boolean isDisappearedFunction(Method f) {
+            return disappearedFunctions.contains(f);
+        }
+
+        @Override
+        public void adjustAppearedFunctionASideStartLocations(Edit edit) {
+            final int delta = edit.getLengthB() - edit.getLengthA();
+            final int beginB = edit.getBeginB();
+            for (Map.Entry<Method, Integer> e : appearedFunctionASideStartLocation.entrySet()) {
+                final Method f = e.getKey();
+                final int fStart0 = f.start1 - 1;
+                if (fStart0 < beginB) continue;
+                // NOTE, 2018-11-13, wf: The subtraction is actually correct: If more lines were
+                // deleted than added, delta will be negative, and all B-side function
+                // locations will be smaller than the original A-side locations.  Hence, we must
+                // subtract the (negative) delta, thus increasing the B-side location.
+                final int newStart1 = e.getValue() - delta;
+                e.setValue(newStart1);
+            }
+        }
+
+        @Override
+        public int getASideStartLocationOfAppearedFunction(Method f) {
+            Integer result = appearedFunctionASideStartLocation.get(f);
+            if (result == null) {
+                LOG.warn("Illegal argument: " + f);
+                return f.start1;
+            }
+            return result;
+        }
+    }
+
+    private class AppearedAndDisappearedFunctionHandlerFactory {
+        final String commitId;
+        final DiffASideFunctionList aSideFunctionList;
+        final DiffBSideFunctionList bSideFunctionList;
+
+        public AppearedAndDisappearedFunctionHandlerFactory(String commitId, DiffASideFunctionList aSideFunctionList, DiffBSideFunctionList bSideFunctionList) {
+            this.commitId = commitId;
+            this.aSideFunctionList = aSideFunctionList;
+            this.bSideFunctionList = bSideFunctionList;
+        }
+
+        public AppearedAndDisappearedFunctionHandler getInstance() {
+            final AppearedAndDisappearedFunctionHandler result;
+            if (!aSideFunctionList.getPath().equals(bSideFunctionList.getPath())) {
+                result = new NullAppearedAndDisappearedFunctionHandler(commitId, aSideFunctionList, bSideFunctionList);
+            } else {
+                result = new SimpleAppearedAndDisappearedFunctionHandler(commitId, aSideFunctionList, bSideFunctionList);
+            }
+            result.initialize();
+            return result;
+        }
+    }
 
     private final String commitId;
     private final Consumer<FunctionChangeHunk> changedFunctionConsumer;
+
+    private final AppearedAndDisappearedFunctionHandler appearedAndDisappearedFunctionHandler;
     /**
      * Number of the change hunk within the file for which this mapper has been created.  It is increased each time
      * {@link #accept(Edit)} is called.
@@ -42,38 +240,20 @@ class CommitHunkToFunctionLocationMapper implements Consumer<Edit> {
     private Map<Method, Method> movedMethodsDueToPathDifferences;
 
     public CommitHunkToFunctionLocationMapper(String commitId,
-                                              String oldPath, Collection<Method> functionsInOldPathByOccurrence,
-                                              String newPath, Collection<Method> functionsInNewPathByOccurrence,
+                                              DiffASideFunctionList functionsInOldPath,
+                                              DiffBSideFunctionList functionsInNewPath,
                                               Map<Method, Method> movedMethodsDueToPathDifferences,
                                               Consumer<FunctionChangeHunk> changedFunctionConsumer) {
         this.commitId = commitId;
-        this.oldPath = oldPath;
-        this.newPath = newPath;
-        this.functionsInOldPathByOccurrence = new LinkedList<>(functionsInOldPathByOccurrence);
-        this.functionsInNewPathByOccurrence = new LinkedList<>(functionsInNewPathByOccurrence);
+        this.oldPath = functionsInOldPath.getPath();
+        this.newPath = functionsInNewPath.getPath();
+        this.functionsInOldPathByOccurrence = new LinkedList<>(functionsInOldPath.getFunctionsByOccurrence());
+        this.functionsInNewPathByOccurrence = new LinkedList<>(functionsInNewPath.getFunctionsByOccurrence());
         this.movedMethodsDueToPathDifferences = movedMethodsDueToPathDifferences;
         this.changedFunctionConsumer = changedFunctionConsumer;
 
-        if (oldPath.equals(newPath)) {
-            appearedFunctions = new LinkedHashSet<>(functionsInNewPathByOccurrence);
-            appearedFunctions.removeAll(functionsInOldPathByOccurrence);
-            disappearedFunctions = new LinkedHashSet<>(functionsInOldPathByOccurrence);
-            disappearedFunctions.removeAll(functionsInNewPathByOccurrence);
-            if (LOG.isDebugEnabled()) {
-                for (Method m : appearedFunctions) {
-                    LOG.debug("Commit " + commitId + "    adds function: " + m);
-                }
-                for (Method m : disappearedFunctions) {
-                    LOG.debug("Commit " + commitId + " deletes function: " + m);
-                }
-            }
-        } else {
-            appearedFunctions = Collections.emptySet();
-            disappearedFunctions = Collections.emptySet();
-        }
-
-        untreatedAppearedFunctions = new HashSet<>(appearedFunctions);
-        untreatedDisappearedFunctions = new HashSet<>(disappearedFunctions);
+        this.appearedAndDisappearedFunctionHandler = new AppearedAndDisappearedFunctionHandlerFactory(commitId, functionsInOldPath, functionsInNewPath).getInstance();
+        this.appearedAndDisappearedFunctionHandler.initialize();
     }
 
     @Override
@@ -88,6 +268,7 @@ class CommitHunkToFunctionLocationMapper implements Consumer<Edit> {
         try {
             analyzeASide(edit);
             analyzeBSide(edit);
+            appearedAndDisappearedFunctionHandler.adjustAppearedFunctionASideStartLocations(edit);
             publishHunksForCurrentEdit();
         } finally {
             numHunkInFile++;
@@ -98,15 +279,16 @@ class CommitHunkToFunctionLocationMapper implements Consumer<Edit> {
     }
 
     public void handleUntreatedAddedAndDeletedFunctions() {
-        for (Method f : untreatedDisappearedFunctions) {
+        for (Method f : appearedAndDisappearedFunctionHandler.getUntreatedDisappearedFunctions()) {
             LOG.info("Commit " + commitId + " deletes function: " + f + " but change has not been published. Publishing now.");
             FunctionChangeHunk hunk = FunctionChangeHunk.makePseudoDel(commitId, oldPath, newPath, f);
             changedFunctionConsumer.accept(hunk);
         }
 
-        for (Method f : untreatedAppearedFunctions) {
+        for (Method f : appearedAndDisappearedFunctionHandler.getUntreatedAppearedFunctions()) {
             LOG.info("Commit " + commitId + "    adds function: " + f + " but change has not been published. Publishing now.");
-            FunctionChangeHunk hunk = FunctionChangeHunk.makePseudoAdd(commitId, oldPath, newPath, f);
+            int aSideStartLocation = appearedAndDisappearedFunctionHandler.getASideStartLocationOfAppearedFunction(f);
+            FunctionChangeHunk hunk = FunctionChangeHunk.makePseudoAdd(commitId, oldPath, newPath, f, Optional.of(aSideStartLocation));
             changedFunctionConsumer.accept(hunk);
         }
     }
@@ -153,8 +335,8 @@ class CommitHunkToFunctionLocationMapper implements Consumer<Edit> {
                 break;
         }
 
-        untreatedDisappearedFunctions.remove(delFunction);
-        untreatedAppearedFunctions.remove(addFunction);
+        appearedAndDisappearedFunctionHandler.markFunctionAsDeleted(delFunction);
+        appearedAndDisappearedFunctionHandler.markFunctionAsAdded(addFunction);
     }
 
     private void processPossibleSignatureChanges() {
@@ -191,8 +373,9 @@ class CommitHunkToFunctionLocationMapper implements Consumer<Edit> {
             ChangeHunk mergedChangeHunk = mergeDelAndAddChangeHunk(delChangeHunk, addChangeHunk);
             FunctionChangeHunk move = new FunctionChangeHunk(delFunction, mergedChangeHunk,
                     FunctionChangeHunk.ModificationType.MOVE, addFunction);
-            untreatedDisappearedFunctions.remove(delFunction);
-            untreatedAppearedFunctions.remove(addFunction);
+            appearedAndDisappearedFunctionHandler.markFunctionAsDeleted(delFunction);
+            appearedAndDisappearedFunctionHandler.markFunctionAsAdded(addFunction);
+
             remapModsOfRenamedFunction(delFunction, addFunction, Optional.of(mergedChangeHunk.getHunkNo()));
             changedFunctionConsumer.accept(move);
         } else {
@@ -203,11 +386,17 @@ class CommitHunkToFunctionLocationMapper implements Consumer<Edit> {
     private boolean isPlausibleRename(FunctionChangeHunk del, FunctionChangeHunk add) {
         Method delFunction = del.getFunction();
         Method addFunction = add.getFunction();
-        String delName = delFunction.functionName;
-        String addName = addFunction.functionName;
-        if (delName.equals(addName)) {
+
+        if (delFunction.hasSameOriginalSignature(addFunction)) {
             return true;
         }
+
+        if (delFunction.hasSameName(addFunction)) {
+            return true;
+        }
+
+        final String delName = delFunction.functionName;
+        final String addName = addFunction.functionName;
 
         int threshold = (Math.min(delName.length(), addName.length()) * 3) / 4;
         threshold = Math.max(threshold, 1);
@@ -363,7 +552,7 @@ class CommitHunkToFunctionLocationMapper implements Consumer<Edit> {
                         LOG.debug("Edit " + remBegin + ".." + remEnd + " deletes lines from " + f);
                     }
 
-                    if (editOverlapsSignature(f, remBegin, remEnd) && disappearedFunctions.contains(f)) {
+                    if (editOverlapsSignature(f, remBegin, remEnd) && appearedAndDisappearedFunctionHandler.isDisappearedFunction(f)) {
                         if (logDebug) {
                             LOG.debug("Commit " + commitId + " might delete " + f);
                         }
@@ -408,7 +597,7 @@ class CommitHunkToFunctionLocationMapper implements Consumer<Edit> {
                         LOG.debug("Edit " + addBegin + ".." + addEnd + " adds lines to " + f);
                     }
 
-                    if (editOverlapsSignature(f, addBegin, addEnd) && appearedFunctions.contains(f)) {
+                    if (editOverlapsSignature(f, addBegin, addEnd) && appearedAndDisappearedFunctionHandler.isAppearedFunction(f)) {
                         if (logDebug) {
                             LOG.debug("Commit " + commitId + " might add    " + f);
                         }
