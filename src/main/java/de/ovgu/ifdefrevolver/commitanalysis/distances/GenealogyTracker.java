@@ -372,7 +372,7 @@ public class GenealogyTracker {
             final FunctionId oldFunctionId = change.functionId;
             final FunctionId newFunctionId = change.newFunctionId.get();
 
-            final boolean probableConflictResolution = moveIsProbablyConflictResolution(change);
+            final boolean probableConflictResolution = changeIsProbablyRelatedToConflicResolutionAfterMerge(change);
             allMoveConflicts++;
             if (probableConflictResolution) {
                 moveConflictsThatProbablyResolveMergeConflicts++;
@@ -419,7 +419,7 @@ public class GenealogyTracker {
             continueRegularMove(change, oldFunctionId, newFunctionId, existingFunction);
         }
 
-        private boolean moveIsProbablyConflictResolution(FunctionChangeRow change) {
+        private boolean changeIsProbablyRelatedToConflicResolutionAfterMerge(FunctionChangeRow change) {
             return this.branch.isMergeBranch() && (change.commit == this.branch.firstCommit);
         }
 
