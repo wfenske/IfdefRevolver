@@ -47,7 +47,7 @@
     </logger>
 
     <logger name="de.ovgu.ifdefrevolver.bugs.minecommits.main.CommitDistance">
-        <level value="debug"/>
+        <level value="info"/>
     </logger>
 
     <logger name="de.ovgu.ifdefrevolver.bugs.minecommits.CommitsDistanceDb">
@@ -59,7 +59,7 @@
     </logger>
 
     <logger name="de.ovgu.ifdefrevolver.commitanalysis.CommitHunkToFunctionLocationMapper">
-        <level value="debug"/>
+        <level value="info"/>
     </logger>
 
     <logger name="de.ovgu.ifdefrevolver.commitanalysis.AddDelMergingConsumer">
