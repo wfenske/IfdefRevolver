@@ -24,8 +24,13 @@ public class GenealogyTracker {
     private Commit currentCommit;
 
     private static class FunctionInBranch {
-        private Collection<FunctionChangeRow> changes = new ArrayList<>();
+        private final FunctionId firstId;
+        private List<FunctionChangeRow> changes = new ArrayList<>();
         private Set<FunctionInBranch> sameAs = new HashSet<>();
+
+        public FunctionInBranch(FunctionId firstId) {
+            this.firstId = firstId;
+        }
 
         public void addChange(FunctionChangeRow change) {
             changes.add(change);
@@ -46,16 +51,25 @@ public class GenealogyTracker {
         public boolean isSameAs(FunctionInBranch other) {
             return sameAs.contains(other);
         }
+
+        @Override
+        public String toString() {
+            return "FunctionInBranch{" +
+                    "firstId=" + firstId +
+                    '}';
+        }
     }
 
     private static class DeletionRecord {
         public final FunctionInBranch function;
         public final Commit deletingCommit;
+        public final Branch branch;
         private boolean active = true;
 
-        private DeletionRecord(FunctionInBranch function, Commit deletingCommit) {
+        private DeletionRecord(FunctionInBranch function, Commit deletingCommit, Branch branch) {
             this.function = function;
             this.deletingCommit = deletingCommit;
+            this.branch = branch;
         }
 
         public boolean isActive() {
@@ -65,13 +79,23 @@ public class GenealogyTracker {
         public void deactivate() {
             this.active = false;
         }
+
+        @Override
+        public String toString() {
+            return "DeletionRecord{" +
+                    "function=" + function +
+                    ", deletingCommit=" + deletingCommit +
+                    ", active=" + active +
+                    ", branch=" + branch +
+                    '}';
+        }
     }
 
     private static class FunctionsInBranch {
         private final Branch branch;
 
         private Map<FunctionId, FunctionInBranch> functionsById = new HashMap<>();
-        private Map<FunctionId, FunctionInBranch> added = new HashMap<>();
+        //private Map<FunctionId, FunctionInBranch> added = new HashMap<>();
         private GroupingListMap<FunctionId, DeletionRecord> deleted = new GroupingListMap<>();
         private GroupingListMap<FunctionId, FunctionId> moved = new GroupingListMap<>();
         /**
@@ -87,23 +111,28 @@ public class GenealogyTracker {
             final FunctionId functionId = change.functionId;
             LOG.debug("ADD " + functionId + " by " + change.commit.commitHash + " in " + this.branch);
 
-            FunctionInBranch revivedFunction = undeleteFunction(functionId, change.commit);
+            final FunctionInBranch theFunction;
 
             FunctionInBranch oldFunction = functionsById.get(functionId);
             if (oldFunction != null) {
                 LOG.debug("Added function already exists: " + functionId);
-                FunctionInBranch replacedAdd = added.put(functionId, oldFunction);
-                if ((replacedAdd != null) && (replacedAdd != oldFunction)) {
-                    LOG.warn("Overwriting a previous add for ID " + functionId);
-                    overwritten.add(replacedAdd);
-                }
-            } else if (revivedFunction != null) {
-                functionsById.put(functionId, revivedFunction);
-                added.put(functionId, revivedFunction);
+//                FunctionInBranch replacedAdd = added.put(functionId, oldFunction);
+//                if ((replacedAdd != null) && (replacedAdd != oldFunction)) {
+//                    LOG.warn("Overwriting a previous add for ID " + functionId);
+//                    overwritten.add(replacedAdd);
+//                }
+                markNotDeleted(functionId, oldFunction, change.commit);
             } else {
-                FunctionInBranch newFunction = new FunctionInBranch();
-                functionsById.put(functionId, newFunction);
-                added.put(functionId, newFunction);
+                FunctionInBranch revivedFunction = undeleteFunction(functionId, change.commit);
+                if (revivedFunction != null) {
+                    functionsById.put(functionId, revivedFunction);
+                    //added.put(functionId, revivedFunction);
+                } else {
+                    FunctionInBranch newFunction = new FunctionInBranch(functionId);
+                    functionsById.put(functionId, newFunction);
+                    //added.put(functionId, newFunction);
+                    markNotDeleted(functionId, newFunction, change.commit);
+                }
             }
         }
 
@@ -113,16 +142,27 @@ public class GenealogyTracker {
 
             if (!lastRecord.isActive()) {
                 LOG.debug("Function was previously deleted but currently is not: " + functionId);
-            } else if (isRecordInCurrentBranch(lastRecord)) {
-                LOG.debug("Function was deleted in current branch but is resurrected by " + commit.commitHash + " : " + functionId);
-                lastRecord.deactivate();
             } else {
-                LOG.debug("Function was deleted in a previous branch but is resurrected by " + commit.commitHash + " : " + functionId);
+                if (isRecordInCurrentBranch(lastRecord)) {
+                    LOG.debug("Function was deleted in current branch but is resurrected by " + commit.commitHash + " : " + functionId);
+                } else {
+                    LOG.debug("Function was deleted in a previous branch but is resurrected by " + commit.commitHash + " : " + functionId);
+                }
                 DeletionRecord newRecord = deleteFunction(functionId, lastRecord.function, commit);
                 newRecord.deactivate();
             }
 
             return lastRecord.function;
+        }
+
+        private void markNotDeleted(FunctionId functionId, FunctionInBranch function, Commit commit) {
+            DeletionRecord record = getLastDeletionRecord(functionId);
+            if ((record != null) && (record.deletingCommit == commit) && (record.function == function)) {
+                record.deactivate();
+            } else {
+                DeletionRecord newRecord = deleteFunction(functionId, function, commit);
+                newRecord.deactivate();
+            }
         }
 
         private boolean isFunctionDeleted(FunctionId functionId) {
@@ -132,9 +172,14 @@ public class GenealogyTracker {
         }
 
         private boolean isFunctionDeletedInThisBranch(FunctionId functionId) {
+            DeletionRecord lastRecord = getLastActiveDeletionRecordInThisBranch(functionId);
+            return (lastRecord != null);
+        }
+
+        private DeletionRecord getLastActiveDeletionRecordInThisBranch(FunctionId functionId) {
             DeletionRecord lastRecord = getLastDeletionRecordInThisBranch(functionId);
-            if (lastRecord == null) return false;
-            return lastRecord.isActive();
+            if ((lastRecord != null) && lastRecord.isActive()) return lastRecord;
+            else return null;
         }
 
         private DeletionRecord getLastDeletionRecordInThisBranch(FunctionId functionId) {
@@ -156,6 +201,8 @@ public class GenealogyTracker {
         public void putMod(FunctionChangeRow change) {
             final FunctionId id = change.functionId;
 
+            LOG.debug("MOD " + id + " by " + change.commit.commitHash + " in " + this.branch);
+
             FunctionInBranch function = functionsById.get(id);
             if (function == null) {
                 if (isFunctionDeletedInThisBranch(id)) {
@@ -165,26 +212,29 @@ public class GenealogyTracker {
                 function = findRenamedFunction(id);
             }
 
+            if (isFunctionDeleted(id)) {
+                LOG.warn("MOD to deleted function " + id + " by " + change.commit.commitHash + " in " + this.branch);
+            }
+
             if (function == null) {
-                function = findFunctionInParentBranches(id);
+                function = undeleteFunction(id, change.commit);
+                if (function == null) {
+                    function = findFunctionInParentBranches(id);
+                }
                 if (function != null) {
                     functionsById.put(id, function);
-                    undeleteFunction(id, change.commit);
                 }
             }
 
             if (function == null) {
-                // Apparently, the function is not deleted after all.
-                function = undeleteFunction(id, change.commit);
-            }
-
-            if (function == null) {
                 LOG.info("Modified function does not exist: " + id);
-                function = new FunctionInBranch();
+                function = new FunctionInBranch(id);
                 functionsById.put(id, function);
-                added.put(id, function);
+                //added.put(id, function);
             }
             function.addChange(change);
+
+            markNotDeleted(id, function, change.commit);
         }
 
         private FunctionInBranch findFunctionInParentBranches(FunctionId id) {
@@ -237,66 +287,79 @@ public class GenealogyTracker {
                 return;
             }
 
-            FunctionInBranch oldFunction = functionsById.remove(oldFunctionId);
-            FunctionInBranch newFunction = functionsById.get(newFunctionId);
+            LOG.debug("MOVE " + oldFunctionId + " -> " + newFunctionId + " by " + change.commit.commitHash + " in " + this.branch);
 
-            if ((oldFunction != null) && (newFunction == null)) { // normal case
-                continueRegularMove(change, oldFunctionId, newFunctionId, oldFunction);
+            FunctionInBranch existingFunction = functionsById.remove(oldFunctionId);
+            FunctionInBranch conflictingFunction = functionsById.get(newFunctionId);
+
+            if ((existingFunction != null) && (conflictingFunction == null)) { // normal case
+                continueRegularMove(change, oldFunctionId, newFunctionId, existingFunction);
             } else {
-                continueBrokenMove(change, oldFunction, newFunction);
+                continueBrokenMove(change, existingFunction, conflictingFunction);
             }
             moved.put(oldFunctionId, newFunctionId);
         }
 
-        private void continueRegularMove(FunctionChangeRow change, FunctionId oldFunctionId, FunctionId newFunctionId, FunctionInBranch oldFunction) {
-            oldFunction.addChange(change);
-            functionsById.put(newFunctionId, oldFunction);
+        private void continueRegularMove(FunctionChangeRow change, FunctionId oldFunctionId, FunctionId newFunctionId, FunctionInBranch existingFunction) {
+            existingFunction.addChange(change);
+            functionsById.put(newFunctionId, existingFunction);
             updateAddedAfterMove(oldFunctionId, newFunctionId);
-            updateDeletedAfterMove(change, oldFunctionId, newFunctionId, oldFunction);
+            updateDeletedAfterMove(change, oldFunctionId, newFunctionId, existingFunction);
         }
 
-        private void continueBrokenMove(FunctionChangeRow change, FunctionInBranch oldFunction, FunctionInBranch newFunction) {
+        private void continueBrokenMove(FunctionChangeRow change, FunctionInBranch existingFunction, FunctionInBranch conflictingFunction) {
             final FunctionId oldFunctionId = change.functionId;
             final FunctionId newFunctionId = change.newFunctionId.get();
 
-            if (oldFunction == null) {
-                oldFunction = functionsById.get(newFunctionId);
-                if (oldFunction != null) {
+            if (existingFunction == null) {
+                existingFunction = conflictingFunction;
+                if (existingFunction != null) {
                     LOG.info("Moved function already exists under new ID " + newFunctionId);
                 } else {
-                    oldFunction = new FunctionInBranch();
                     LOG.info("Moved function did not exist under old or new ID " + oldFunctionId + " or " + newFunctionId);
+                    existingFunction = undeleteFunction(oldFunctionId, change.commit);
+                    if (existingFunction != null) {
+                        LOG.info("Moved function has been resurrected under old id: " + oldFunctionId);
+                    } else {
+                        existingFunction = undeleteFunction(newFunctionId, change.commit);
+                        if (existingFunction != null) {
+                            LOG.info("Moved function has been resurrected under new id: " + newFunctionId);
+                        } else {
+                            LOG.info("Moved function has been created fresh");
+                            existingFunction = new FunctionInBranch(newFunctionId);
+                        }
+                    }
                 }
             }
 
-            if ((newFunction != null) && (newFunction != oldFunction)) {
+            if ((conflictingFunction != null) && (conflictingFunction != existingFunction)) {
                 LOG.info("Move conflicts with existing function for new ID " + newFunctionId);
-                overwritten.add(newFunction);
+                overwritten.add(conflictingFunction);
             }
 
-            continueRegularMove(change, oldFunctionId, newFunctionId, oldFunction);
+            continueRegularMove(change, oldFunctionId, newFunctionId, existingFunction);
         }
 
         private void updateAddedAfterMove(FunctionId oldFunctionId, FunctionId newFunctionId) {
-            FunctionInBranch oldAdd = added.remove(oldFunctionId);
-            FunctionInBranch replacedAdd = null;
-            if (oldAdd != null) {
-                replacedAdd = added.put(newFunctionId, oldAdd);
-            }
-
-            if ((replacedAdd != null) && (replacedAdd != oldAdd)) {
-                LOG.info("Move conflicts with add for change " + oldFunctionId + " -> " + newFunctionId);
-                overwritten.add(replacedAdd);
-            }
+//            FunctionInBranch oldAdd = added.remove(oldFunctionId);
+//            FunctionInBranch replacedAdd = null;
+//            if (oldAdd != null) {
+//                replacedAdd = added.put(newFunctionId, oldAdd);
+//            }
+//
+//            if ((replacedAdd != null) && (replacedAdd != oldAdd)) {
+//                LOG.info("Move conflicts with add for change " + oldFunctionId + " -> " + newFunctionId);
+//                overwritten.add(replacedAdd);
+//            }
         }
 
-        private void updateDeletedAfterMove(FunctionChangeRow change, FunctionId oldFunctionId, FunctionId newFunctionId, FunctionInBranch oldFunction) {
-            undeleteFunction(newFunctionId, change.commit);
-            deleteFunction(oldFunctionId, oldFunction, change.commit);
+        private void updateDeletedAfterMove(FunctionChangeRow change, FunctionId oldFunctionId, FunctionId newFunctionId, FunctionInBranch existingFunction) {
+            deleteFunction(oldFunctionId, existingFunction, change.commit);
+            markNotDeleted(newFunctionId, existingFunction, change.commit);
         }
 
         private DeletionRecord deleteFunction(FunctionId id, FunctionInBranch function, Commit commit) {
-            DeletionRecord record = new DeletionRecord(function, commit);
+            DeletionRecord record = new DeletionRecord(function, commit, branch);
             this.deleted.put(id, record);
             return record;
         }
@@ -305,10 +368,10 @@ public class GenealogyTracker {
             final FunctionId functionId = change.functionId;
             LOG.debug("DEL " + functionId + " by " + change.commit.commitHash + " in " + this.branch);
 
-            FunctionInBranch overwrittenAdd = added.remove(functionId);
-            if (overwrittenAdd != null) {
-                overwritten.add(overwrittenAdd);
-            }
+//            FunctionInBranch overwrittenAdd = added.remove(functionId);
+//            if (overwrittenAdd != null) {
+//                overwritten.add(overwrittenAdd);
+//            }
 
             FunctionInBranch oldFunction = functionsById.remove(functionId);
             if ((oldFunction == null) && isFunctionDeleted(functionId)) {
@@ -323,7 +386,7 @@ public class GenealogyTracker {
             }
 
             if (oldFunction == null) {
-                oldFunction = new FunctionInBranch();
+                oldFunction = new FunctionInBranch(functionId);
                 LOG.info("Deleted function did not exist.  Created new dummy function. change=" + change);
             }
 
@@ -335,10 +398,10 @@ public class GenealogyTracker {
 
             inheritFunctionsByIdAndAdded(parentFunctions[0]);
 
-            for (int i = 1; i < parentFunctions.length; i++) {
-                FunctionsInBranch otherParent = parentFunctions[i];
-                mergeFirstMapIntoSecond(otherParent.added, this.added, true);
-            }
+//            for (int i = 1; i < parentFunctions.length; i++) {
+//                FunctionsInBranch otherParent = parentFunctions[i];
+//                mergeFirstMapIntoSecond(otherParent.added, this.added, true);
+//            }
 
             mergeDeleted(parentFunctions);
 
@@ -348,7 +411,7 @@ public class GenealogyTracker {
                 final DeletionRecord lastRecord = records.get(records.size() - 1);
                 if (lastRecord.isActive()) {
                     this.functionsById.remove(deletedId);
-                    this.added.remove(deletedId);
+                    //this.added.remove(deletedId);
                 }
             }
         }
@@ -374,14 +437,19 @@ public class GenealogyTracker {
                 }
 
                 if (numActive == 0) {
-                    LOG.debug("Function is not deleted in any parent branch: " + id);
+                    LOG.debug("Function is not deleted in any parent branch: " + id + " branch=" + this.branch);
+                    for (DeletionRecord r : records) {
+                        this.deleted.put(id, r);
+                    }
                 } else if (numActive == numAllRecords) {
                     LOG.info("Function is deleted in all parent branches: " + id + " branch=" + this.branch);
-                    this.deleted.put(id, records.get(0));
+                    for (DeletionRecord r : records) {
+                        this.deleted.put(id, r);
+                    }
                 } else {
                     final int numInactive = numAllRecords - numActive;
                     LOG.warn("Function is deleted in " + numActive + " parent branch(es) but not in " +
-                            numInactive + " branch(es): " + id + " branch=" + this.branch);
+                            numInactive + " other(s): " + id + " branch=" + this.branch + " deletions=" + records);
                 }
             }
         }
@@ -423,26 +491,37 @@ public class GenealogyTracker {
 
         public void inherit(FunctionsInBranch parentFunctions) {
             inheritFunctionsByIdAndAdded(parentFunctions);
-            this.deleted.getMap().putAll(parentFunctions.deleted.getMap());
+            inheritDeletedRecords(parentFunctions);
+        }
+
+        private void inheritDeletedRecords(FunctionsInBranch parentFunctions) {
+            for (Map.Entry<FunctionId, List<DeletionRecord>> e : parentFunctions.deleted.getMap().entrySet()) {
+                List<DeletionRecord> values = e.getValue();
+                DeletionRecord lastRecord = values.get(values.size() - 1);
+                deleted.put(e.getKey(), lastRecord);
+            }
         }
 
         private void inheritFunctionsByIdAndAdded(FunctionsInBranch parentFunctions) {
             this.functionsById.putAll(parentFunctions.functionsById);
-            this.added.putAll(parentFunctions.added);
+            //this.added.putAll(parentFunctions.added);
         }
 
         public void logOccurrenceOfFunction(FunctionId id) {
             if (functionsById.containsKey(id)) {
                 LOG.warn(id + " is in functionsById in " + this.branch);
             }
-            if (added.containsKey(id)) {
-                LOG.warn(id + " was added in " + this.branch);
-            }
-            if (deleted.containsKey(id)) {
-                if (isFunctionDeletedInThisBranch(id)) {
-                    LOG.warn(id + " was deletedInThisBranch in " + this.branch);
+//            if (added.containsKey(id)) {
+//                LOG.warn(id + " was added in " + this.branch);
+//            }
+            DeletionRecord lastDeletionRecord = getLastDeletionRecord(id);
+            if ((lastDeletionRecord != null) && lastDeletionRecord.isActive()) {
+                if (isRecordInCurrentBranch(lastDeletionRecord)) {
+                    LOG.warn(id + " was deletedInThisBranch by " +
+                            lastDeletionRecord.deletingCommit.commitHash +
+                            " in " + this.branch);
                 } else {
-                    LOG.warn(id + " was deleted in " + this.branch);
+                    LOG.warn(id + " was deleted in a parent branch of " + this.branch);
                 }
             }
             if (overwritten.contains(id)) {
@@ -464,7 +543,7 @@ public class GenealogyTracker {
         }
 
         public List<Branch> parentsInLevelOrder() {
-            List<Branch> seen = new ArrayList<>();
+            Set<Branch> seen = new LinkedHashSet<>();
             Queue<Branch> parentBranches = new LinkedList<>();
             for (Branch parent : this.parentBranches) {
                 parentBranches.offer(parent);
@@ -472,15 +551,15 @@ public class GenealogyTracker {
 
             Branch b;
             while ((b = parentBranches.poll()) != null) {
+                seen.add(b);
                 for (Branch parent : b.parentBranches) {
                     if (!seen.contains(parent)) {
                         parentBranches.offer(parent);
                     }
                 }
-                seen.add(b);
             }
 
-            return seen;
+            return new ArrayList<>(seen);
         }
 
         @Override
@@ -671,15 +750,18 @@ public class GenealogyTracker {
         final Set<FunctionId> functionsThatAreMissing = new HashSet<>(actualIds);
         functionsThatAreMissing.removeAll(computedIds);
 
+        final int numActualIds = actualIds.size();
+        LOG.info("After merge: # actual function ids: " + numActualIds + " " + this.currentBranch);
+        LOG.info("After merge: # identical function ids: " + identicalFunctions.size() + "/" + numActualIds + " " + this.currentBranch);
+
+
         if (functionsThatAreMissing.isEmpty() && functionsThatShouldNotExist.isEmpty()) {
             LOG.info("After merge: Computed and actual function ids match exactly. " + this.currentBranch);
             return;
         }
 
-        LOG.warn("After merge: # actual function ids: " + actualIds.size() + " " + this.currentBranch);
         LOG.warn("After merge: # computed function ids: " + computedIds.size() + " " + this.currentBranch);
-        LOG.warn("After merge: # identical function ids: " + identicalFunctions.size() + " " + this.currentBranch);
-        LOG.warn("After merge: # missing function ids: " + functionsThatAreMissing.size() + " " + this.currentBranch);
+        LOG.warn("After merge: # missing function ids: " + functionsThatAreMissing.size() + "/" + numActualIds + " " + this.currentBranch);
         LOG.warn("After merge: # superfluous function ids: " + functionsThatShouldNotExist.size() + " " + this.currentBranch);
 
         if (!functionsThatAreMissing.isEmpty()) {
