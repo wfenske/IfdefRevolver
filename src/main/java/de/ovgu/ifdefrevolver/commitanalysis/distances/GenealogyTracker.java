@@ -493,8 +493,10 @@ public class GenealogyTracker {
             deleteFunction(functionId, oldFunction, change.commit);
         }
 
-        public void merge(FunctionsInBranch[] parentFunctionsList) {
+        public void merge(FunctionsInBranch[] parentFunctionsList, List<FunctionChangeRow> changesOfMergeCommit) {
             if (parentFunctionsList.length == 0) return;
+
+            mergeChangesOfMergeCommits(parentFunctionsList, changesOfMergeCommit);
 
             final Set<FunctionId> activeDeletes = mergeDeleted(parentFunctionsList);
 
@@ -573,6 +575,45 @@ public class GenealogyTracker {
             return allActiveDeletes;
         }
 
+        private void mergeChangesOfMergeCommits(FunctionsInBranch[] parentFunctions, List<FunctionChangeRow> changesOfMergeCommit) {
+            for (Iterator<FunctionChangeRow> changeIt = changesOfMergeCommit.iterator(); changeIt.hasNext(); ) {
+                final FunctionChangeRow change = changeIt.next();
+                final FunctionId functionId = change.functionId;
+                boolean merged = false;
+                for (FunctionsInBranch branch : parentFunctions) {
+                    switch (change.modType) {
+                        case ADD:
+                            if (!branch.functionsById.containsKey(functionId)) {
+                                branch.assignChange(change);
+                                merged = true;
+                            }
+                            break;
+                        case DEL:
+                        case MOD:
+                            if (branch.functionsById.containsKey(functionId)) {
+                                branch.assignChange(change);
+                                merged = true;
+                            }
+                            break;
+                        case MOVE: {
+                            FunctionId newId = change.newFunctionId.get();
+                            if (branch.functionsById.containsKey(functionId)) {
+                                if (newId.equals(functionId) || !branch.functionsById.containsKey(newId)) {
+                                    branch.assignChange(change);
+                                    merged = true;
+                                }
+                            }
+                        }
+                        break;
+                    }
+                    if (merged) {
+                        changeIt.remove();
+                        break;
+                    }
+                }
+            }
+        }
+
         private void handleDisplacedFunctionDuringBranchMerge(FunctionId id, FunctionInBranch function, FunctionInBranch displaced) {
             boolean isSameAlready = function.isSameAs(displaced);
             if (!isSameAlready) {
@@ -618,6 +659,23 @@ public class GenealogyTracker {
             }
             if (overwritten.contains(id)) {
                 LOG.warn(id + " was overwritten in " + this.branch);
+            }
+        }
+
+        public void assignChange(FunctionChangeRow change) {
+            switch (change.modType) {
+                case ADD:
+                    putAdd(change);
+                    break;
+                case MOD:
+                    putMod(change);
+                    break;
+                case MOVE:
+                    putMove(change);
+                    break;
+                case DEL:
+                    putDel(change);
+                    break;
             }
         }
     }
@@ -683,12 +741,12 @@ public class GenealogyTracker {
             return parentBranches;
         }
 
-        public void merge(Branch[] parentBranches) {
+        public void merge(Branch[] parentBranches, List<FunctionChangeRow> mergeChanges) {
             FunctionsInBranch[] parentFunctions = new FunctionsInBranch[parentBranches.length];
             for (int i = 0; i < parentBranches.length; i++) {
                 parentFunctions[i] = parentBranches[i].functions;
             }
-            this.functions.merge(parentFunctions);
+            this.functions.merge(parentFunctions, mergeChanges);
         }
 
         public void split(Branch parentBranch) {
@@ -833,7 +891,7 @@ public class GenealogyTracker {
         processChangesOfCurrentCommit();
 
         if ((currentBranch.getFirstCommit() == currentCommit) && (currentBranch.parentBranches.length > 1)) {
-            validateComputedFunctionsAfterMerge();
+            //validateComputedFunctionsAfterMerge();
         }
 
         Commit[] children = currentCommit.children();
@@ -970,7 +1028,17 @@ public class GenealogyTracker {
     }
 
     private void createNewBranchFromMerge(Branch branch, Branch[] parentBranches) {
-        branch.merge(parentBranches);
+        int numParents = parentBranches.length;
+        Branch[] mergeBranches = new Branch[numParents];
+        for (int i = 0; i < numParents; i++) {
+            Branch[] parents = new Branch[1];
+            Branch parentParent = parentBranches[i];
+            parents[0] = parentParent;
+            Branch mergeBranch = new Branch(parents, this.currentCommit);
+            mergeBranch.split(parentParent);
+            mergeBranches[i] = mergeBranch;
+        }
+        branch.merge(mergeBranches, getChangesOfCurrentCommit());
     }
 
     private void createNewBranchForBranchSplit(Branch branch, Branch parentBranch) {
@@ -978,15 +1046,13 @@ public class GenealogyTracker {
     }
 
     private void processChangesOfCurrentCommit() {
-        Collection<FunctionChangeRow> changes = getChangesOfCurrentCommit();
+        List<FunctionChangeRow> changes = getChangesOfCurrentCommit();
         assignChangesToFunctions(changes);
     }
 
-    private Collection<FunctionChangeRow> getChangesOfCurrentCommit() {
+    private List<FunctionChangeRow> getChangesOfCurrentCommit() {
         return changesByCommitKey[currentCommit.key];
     }
-
-    private int numSkippedModsOfDeletedFunctions = 0;
 
     private void assignChangesToFunctions(Collection<FunctionChangeRow> changes) {
         GroupingListMap<FunctionId, FunctionChangeRow> deletions = new GroupingListMap<>();
@@ -1002,8 +1068,7 @@ public class GenealogyTracker {
             boolean isModOfDeletedFunction = isModOfDeletedFunction(deletions, r);
 
             if (isModOfDeletedFunction) {
-                numSkippedModsOfDeletedFunctions++;
-                LOG.debug("Skipping mod/move of deleted function: " + r);
+                LOG.debug("Skipping MOD/MOVE of deleted function: " + r);
             } else {
                 assignChangeToFunction(r);
             }
@@ -1035,20 +1100,7 @@ public class GenealogyTracker {
 
     private void assignChangeToFunction(FunctionChangeRow change) {
         FunctionsInBranch functions = this.currentBranch.functions;
-        switch (change.modType) {
-            case ADD:
-                functions.putAdd(change);
-                break;
-            case MOD:
-                functions.putMod(change);
-                break;
-            case MOVE:
-                functions.putMove(change);
-                break;
-            case DEL:
-                functions.putDel(change);
-                break;
-        }
+        functions.assignChange(change);
         changesProcessed++;
     }
 }
