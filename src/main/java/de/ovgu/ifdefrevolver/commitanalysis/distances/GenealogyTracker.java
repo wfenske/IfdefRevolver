@@ -43,14 +43,8 @@ public class GenealogyTracker {
 
         public void markSameAs(FunctionInBranch function) {
             LOG.debug("Marking as the same function: " + function + " and " + this);
-            Set<FunctionInBranch> allSameFunctions = new HashSet<>();
-            allSameFunctions.addAll(this.sameAs);
-            allSameFunctions.addAll(function.sameAs);
-            allSameFunctions.add(this);
-            allSameFunctions.add(function);
-            for (FunctionInBranch f : allSameFunctions) {
-                f.sameAs.addAll(allSameFunctions);
-            }
+            this.sameAs.add(function);
+            function.sameAs.add(this);
         }
 
         public boolean isSameAs(FunctionInBranch other) {
