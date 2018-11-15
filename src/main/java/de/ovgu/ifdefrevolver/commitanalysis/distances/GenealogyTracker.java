@@ -151,7 +151,7 @@ public class GenealogyTracker {
 
         private Map<FunctionId, FunctionInBranch> functionsById = new HashMap<>();
         //private Map<FunctionId, FunctionInBranch> added = new HashMap<>();
-        private GroupingListMap<FunctionId, DeletionRecord> deleted = new GroupingListMap<>();
+        private Map<FunctionId, DeletionRecord> deleted = new HashMap<>();
         private GroupingListMap<FunctionId, FunctionId> movedInCurrentBranch = new GroupingListMap<>();
         /**
          * Where we save functions that have somehow been replaced because we parsed the changes wrong.
@@ -248,9 +248,9 @@ public class GenealogyTracker {
         }
 
         private DeletionRecord getLastDeletionRecord(FunctionId functionId) {
-            List<DeletionRecord> deletionRecords = this.deleted.get(functionId);
-            if (deletionRecords == null) return null;
-            return deletionRecords.get(deletionRecords.size() - 1);
+            DeletionRecord deletionRecord = this.deleted.get(functionId);
+            if (deletionRecord == null) return null;
+            return deletionRecord;
         }
 
         public void putMod(FunctionChangeRow change) {
@@ -519,10 +519,9 @@ public class GenealogyTracker {
         private Set<FunctionId> mergeDeleted(FunctionsInBranch[] parentFunctions) {
             GroupingListMap<FunctionId, DeletionRecord> lastDeletionRecordsById = new GroupingListMap<>();
             for (FunctionsInBranch parent : parentFunctions) {
-                for (Map.Entry<FunctionId, List<DeletionRecord>> e : parent.deleted.getMap().entrySet()) {
+                for (Map.Entry<FunctionId, DeletionRecord> e : parent.deleted.entrySet()) {
                     final FunctionId id = e.getKey();
-                    List<DeletionRecord> values = e.getValue();
-                    final DeletionRecord lastRecord = values.get(values.size() - 1);
+                    final DeletionRecord lastRecord = e.getValue();
                     lastDeletionRecordsById.put(id, lastRecord);
                 }
             }
@@ -548,16 +547,22 @@ public class GenealogyTracker {
                     }
                 }
 
+                final DeletionRecord winningDeletionRecord = withoutSupersededRecords.get(withoutSupersededRecords.size() - 1);
+//                final FunctionInBranch function = winningDeletionRecord.function;
                 if (summary.isNeverDeleted()) {
                     LOG.debug("Function is not deleted in any parent branch: " + id + " branch=" + this.branch);
-                    for (DeletionRecord r : withoutSupersededRecords) {
-                        this.deleted.put(id, r);
-                    }
+//                    for (DeletionRecord r : withoutSupersededRecords) {
+//                        this.deleted.put(id, r);
+//                    }
+                    //this.markNotDeleted(id, function, this.branch.firstCommit);
+                    this.deleted.put(id, winningDeletionRecord);
                 } else if (summary.isAlwaysDeleted()) {
                     LOG.info("Function is deleted in all parent branches: " + id + " branch=" + this.branch);
-                    for (DeletionRecord r : withoutSupersededRecords) {
-                        this.deleted.put(id, r);
-                    }
+//                    for (DeletionRecord r : withoutSupersededRecords) {
+//                        this.deleted.put(id, r);
+//                    }
+                    //this.deleteFunction(id, function, this.branch.firstCommit);
+                    this.deleted.put(id, winningDeletionRecord);
                     allActiveDeletes.add(id);
                 } else {
                     LOG.warn("Function is deleted in " + summary.numActiveDeletes + " parent branch(es) but not in " +
@@ -627,11 +632,7 @@ public class GenealogyTracker {
         }
 
         private void inheritDeletedRecords(FunctionsInBranch parentFunctions) {
-            for (Map.Entry<FunctionId, List<DeletionRecord>> e : parentFunctions.deleted.getMap().entrySet()) {
-                List<DeletionRecord> values = e.getValue();
-                DeletionRecord lastRecord = values.get(values.size() - 1);
-                deleted.put(e.getKey(), lastRecord);
-            }
+            deleted.putAll(parentFunctions.deleted);
         }
 
         public void logOccurrenceOfFunction(FunctionId id) {
