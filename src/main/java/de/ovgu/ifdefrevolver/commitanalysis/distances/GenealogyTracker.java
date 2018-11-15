@@ -798,7 +798,7 @@ public class GenealogyTracker {
             throw new RuntimeException("Some unprocessed commits remain");
         }
 
-        LOG.info("Successfully processed all " + changesProcessed + "commits.");
+        LOG.info("Successfully processed all " + changesProcessed + " commits.");
         maybeReportBranchStats();
         LOG.debug("Processed " + changesProcessed + " changes.");
 
