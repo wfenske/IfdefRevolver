@@ -35,6 +35,7 @@ public class CommitChangedFunctionLister {
     private Map<String, List<Method>> allBSideFunctions;
 
     private IFunctionLocationProvider functionLocationProvider;
+    private ChangeId currentChangeId;
 
     public CommitChangedFunctionLister(Repository repo, String commitId,
                                        IFunctionLocationProvider functionLocationProvider,
@@ -61,6 +62,7 @@ public class CommitChangedFunctionLister {
 
                 if (parentCount == 0) {
                     LOG.warn("Encountered parent-less commit: " + commitId);
+                    this.currentChangeId = new ChangeId("", commitId);
                     addFunctionsOfParentLessCommit(commit);
                     return;
                 }
@@ -73,6 +75,7 @@ public class CommitChangedFunctionLister {
                     try {
                         ObjectId parentCommitId = commit.getParent(iParent).getId();
                         RevCommit parent = rw.parseCommit(parentCommitId);
+                        currentChangeId = new ChangeId(parentCommitId.getName(), commitId);
                         formatter = getDiffFormatterInstance();
                         diffs = formatter.scan(parent.getTree(), commit.getTree());
                         LOG.debug(parentCommitId.name() + " ... " + commitId);
@@ -115,7 +118,7 @@ public class CommitChangedFunctionLister {
             LOG.debug("File changed by parent-less commit: " + newPath);
 
             for (Method m : e.getValue()) {
-                ChangeHunk ch = new ChangeHunk(commitId, "/dev/null", newPath, 0, 0, m.getGrossLoc());
+                ChangeHunk ch = new ChangeHunk(currentChangeId, "/dev/null", newPath, 0, 0, m.getGrossLoc());
                 FunctionChangeHunk fch = new FunctionChangeHunk(m, ch, FunctionChangeHunk.ModificationType.ADD);
                 if (logDebug) {
                     LOG.debug("ADD for parent-less commit: " + fch);
@@ -236,7 +239,7 @@ public class CommitChangedFunctionLister {
                 throw new RuntimeException("Expected the same functions in the same order during file rename, but signatures don't match. Commit: " + commitId +
                         " old function: " + oldFunc + " new function: " + newFunc);
             }
-            ChangeHunk ch = new ChangeHunk(commitId, oldPath, newPath, hunkNo, 0, 0);
+            ChangeHunk ch = new ChangeHunk(currentChangeId, oldPath, newPath, hunkNo, 0, 0);
             FunctionChangeHunk fh = new FunctionChangeHunk(oldFunc, ch, FunctionChangeHunk.ModificationType.MOVE, newFunc);
             changedFunctionConsumer.accept(fh);
             hunkNo++;
@@ -305,7 +308,7 @@ public class CommitChangedFunctionLister {
                 publishMoveEvents(oldPath, newPath, oldFunctions, newFunctions, movedMethods);
             }
 
-            CommitHunkToFunctionLocationMapper editLocMapper = new CommitHunkToFunctionLocationMapper(commitId,
+            CommitHunkToFunctionLocationMapper editLocMapper = new CommitHunkToFunctionLocationMapper(currentChangeId,
                     aSideFunctionList,
                     bSideFunctionList,
                     movedMethods,
@@ -342,7 +345,7 @@ public class CommitChangedFunctionLister {
         createdSignatures.removeAll(movedSignatures);
 
         for (String movedSignature : movedSignatures) {
-            ChangeHunk ch = new ChangeHunk(commitId, oldPath, newPath, 0, 0, 0);
+            ChangeHunk ch = new ChangeHunk(currentChangeId, oldPath, newPath, 0, 0, 0);
             Method oldFunc = oldFunctionsBySignature.get(movedSignature);
             Method newFunc = newFunctionsBySignature.get(movedSignature);
             FunctionChangeHunk fh = new FunctionChangeHunk(oldFunc, ch, FunctionChangeHunk.ModificationType.MOVE, newFunc);
@@ -355,13 +358,13 @@ public class CommitChangedFunctionLister {
 
         for (String signature : deletedSignatures) {
             Method func = oldFunctionsBySignature.get(signature);
-            FunctionChangeHunk fh = FunctionChangeHunk.makePseudoDel(commitId, oldPath, newPath, func);
+            FunctionChangeHunk fh = FunctionChangeHunk.makePseudoDel(currentChangeId, oldPath, newPath, func);
             changedFunctionConsumer.accept(fh);
         }
 
         for (String signature : createdSignatures) {
             Method func = newFunctionsBySignature.get(signature);
-            FunctionChangeHunk fh = FunctionChangeHunk.makePseudoAdd(commitId, oldPath, newPath, func, Optional.empty());
+            FunctionChangeHunk fh = FunctionChangeHunk.makePseudoAdd(currentChangeId, oldPath, newPath, func, Optional.empty());
             changedFunctionConsumer.accept(fh);
         }
     }

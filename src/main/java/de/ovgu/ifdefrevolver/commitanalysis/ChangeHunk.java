@@ -7,9 +7,10 @@ package de.ovgu.ifdefrevolver.commitanalysis;
  */
 public class ChangeHunk {
     /**
-     * ID of the commit to which this hunk belongs
+     * IDs of the commits to which this hunk belongs
      */
-    private String commitId;
+    private ChangeId changeId;
+
     /**
      * File being changed (old file name, in contrast to the new file name in cases where a file is renamed or newly
      * created)
@@ -32,8 +33,8 @@ public class ChangeHunk {
      */
     private int linesAdded;
 
-    public ChangeHunk(String commitId, String oldPath, String newPath, int hunkNo, int linesDeleted, int linesAdded) {
-        this.commitId = commitId;
+    public ChangeHunk(ChangeId commitId, String oldPath, String newPath, int hunkNo, int linesDeleted, int linesAdded) {
+        this.changeId = commitId;
         this.oldPath = oldPath;
         this.newPath = newPath;
         this.hunkNo = hunkNo;
@@ -42,7 +43,7 @@ public class ChangeHunk {
     }
 
     private ChangeHunk(ChangeHunk template) {
-        this.commitId = template.commitId;
+        this.changeId = template.changeId;
         this.oldPath = template.oldPath;
         this.newPath = template.newPath;
         this.hunkNo = template.hunkNo;
@@ -54,8 +55,8 @@ public class ChangeHunk {
         this.linesAdded = linesAdded;
     }
 
-    public String getCommitId() {
-        return commitId;
+    public ChangeId getChangeId() {
+        return changeId;
     }
 
     public String getOldPath() {
@@ -94,7 +95,8 @@ public class ChangeHunk {
             path = oldPath + " -> " + newPath;
         }
         return this.getClass().getSimpleName() + '{' +
-                "" + commitId +
+                "" + changeId.previousRevisionId +
+                ".." + changeId.commitId +
                 ", " + path +
                 ", hunkNo=" + hunkNo +
                 ", -" + linesDeleted +

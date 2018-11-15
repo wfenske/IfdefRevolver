@@ -71,13 +71,13 @@ public class FunctionChangeHunk {
         }
     }
 
-    public static FunctionChangeHunk makePseudoAdd(String commitId, String oldPath, String newPath, Method func, Optional<Integer> aSideStartLocation) {
+    public static FunctionChangeHunk makePseudoAdd(ChangeId commitId, String oldPath, String newPath, Method func, Optional<Integer> aSideStartLocation) {
         ChangeHunk ch = new ChangeHunk(commitId, oldPath, newPath, -1, 0, func.getSignatureGrossLinesOfCode());
         FunctionChangeHunk fh = new FunctionChangeHunk(func, ch, FunctionChangeHunk.ModificationType.ADD, aSideStartLocation);
         return fh;
     }
 
-    public static FunctionChangeHunk makePseudoDel(String commitId, String oldPath, String newPath, Method func) {
+    public static FunctionChangeHunk makePseudoDel(ChangeId commitId, String oldPath, String newPath, Method func) {
         ChangeHunk ch = new ChangeHunk(commitId, oldPath, newPath, -1, func.getSignatureGrossLinesOfCode(), 0);
         FunctionChangeHunk fh = new FunctionChangeHunk(func, ch, FunctionChangeHunk.ModificationType.DEL);
         return fh;

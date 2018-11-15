@@ -45,7 +45,7 @@ public enum FunctionChangeHunksColumns implements CsvColumnValueProvider<Functio
     COMMIT_ID {
         @Override
         public String csvColumnValue(FunctionChangeHunk changedFunc, IMinimalSnapshot snapshot) {
-            return changedFunc.getHunk().getCommitId();
+            return changedFunc.getHunk().getChangeId().commitId;
         }
     },
     /**
@@ -63,7 +63,7 @@ public enum FunctionChangeHunksColumns implements CsvColumnValueProvider<Functio
     BUGFIX {
         @Override
         public Integer csvColumnValue(FunctionChangeHunk changedFunc, IMinimalSnapshot snapshot) {
-            String commitId = changedFunc.getHunk().getCommitId();
+            String commitId = changedFunc.getHunk().getChangeId().commitId;
             if (snapshot.isBugfixCommit(commitId)) {
                 return 1;
             } else {
@@ -130,6 +130,16 @@ public enum FunctionChangeHunksColumns implements CsvColumnValueProvider<Functio
             if (newFunction.isPresent()) {
                 return newFunction.get().FilePathForDisplay();
             } else return "";
+        }
+    },
+    /**
+     * Revision before this commit came. Usually, this is unambiguous, but for merge commits, there can be multiple
+     * previous revisions.
+     */
+    PREVIOUS_REVISION_ID {
+        @Override
+        public String csvColumnValue(FunctionChangeHunk changedFunc, IMinimalSnapshot snapshot) {
+            return changedFunc.getHunk().getChangeId().previousRevisionId;
         }
     };
 

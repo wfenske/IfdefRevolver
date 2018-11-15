@@ -23,6 +23,7 @@ public class FunctionChangeRow {
     };
 
     public FunctionId functionId;
+    public Optional<Commit> previousRevision;
     public Commit commit;
     public int hunk;
     public int linesAdded;
@@ -34,9 +35,17 @@ public class FunctionChangeRow {
     public String toString() {
         return "FunctionChangeRow{" +
                 "modType=" + modType +
-                ", commit='" + commit + '\'' +
+                ", " + previousRevisionToString() + commit.commitHash +
                 ", functionId=" + functionId +
                 ", newFunctionId=" + (newFunctionId.isPresent() ? newFunctionId : "") +
                 '}';
+    }
+
+    private String previousRevisionToString() {
+        if (previousRevision.isPresent()) {
+            return previousRevision.get().commitHash + "..";
+        } else {
+            return "";
+        }
     }
 }

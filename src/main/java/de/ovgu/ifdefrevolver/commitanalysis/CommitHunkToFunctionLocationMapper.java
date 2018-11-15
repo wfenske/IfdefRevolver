@@ -25,12 +25,12 @@ class CommitHunkToFunctionLocationMapper implements Consumer<Edit> {
     final List<Method> functionsInNewPathByOccurrence;
 
     private static abstract class AppearedAndDisappearedFunctionHandler {
-        final String commitId;
+        final ChangeId changeId;
         final DiffASideFunctionList aSideFunctionList;
         final DiffBSideFunctionList bSideFunctionList;
 
-        public AppearedAndDisappearedFunctionHandler(String commitId, DiffASideFunctionList aSideFunctionList, DiffBSideFunctionList bSideFunctionList) {
-            this.commitId = commitId;
+        public AppearedAndDisappearedFunctionHandler(ChangeId changeId, DiffASideFunctionList aSideFunctionList, DiffBSideFunctionList bSideFunctionList) {
+            this.changeId = changeId;
             this.aSideFunctionList = aSideFunctionList;
             this.bSideFunctionList = bSideFunctionList;
         }
@@ -57,8 +57,8 @@ class CommitHunkToFunctionLocationMapper implements Consumer<Edit> {
     }
 
     private static class NullAppearedAndDisappearedFunctionHandler extends AppearedAndDisappearedFunctionHandler {
-        public NullAppearedAndDisappearedFunctionHandler(String commitId, DiffASideFunctionList aSideFunctionList, DiffBSideFunctionList bSideFunctionList) {
-            super(commitId, aSideFunctionList, bSideFunctionList);
+        public NullAppearedAndDisappearedFunctionHandler(ChangeId changeId, DiffASideFunctionList aSideFunctionList, DiffBSideFunctionList bSideFunctionList) {
+            super(changeId, aSideFunctionList, bSideFunctionList);
         }
 
         @Override
@@ -109,8 +109,8 @@ class CommitHunkToFunctionLocationMapper implements Consumer<Edit> {
         private Set<Method> untreatedDisappearedFunctions;
         private Map<Method, Integer> appearedFunctionASideStartLocation;
 
-        public SimpleAppearedAndDisappearedFunctionHandler(String commitId, DiffASideFunctionList aSideFunctionList, DiffBSideFunctionList bSideFunctionList) {
-            super(commitId, aSideFunctionList, bSideFunctionList);
+        public SimpleAppearedAndDisappearedFunctionHandler(ChangeId changeId, DiffASideFunctionList aSideFunctionList, DiffBSideFunctionList bSideFunctionList) {
+            super(changeId, aSideFunctionList, bSideFunctionList);
         }
 
         @Override
@@ -134,10 +134,10 @@ class CommitHunkToFunctionLocationMapper implements Consumer<Edit> {
         private void logAfterInit() {
             if (LOG.isDebugEnabled()) {
                 for (Method m : appearedFunctions) {
-                    LOG.debug("Commit " + commitId + "    adds function: " + m);
+                    LOG.debug("Commit " + changeId + "    adds function: " + m);
                 }
                 for (Method m : disappearedFunctions) {
-                    LOG.debug("Commit " + commitId + " deletes function: " + m);
+                    LOG.debug("Commit " + changeId + " deletes function: " + m);
                 }
             }
         }
@@ -203,12 +203,12 @@ class CommitHunkToFunctionLocationMapper implements Consumer<Edit> {
     }
 
     private class AppearedAndDisappearedFunctionHandlerFactory {
-        final String commitId;
+        final ChangeId changeId;
         final DiffASideFunctionList aSideFunctionList;
         final DiffBSideFunctionList bSideFunctionList;
 
-        public AppearedAndDisappearedFunctionHandlerFactory(String commitId, DiffASideFunctionList aSideFunctionList, DiffBSideFunctionList bSideFunctionList) {
-            this.commitId = commitId;
+        public AppearedAndDisappearedFunctionHandlerFactory(ChangeId changeId, DiffASideFunctionList aSideFunctionList, DiffBSideFunctionList bSideFunctionList) {
+            this.changeId = changeId;
             this.aSideFunctionList = aSideFunctionList;
             this.bSideFunctionList = bSideFunctionList;
         }
@@ -216,16 +216,16 @@ class CommitHunkToFunctionLocationMapper implements Consumer<Edit> {
         public AppearedAndDisappearedFunctionHandler getInstance() {
             final AppearedAndDisappearedFunctionHandler result;
             if (!aSideFunctionList.getPath().equals(bSideFunctionList.getPath())) {
-                result = new NullAppearedAndDisappearedFunctionHandler(commitId, aSideFunctionList, bSideFunctionList);
+                result = new NullAppearedAndDisappearedFunctionHandler(changeId, aSideFunctionList, bSideFunctionList);
             } else {
-                result = new SimpleAppearedAndDisappearedFunctionHandler(commitId, aSideFunctionList, bSideFunctionList);
+                result = new SimpleAppearedAndDisappearedFunctionHandler(changeId, aSideFunctionList, bSideFunctionList);
             }
             result.initialize();
             return result;
         }
     }
 
-    private final String commitId;
+    private final ChangeId changeId;
     private final Consumer<FunctionChangeHunk> changedFunctionConsumer;
 
     private final AppearedAndDisappearedFunctionHandler appearedAndDisappearedFunctionHandler;
@@ -239,12 +239,12 @@ class CommitHunkToFunctionLocationMapper implements Consumer<Edit> {
     private List<FunctionChangeHunk> possibleSignatureChangesBSides;
     private Map<Method, Method> movedMethodsDueToPathDifferences;
 
-    public CommitHunkToFunctionLocationMapper(String commitId,
+    public CommitHunkToFunctionLocationMapper(ChangeId changeId,
                                               DiffASideFunctionList functionsInOldPath,
                                               DiffBSideFunctionList functionsInNewPath,
                                               Map<Method, Method> movedMethodsDueToPathDifferences,
                                               Consumer<FunctionChangeHunk> changedFunctionConsumer) {
-        this.commitId = commitId;
+        this.changeId = changeId;
         this.oldPath = functionsInOldPath.getPath();
         this.newPath = functionsInNewPath.getPath();
         this.functionsInOldPathByOccurrence = new LinkedList<>(functionsInOldPath.getFunctionsByOccurrence());
@@ -252,7 +252,7 @@ class CommitHunkToFunctionLocationMapper implements Consumer<Edit> {
         this.movedMethodsDueToPathDifferences = movedMethodsDueToPathDifferences;
         this.changedFunctionConsumer = changedFunctionConsumer;
 
-        this.appearedAndDisappearedFunctionHandler = new AppearedAndDisappearedFunctionHandlerFactory(commitId, functionsInOldPath, functionsInNewPath).getInstance();
+        this.appearedAndDisappearedFunctionHandler = new AppearedAndDisappearedFunctionHandlerFactory(changeId, functionsInOldPath, functionsInNewPath).getInstance();
         this.appearedAndDisappearedFunctionHandler.initialize();
     }
 
@@ -280,15 +280,15 @@ class CommitHunkToFunctionLocationMapper implements Consumer<Edit> {
 
     public void handleUntreatedAddedAndDeletedFunctions() {
         for (Method f : appearedAndDisappearedFunctionHandler.getUntreatedDisappearedFunctions()) {
-            LOG.info("Commit " + commitId + " deletes function: " + f + " but change has not been published. Publishing now.");
-            FunctionChangeHunk hunk = FunctionChangeHunk.makePseudoDel(commitId, oldPath, newPath, f);
+            LOG.info("Commit " + changeId + " deletes function: " + f + " but change has not been published. Publishing now.");
+            FunctionChangeHunk hunk = FunctionChangeHunk.makePseudoDel(changeId, oldPath, newPath, f);
             changedFunctionConsumer.accept(hunk);
         }
 
         for (Method f : appearedAndDisappearedFunctionHandler.getUntreatedAppearedFunctions()) {
-            LOG.info("Commit " + commitId + "    adds function: " + f + " but change has not been published. Publishing now.");
+            LOG.info("Commit " + changeId + "    adds function: " + f + " but change has not been published. Publishing now.");
             int aSideStartLocation = appearedAndDisappearedFunctionHandler.getASideStartLocationOfAppearedFunction(f);
-            FunctionChangeHunk hunk = FunctionChangeHunk.makePseudoAdd(commitId, oldPath, newPath, f, Optional.of(aSideStartLocation));
+            FunctionChangeHunk hunk = FunctionChangeHunk.makePseudoAdd(changeId, oldPath, newPath, f, Optional.of(aSideStartLocation));
             changedFunctionConsumer.accept(hunk);
         }
     }
@@ -487,8 +487,7 @@ class CommitHunkToFunctionLocationMapper implements Consumer<Edit> {
             return false;
         } else if (numChanges == 0) {
             if (LOG.isDebugEnabled()) {
-                LOG.debug("No signature change detected for commit " + commitId
-                        + " edit " + numHunkInFile);
+                LOG.debug("No signature change detected for commit " + changeId + " edit " + numHunkInFile);
             }
             return false;
         } else if (numChanges > 1) {
@@ -528,7 +527,7 @@ class CommitHunkToFunctionLocationMapper implements Consumer<Edit> {
     }
 
     private void analyzeASide(Edit edit) {
-        LOG.debug("Analyzing A-side of commit " + commitId);
+        LOG.debug("Analyzing A-side of commit " + changeId);
 
         final int remBegin = edit.getBeginA();
         final int remEnd = edit.getEndA();
@@ -554,7 +553,7 @@ class CommitHunkToFunctionLocationMapper implements Consumer<Edit> {
 
                     if (editOverlapsSignature(f, remBegin, remEnd) && appearedAndDisappearedFunctionHandler.isDisappearedFunction(f)) {
                         if (logDebug) {
-                            LOG.debug("Commit " + commitId + " might delete " + f);
+                            LOG.debug("Commit " + changeId + " might delete " + f);
                         }
                         markFunctionASideEdit(edit, f, FunctionChangeHunk.ModificationType.DEL, true);
                     } else {
@@ -574,7 +573,7 @@ class CommitHunkToFunctionLocationMapper implements Consumer<Edit> {
     }
 
     private void analyzeBSide(Edit edit) {
-        LOG.debug("Analyzing B-side of commit " + commitId);
+        LOG.debug("Analyzing B-side of commit " + changeId);
 
         final int addBegin = edit.getBeginB();
         final int addEnd = edit.getEndB();
@@ -599,7 +598,7 @@ class CommitHunkToFunctionLocationMapper implements Consumer<Edit> {
 
                     if (editOverlapsSignature(f, addBegin, addEnd) && appearedAndDisappearedFunctionHandler.isAppearedFunction(f)) {
                         if (logDebug) {
-                            LOG.debug("Commit " + commitId + " might add    " + f);
+                            LOG.debug("Commit " + changeId + " might add    " + f);
                         }
                         markFunctionBSideEdit(edit, f, FunctionChangeHunk.ModificationType.ADD, true);
                     } else {
@@ -692,7 +691,7 @@ class CommitHunkToFunctionLocationMapper implements Consumer<Edit> {
                 //LOG.debug("hunkFromASideEdit: 4 " + linesDeleted);
             }
         }
-        return new ChangeHunk(commitId, oldPath, newPath, this.numHunkInFile, linesDeleted, 0);
+        return new ChangeHunk(changeId, oldPath, newPath, this.numHunkInFile, linesDeleted, 0);
     }
 
     private ChangeHunk hunkFromBSideEdit(Method f, Edit edit) {
@@ -719,7 +718,7 @@ class CommitHunkToFunctionLocationMapper implements Consumer<Edit> {
                 linesAdded = edit.getLengthB();
             }
         }
-        return new ChangeHunk(commitId, oldPath, newPath, this.numHunkInFile, 0, linesAdded);
+        return new ChangeHunk(changeId, oldPath, newPath, this.numHunkInFile, 0, linesAdded);
     }
 
     /*

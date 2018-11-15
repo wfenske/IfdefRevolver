@@ -2,6 +2,7 @@ package de.ovgu.ifdefrevolver.commitanalysis;
 
 import de.ovgu.ifdefrevolver.bugs.correlate.main.IHasResultsDir;
 import de.ovgu.ifdefrevolver.bugs.minecommits.CommitsDistanceDb;
+import de.ovgu.ifdefrevolver.bugs.minecommits.CommitsDistanceDb.Commit;
 import de.ovgu.ifdefrevolver.util.SimpleCsvFileReader;
 import de.ovgu.skunk.detection.output.CsvEnumUtils;
 
@@ -39,8 +40,12 @@ public class FunctionChangeHunksCsvReader extends SimpleCsvFileReader<List<Funct
         String file = line[FunctionChangeHunksColumns.FILE.ordinal()];
         FunctionId functionId = new FunctionId(signature, file);
         result.functionId = functionId;
+
         String commitId = line[FunctionChangeHunksColumns.COMMIT_ID.ordinal()];
-        CommitsDistanceDb.Commit commit = commitsDistanceDb.internCommit(commitId);
+        Commit commit = commitsDistanceDb.internCommit(commitId);
+
+        result.previousRevision = parsePreviousRevisionId(line[FunctionChangeHunksColumns.PREVIOUS_REVISION_ID.ordinal()]);
+
         result.commit = commit;
         String modTypeName = line[FunctionChangeHunksColumns.MOD_TYPE.ordinal()];
         String hunkS = line[FunctionChangeHunksColumns.HUNK.ordinal()];
@@ -57,6 +62,17 @@ public class FunctionChangeHunksCsvReader extends SimpleCsvFileReader<List<Funct
 //        }
 
         results.add(result);
+    }
+
+    private Optional<Commit> parsePreviousRevisionId(String previousRevisionId1) {
+        String previousRevisionId = previousRevisionId1;
+        final Optional<Commit> previousRevision;
+        if ((previousRevisionId == null) || previousRevisionId.isEmpty()) {
+            previousRevision = Optional.empty();
+        } else {
+            previousRevision = Optional.of(commitsDistanceDb.internCommit(previousRevisionId));
+        }
+        return previousRevision;
     }
 
     private int parseMandatoryInt(String[] line, FunctionChangeHunksColumns column) {
