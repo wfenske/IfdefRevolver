@@ -1,6 +1,7 @@
 package de.ovgu.ifdefrevolver.commitanalysis;
 
 import de.ovgu.skunk.detection.data.Method;
+import de.ovgu.skunk.detection.input.PositionalXmlReader;
 import org.apache.log4j.Logger;
 import org.eclipse.jgit.api.Git;
 import org.eclipse.jgit.lib.Repository;
@@ -19,6 +20,8 @@ public final class GitUtil {
     }
 
     public static Map<String, List<Method>> listFunctionsAtCurrentCommit(String repoDir, String commitId) {
+        final PositionalXmlReader xmlReader = new PositionalXmlReader();
+
         Git git;
         try {
             git = Git.open(new File(repoDir));
@@ -31,8 +34,7 @@ public final class GitUtil {
         try {
             RevWalk rw = null;
             try {
-
-                FunctionLocationProvider p = new FunctionLocationProvider(repo, commitId);
+                FunctionLocationProvider p = new FunctionLocationProvider(repo, commitId, xmlReader);
                 rw = new RevWalk(repo);
                 RevCommit rCommit = rw.parseCommit(repo.resolve(commitId));
                 return p.listFunctionsInDotCFiles(rCommit);

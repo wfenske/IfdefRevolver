@@ -2,6 +2,7 @@ package de.ovgu.ifdefrevolver.commitanalysis;
 
 import de.ovgu.skunk.detection.data.Context;
 import de.ovgu.skunk.detection.data.Method;
+import de.ovgu.skunk.detection.input.PositionalXmlReader;
 import de.ovgu.skunk.detection.input.SrcMlFolderReader;
 import org.apache.log4j.Logger;
 import org.eclipse.jgit.lib.ObjectId;
@@ -28,15 +29,15 @@ import java.util.function.Consumer;
 public class FunctionLocationProvider {
     private static final Logger LOG = Logger.getLogger(FunctionLocationProvider.class);
     private final Context ctx;
-    private final SrcMlFolderReader folderReader;
     private final Repository repository;
     private final String commitId;
+    private final PositionalXmlReader xmlReader;
 
-    public FunctionLocationProvider(Repository repository, String commitId) {
+    public FunctionLocationProvider(Repository repository, String commitId, PositionalXmlReader xmlReader) {
         this.repository = repository;
         this.commitId = commitId;
         this.ctx = new Context(null);
-        this.folderReader = new SrcMlFolderReader(ctx);
+        this.xmlReader = xmlReader;
     }
 
     /**
@@ -85,7 +86,7 @@ public class FunctionLocationProvider {
         return effectiveFilter;
     }
 
-    private Map<String, List<Method>> listFunctionsInFiles(RevCommit stateBeforeCommit, TreeFilter pathFilter) throws IOException {
+    private Map<String, List<Method>> listFunctionsInFiles(RevCommit state, TreeFilter pathFilter) throws IOException {
         final Map<String, List<Method>> functionsByFilename = new HashMap<>();
         Consumer<Method> changedFunctionHandler = new Consumer<Method>() {
             @Override
@@ -100,15 +101,15 @@ public class FunctionLocationProvider {
             }
         };
 
-        listFunctionsInFiles(stateBeforeCommit, pathFilter, changedFunctionHandler);
+        listFunctionsInFiles(state, pathFilter, changedFunctionHandler);
         return functionsByFilename;
     }
 
-    private void listFunctionsInFiles(RevCommit stateBeforeCommit, TreeFilter pathFilter, Consumer<Method> functionHandler) throws IOException {
+    private void listFunctionsInFiles(RevCommit state, TreeFilter pathFilter, Consumer<Method> functionHandler) throws IOException {
         // a RevWalk allows to walk over commits based on some filtering that is defined
         // and using commit's tree find the path
-        RevTree tree = stateBeforeCommit.getTree();
-        LOG.debug("Analyzing state " + stateBeforeCommit.getId().name() + ". Looking at tree: " + tree);
+        RevTree tree = state.getTree();
+        LOG.debug("Analyzing state " + state.getId().name() + ". Looking at tree: " + tree);
         //LOG.debug("Paths to analyze: " + paths);
 
         // now try to find a specific file
@@ -142,7 +143,8 @@ public class FunctionLocationProvider {
 
     private void readFileForPath(ObjectLoader loader, String filePath, Consumer<Method> functionHandler) {
         LOG.debug("Parsing functions in " + filePath);
-        Document doc = getSrcMlDoc(loader, filePath);
+        SrcMlFolderReader folderReader = new SrcMlFolderReader(ctx, xmlReader);
+        Document doc = getSrcMlDoc(loader, filePath, folderReader);
         Method[] functions = folderReader.parseAllFunctionsInFile(doc, filePath);
 
         LOG.debug("Found " + functions.length + " functions in `" + filePath + "'.");
@@ -153,7 +155,7 @@ public class FunctionLocationProvider {
     }
 
 
-    private Document getSrcMlDoc(ObjectLoader loader, String path) {
+    private Document getSrcMlDoc(ObjectLoader loader, String path, SrcMlFolderReader folderReader) {
         LOG.debug("Getting SrcML of " + path + " at " + commitId);
         Document[] doc = new Document[1];
         getSrcMlStdoutStream(loader, new Consumer<InputStream>() {

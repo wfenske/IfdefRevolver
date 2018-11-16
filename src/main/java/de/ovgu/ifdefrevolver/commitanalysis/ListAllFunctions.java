@@ -9,6 +9,7 @@ import de.ovgu.ifdefrevolver.util.TerminableThread;
 import de.ovgu.ifdefrevolver.util.UncaughtWorkerThreadException;
 import de.ovgu.skunk.detection.data.Context;
 import de.ovgu.skunk.detection.data.Method;
+import de.ovgu.skunk.detection.input.PositionalXmlReader;
 import de.ovgu.skunk.detection.input.SrcMlFolderReader;
 import de.ovgu.skunk.detection.output.CsvFileWriterHelper;
 import de.ovgu.skunk.detection.output.CsvRowProvider;
@@ -202,6 +203,8 @@ public class ListAllFunctions {
                         }
                     };
 
+                    PositionalXmlReader xmlReader = new PositionalXmlReader();
+
                     while (!terminationRequested) {
                         functionsInCurrentFile.clear();
                         final String nextFilename;
@@ -212,7 +215,7 @@ public class ListAllFunctions {
                             nextFilename = filenameIter.next();
                         }
 
-                        boolean success = parseFunctionsInCurrentFile(nextFilename, localFunctionDefinitionConsumer);
+                        boolean success = parseFunctionsInCurrentFile(nextFilename, localFunctionDefinitionConsumer, xmlReader);
                         if (success) {
                             for (Method f : functionsInCurrentFile) {
                                 functionDefinitionsConsumer.accept(f);
@@ -225,10 +228,10 @@ public class ListAllFunctions {
                     }
                 }
 
-                private boolean parseFunctionsInCurrentFile(String filename, Consumer<Method> localFunctionDefinitionConsumer) {
+                private boolean parseFunctionsInCurrentFile(String filename, Consumer<Method> localFunctionDefinitionConsumer, PositionalXmlReader xmlReader) {
                     try {
                         //LOG.info("Processing file " + (ixFile++) + "/" + numFiles);
-                        listFunctions(filename, localFunctionDefinitionConsumer);
+                        listFunctions(filename, localFunctionDefinitionConsumer, xmlReader);
                     } catch (RuntimeException t) {
                         fileFailHandlingStrategy.handleFailedFile(filename, t);
                         return false;
@@ -265,10 +268,10 @@ public class ListAllFunctions {
         errors++;
     }
 
-    private void listFunctions(String filename, Consumer<Method> functionDefinitionsConsumer) {
+    private void listFunctions(String filename, Consumer<Method> functionDefinitionsConsumer, PositionalXmlReader xmlReader) {
         Context ctx = new Context(null);
         de.ovgu.skunk.detection.data.File file = ctx.files.InternFile(filename);
-        SrcMlFolderReader folderReader = new SrcMlFolderReader(ctx);
+        SrcMlFolderReader folderReader = new SrcMlFolderReader(ctx, xmlReader);
         folderReader.readAndRememberSrcmlFile(file.filePath);
         folderReader.internAllFunctionsInFile(file);
         ctx.functions.PostAction();
@@ -280,7 +283,6 @@ public class ListAllFunctions {
         for (Method function : ctx.functions.AllMethods()) {
             functionDefinitionsConsumer.accept(function);
         }
-
     }
 
     /**

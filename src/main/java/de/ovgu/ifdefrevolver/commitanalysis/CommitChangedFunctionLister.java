@@ -1,6 +1,7 @@
 package de.ovgu.ifdefrevolver.commitanalysis;
 
 import de.ovgu.skunk.detection.data.Method;
+import de.ovgu.skunk.detection.input.PositionalXmlReader;
 import org.apache.log4j.Logger;
 import org.eclipse.jgit.api.Git;
 import org.eclipse.jgit.diff.*;
@@ -110,7 +111,7 @@ public class CommitChangedFunctionLister {
 
     private void addFunctionsOfParentLessCommit(RevCommit commit) throws IOException {
         final boolean logDebug = LOG.isDebugEnabled();
-        FunctionLocationProvider p = new FunctionLocationProvider(repo, commitId);
+        FunctionLocationProvider p = new FunctionLocationProvider(repo, commitId, functionLocationProvider.getXmlReaderInstance());
         allBSideFunctions = p.listFunctionsInDotCFiles(commit);
 
         for (Map.Entry<String, List<Method>> e : allBSideFunctions.entrySet()) {
@@ -403,7 +404,7 @@ public class CommitChangedFunctionLister {
         };
 
 
-        IFunctionLocationProvider functionLocationProvider = new EagerFunctionLocationProvider(repo);
+        IFunctionLocationProvider functionLocationProvider = new EagerFunctionLocationProvider(repo, new PositionalXmlReader());
 
         for (String commitId : args) {
             CommitChangedFunctionLister lister = new CommitChangedFunctionLister(repo, commitId,

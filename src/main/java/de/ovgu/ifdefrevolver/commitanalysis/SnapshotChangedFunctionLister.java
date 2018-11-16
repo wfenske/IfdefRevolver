@@ -3,6 +3,7 @@ package de.ovgu.ifdefrevolver.commitanalysis;
 import de.ovgu.ifdefrevolver.bugs.correlate.data.IMinimalSnapshot;
 import de.ovgu.ifdefrevolver.util.TerminableThread;
 import de.ovgu.ifdefrevolver.util.UncaughtWorkerThreadException;
+import de.ovgu.skunk.detection.input.PositionalXmlReader;
 import de.ovgu.skunk.detection.output.CsvFileWriterHelper;
 import de.ovgu.skunk.detection.output.CsvRowProvider;
 import org.apache.commons.csv.CSVPrinter;
@@ -146,13 +147,14 @@ public class SnapshotChangedFunctionLister {
 
                 @Override
                 public void run() {
+                    PositionalXmlReader xmlReader = new PositionalXmlReader();
                     while (!terminationRequested) {
                         popNextCommitIds();
                         if (nextCommitIds.isEmpty()) {
                             break;
                         }
 
-                        final IFunctionLocationProvider functionLocationProvider = new EagerFunctionLocationProvider(repo);
+                        final IFunctionLocationProvider functionLocationProvider = new EagerFunctionLocationProvider(repo, xmlReader);
                         for (String nextCommitId : nextCommitIds) {
                             if (terminationRequested) {
                                 break;
