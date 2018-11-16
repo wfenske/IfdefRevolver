@@ -1,7 +1,7 @@
 package de.ovgu.ifdefrevolver.bugs.minecommits;
 
-import de.ovgu.skunk.util.GroupingHashSetMap;
 import de.ovgu.ifdefrevolver.util.ProgressMonitor;
+import de.ovgu.skunk.util.GroupingHashSetMap;
 import org.apache.log4j.Logger;
 
 import java.util.*;
@@ -81,6 +81,10 @@ public class CommitsDistanceDb {
 
         public Commit[] children() {
             return this.children;
+        }
+
+        public boolean isMerge() {
+            return this.parents.length > 1;
         }
     }
 

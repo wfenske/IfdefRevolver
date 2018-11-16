@@ -25,8 +25,10 @@ public class GenealogyTracker {
     private Branch currentBranch;
     private Commit currentCommit;
 
-    private int allMoveConflicts = 0;
-    private int moveConflictsThatProbablyResolveMergeConflicts = 0;
+    private static class MoveConflictStats {
+        public int allMoveConflicts = 0;
+        public int moveConflictsThatProbablyResolveMergeConflicts = 0;
+    }
 
     private static class FunctionInBranch {
         private final FunctionId firstId;
@@ -146,20 +148,21 @@ public class GenealogyTracker {
         }
     }
 
-    private class FunctionsInBranch {
-        private final Branch branch;
+    private static class FunctionsInBranch {
+        protected Branch branch;
+        protected final MoveConflictStats moveConflictStats;
 
         private Map<FunctionId, FunctionInBranch> functionsById = new HashMap<>();
         //private Map<FunctionId, FunctionInBranch> added = new HashMap<>();
         private Map<FunctionId, DeletionRecord> deleted = new HashMap<>();
-        private GroupingListMap<FunctionId, FunctionId> movedInCurrentBranch = new GroupingListMap<>();
+        private GroupingListMap<FunctionId, FunctionChangeRow> movedInCurrentBranch = new GroupingListMap<>();
         /**
          * Where we save functions that have somehow been replaced because we parsed the changes wrong.
          */
         private Set<FunctionInBranch> overwritten = new HashSet<>();
 
-        public FunctionsInBranch(Branch branch) {
-            this.branch = branch;
+        public FunctionsInBranch(MoveConflictStats moveConflictStats) {
+            this.moveConflictStats = moveConflictStats;
         }
 
         public void putAdd(FunctionChangeRow change) {
@@ -319,12 +322,13 @@ public class GenealogyTracker {
         }
 
         private FunctionInBranch findRenamedFunction(FunctionId id) {
-            List<FunctionId> newNames = movedInCurrentBranch.get(id);
-            if (newNames == null) return null;
+            List<FunctionChangeRow> moves = movedInCurrentBranch.get(id);
+            if (moves == null) return null;
 
-            ListIterator<FunctionId> reverseIter = newNames.listIterator(newNames.size());
+            ListIterator<FunctionChangeRow> reverseIter = moves.listIterator(moves.size());
             while (reverseIter.hasPrevious()) {
-                FunctionId newId = reverseIter.previous();
+                final FunctionChangeRow move = reverseIter.previous();
+                FunctionId newId = move.newFunctionId.get();
                 FunctionInBranch newFunction = functionsById.get(newId);
                 LOG.warn("Remapping change to a renamed function: oldId=" + id + " newId=" + newId + " branch=" + branch);
                 if (newFunction != null) return newFunction;
@@ -352,7 +356,7 @@ public class GenealogyTracker {
             } else {
                 continueBrokenMove(change, existingFunction, conflictingFunction);
             }
-            movedInCurrentBranch.put(oldFunctionId, newFunctionId);
+            movedInCurrentBranch.put(oldFunctionId, change);
         }
 
         private void continueRegularMove(FunctionChangeRow change, FunctionId oldFunctionId, FunctionId newFunctionId, FunctionInBranch existingFunction) {
@@ -366,15 +370,19 @@ public class GenealogyTracker {
             final FunctionId oldFunctionId = change.functionId;
             final FunctionId newFunctionId = change.newFunctionId.get();
 
-            final boolean probableConflictResolution = changeIsProbablyRelatedToConflicResolutionAfterMerge(change);
-            allMoveConflicts++;
-            if (probableConflictResolution) {
-                moveConflictsThatProbablyResolveMergeConflicts++;
+            if ((existingFunction == null) && (conflictingFunction != null) && moveAlreadyHappenedInCurrentBranch(oldFunctionId, newFunctionId)) {
+                if (moveAlreadyHappenedForSameCommit(change)) {
+                    LOG.info("Ignoring duplicate MOVE " + change + " due to an identical MOVE in the same commit. " + this.branch);
+                } else {
+                    LOG.warn("Ignoring MOVE " + change + " due to a prior identical MOVE in the same branch. " + this.branch);
+                }
+                return;
             }
 
-            if ((existingFunction == null) && (conflictingFunction != null) && moveAlreadyHappenedInCurrentBranch(oldFunctionId, newFunctionId)) {
-                LOG.warn("Ignoring MOVE " + change + " due to a prior identical MOVE in the same branch. " + this.branch);
-                return;
+            final boolean probableConflictResolution = changeIsProbablyRelatedToConflicResolutionAfterMerge(change);
+            moveConflictStats.allMoveConflicts++;
+            if (probableConflictResolution) {
+                moveConflictStats.moveConflictsThatProbablyResolveMergeConflicts++;
             }
 
             if (existingFunction == null) {
@@ -427,11 +435,16 @@ public class GenealogyTracker {
             }
         }
 
+        private boolean moveAlreadyHappenedForSameCommit(FunctionChangeRow move) {
+            final List<FunctionChangeRow> moves = movedInCurrentBranch.get(move.functionId);
+            if (moves == null) return false;
+            return moves.stream().anyMatch(other -> other.isMoveOfIdenticalFunctionIds(move) && other.isSamePreviousRevisionAndCommit(move));
+        }
+
         private boolean moveAlreadyHappenedInCurrentBranch(FunctionId oldFunctionId, FunctionId newFunctionId) {
-            final List<FunctionId> newFunctionIds = movedInCurrentBranch.get(oldFunctionId);
-            if (newFunctionIds == null) return false;
-            if (newFunctionIds.contains(newFunctionId)) return true;
-            return false;
+            final List<FunctionChangeRow> moves = movedInCurrentBranch.get(oldFunctionId);
+            if (moves == null) return false;
+            return moves.stream().anyMatch(move -> newFunctionId.equals(move.newFunctionId.get()));
         }
 
         private void updateAddedAfterMove(FunctionId oldFunctionId, FunctionId newFunctionId) {
@@ -487,17 +500,17 @@ public class GenealogyTracker {
             deleteFunction(functionId, oldFunction, change.commit);
         }
 
-        public void merge(FunctionsInBranch[] parentFunctionsList, List<FunctionChangeRow> changesOfMergeCommit) {
-            if (parentFunctionsList.length == 0) return;
+        public void merge(PreMergeBranch[] parentBranches, List<FunctionChangeRow> changesOfMergeCommit) {
+            if (parentBranches.length == 0) return;
 
-            mergeChangesOfMergeCommits(parentFunctionsList, changesOfMergeCommit);
+            mergeChangesOfMergeCommits(parentBranches, changesOfMergeCommit);
 
-            final Set<FunctionId> activeDeletes = mergeDeleted(parentFunctionsList);
+            final Set<FunctionId> activeDeletes = mergeDeleted(parentBranches);
 
             GroupingHashSetMap<FunctionId, FunctionInBranch> allNonDeletedFunctionsById = new GroupingHashSetMap<>();
 
-            for (FunctionsInBranch parentFunctions : parentFunctionsList) {
-                for (Map.Entry<FunctionId, FunctionInBranch> e : parentFunctions.functionsById.entrySet()) {
+            for (PreMergeBranch parentBranch : parentBranches) {
+                for (Map.Entry<FunctionId, FunctionInBranch> e : parentBranch.functions.functionsById.entrySet()) {
                     FunctionId functionId = e.getKey();
                     if (!activeDeletes.contains(functionId)) {
                         allNonDeletedFunctionsById.put(functionId, e.getValue());
@@ -514,12 +527,16 @@ public class GenealogyTracker {
                     handleDisplacedFunctionDuringBranchMerge(functionId, winner, valueIt.next());
                 }
             }
+
+            for (PreMergeBranch parentBranch : parentBranches) {
+                inheritDeletedRecords(parentBranch.functions);
+            }
         }
 
-        private Set<FunctionId> mergeDeleted(FunctionsInBranch[] parentFunctions) {
+        private Set<FunctionId> mergeDeleted(PreMergeBranch[] parentBranches) {
             GroupingListMap<FunctionId, DeletionRecord> lastDeletionRecordsById = new GroupingListMap<>();
-            for (FunctionsInBranch parent : parentFunctions) {
-                for (Map.Entry<FunctionId, DeletionRecord> e : parent.deleted.entrySet()) {
+            for (PreMergeBranch parent : parentBranches) {
+                for (Map.Entry<FunctionId, DeletionRecord> e : parent.functions.deleted.entrySet()) {
                     final FunctionId id = e.getKey();
                     final DeletionRecord lastRecord = e.getValue();
                     lastDeletionRecordsById.put(id, lastRecord);
@@ -574,41 +591,55 @@ public class GenealogyTracker {
             return allActiveDeletes;
         }
 
-        private void mergeChangesOfMergeCommits(FunctionsInBranch[] parentFunctions, List<FunctionChangeRow> changesOfMergeCommit) {
+        private void mergeChangesOfMergeCommits(PreMergeBranch[] parentBranches, List<FunctionChangeRow> changesOfMergeCommit) {
+            mergeChangesOfMergeCommits1(parentBranches, changesOfMergeCommit);
+
+//            changesOfMergeCommit.clear();
+
+            if (!changesOfMergeCommit.isEmpty()) {
+                LOG.warn("Merge failed to process " + changesOfMergeCommit.size() + " changes in " + this.branch);
+            }
+        }
+
+        private void mergeChangesOfMergeCommits1(PreMergeBranch[] parentBranches, List<FunctionChangeRow> changesOfMergeCommit) {
+            GroupingListMap<FunctionId, FunctionChangeRow> delsByFunctionId = new GroupingListMap<>();
+            for (FunctionChangeRow r : changesOfMergeCommit) {
+                delsByFunctionId.put(r.functionId, r);
+            }
+
             for (Iterator<FunctionChangeRow> changeIt = changesOfMergeCommit.iterator(); changeIt.hasNext(); ) {
                 final FunctionChangeRow change = changeIt.next();
+                if (!change.previousRevision.isPresent()) continue;
+                final Commit previousRevision = change.previousRevision.get();
                 final FunctionId functionId = change.functionId;
                 boolean merged = false;
-                for (FunctionsInBranch branch : parentFunctions) {
+                for (PreMergeBranch preMergeBranch : parentBranches) {
+                    if (preMergeBranch.getLastCommitBeforeMerge() != previousRevision) continue;
+                    final FunctionsInBranch preMergeFunctions = preMergeBranch.functions;
                     switch (change.modType) {
-                        case ADD:
-                            if (!branch.functionsById.containsKey(functionId)) {
-                                branch.assignChange(change);
-                                merged = true;
-                            }
-                            break;
-                        case DEL:
                         case MOD:
-                            if (branch.functionsById.containsKey(functionId)) {
-                                branch.assignChange(change);
+                            if (preMergeFunctions.functionsById.containsKey(functionId)) {
+                                preMergeFunctions.assignChange(change);
                                 merged = true;
-                            }
-                            break;
-                        case MOVE: {
-                            FunctionId newId = change.newFunctionId.get();
-                            if (branch.functionsById.containsKey(functionId)) {
-                                if (newId.equals(functionId) || !branch.functionsById.containsKey(newId)) {
-                                    branch.assignChange(change);
+                            } else {
+                                final List<FunctionChangeRow> dels = delsByFunctionId.get(functionId);
+                                if ((dels != null) && dels.stream().anyMatch(del -> del.isSamePreviousRevisionAndCommit(change))) {
+                                    LOG.info("Ignoring MOD to function that is deleted by another hunk in the same commit: " + change);
                                     merged = true;
+                                } else {
+                                    LOG.warn("Ignoring MOD to non-existing function: " + change);
                                 }
                             }
-                        }
-                        break;
+                            break;
+                        default:
+                            preMergeFunctions.assignChange(change);
+                            merged = true;
                     }
+
                     if (merged) {
                         changeIt.remove();
-                        break;
                     }
+                    break;
                 }
             }
         }
@@ -639,9 +670,7 @@ public class GenealogyTracker {
             if (functionsById.containsKey(id)) {
                 LOG.warn(id + " is in functionsById in " + this.branch);
             }
-//            if (added.containsKey(id)) {
-//                LOG.warn(id + " was added in " + this.branch);
-//            }
+
             DeletionRecord lastDeletionRecord = getLastDeletionRecord(id);
             if ((lastDeletionRecord != null) && lastDeletionRecord.isActive()) {
                 if (isRecordInCurrentBranch(lastDeletionRecord)) {
@@ -673,18 +702,36 @@ public class GenealogyTracker {
                     break;
             }
         }
+
+        public Branch getBranch() {
+            return branch;
+        }
+
+        public void setBranch(Branch branch) {
+            this.branch = branch;
+        }
+
     }
 
-    private class Branch {
-        public final Branch[] parentBranches;
-        private final Commit firstCommit;
-        private FunctionsInBranch functions;
-        private Set<Commit> directCommits = new LinkedHashSet<>();
+    private static class Branch {
+        protected final Branch[] parentBranches;
+        protected final Commit firstCommit;
+        protected Commit mostRecentCommit;
+        protected final MoveConflictStats moveConflictStats;
+        protected final FunctionsInBranch functions;
+        protected final Set<Commit> directCommits = new LinkedHashSet<>();
 
-        public Branch(Branch[] parentBranches, Commit firstCommit) {
+        protected Branch(Branch[] parentBranches, Commit firstCommit, MoveConflictStats moveConflictStats, FunctionsInBranch functionsInBranch) {
             this.parentBranches = parentBranches;
             this.firstCommit = firstCommit;
-            this.functions = new FunctionsInBranch(this);
+            this.mostRecentCommit = firstCommit;
+            this.moveConflictStats = moveConflictStats;
+            this.functions = functionsInBranch;
+            this.functions.setBranch(this);
+        }
+
+        public Branch(Branch[] parentBranches, Commit firstCommit, MoveConflictStats moveConflictStats) {
+            this(parentBranches, firstCommit, moveConflictStats, new FunctionsInBranch(moveConflictStats));
         }
 
         public List<Branch> parentsInLevelOrder() {
@@ -736,12 +783,8 @@ public class GenealogyTracker {
             return parentBranches;
         }
 
-        public void merge(Branch[] parentBranches, List<FunctionChangeRow> mergeChanges) {
-            FunctionsInBranch[] parentFunctions = new FunctionsInBranch[parentBranches.length];
-            for (int i = 0; i < parentBranches.length; i++) {
-                parentFunctions[i] = parentBranches[i].functions;
-            }
-            this.functions.merge(parentFunctions, mergeChanges);
+        public void merge(PreMergeBranch[] parentBranches, List<FunctionChangeRow> mergeChanges) {
+            this.functions.merge(parentBranches, mergeChanges);
         }
 
         public void split(Branch parentBranch) {
@@ -762,6 +805,11 @@ public class GenealogyTracker {
 
         public void addDirectCommit(Commit currentCommit) {
             this.directCommits.add(currentCommit);
+            this.mostRecentCommit = currentCommit;
+        }
+
+        public Commit getMostRecentCommit() {
+            return this.mostRecentCommit;
         }
 
         public boolean directlyContains(Commit commit) {
@@ -771,9 +819,27 @@ public class GenealogyTracker {
         public boolean isMergeBranch() {
             return this.parentBranches.length > 1;
         }
+
+        public static Branch[] toBranchArray(Branch b) {
+            Branch[] result = new Branch[1];
+            result[0] = b;
+            return result;
+        }
     }
 
-    private Branch[] branchIdsByCommitKey;
+    private static class PreMergeBranch extends Branch {
+        public PreMergeBranch(Branch actualBranchBeingMerged, Commit lastCommitBeforeMerge, MoveConflictStats moveConflictStats) {
+            super(toBranchArray(actualBranchBeingMerged), lastCommitBeforeMerge, moveConflictStats);
+            this.split(actualBranchBeingMerged);
+        }
+
+        public Commit getLastCommitBeforeMerge() {
+            return firstCommit;
+        }
+    }
+
+    private Branch[] branchesByCommitKey;
+    private MoveConflictStats moveConflictStats;
 
     public GenealogyTracker(CommitsDistanceDb commitsDistanceDb, Map<Commit, List<AllFunctionsRow>> allFunctionsBySnapshotStartCommit, List<FunctionChangeRow>[] changesByCommitKey, String repoDir) {
         this.commitsDistanceDb = commitsDistanceDb;
@@ -783,8 +849,10 @@ public class GenealogyTracker {
 
     public void main() {
         final int numAllCommits = commitsDistanceDb.getCommits().size();
+        moveConflictStats = new MoveConflictStats();
+
         done = new BitSet(numAllCommits);
-        branchIdsByCommitKey = new Branch[numAllCommits];
+        branchesByCommitKey = new Branch[numAllCommits];
 
         Set<Commit> rootCommits = commitsDistanceDb.getRoots();
         next = new LinkedList<>(rootCommits);
@@ -803,10 +871,10 @@ public class GenealogyTracker {
         maybeReportBranchStats();
         LOG.debug("Processed " + changesProcessed + " changes.");
 
-        if (allMoveConflicts > 0) {
-            int perentage = (int) Math.round((100.0 * moveConflictsThatProbablyResolveMergeConflicts) / allMoveConflicts);
-            LOG.debug("Encountered " + allMoveConflicts + " MOVE conflicts of which " +
-                    moveConflictsThatProbablyResolveMergeConflicts +
+        if (moveConflictStats.allMoveConflicts > 0) {
+            int perentage = (int) Math.round((100.0 * moveConflictStats.moveConflictsThatProbablyResolveMergeConflicts) / moveConflictStats.allMoveConflicts);
+            LOG.debug("Encountered " + moveConflictStats.allMoveConflicts + " MOVE conflicts of which " +
+                    moveConflictStats.moveConflictsThatProbablyResolveMergeConflicts +
                     " (" + perentage + "%) probably resolved a merge conflict.");
         } else {
             LOG.debug("Encountered no MOVE conflicts.");
@@ -820,7 +888,7 @@ public class GenealogyTracker {
         int merges = 0;
         int splits = 0;
         int roots = 0;
-        for (Branch id : branchIdsByCommitKey) {
+        for (Branch id : branchesByCommitKey) {
             boolean wasNew = branches.add(id);
             if (wasNew) {
                 switch (id.getParentBranches().length) {
@@ -857,13 +925,29 @@ public class GenealogyTracker {
     }
 
     private boolean isProcessable(Commit commit) {
-        Commit[] parents = commit.parents();
-        for (Commit parent : parents) {
+        for (Commit parent : commit.parents()) {
             if (!isCommitProcessed(parent)) {
                 return false;
             }
         }
+
+//        if (isCommitSuccessorOfParentOfUnprocessedMerge(commit)) {
+//            return false;
+//        }
+
         return true;
+    }
+
+    private boolean isCommitSuccessorOfParentOfUnprocessedMerge(Commit commit) {
+        for (Commit parent : commit.parents()) {
+            Commit[] children = parent.children();
+            for (Commit child : children) {
+                if (child.isMerge() && !isCommitProcessed(child)) {
+                    return true;
+                }
+            }
+        }
+        return false;
     }
 
     private boolean isCommitProcessed(Commit commit) {
@@ -885,8 +969,8 @@ public class GenealogyTracker {
         }
         processChangesOfCurrentCommit();
 
-        if ((currentBranch.getFirstCommit() == currentCommit) && (currentBranch.parentBranches.length > 1)) {
-            //validateComputedFunctionsAfterMerge();
+        if ((currentBranch.getFirstCommit() == currentCommit) && (currentCommit.isMerge())) {
+            validateComputedFunctionsAfterMerge();
         }
 
         Commit[] children = currentCommit.children();
@@ -963,43 +1047,42 @@ public class GenealogyTracker {
     }
 
     private Branch ensureBranchId(Commit commit) {
-        final Branch existingId = branchIdsByCommitKey[commit.key];
+        final Branch existingId = branchesByCommitKey[commit.key];
         if (existingId != null) return existingId;
 
         final Branch id;
         Commit[] parents = commit.parents();
         if (parents.length == 0) { // a root commit
             Branch[] parentBranches = new Branch[0];
-            id = new Branch(parentBranches, commit);
+            id = new Branch(parentBranches, commit, moveConflictStats);
             LOG.debug("Creating new root branch " + id);
         } else if (parents.length == 1) {
             Commit parent = parents[0];
             if (parent.children().length == 1) {
-                id = getBranchIdOrDie(parent);
+                id = getBranchForCommitOrDie(parent);
                 LOG.debug("Inheriting branch for " + commit + " from parent commit " + id);
             } else {
                 // Parent splits into multiple branches
-                Branch parentBranch = getBranchIdOrDie(parent);
-                Branch[] parentBranches = new Branch[1];
-                parentBranches[0] = parentBranch;
-                id = new Branch(parentBranches, commit);
+                Branch parentBranch = getBranchForCommitOrDie(parent);
+                Branch[] parentBranches = Branch.toBranchArray(parentBranch);
+                id = new Branch(parentBranches, commit, moveConflictStats);
                 LOG.debug("Creating new branch after branch split " + id);
             }
         } else { // a merge commit
             Branch[] parentBranches = new Branch[parents.length];
             for (int i = 0; i < parents.length; i++) {
-                parentBranches[i] = getBranchIdOrDie(parents[i]);
+                parentBranches[i] = getBranchForCommitOrDie(parents[i]);
             }
-            id = new Branch(parentBranches, commit);
+            id = new Branch(parentBranches, commit, moveConflictStats);
             LOG.debug("Creating new branch after merge " + id);
         }
 
-        branchIdsByCommitKey[commit.key] = id;
+        branchesByCommitKey[commit.key] = id;
         return id;
     }
 
-    private Branch getBranchIdOrDie(Commit commit) {
-        Branch id = branchIdsByCommitKey[commit.key];
+    private Branch getBranchForCommitOrDie(Commit commit) {
+        Branch id = branchesByCommitKey[commit.key];
         if (id != null) return id;
         throw new IllegalArgumentException(commit + " lacks a branch id");
     }
@@ -1024,13 +1107,25 @@ public class GenealogyTracker {
 
     private void createNewBranchFromMerge(Branch branch, Branch[] parentBranches) {
         int numParents = parentBranches.length;
-        Branch[] mergeBranches = new Branch[numParents];
+        PreMergeBranch[] mergeBranches = new PreMergeBranch[numParents];
+        final Commit[] parentCommits = branch.firstCommit.parents();
+        for (int i = 0; i < parentCommits.length; i++) {
+            final Commit parentCommit = parentCommits[i];
+            Branch parentBranch = getBranchForCommitOrDie(parentCommit);
+            final Branch receivedParentBranch = parentBranches[i];
+            if (parentBranch != receivedParentBranch) {
+                throw new RuntimeException("Parent branches mismatch: expected=" + parentBranch + " got=" + receivedParentBranch);
+            }
+            final Commit receivedParentCommit = receivedParentBranch.getMostRecentCommit();
+            if (parentCommit != receivedParentCommit) {
+                throw new RuntimeException("Commits in parent branch mismatch: expected=" + parentCommit + " got=" + receivedParentCommit + ".");
+            }
+        }
+
         for (int i = 0; i < numParents; i++) {
-            Branch[] parents = new Branch[1];
             Branch parentParent = parentBranches[i];
-            parents[0] = parentParent;
-            Branch mergeBranch = new Branch(parents, this.currentCommit);
-            mergeBranch.split(parentParent);
+            PreMergeBranch mergeBranch = new PreMergeBranch(parentParent,
+                    parentParent.getMostRecentCommit(), moveConflictStats);
             mergeBranches[i] = mergeBranch;
         }
         branch.merge(mergeBranches, getChangesOfCurrentCommit());

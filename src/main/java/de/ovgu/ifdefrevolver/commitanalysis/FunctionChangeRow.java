@@ -48,4 +48,24 @@ public class FunctionChangeRow {
             return "";
         }
     }
+
+    private boolean isMove() {
+        return this.modType == FunctionChangeHunk.ModificationType.MOVE;
+    }
+
+    public boolean isMoveOfIdenticalFunctionIds(FunctionChangeRow other) {
+        if (!this.isMove() || !other.isMove()) return false;
+        if (!functionId.equals(other.functionId)) return false;
+        if (!newFunctionId.get().equals(other.newFunctionId.get())) return false;
+        return true;
+    }
+
+    public boolean isSamePreviousRevisionAndCommit(FunctionChangeRow other) {
+        if (this.commit != other.commit) return false;
+        if (this.previousRevision.isPresent() && other.previousRevision.isPresent()) {
+            return this.previousRevision.get() == other.previousRevision.get();
+        } else {
+            return this.previousRevision.isPresent() == other.previousRevision.isPresent();
+        }
+    }
 }
