@@ -1028,6 +1028,11 @@ public class GenealogyTracker {
     }
 
     private Set<FunctionId> getActualFunctionIdsAtCurrentCommit() {
+        boolean logDebug = LOG.isDebugEnabled();
+        long timeBefore = 0;
+        if (logDebug) {
+            timeBefore = System.currentTimeMillis();
+        }
         Map<String, List<Method>> actualFunctionsByPath = GitUtil.listFunctionsAtCurrentCommit(this.repoDir, this.currentCommit.commitHash);
         final Set<FunctionId> actualIds = new LinkedHashSet<>();
         for (Map.Entry<String, List<Method>> functionsInPath : actualFunctionsByPath.entrySet()) {
@@ -1037,6 +1042,16 @@ public class GenealogyTracker {
                 actualIds.add(id);
             }
         }
+
+        if (logDebug) {
+            long timeAfter = System.currentTimeMillis();
+            long timeInMillis = timeAfter - timeBefore;
+            long minutes = timeInMillis / (1000 * 60);
+            long seconds = timeInMillis / 1000;
+            LOG.debug("Time for checking out revision " + this.currentCommit.commitHash +
+                    ": " + minutes + "m" + seconds + "s.");
+        }
+
         return actualIds;
     }
 

@@ -37,7 +37,8 @@ public final class GitUtil {
                 FunctionLocationProvider p = new FunctionLocationProvider(repo, commitId, xmlReader);
                 rw = new RevWalk(repo);
                 RevCommit rCommit = rw.parseCommit(repo.resolve(commitId));
-                return p.listFunctionsInDotCFiles(rCommit);
+                final Map<String, List<Method>> result = p.listFunctionsInDotCFiles(rCommit);
+                return result;
             } catch (IOException ioe) {
                 LOG.warn("I/O exception parsing files changed by commit " + commitId, ioe);
                 return null;
