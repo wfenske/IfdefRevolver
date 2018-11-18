@@ -51,4 +51,18 @@ public class AllFunctionsCsvReader extends SimpleCsvFileReader<List<AllFunctions
         File f = new File(config.snapshotResultsDirForDate(snapshotDate), AllSnapshotFunctionsColumns.FILE_BASENAME);
         return readFile(f);
     }
+
+    public List<AllFunctionsRow> readFile(IHasResultsDir config, String commitHash) {
+        File f = getFileForCommitHash(config, commitHash);
+        return readFile(f);
+    }
+
+    public static boolean fileExists(IHasResultsDir config, String commitHash) {
+        File f = getFileForCommitHash(config, commitHash);
+        return f.exists() && !f.isDirectory();
+    }
+
+    public static File getFileForCommitHash(IHasResultsDir config, String commitHash) {
+        return new File(config.snapshotResultsDirForCommit(commitHash), AllSnapshotFunctionsColumns.FILE_BASENAME);
+    }
 }

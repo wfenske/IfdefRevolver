@@ -33,8 +33,8 @@ public class ProjectInformationConfig implements IHasSnapshotsDir, IHasResultsDi
     public static final String OPT_PROJECT_L = "project";
 
     /**
-     * Directory containing the &lt;project&gt;ABRes/*.csv,
-     * &lt;project&gt;AFRes/*.csv, &lt;project&gt;LFRes/*.csv files
+     * Directory containing the &lt;project&gt;ABRes/*.csv, &lt;project&gt;AFRes/*.csv, &lt;project&gt;LFRes/*.csv
+     * files
      */
     public static final String OPT_RESULTS_DIR_L = "resultsdir";
     public static final String OPT_SNAPSHOTS_DIR_L = "snapshotsdir";
@@ -53,8 +53,7 @@ public class ProjectInformationConfig implements IHasSnapshotsDir, IHasResultsDi
     public static final String DEFAULT_RESULTS_DIR_NAME = "results";
 
     /**
-     * Name of the revisionsFull.csv of this project, e.g.
-     * "results/openvpn/revisionsFull.csv"
+     * Name of the revisionsFull.csv of this project, e.g. "results/openvpn/revisionsFull.csv"
      */
     protected File revisionCsvFile = null;
     public static final String REVISIONS_FILE_BASENAME = "revisionsFull.csv";
@@ -66,8 +65,8 @@ public class ProjectInformationConfig implements IHasSnapshotsDir, IHasResultsDi
     public static final String DEFAULT_SNAPSHOTS_DIR_NAME = "snapshots";
 
     /**
-     * In case you don't want to analyze all snapshots of the project, but only some of them, their date strings will
-     * be saved in this list.  In that case, the predicate {@link Optional#isPresent()} will return <code>true</code>.
+     * In case you don't want to analyze all snapshots of the project, but only some of them, their date strings will be
+     * saved in this list.  In that case, the predicate {@link Optional#isPresent()} will return <code>true</code>.
      * Else, all snapshots should be analyzed.
      */
     protected Optional<List<Date>> snapshotFilter = Optional.empty();
@@ -250,6 +249,11 @@ public class ProjectInformationConfig implements IHasSnapshotsDir, IHasResultsDi
         synchronized (dateFormatter) {
             return new File(projectResultsDir(), dateFormatter.format(date));
         }
+    }
+
+    @Override
+    public File snapshotResultsDirForCommit(String commitHash) {
+        return new File(projectResultsDir(), commitHash);
     }
 
     @Override

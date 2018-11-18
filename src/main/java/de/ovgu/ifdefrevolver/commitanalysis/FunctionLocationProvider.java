@@ -28,7 +28,6 @@ import java.util.function.Consumer;
  */
 public class FunctionLocationProvider {
     private static final Logger LOG = Logger.getLogger(FunctionLocationProvider.class);
-    private final Context ctx;
     private final Repository repository;
     private final String commitId;
     private final PositionalXmlReader xmlReader;
@@ -36,7 +35,6 @@ public class FunctionLocationProvider {
     public FunctionLocationProvider(Repository repository, String commitId, PositionalXmlReader xmlReader) {
         this.repository = repository;
         this.commitId = commitId;
-        this.ctx = new Context(null);
         this.xmlReader = xmlReader;
     }
 
@@ -88,20 +86,17 @@ public class FunctionLocationProvider {
 
     private Map<String, List<Method>> listFunctionsInFiles(RevCommit state, TreeFilter pathFilter) throws IOException {
         final Map<String, List<Method>> functionsByFilename = new HashMap<>();
-        Consumer<Method> changedFunctionHandler = new Consumer<Method>() {
-            @Override
-            public void accept(Method method) {
-                String filePath = method.filePath;
-                List<Method> functions = functionsByFilename.get(filePath);
-                if (functions == null) {
-                    functions = new ArrayList<>();
-                    functionsByFilename.put(filePath, functions);
-                }
-                functions.add(method);
+        Consumer<Method> identifiedFunctionHandler = (method) -> {
+            String filePath = method.filePath;
+            List<Method> functions = functionsByFilename.get(filePath);
+            if (functions == null) {
+                functions = new ArrayList<>();
+                functionsByFilename.put(filePath, functions);
             }
+            functions.add(method);
         };
 
-        listFunctionsInFiles(state, pathFilter, changedFunctionHandler);
+        listFunctionsInFiles(state, pathFilter, identifiedFunctionHandler);
         return functionsByFilename;
     }
 
@@ -143,7 +138,8 @@ public class FunctionLocationProvider {
 
     private void readFileForPath(ObjectLoader loader, String filePath, Consumer<Method> functionHandler) {
         LOG.debug("Parsing functions in " + filePath);
-        SrcMlFolderReader folderReader = new SrcMlFolderReader(ctx, xmlReader);
+        Context ctx = new Context(null);
+        SrcMlFolderReader folderReader = new SrcMlFolderReader(ctx, xmlReader, GitMethod::new);
         Document doc = getSrcMlDoc(loader, filePath, folderReader);
         Method[] functions = folderReader.parseAllFunctionsInFile(doc, filePath);
 

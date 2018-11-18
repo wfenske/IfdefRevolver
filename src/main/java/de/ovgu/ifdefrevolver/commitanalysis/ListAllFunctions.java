@@ -1,6 +1,6 @@
 package de.ovgu.ifdefrevolver.commitanalysis;
 
-import de.ovgu.ifdefrevolver.bugs.correlate.data.IMinimalSnapshot;
+import de.ovgu.ifdefrevolver.bugs.correlate.data.IHasSnapshotDate;
 import de.ovgu.ifdefrevolver.bugs.correlate.data.Snapshot;
 import de.ovgu.ifdefrevolver.bugs.correlate.input.ProjectInformationReader;
 import de.ovgu.ifdefrevolver.bugs.correlate.main.ProjectInformationConfig;
@@ -76,7 +76,7 @@ public class ListAllFunctions {
         final String uncaughtExceptionErrorMessage = "Uncaught exception while listing all functions in snapshot " + snapshot + ". Deleting output file " + outputFile.getAbsolutePath();
         final String fileDeleteFailedErrorMessage = "Failed to delete output file " + outputFile.getAbsolutePath() + ". Must be deleted manually.";
         return new CsvFileWriterHelper() {
-            CsvRowProvider<Method, IMinimalSnapshot, AllSnapshotFunctionsColumns> csvRowProvider = AllSnapshotFunctionsColumns.newCsvRowProviderForSnapshot(snapshot);
+            CsvRowProvider<Method, IHasSnapshotDate, AllSnapshotFunctionsColumns> csvRowProvider = AllSnapshotFunctionsColumns.newCsvRowProvider(snapshot);
 
             @Override
             protected void actuallyDoStuff(CSVPrinter csv) throws IOException {
@@ -96,7 +96,7 @@ public class ListAllFunctions {
         };
     }
 
-    private Consumer<Method> newThreadSafeFunctionToCsvWriter(final CSVPrinter csv, final CsvRowProvider<Method, IMinimalSnapshot, AllSnapshotFunctionsColumns> csvRowProvider) {
+    private Consumer<Method> newThreadSafeFunctionToCsvWriter(final CSVPrinter csv, final CsvRowProvider<Method, IHasSnapshotDate, AllSnapshotFunctionsColumns> csvRowProvider) {
         return new Consumer<Method>() {
             @Override
             public void accept(Method function) {
@@ -271,7 +271,7 @@ public class ListAllFunctions {
     private void listFunctions(String filename, Consumer<Method> functionDefinitionsConsumer, PositionalXmlReader xmlReader) {
         Context ctx = new Context(null);
         de.ovgu.skunk.detection.data.File file = ctx.files.InternFile(filename);
-        SrcMlFolderReader folderReader = new SrcMlFolderReader(ctx, xmlReader);
+        SrcMlFolderReader folderReader = new SrcMlFolderReader(ctx, xmlReader, Method::new);
         folderReader.readAndRememberSrcmlFile(file.filePath);
         folderReader.internAllFunctionsInFile(file);
         ctx.functions.PostAction();

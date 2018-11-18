@@ -1,23 +1,26 @@
 package de.ovgu.ifdefrevolver.commitanalysis.distances;
 
+import de.ovgu.ifdefrevolver.bugs.correlate.data.IHasSnapshotDate;
 import de.ovgu.ifdefrevolver.bugs.minecommits.CommitsDistanceDb;
 import de.ovgu.ifdefrevolver.bugs.minecommits.CommitsDistanceDb.Commit;
-import de.ovgu.ifdefrevolver.commitanalysis.AllFunctionsRow;
-import de.ovgu.ifdefrevolver.commitanalysis.FunctionChangeRow;
-import de.ovgu.ifdefrevolver.commitanalysis.FunctionId;
-import de.ovgu.ifdefrevolver.commitanalysis.GitUtil;
+import de.ovgu.ifdefrevolver.commitanalysis.*;
 import de.ovgu.skunk.detection.data.Method;
+import de.ovgu.skunk.detection.output.CsvFileWriterHelper;
+import de.ovgu.skunk.detection.output.CsvRowProvider;
 import de.ovgu.skunk.util.GroupingHashSetMap;
 import de.ovgu.skunk.util.GroupingListMap;
+import org.apache.commons.csv.CSVPrinter;
 import org.apache.log4j.Logger;
 
+import java.io.File;
+import java.io.IOException;
 import java.util.*;
 import java.util.stream.Collectors;
 
 public class GenealogyTracker {
     private static Logger LOG = Logger.getLogger(GenealogyTracker.class);
     private final List<FunctionChangeRow>[] changesByCommitKey;
-    private final String repoDir;
+    private final ListChangedFunctionsConfig config;
 
     private CommitsDistanceDb commitsDistanceDb;
     private Queue<Commit> next;
@@ -841,10 +844,10 @@ public class GenealogyTracker {
     private Branch[] branchesByCommitKey;
     private MoveConflictStats moveConflictStats;
 
-    public GenealogyTracker(CommitsDistanceDb commitsDistanceDb, Map<Commit, List<AllFunctionsRow>> allFunctionsBySnapshotStartCommit, List<FunctionChangeRow>[] changesByCommitKey, String repoDir) {
+    public GenealogyTracker(CommitsDistanceDb commitsDistanceDb, Map<Commit, List<AllFunctionsRow>> allFunctionsBySnapshotStartCommit, List<FunctionChangeRow>[] changesByCommitKey, ListChangedFunctionsConfig config) {
         this.commitsDistanceDb = commitsDistanceDb;
         this.changesByCommitKey = changesByCommitKey;
-        this.repoDir = repoDir;
+        this.config = config;
     }
 
     public void main() {
@@ -942,7 +945,7 @@ public class GenealogyTracker {
         for (Commit parent : commit.parents()) {
             Commit[] children = parent.children();
             for (Commit child : children) {
-                if (child.isMerge() && !isCommitProcessed(child)) {
+                if (child.isMerge() && !isCommitProcessed(child) && (child != commit)) {
                     return true;
                 }
             }
@@ -1027,21 +1030,118 @@ public class GenealogyTracker {
         return;
     }
 
+    private static class CachingFunctionsLister {
+        private final ListChangedFunctionsConfig config;
+
+        public CachingFunctionsLister(ListChangedFunctionsConfig config) {
+            this.config = config;
+        }
+
+        public Set<FunctionId> getFunctionIdsAtCommit(Commit commit) {
+            if (cacheFileExists(commit)) {
+                return getFunctionIdsFromCsv(commit);
+            } else {
+                Map<String, List<Method>> actualFunctionsByPath = GitUtil.listFunctionsAtCurrentCommit(this.config.getRepoDir(), commit.commitHash);
+                writeCacheCsvFile(actualFunctionsByPath, commit);
+                return extractFunctionIds(actualFunctionsByPath);
+            }
+        }
+
+        private void writeCacheCsvFile(Map<String, List<Method>> actualFunctionsByPath, Commit commit) {
+            final File outputFile = AllFunctionsCsvReader.getFileForCommitHash(config, commit.commitHash);
+            ensureOutputFileDirOrDie(outputFile);
+            Calendar commitDateAsCalendar = GitUtil.getAuthorDateOfCommit(this.config.getRepoDir(), commit.commitHash);
+            final Date commitDate = commitDateAsCalendar.getTime();
+
+            CsvFileWriterHelper writer = new CsvFileWriterHelper() {
+                IHasSnapshotDate dateProvider = new IHasSnapshotDate() {
+                    @Override
+                    public Date getSnapshotDate() {
+                        return commitDate;
+                    }
+                };
+
+                CsvRowProvider<Method, IHasSnapshotDate, AllSnapshotFunctionsColumns> csvRowProvider = AllSnapshotFunctionsColumns.newCsvRowProvider(dateProvider);
+
+                @Override
+                protected void actuallyDoStuff(CSVPrinter csv) throws IOException {
+                    csv.printRecord(csvRowProvider.headerRow());
+                    try {
+                        printRecordsForFunctions(csv);
+                    } catch (IOException | RuntimeException ex) {
+                        LOG.warn("Failed to write output file " + outputFile, ex);
+                        boolean deleteFailed = false;
+                        try {
+                            deleteFailed = outputFile.delete();
+                        } catch (RuntimeException re) {
+                            LOG.warn("Failed to delete incomplete output file " + outputFile, re);
+                        }
+                        if (deleteFailed) {
+                            LOG.warn("Failed to delete output file " + outputFile);
+                        }
+                    }
+                }
+
+                private void printRecordsForFunctions(CSVPrinter csv) throws IOException {
+                    for (List<Method> functions : actualFunctionsByPath.values()) {
+                        for (Method f : functions) {
+                            final Object[] row = csvRowProvider.dataRow(f);
+                            csv.printRecord(row);
+                        }
+                    }
+                }
+            };
+
+            writer.write(outputFile);
+        }
+
+        private void ensureOutputFileDirOrDie(File outputFile) {
+            File dir = outputFile.getParentFile();
+            if (dir.isDirectory()) {
+                return;
+            }
+
+            if (!dir.mkdirs()) {
+                throw new RuntimeException("Failed to create directory for output file " + outputFile);
+            }
+        }
+
+        private boolean cacheFileExists(Commit commit) {
+            return AllFunctionsCsvReader.fileExists(config, commit.commitHash);
+        }
+
+        private Set<FunctionId> extractFunctionIds(Map<String, List<Method>> actualFunctionsByPath) {
+            final Set<FunctionId> actualIds = new LinkedHashSet<>();
+            for (Map.Entry<String, List<Method>> functionsInPath : actualFunctionsByPath.entrySet()) {
+                String path = functionsInPath.getKey();
+                for (Method f : functionsInPath.getValue()) {
+                    FunctionId id = new FunctionId(f.uniqueFunctionSignature, path);
+                    actualIds.add(id);
+                }
+            }
+            return actualIds;
+        }
+
+        private Set<FunctionId> getFunctionIdsFromCsv(Commit commit) {
+            AllFunctionsCsvReader reader = new AllFunctionsCsvReader();
+            final List<AllFunctionsRow> allFunctionsRows = reader.readFile(config, commit.commitHash);
+            Set<FunctionId> result = new LinkedHashSet<>();
+            for (AllFunctionsRow r : allFunctionsRows) {
+                result.add(r.functionId);
+            }
+            return result;
+        }
+    }
+
     private Set<FunctionId> getActualFunctionIdsAtCurrentCommit() {
         boolean logDebug = LOG.isDebugEnabled();
         long timeBefore = 0;
         if (logDebug) {
             timeBefore = System.currentTimeMillis();
         }
-        Map<String, List<Method>> actualFunctionsByPath = GitUtil.listFunctionsAtCurrentCommit(this.repoDir, this.currentCommit.commitHash);
-        final Set<FunctionId> actualIds = new LinkedHashSet<>();
-        for (Map.Entry<String, List<Method>> functionsInPath : actualFunctionsByPath.entrySet()) {
-            String path = functionsInPath.getKey();
-            for (Method f : functionsInPath.getValue()) {
-                FunctionId id = new FunctionId(f.uniqueFunctionSignature, path);
-                actualIds.add(id);
-            }
-        }
+
+        CachingFunctionsLister l = new CachingFunctionsLister(config);
+        Set<FunctionId> result = l.getFunctionIdsAtCommit(this.currentCommit);
 
         if (logDebug) {
             long timeAfter = System.currentTimeMillis();
@@ -1052,7 +1152,7 @@ public class GenealogyTracker {
                     ": " + minutes + "m" + seconds + "s.");
         }
 
-        return actualIds;
+        return result;
     }
 
     private void offerIfNew(Commit commit) {

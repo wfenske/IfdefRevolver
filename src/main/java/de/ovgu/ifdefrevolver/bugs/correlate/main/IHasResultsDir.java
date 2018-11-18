@@ -15,4 +15,9 @@ public interface IHasResultsDir {
      * Directory in which computed information related to the snapshot with the given date resides.
      */
     File snapshotResultsDirForDate(Date date);
+
+    /**
+     * Directory in which computed information related to the snapshot with the given commit hash resides.
+     */
+    File snapshotResultsDirForCommit(String commitHash);
 }

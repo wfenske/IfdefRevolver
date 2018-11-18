@@ -10,13 +10,13 @@ import de.ovgu.ifdefrevolver.bugs.minecommits.CommitsDistanceDb;
 import de.ovgu.ifdefrevolver.bugs.minecommits.CommitsDistanceDb.Commit;
 import de.ovgu.ifdefrevolver.bugs.minecommits.CommitsDistanceDbCsvReader;
 import de.ovgu.ifdefrevolver.commitanalysis.*;
-import de.ovgu.skunk.util.LinkedGroupingListMap;
 import de.ovgu.ifdefrevolver.util.ProgressMonitor;
 import de.ovgu.ifdefrevolver.util.ThreadProcessor;
 import de.ovgu.ifdefrevolver.util.UncaughtWorkerThreadException;
 import de.ovgu.skunk.detection.output.CsvEnumUtils;
 import de.ovgu.skunk.detection.output.CsvFileWriterHelper;
 import de.ovgu.skunk.detection.output.CsvRowProvider;
+import de.ovgu.skunk.util.LinkedGroupingListMap;
 import org.apache.commons.cli.*;
 import org.apache.commons.csv.CSVPrinter;
 import org.apache.commons.math3.stat.descriptive.moment.Mean;
@@ -166,7 +166,7 @@ public class AddChangeDistances {
         Map<Commit, List<AllFunctionsRow>> allFunctionsBySnapshotStartCommit = groupAllFunctionsBySnapshotStartCommit();
 
         GenealogyTracker gt = new GenealogyTracker(commitsDistanceDb, allFunctionsBySnapshotStartCommit, changesByCommitKey,
-                config.getRepoDir());
+                config);
         gt.main();
         System.exit(0);
     }
