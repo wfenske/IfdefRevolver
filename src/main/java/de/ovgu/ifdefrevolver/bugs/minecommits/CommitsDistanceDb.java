@@ -79,6 +79,18 @@ public class CommitsDistanceDb {
             return this.parents;
         }
 
+//        public Set<Commit> siblings() {
+//            Set<Commit> siblings = new HashSet<>();
+//            for (Commit parent : this.parents) {
+//                for (Commit child : parent.children()) {
+//                    if (child != this) {
+//                        siblings.add(child);
+//                    }
+//                }
+//            }
+//            return siblings;
+//        }
+
         public Commit[] children() {
             return this.children;
         }
