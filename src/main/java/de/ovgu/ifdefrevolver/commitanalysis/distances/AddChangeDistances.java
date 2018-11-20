@@ -10,6 +10,7 @@ import de.ovgu.ifdefrevolver.bugs.minecommits.CommitsDistanceDb;
 import de.ovgu.ifdefrevolver.bugs.minecommits.CommitsDistanceDb.Commit;
 import de.ovgu.ifdefrevolver.bugs.minecommits.CommitsDistanceDbCsvReader;
 import de.ovgu.ifdefrevolver.commitanalysis.*;
+import de.ovgu.ifdefrevolver.commitanalysis.branchtraversal.GenealogyTracker;
 import de.ovgu.ifdefrevolver.util.ProgressMonitor;
 import de.ovgu.ifdefrevolver.util.ThreadProcessor;
 import de.ovgu.ifdefrevolver.util.UncaughtWorkerThreadException;
@@ -163,11 +164,11 @@ public class AddChangeDistances {
 
     private void trackGenealogies() {
         List<FunctionChangeRow>[] changesByCommitKey = groupChangesByCommitKey();
-        Map<Commit, List<AllFunctionsRow>> allFunctionsBySnapshotStartCommit = groupAllFunctionsBySnapshotStartCommit();
+        //Map<Commit, List<AllFunctionsRow>> allFunctionsBySnapshotStartCommit = groupAllFunctionsBySnapshotStartCommit();
 
-        GenealogyTracker gt = new GenealogyTracker(commitsDistanceDb, allFunctionsBySnapshotStartCommit, changesByCommitKey,
+        GenealogyTracker gt = new GenealogyTracker(commitsDistanceDb, changesByCommitKey,
                 config);
-        gt.main();
+        gt.processCommits();
         System.exit(0);
     }
 
