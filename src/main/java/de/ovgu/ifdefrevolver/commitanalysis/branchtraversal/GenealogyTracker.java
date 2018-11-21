@@ -10,61 +10,56 @@ import org.apache.log4j.Logger;
 
 import java.util.*;
 
-public class GenealogyTracker {
+public class GenealogyTracker extends AbstractCommitWalker {
     private static Logger LOG = Logger.getLogger(GenealogyTracker.class);
     private final List<FunctionChangeRow>[] changesByCommitKey;
     private final ListChangedFunctionsConfig config;
 
-    protected CommitsDistanceDb commitsDistanceDb;
-    protected Commit currentCommit;
-    private Queue<Commit> next;
-    private BitSet done;
     private Branch currentBranch;
     private FunctionInBranchFactory functionFactory;
     private Branch[] branchesByCommitKey;
     private MoveConflictStats moveConflictStats;
+    protected int changesProcessed;
 
     public GenealogyTracker(CommitsDistanceDb commitsDistanceDb, List<FunctionChangeRow>[] changesByCommitKey, ListChangedFunctionsConfig config) {
-        this.commitsDistanceDb = commitsDistanceDb;
+        super(commitsDistanceDb);
         this.changesByCommitKey = changesByCommitKey;
         this.config = config;
     }
 
+    @Override
     public void processCommits() {
-        final int numAllCommits = commitsDistanceDb.getCommits().size();
-        moveConflictStats = new MoveConflictStats();
-
-        done = new BitSet(numAllCommits);
-        branchesByCommitKey = new Branch[numAllCommits];
-
-        Set<Commit> rootCommits = commitsDistanceDb.getRoots();
-        next = new LinkedList<>(rootCommits);
-
+        this.moveConflictStats = new MoveConflictStats();
+        this.branchesByCommitKey = new Branch[getNumAllCommits()];
         this.functionFactory = new FunctionInBranchFactory();
+        this.changesProcessed = 0;
 
-        while (!next.isEmpty()) {
-            this.currentCommit = getNextProcessableCommit();
-            processCurrentCommit();
-            markCurrentCommitAsDone();
+        super.processCommits();
+    }
 
-            for (Commit child : currentCommit.children()) {
-                offerIfNew(child);
+    @Override
+    protected void processCurrentCommit() {
+        LOG.debug("Processing " + currentCommit);
+        this.currentBranch = assignBranch(currentCommit);
+        GenealogyTracker.LOG.debug("Current branch of " + currentCommit + " is " + this.currentBranch);
+
+        processChangesOfCurrentCommit();
+
+        if ((currentBranch.getFirstCommit() == currentCommit) && (currentCommit.isMerge())) {
+            validateComputedFunctionsAfterMerge();
+        }
+
+        for (Commit child : currentCommit.children()) {
+            if (child.isMerge()) {
+                this.currentBranch.createPreMergeBranch(child);
             }
         }
-
-        if (done.cardinality() != numAllCommits) {
-            onUnprocessedCommitsRemain();
-        }
-
-        onAllCommitsProcessed();
     }
 
-    protected void onUnprocessedCommitsRemain() {
-        throw new RuntimeException("Some unprocessed commits remain");
-    }
-
+    @Override
     protected void onAllCommitsProcessed() {
-        LOG.info("Successfully processed all " + changesProcessed + " commits.");
+        super.onAllCommitsProcessed();
+
         maybeReportBranchStats();
         LOG.debug("Processed " + changesProcessed + " changes.");
 
@@ -79,7 +74,7 @@ public class GenealogyTracker {
     }
 
     protected void maybeReportBranchStats() {
-        if (!LOG.isDebugEnabled()) return;
+        if (!LOG.isInfoEnabled()) return;
 
         Set<Branch> branches = new HashSet<>();
         int merges = 0;
@@ -101,42 +96,10 @@ public class GenealogyTracker {
             }
         }
 
-        LOG.debug("Created " + branches.size() + " branches. merges=" + merges + ", splits=" + splits + ", roots=" + roots);
+        LOG.info("Created " + branches.size() + " branches. merges=" + merges + ", splits=" + splits + ", roots=" + roots);
     }
 
-    protected void markCurrentCommitAsDone() {
-        done.set(currentCommit.key);
-    }
-
-    protected Commit getNextProcessableCommit() {
-        int sz = next.size();
-        for (int i = 0; i < sz; i++) {
-            Commit nextCommit = next.poll(); // cannot be null due to preconditions of this method
-            if (isProcessable(nextCommit)) {
-                return nextCommit;
-            } else {
-                next.offer(nextCommit);
-            }
-        }
-        throw new RuntimeException("None of the next commits is processable");
-    }
-
-    private boolean isProcessable(Commit commit) {
-        for (Commit parent : commit.parents()) {
-            if (!isCommitProcessed(parent)) {
-                //LOG.debug(commit + " cannot be processed: Parent " + parent + " has not yet been processed.");
-                return false;
-            }
-        }
-
-//        if (isCommitSiblingOfUnprocessedMerge(commit)) {
-//            return false;
-//        }
-
-        return true;
-    }
-
-//    private boolean isCommitSiblingOfUnprocessedMerge(Commit commit) {
+    //    private boolean isCommitSiblingOfUnprocessedMerge(Commit commit) {
 ////        for (Commit parent : commit.parents()) {
 ////            Commit[] children = parent.children();
 ////            for (Commit child : children) {
@@ -155,28 +118,6 @@ public class GenealogyTracker {
 //        }
 //        return false;
 //    }
-
-    protected boolean isCommitProcessed(Commit commit) {
-        return done.get(commit.key);
-    }
-
-    protected void processCurrentCommit() {
-        LOG.debug("Processing " + currentCommit);
-        this.currentBranch = assignBranch(currentCommit);
-        LOG.debug("Current branch of " + currentCommit + " is " + this.currentBranch);
-
-        processChangesOfCurrentCommit();
-
-        if ((currentBranch.getFirstCommit() == currentCommit) && (currentCommit.isMerge())) {
-            validateComputedFunctionsAfterMerge();
-        }
-
-        for (Commit child : currentCommit.children()) {
-            if (child.isMerge()) {
-                this.currentBranch.createPreMergeBranch(child);
-            }
-        }
-    }
 
     private void validateComputedFunctionsAfterMerge() {
         final Set<FunctionId> actualIds = getActualFunctionIdsAtCurrentCommit();
@@ -227,7 +168,7 @@ public class GenealogyTracker {
     }
 
     private Set<FunctionId> getActualFunctionIdsAtCurrentCommit() {
-        boolean logDebug = LOG.isDebugEnabled();
+        final boolean logDebug = LOG.isDebugEnabled();
         long timeBefore = 0;
         if (logDebug) {
             timeBefore = System.currentTimeMillis();
@@ -246,12 +187,6 @@ public class GenealogyTracker {
         }
 
         return result;
-    }
-
-    private void offerIfNew(Commit commit) {
-        if (!isCommitProcessed(commit) && !next.contains(commit)) {
-            next.offer(commit);
-        }
     }
 
     private Branch assignBranch(Commit commit) {
@@ -320,9 +255,9 @@ public class GenealogyTracker {
             boolean isModOfDeletedFunction = isModOfDeletedFunction(deletions, r);
 
             if (isModOfDeletedFunction) {
-                LOG.debug("Skipping MOD/MOVE of deleted function: " + r);
+                LOG.debug("Skipping MOD/MOVE of function that was deleted by a previous hunk in the same commit: " + r);
             } else {
-                assignChangeToFunction(r);
+                assignChangeToFunctionsInBranch(r);
             }
         }
     }
@@ -337,7 +272,9 @@ public class GenealogyTracker {
         }
 
         List<FunctionChangeRow> deletionsForSameFunction = deletions.get(r.functionId);
-        if (deletionsForSameFunction == null) return false;
+        if (deletionsForSameFunction == null) {
+            return false;
+        }
 
         for (FunctionChangeRow del : deletionsForSameFunction) {
             if (del.hunk < r.hunk) {
@@ -348,9 +285,7 @@ public class GenealogyTracker {
         return false;
     }
 
-    private int changesProcessed = 0;
-
-    private void assignChangeToFunction(FunctionChangeRow change) {
+    private void assignChangeToFunctionsInBranch(FunctionChangeRow change) {
         FunctionsInBranch functions = this.currentBranch.functions;
         functions.assignChange(change);
         changesProcessed++;
