@@ -13,6 +13,14 @@ public class DateUtils {
     private DateUtils() {
     }
 
+    /**
+     * Test if the first date is at least one day before the the second date.
+     * Hours, minutes, etc. are ignored in this comparison.
+     *
+     * @param thisDate
+     * @param otherDate
+     * @return
+     */
     public static boolean isAtLeastOneDayBefore(Date thisDate, Date otherDate) {
         return isAtLeastOneDayBefore(toCalendar(thisDate), toCalendar(otherDate));
     }
@@ -23,6 +31,14 @@ public class DateUtils {
         return cal;
     }
 
+    /**
+     * Test if the first calendar is at least one day before the the second calendar.
+     * Hours, minutes, etc. are ignored in this comparison.
+     *
+     * @param thisCal
+     * @param otherCal
+     * @return
+     */
     public static boolean isAtLeastOneDayBefore(Calendar thisCal, Calendar otherCal) {
         int thisYear = thisCal.get(Calendar.YEAR);
         int otherYear = otherCal.get(Calendar.YEAR);

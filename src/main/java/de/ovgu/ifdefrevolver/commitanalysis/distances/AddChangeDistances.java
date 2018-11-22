@@ -11,6 +11,7 @@ import de.ovgu.ifdefrevolver.bugs.minecommits.CommitsDistanceDb.Commit;
 import de.ovgu.ifdefrevolver.bugs.minecommits.CommitsDistanceDbCsvReader;
 import de.ovgu.ifdefrevolver.commitanalysis.*;
 import de.ovgu.ifdefrevolver.commitanalysis.branchtraversal.GenealogyTracker;
+import de.ovgu.ifdefrevolver.commitanalysis.branchtraversal.SnapshotCreatingCommitWalker;
 import de.ovgu.ifdefrevolver.util.ProgressMonitor;
 import de.ovgu.ifdefrevolver.util.ThreadProcessor;
 import de.ovgu.ifdefrevolver.util.UncaughtWorkerThreadException;
@@ -140,7 +141,11 @@ public class AddChangeDistances {
         Set<FunctionIdWithCommit> leftOverFunctionIdsWithCommits = getFunctionIdsWithCommitFromLeftOverSnapshot(leftOverSnapshotDate);
         Set<FunctionIdWithCommit> functionsAddedInBetween = getFunctionIdsWithCommitsAddedInBetween();
 
+        createSnapshots();
+        System.exit(0);
+
         trackGenealogies();
+        System.exit(0);
 
 //        functionGenealogies = computeFunctionGenealogies(allFunctionsEver, leftOverFunctionIdsWithCommits, functionsAddedInBetween);
         List<SnapshotWithFunctions> snapshotsWithFunctions = mergeGenealogiesWithSnapshotData();
@@ -162,6 +167,11 @@ public class AddChangeDistances {
         LOG.info(ageRequestStats);
     }
 
+    private void createSnapshots() {
+        SnapshotCreatingCommitWalker<ListChangedFunctionsConfig> walker = new SnapshotCreatingCommitWalker<ListChangedFunctionsConfig>(commitsDistanceDb, config);
+        walker.processCommits();
+    }
+
     private void trackGenealogies() {
         List<FunctionChangeRow>[] changesByCommitKey = groupChangesByCommitKey();
         //Map<Commit, List<AllFunctionsRow>> allFunctionsBySnapshotStartCommit = groupAllFunctionsBySnapshotStartCommit();
@@ -169,7 +179,6 @@ public class AddChangeDistances {
         GenealogyTracker gt = new GenealogyTracker(commitsDistanceDb, changesByCommitKey,
                 config);
         gt.processCommits();
-        System.exit(0);
     }
 
     private Map<Commit, List<AllFunctionsRow>> groupAllFunctionsBySnapshotStartCommit() {

@@ -14,7 +14,7 @@ import java.util.Optional;
  *
  * @author wfenske
  */
-public class ListChangedFunctionsConfig extends ProjectInformationConfig implements IHasRepoDir {
+public class ListChangedFunctionsConfig extends ProjectInformationConfig implements IHasRepoDir, IHasRepoAndResultsDir {
 
     public static final char OPT_THREADS = 't';
     public static final String OPT_THREADS_L = "threads";
@@ -40,10 +40,6 @@ public class ListChangedFunctionsConfig extends ProjectInformationConfig impleme
     public static final boolean DEFAULT_LEFT_OVER_CHANGES = false;
     private String repoDir = null;
 
-    /**
-     * The IDs of GIT commit which should be analyzed
-     */
-    //public List<String> commitIds;
     public int maxNumberOfFilesPerCommit = DEFAULT_MAX_NUMBER_OF_FILES_PER_COMMIT;
     public int maxSizeOfADiff = DEFAULT_MAX_SIZE_OF_A_DIFF;
     public int maxSizeOfDiffSource = DEFAULT_MAX_SIZE_OF_DIFF_SOURCE;

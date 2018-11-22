@@ -4,7 +4,7 @@ import de.ovgu.ifdefrevolver.bugs.minecommits.CommitsDistanceDb;
 import de.ovgu.ifdefrevolver.bugs.minecommits.CommitsDistanceDb.Commit;
 import de.ovgu.ifdefrevolver.commitanalysis.FunctionChangeRow;
 import de.ovgu.ifdefrevolver.commitanalysis.FunctionId;
-import de.ovgu.ifdefrevolver.commitanalysis.ListChangedFunctionsConfig;
+import de.ovgu.ifdefrevolver.commitanalysis.IHasRepoAndResultsDir;
 import de.ovgu.skunk.util.GroupingListMap;
 import org.apache.log4j.Logger;
 
@@ -13,7 +13,7 @@ import java.util.*;
 public class GenealogyTracker extends AbstractCommitWalker {
     private static Logger LOG = Logger.getLogger(GenealogyTracker.class);
     private final List<FunctionChangeRow>[] changesByCommitKey;
-    private final ListChangedFunctionsConfig config;
+    private final IHasRepoAndResultsDir config;
 
     private Branch currentBranch;
     private FunctionInBranchFactory functionFactory;
@@ -21,7 +21,7 @@ public class GenealogyTracker extends AbstractCommitWalker {
     private MoveConflictStats moveConflictStats;
     protected int changesProcessed;
 
-    public GenealogyTracker(CommitsDistanceDb commitsDistanceDb, List<FunctionChangeRow>[] changesByCommitKey, ListChangedFunctionsConfig config) {
+    public GenealogyTracker(CommitsDistanceDb commitsDistanceDb, List<FunctionChangeRow>[] changesByCommitKey, IHasRepoAndResultsDir config) {
         super(commitsDistanceDb);
         this.changesByCommitKey = changesByCommitKey;
         this.config = config;

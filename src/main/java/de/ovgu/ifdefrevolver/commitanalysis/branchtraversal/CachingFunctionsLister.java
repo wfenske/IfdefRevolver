@@ -16,9 +16,9 @@ import java.util.*;
 class CachingFunctionsLister {
     private static Logger LOG = Logger.getLogger(CachingFunctionsLister.class);
 
-    private final ListChangedFunctionsConfig config;
+    private final IHasRepoAndResultsDir config;
 
-    public CachingFunctionsLister(ListChangedFunctionsConfig config) {
+    public CachingFunctionsLister(IHasRepoAndResultsDir config) {
         this.config = config;
     }
 

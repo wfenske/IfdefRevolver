@@ -18,7 +18,7 @@ interface ISnapshotProcessingModeStrategy {
     /**
      * Create the Snapshot, if it does not already exist. Snapshots are
      * stored on disk in the folder {@link CreateSnapshotsConfig#projectSnapshotsDir()}
-     * /&lt;date&gt;, where &lt;date&gt; hsa the format
+     * /&lt;date&gt;, where &lt;date&gt; has the format
      * &quot;YYYY-MM-DD&quot;.
      *
      * @param currentSnapshot Start date of the current snapshot
