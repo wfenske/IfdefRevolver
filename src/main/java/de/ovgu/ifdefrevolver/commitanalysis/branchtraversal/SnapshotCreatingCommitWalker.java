@@ -8,6 +8,7 @@ import de.ovgu.ifdefrevolver.commitanalysis.GitUtil;
 import de.ovgu.ifdefrevolver.commitanalysis.IHasRepoDir;
 import de.ovgu.ifdefrevolver.util.DateUtils;
 import de.ovgu.skunk.detection.output.CsvFileWriterHelper;
+import de.ovgu.skunk.detection.output.CsvRowProvider;
 import org.apache.commons.csv.CSVPrinter;
 import org.apache.log4j.Logger;
 
@@ -40,17 +41,16 @@ public class SnapshotCreatingCommitWalker<TConfig extends IHasRepoDir & IHasSnap
     private void writeSnapshotOverviewFile() {
         LOG.debug("Writing snapshot overview CSV for " + snapshots.size() + " snapshot(s).");
         File outputDir = config.projectResultsDir();
-        File outputFile = new File(outputDir, "snapshots.csv");
+        File outputFile = new File(outputDir, SnapshotsColumns.FILE_BASENAME);
         LOG.info("Writing snapshot overview file to " + outputFile);
+        CsvRowProvider<Snapshot, Void, SnapshotsColumns> rowProvider = new CsvRowProvider<>(SnapshotsColumns.class, null);
 
         CsvFileWriterHelper writer = new CsvFileWriterHelper() {
             @Override
             protected void actuallyDoStuff(CSVPrinter csv) throws IOException {
-                csv.printRecord("SNAPSHOT_INDEX", "SNAPSHOT_DATE", "START_COMMIT_HASH");
+                csv.printRecord(rowProvider.headerRow());
                 for (Snapshot s : snapshots) {
-                    final String snapshotIndexString = String.valueOf(s.getSnapshotIndex());
-                    final String snapshotDateString = s.getFormattedSnapshotDate();
-                    csv.printRecord(snapshotIndexString, snapshotDateString, s.getStartHash());
+                    csv.printRecord(rowProvider.dataRow(s));
                 }
             }
         };
@@ -76,18 +76,17 @@ public class SnapshotCreatingCommitWalker<TConfig extends IHasRepoDir & IHasSnap
                 throw new RuntimeException("Failed to create output directory " + outputDir);
             }
         }
-        File outputFile = new File(outputDir, "snapshot_commits.csv");
+        File outputFile = new File(outputDir, SnapshotCommitsColumns.FILE_BASENAME);
         LOG.info("Writing snapshot " + s + " to " + outputFile);
 
-        final String snapshotDateString = s.getFormattedSnapshotDate();
-        final String snapshotIndexString = String.valueOf(s.getSnapshotIndex());
+        CsvRowProvider<String, Snapshot, SnapshotCommitsColumns> rowProvider = new CsvRowProvider<>(SnapshotCommitsColumns.class, s);
 
         CsvFileWriterHelper writer = new CsvFileWriterHelper() {
             @Override
             protected void actuallyDoStuff(CSVPrinter csv) throws IOException {
-                csv.printRecord("SNAPSHOT_INDEX", "COMMIT_HASH", "SNAPSHOT_DATE");
+                csv.printRecord(rowProvider.headerRow());
                 for (String commitHash : s.getCommitHashes()) {
-                    csv.printRecord(snapshotIndexString, commitHash, snapshotDateString);
+                    csv.printRecord(rowProvider.dataRow(commitHash));
                 }
             }
         };
@@ -120,6 +119,37 @@ public class SnapshotCreatingCommitWalker<TConfig extends IHasRepoDir & IHasSnap
         final int discardedCommits = commitsInCurrentSnapshot.size();
         LOG.info("Collected " + commitsInSnapshots + " commit(s) in " + numSnapshots + " snapshot(s). " +
                 "Discarded " + discardedCommits + " commit(s) since it/they did not fill up a whole snapshot.");
+
+        //validateWrittenSnapshots();
+    }
+
+    private void validateWrittenSnapshots() {
+        final int numExpectedSnapshots = snapshots.size();
+
+        final List<Snapshot> snapshotsRead = SnapshotReader.readSnapshots(config);
+        if (snapshotsRead.size() != numExpectedSnapshots) {
+            throw new RuntimeException("Read wrong number of snapshots. Expected: " + numExpectedSnapshots + " got: " + snapshotsRead.size());
+        }
+        for (int i = 0; i < numExpectedSnapshots; i++) {
+            Snapshot expectedSnapshot = snapshots.get(i);
+            Snapshot actualSnapshot = snapshotsRead.get(i);
+            if (expectedSnapshot.getSnapshotIndex() != actualSnapshot.getSnapshotIndex()) {
+                throw new RuntimeException("Snapshot indexes don't match. Expected: " + expectedSnapshot + " got: " + actualSnapshot);
+            }
+
+            if (!expectedSnapshot.getStartHash().equals(actualSnapshot.getStartHash())) {
+                throw new RuntimeException("Snapshot start commit hashes don't match. Expected: " + expectedSnapshot + " got: " + actualSnapshot);
+            }
+
+            if (!expectedSnapshot.getCommitHashes().equals(actualSnapshot.getCommitHashes())) {
+                throw new RuntimeException("Snapshot commit hashes don't match. Expected: " + expectedSnapshot + " got: " + actualSnapshot);
+            }
+
+            if (!org.apache.commons.lang3.time.DateUtils.isSameDay(expectedSnapshot.getSnapshotDate(), actualSnapshot.getSnapshotDate())) {
+                throw new RuntimeException("Snapshot start dates don't match. Expected: " + expectedSnapshot + " got: " + actualSnapshot);
+            }
+        }
+        LOG.info("Successfully validated all written snapshots.");
     }
 
     @Override
