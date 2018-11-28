@@ -71,6 +71,16 @@ public class ProjectInformationConfig implements IHasSnapshotsDir, IHasResultsDi
      */
     protected Optional<List<Date>> snapshotFilter = Optional.empty();
 
+    public static void validateRepoDir(String repoDir) {
+        File repoFile = new File(repoDir);
+        if (!repoFile.exists()) {
+            throw new IllegalArgumentException("Repository directory does not exist: " + repoDir);
+        }
+        if (!repoFile.isDirectory()) {
+            throw new IllegalArgumentException("Repository is not a directory: " + repoDir);
+        }
+    }
+
     public static <TConfig extends IHasResultsDir & IHasProjectName> void parseProjectResultsDirFromCommandLine(CommandLine line, TConfig config) {
         final String resultsDirName;
         if (line.hasOption(OPT_RESULTS_DIR_L)) {

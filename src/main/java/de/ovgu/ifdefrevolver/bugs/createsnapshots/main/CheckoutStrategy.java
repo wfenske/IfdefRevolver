@@ -1,10 +1,12 @@
 package de.ovgu.ifdefrevolver.bugs.createsnapshots.main;
 
+import de.ovgu.ifdefrevolver.bugs.correlate.data.Snapshot;
 import de.ovgu.ifdefrevolver.bugs.createsnapshots.data.Commit;
 import de.ovgu.ifdefrevolver.bugs.createsnapshots.data.ISnapshot;
 import de.ovgu.ifdefrevolver.bugs.createsnapshots.data.ProperSnapshot;
 import de.ovgu.ifdefrevolver.bugs.createsnapshots.input.FileFinder;
 import de.ovgu.ifdefrevolver.bugs.createsnapshots.input.RevisionsCsvReader;
+import de.ovgu.ifdefrevolver.bugs.minecommits.CommitsDistanceDb;
 import de.ovgu.ifdefrevolver.util.FileUtils;
 import org.apache.log4j.Logger;
 
@@ -18,9 +20,9 @@ import java.util.List;
 
 /**
  * <p>Checks out a project from GIT and creates the commit windows in the project's <code>snapshots</code>
- * directory<p/> <ol> <li>Reads all the commits of a repo,</li> <li>computes commit windows and writes them to disc
- * (to the following files <code>projectInfo.csv</code>, <code>snapshots/YYYY-MM-DD.csv</code>, where YYYY-MM-DD is
- * the date of the first commit in the snapshot; both files reside in the project's results directory)</li>
+ * directory<p/> <ol> <li>Reads all the commits of a repo,</li> <li>computes commit windows and writes them to disc (to
+ * the following files <code>projectInfo.csv</code>, <code>snapshots/YYYY-MM-DD.csv</code>, where YYYY-MM-DD is the date
+ * of the first commit in the snapshot; both files reside in the project's results directory)</li>
  * <li>checks out the sources from the GIT repo</li> <li>runs cppstats on each of the checked out commit
  * windows.</li> </ol>
  */
@@ -28,23 +30,25 @@ class CheckoutStrategy implements ISnapshotProcessingModeStrategy {
     private static final String CPPSTATS_INPUT_TXT = "cppstats_input.txt";
     private static Logger LOG = Logger.getLogger(CheckoutStrategy.class);
 
+    private final CommitsDistanceDb commitsDb;
     private final CreateSnapshotsConfig conf;
     private ISnapshot previousSnapshot;
     private RevisionsCsvReader revisionsCsvReader;
 
-    public CheckoutStrategy(CreateSnapshotsConfig conf) {
+    public CheckoutStrategy(CommitsDistanceDb commitsDb, CreateSnapshotsConfig conf) {
+        this.commitsDb = commitsDb;
         this.conf = conf;
     }
 
     @Override
     public void readAllRevisionsAndComputeSnapshots() {
-        this.revisionsCsvReader = new RevisionsCsvReader(conf.revisionCsvFile());
+        this.revisionsCsvReader = new RevisionsCsvReader(commitsDb, conf.revisionCsvFile());
         this.revisionsCsvReader.readAllCommits();
         this.revisionsCsvReader.computeSnapshots(conf);
     }
 
     @Override
-    public Collection<ProperSnapshot> getSnapshotsToProcess() {
+    public Collection<Snapshot> getSnapshotsToProcess() {
         if (conf.getSnapshotFilter().isPresent()) {
             LOG.warn("Ignoring snapshot filter: cannot be used in conjunction with " + this.getClass().getSimpleName());
         }
@@ -93,11 +97,12 @@ class CheckoutStrategy implements ISnapshotProcessingModeStrategy {
         // GIT CHECKOUT
         gitCheckout(currentSnapshot);
         // Anzahl der .c Dateien checken
-        LOG.debug("Looking for checkout .c files in directory " + conf.projectRepoDir().getAbsolutePath());
-        List<File> filesFound = FileFinder.find(conf.projectRepoDir(), "(.*\\.c$)");
+        File projectRepoDir = new File(conf.getRepoDir());
+        LOG.debug("Looking for checkout .c files in directory " + projectRepoDir.getAbsolutePath());
+        List<File> filesFound = FileFinder.find(projectRepoDir, "(.*\\.c$)");
         final int filesCount = filesFound.size();
         LOG.info(String.format("Found %d .c file%s in %s", filesCount, filesCount == 1 ? "" : "s",
-                conf.projectRepoDir().getAbsolutePath()));
+                projectRepoDir.getAbsolutePath()));
         conf.projectResultsDir().mkdirs();
         appendToProjectCsv(currentSnapshot, filesFound);
         appendToProjectAnalysisCsv(currentSnapshot, filesFound);
@@ -114,18 +119,20 @@ class CheckoutStrategy implements ISnapshotProcessingModeStrategy {
      */
     private void gitCheckout(ProperSnapshot snapshot) {
         String hash = snapshot.revisionHash();
-        CreateSnapshots.runExternalCommand(CreateSnapshotsConfig.GIT_PROG, conf.projectRepoDir().getAbsoluteFile(), "checkout", "--force", hash);
+        File projectRepoDir = new File(conf.getRepoDir());
+        CreateSnapshots.runExternalCommand(CreateSnapshotsConfig.GIT_PROG, projectRepoDir.getAbsoluteFile(), "checkout", "--force", hash);
     }
 
     private void appendToProjectAnalysisCsv(ProperSnapshot snapshot, List<File> filesFound) {
         final File csvOutFile = conf.projectAnalysisCsv();
+        final File projectRepoDir = new File(conf.getRepoDir());
         FileWriter fileWriter = null;
         BufferedWriter buff = null;
         try {
             fileWriter = new FileWriter(csvOutFile, true);
             buff = new BufferedWriter(fileWriter);
             for (File f : filesFound) {
-                String relativeFileName = CreateSnapshots.pathRelativeTo(f, conf.projectRepoDir());
+                String relativeFileName = CreateSnapshots.pathRelativeTo(f, projectRepoDir);
                 buff.write(relativeFileName + "," + snapshot.revisionDateString());
                 buff.newLine();
             }
@@ -190,7 +197,8 @@ class CheckoutStrategy implements ISnapshotProcessingModeStrategy {
     }
 
     private void copyFileToDir(File file, File destDir) {
-        String relFileName = CreateSnapshots.pathRelativeTo(file, conf.projectRepoDir());
+        final File projectRepoDir = new File(conf.getRepoDir());
+        String relFileName = CreateSnapshots.pathRelativeTo(file, projectRepoDir);
         File targetFileName = new File(destDir, relFileName);
         final File targetFileDir = targetFileName.getParentFile();
         targetFileDir.mkdirs();

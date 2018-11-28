@@ -255,7 +255,7 @@ public class CommitsDistanceDb {
         return commitsFromHashes.size();
     }
 
-    private synchronized Commit findCommitOrDie(String commitHash) {
+    public synchronized Commit findCommitOrDie(String commitHash) {
         Commit result = commitsFromHashes.get(commitHash);
         if (result == null) {
             throw new IllegalArgumentException("Unknown commit: " + commitHash);

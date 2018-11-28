@@ -5,6 +5,8 @@ import de.ovgu.ifdefrevolver.bugs.correlate.data.Snapshot;
 import de.ovgu.ifdefrevolver.bugs.correlate.input.ProjectInformationReader;
 import de.ovgu.ifdefrevolver.bugs.correlate.main.ProjectInformationConfig;
 import de.ovgu.ifdefrevolver.bugs.createsnapshots.main.CreateSnapshots;
+import de.ovgu.ifdefrevolver.bugs.minecommits.CommitsDistanceDb;
+import de.ovgu.ifdefrevolver.bugs.minecommits.CommitsDistanceDbCsvReader;
 import de.ovgu.ifdefrevolver.util.TerminableThread;
 import de.ovgu.ifdefrevolver.util.UncaughtWorkerThreadException;
 import de.ovgu.skunk.detection.data.Context;
@@ -27,6 +29,7 @@ public class ListAllFunctions {
     private static final Logger LOG = Logger.getLogger(ListAllFunctions.class);
     private ListAllFunctionsConfig config;
     private int errors;
+    private CommitsDistanceDb commitsDb;
 
     public static void main(String[] args) {
         ListAllFunctions main = new ListAllFunctions();
@@ -51,7 +54,8 @@ public class ListAllFunctions {
     private void execute() {
         LOG.debug("Listing all function definitions in snapshots in " + config.projectSnapshotsDir());
         this.errors = 0;
-        ProjectInformationReader<ListAllFunctionsConfig> projectInfo = new ProjectInformationReader<>(config);
+        this.commitsDb = (new CommitsDistanceDbCsvReader().dbFromCsv(config));
+        ProjectInformationReader<ListAllFunctionsConfig> projectInfo = new ProjectInformationReader<>(config, commitsDb);
         LOG.debug("Reading project information");
         projectInfo.readSnapshotsAndRevisionsFile();
         LOG.debug("Done reading project information");

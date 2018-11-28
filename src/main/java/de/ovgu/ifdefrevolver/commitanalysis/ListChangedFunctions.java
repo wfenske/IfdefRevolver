@@ -19,6 +19,7 @@ public class ListChangedFunctions {
     private ListChangedFunctionsConfig config;
     private int errors;
     private ProjectInformationReader<ListChangedFunctionsConfig> projectInfo;
+    private CommitsDistanceDb commitsDb;
 
     public static void main(String[] args) {
         ListChangedFunctions main = new ListChangedFunctions();
@@ -38,7 +39,8 @@ public class ListChangedFunctions {
     private void execute() {
         LOG.debug("Listing changed functions in snapshots in " + config.projectSnapshotsDir() + " and repo " + config.getRepoDir());
         this.errors = 0;
-        this.projectInfo = new ProjectInformationReader<>(config);
+        this.commitsDb = (new CommitsDistanceDbCsvReader()).dbFromCsv(config);
+        this.projectInfo = new ProjectInformationReader<>(config, commitsDb);
         LOG.debug("Reading project information");
         projectInfo.readSnapshotsAndRevisionsFile();
         LOG.debug("Done reading project information");
@@ -74,9 +76,9 @@ public class ListChangedFunctions {
 
     private IMinimalSnapshot createDummySnapshotToCoverRemainingCommits() {
         Collection<Snapshot> allActualSnapshots = projectInfo.getAllSnapshots();
-        final Set<String> remainingCommits = new HashSet<>(readAllCommits(config));
+        final Set<CommitsDistanceDb.Commit> remainingCommits = new HashSet<>(readAllCommits(config));
         for (IMinimalSnapshot actualSnapshot : allActualSnapshots) {
-            remainingCommits.removeAll(actualSnapshot.getCommitHashes());
+            remainingCommits.removeAll(actualSnapshot.getCommits());
         }
 
         return new IMinimalSnapshot() {
@@ -88,14 +90,14 @@ public class ListChangedFunctions {
             }
 
             @Override
-            public Set<String> getCommitHashes() {
+            public Set<CommitsDistanceDb.Commit> getCommits() {
                 return remainingCommits;
             }
-
-            @Override
-            public boolean isBugfixCommit(String commitHash) {
-                return false;
-            }
+//
+//            @Override
+//            public boolean isBugfixCommit(String commitHash) {
+//                return false;
+//            }
         };
     }
 
@@ -112,12 +114,10 @@ public class ListChangedFunctions {
         }
     }
 
-    private Set<String> readAllCommits(ListChangedFunctionsConfig config) {
-        File commitParentsFile = new File(config.projectResultsDir(), "commitParents.csv");
-        LOG.debug("Reading information about commit parent-child relationships from " + commitParentsFile);
+    private Set<CommitsDistanceDb.Commit> readAllCommits(ListChangedFunctionsConfig config) {
         CommitsDistanceDbCsvReader distanceReader = new CommitsDistanceDbCsvReader();
-        CommitsDistanceDb commitsDistanceDb = distanceReader.dbFromCsv(commitParentsFile);
-        return commitsDistanceDb.getCommitHashes();
+        CommitsDistanceDb commitsDistanceDb = distanceReader.dbFromCsv(config);
+        return commitsDistanceDb.getCommits();
     }
 
     private void listFunctionsInSnapshots(Collection<? extends IMinimalSnapshot> snapshots) {

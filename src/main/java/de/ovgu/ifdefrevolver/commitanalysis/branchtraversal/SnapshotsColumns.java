@@ -19,7 +19,7 @@ public enum SnapshotsColumns implements CsvColumnValueProvider<Snapshot, Void> {
     START_COMMIT_HASH {
         @Override
         public String csvColumnValue(Snapshot s, Void ctx) {
-            return s.getStartHash();
+            return s.getStartCommit().commitHash;
         }
     };
 

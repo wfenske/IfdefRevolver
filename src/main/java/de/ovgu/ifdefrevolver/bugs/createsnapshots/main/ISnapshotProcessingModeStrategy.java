@@ -1,5 +1,6 @@
 package de.ovgu.ifdefrevolver.bugs.createsnapshots.main;
 
+import de.ovgu.ifdefrevolver.bugs.correlate.data.Snapshot;
 import de.ovgu.ifdefrevolver.bugs.createsnapshots.data.ISnapshot;
 import de.ovgu.ifdefrevolver.bugs.createsnapshots.data.ProperSnapshot;
 
@@ -10,15 +11,13 @@ import java.util.Collection;
  */
 interface ISnapshotProcessingModeStrategy {
     /**
-     * Delete output files, such as the projectInfo.csv, if they are
-     * recreated anyway
+     * Delete output files, such as the projectInfo.csv, if they are recreated anyway
      */
     void removeOutputFiles();
 
     /**
-     * Create the Snapshot, if it does not already exist. Snapshots are
-     * stored on disk in the folder {@link CreateSnapshotsConfig#projectSnapshotsDir()}
-     * /&lt;date&gt;, where &lt;date&gt; has the format
+     * Create the Snapshot, if it does not already exist. Snapshots are stored on disk in the folder {@link
+     * CreateSnapshotsConfig#projectSnapshotsDir()} /&lt;date&gt;, where &lt;date&gt; has the format
      * &quot;YYYY-MM-DD&quot;.
      *
      * @param currentSnapshot Start date of the current snapshot
@@ -43,7 +42,7 @@ interface ISnapshotProcessingModeStrategy {
 
     void readAllRevisionsAndComputeSnapshots();
 
-    Collection<ProperSnapshot> getSnapshotsToProcess();
+    Collection<Snapshot> getSnapshotsToProcess();
 
     /**
      * Check whether the given snapshot has already been processed.  If so, processing this snapshot can be skipped.

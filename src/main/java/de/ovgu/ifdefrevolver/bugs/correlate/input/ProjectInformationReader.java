@@ -1,15 +1,15 @@
 package de.ovgu.ifdefrevolver.bugs.correlate.input;
 
 import com.opencsv.CSVReader;
-import de.ovgu.ifdefrevolver.bugs.correlate.data.FileChangeHunk;
 import de.ovgu.ifdefrevolver.bugs.correlate.data.IMinimalSnapshot;
 import de.ovgu.ifdefrevolver.bugs.correlate.data.Snapshot;
 import de.ovgu.ifdefrevolver.bugs.correlate.main.IHasProjectInfoFile;
 import de.ovgu.ifdefrevolver.bugs.correlate.main.IHasResultsDir;
 import de.ovgu.ifdefrevolver.bugs.correlate.main.IHasRevisionCsvFile;
 import de.ovgu.ifdefrevolver.bugs.correlate.main.IHasSnapshotsDir;
-import de.ovgu.ifdefrevolver.bugs.createsnapshots.data.Commit;
 import de.ovgu.ifdefrevolver.bugs.createsnapshots.input.RevisionsCsvReader;
+import de.ovgu.ifdefrevolver.bugs.minecommits.CommitsDistanceDb;
+import de.ovgu.ifdefrevolver.bugs.minecommits.CommitsDistanceDb.Commit;
 import de.ovgu.ifdefrevolver.commitanalysis.IHasSnapshotFilter;
 import de.ovgu.ifdefrevolver.util.SimpleCsvFileReader;
 import org.apache.commons.lang3.tuple.Pair;
@@ -29,7 +29,9 @@ import java.util.*;
 public class ProjectInformationReader<TConfig extends IHasProjectInfoFile & IHasResultsDir & IHasSnapshotsDir & IHasRevisionCsvFile> {
     private static Logger LOG = Logger.getLogger(ProjectInformationReader.class);
 
-    protected TConfig conf;
+    protected final TConfig conf;
+    protected final CommitsDistanceDb commitsDb;
+
 
     protected SortedMap<Date, Snapshot> snapshots;
 
@@ -38,8 +40,13 @@ public class ProjectInformationReader<TConfig extends IHasProjectInfoFile & IHas
     //protected SortedMap<IMinimalSnapshot, SortedMap<FileChangeHunk, String>> changedFilesBySnapshot = new TreeMap<>();
     //protected SortedMap<IMinimalSnapshot, SortedMap<FileChangeHunk, String>> fixedFilesBySnapshot = new TreeMap<>();
 
-    public ProjectInformationReader(TConfig conf) {
+    public ProjectInformationReader(TConfig conf, CommitsDistanceDb commitsDb) {
         this.conf = conf;
+        this.commitsDb = commitsDb;
+    }
+
+    public CommitsDistanceDb commitsDb() {
+        return this.commitsDb;
     }
 
     /**
@@ -49,7 +56,7 @@ public class ProjectInformationReader<TConfig extends IHasProjectInfoFile & IHas
      */
     public void readSnapshotsAndRevisionsFile() {
         LOG.info("Reading revisions file " + conf.revisionCsvFile());
-        revisionsReader = new RevisionsCsvReader(conf.revisionCsvFile());
+        revisionsReader = new RevisionsCsvReader(commitsDb, conf.revisionCsvFile());
         revisionsReader.readAllCommits();
         snapshots = readSnapshots();
     }
@@ -60,13 +67,12 @@ public class ProjectInformationReader<TConfig extends IHasProjectInfoFile & IHas
         SortedMap<Date, Snapshot> result = new TreeMap<>();
         for (RawSnapshotInfo rawSnapshotInfo : rawSnapshotInfos) {
             String startHash = rawSnapshotInfo.commitHashes.iterator().next();
-            Optional<Commit> startCommit = revisionsReader.getCommitByHash(startHash);
-            if (!startCommit.isPresent()) {
-                throw new IllegalArgumentException("Cannot determine branch number of unknown commit");
-            }
-            int branch = startCommit.get().getBranch();
-            Snapshot snapshot = new Snapshot(rawSnapshotInfo.sortIndex, branch, rawSnapshotInfo.date,
-                    rawSnapshotInfo.commitHashes, rawSnapshotInfo.snapshotDir);
+            Commit startCommit = commitsDb.findCommitOrDie(startHash);
+            //int branch = startCommit.get().getBranch();
+            Set<Commit> commits = new LinkedHashSet<>();
+            rawSnapshotInfo.commitHashes.forEach(hash -> commits.add(commitsDb.findCommitOrDie(hash)));
+
+            Snapshot snapshot = new Snapshot(rawSnapshotInfo.sortIndex, -1, rawSnapshotInfo.date, commits, rawSnapshotInfo.snapshotDir);
             result.put(rawSnapshotInfo.date, snapshot);
         }
 
@@ -227,35 +233,35 @@ public class ProjectInformationReader<TConfig extends IHasProjectInfoFile & IHas
         return snapshotsToProcess;
     }
 
-    protected Map<String, Snapshot> mapSnapshotsToCommits() {
-        Map<String, Snapshot> snapshotsByCommit = new HashMap<>();
-        for (Snapshot s : snapshots.values()) {
-            for (String commitHash : s.getCommitHashes()) {
-                Snapshot previousSnapshot = snapshotsByCommit.put(commitHash, s);
-                if (previousSnapshot != null) {
-                    throw new RuntimeException("Commit " + commitHash + " occurs in two snapshots "
-                            + previousSnapshot + " and " + s);
-                }
-            }
-        }
-        return snapshotsByCommit;
-    }
+//    protected Map<Commit, Snapshot> mapSnapshotsToCommits() {
+//        Map<Commit, Snapshot> snapshotsByCommit = new HashMap<>();
+//        for (Snapshot s : snapshots.values()) {
+//            for (Commit commit : s.getCommits()) {
+//                Snapshot previousSnapshot = snapshotsByCommit.put(commit, s);
+//                if (previousSnapshot != null) {
+//                    throw new RuntimeException("Commit " + commit + " occurs in two snapshots "
+//                            + previousSnapshot + " and " + s);
+//                }
+//            }
+//        }
+//        return snapshotsByCommit;
+//    }
+//
+//    protected void putChangedFile(SortedMap<IMinimalSnapshot, SortedMap<FileChangeHunk, String>> map,
+//                                  IMinimalSnapshot snapshot, FileChangeHunk chFile, String fileName) {
+//        SortedMap<FileChangeHunk, String> changedFiles = ensureValueForKey(map, snapshot);
+//        changedFiles.put(chFile, fileName);
+//    }
 
-    protected void putChangedFile(SortedMap<IMinimalSnapshot, SortedMap<FileChangeHunk, String>> map,
-                                  IMinimalSnapshot snapshot, FileChangeHunk chFile, String fileName) {
-        SortedMap<FileChangeHunk, String> changedFiles = ensureValueForKey(map, snapshot);
-        changedFiles.put(chFile, fileName);
-    }
-
-    private static SortedMap<FileChangeHunk, String> ensureValueForKey(
-            SortedMap<IMinimalSnapshot, SortedMap<FileChangeHunk, String>> filesBySnapshot,
-            IMinimalSnapshot snapshot) {
-        SortedMap<FileChangeHunk, String> value = filesBySnapshot.get(snapshot);
-        if (value != null) {
-            return value;
-        }
-        value = new TreeMap<>();
-        filesBySnapshot.put(snapshot, value);
-        return value;
-    }
+//    private static SortedMap<FileChangeHunk, String> ensureValueForKey(
+//            SortedMap<IMinimalSnapshot, SortedMap<FileChangeHunk, String>> filesBySnapshot,
+//            IMinimalSnapshot snapshot) {
+//        SortedMap<FileChangeHunk, String> value = filesBySnapshot.get(snapshot);
+//        if (value != null) {
+//            return value;
+//        }
+//        value = new TreeMap<>();
+//        filesBySnapshot.put(snapshot, value);
+//        return value;
+//    }
 }

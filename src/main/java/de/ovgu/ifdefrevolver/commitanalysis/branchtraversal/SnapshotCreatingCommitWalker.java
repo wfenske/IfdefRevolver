@@ -4,6 +4,7 @@ import de.ovgu.ifdefrevolver.bugs.correlate.data.Snapshot;
 import de.ovgu.ifdefrevolver.bugs.correlate.main.IHasResultsDir;
 import de.ovgu.ifdefrevolver.bugs.correlate.main.IHasSnapshotsDir;
 import de.ovgu.ifdefrevolver.bugs.minecommits.CommitsDistanceDb;
+import de.ovgu.ifdefrevolver.bugs.minecommits.CommitsDistanceDb.Commit;
 import de.ovgu.ifdefrevolver.commitanalysis.GitUtil;
 import de.ovgu.ifdefrevolver.commitanalysis.IHasRepoDir;
 import de.ovgu.ifdefrevolver.util.DateUtils;
@@ -16,24 +17,29 @@ import java.io.File;
 import java.io.IOException;
 import java.util.*;
 
-public class SnapshotCreatingCommitWalker<TConfig extends IHasRepoDir & IHasSnapshotsDir & IHasResultsDir> extends AbstractCommitWalker {
+public class SnapshotCreatingCommitWalker<TConfig extends IHasResultsDir & IHasSnapshotsDir & IHasRepoDir> extends AbstractCommitWalker {
     private static Logger LOG = Logger.getLogger(SnapshotCreatingCommitWalker.class);
 
     private final int snapshotSize;
     private List<Snapshot> snapshots;
-    private List<String> commitsInCurrentSnapshot;
+    private List<Commit> commitsInCurrentSnapshot;
     private Calendar lastSnapshotCal = null;
     private final TConfig config;
 
-    public SnapshotCreatingCommitWalker(CommitsDistanceDb commitsDistanceDb, TConfig config) {
+    public SnapshotCreatingCommitWalker(CommitsDistanceDb commitsDistanceDb, TConfig config, int snapshotSize) {
         super(commitsDistanceDb);
         this.config = config;
-        this.snapshotSize = 200;
+        this.snapshotSize = snapshotSize;
     }
 
     @Override
     public void processCommits() {
         this.snapshots = new ArrayList<>();
+
+        if (snapshotSize <= 0) {
+            throw new IllegalArgumentException("Invalid snapshot size (should be >= 1): " + snapshotSize);
+        }
+
         startNewSnapshot();
         super.processCommits();
     }
@@ -79,14 +85,14 @@ public class SnapshotCreatingCommitWalker<TConfig extends IHasRepoDir & IHasSnap
         File outputFile = new File(outputDir, SnapshotCommitsColumns.FILE_BASENAME);
         LOG.info("Writing snapshot " + s + " to " + outputFile);
 
-        CsvRowProvider<String, Snapshot, SnapshotCommitsColumns> rowProvider = new CsvRowProvider<>(SnapshotCommitsColumns.class, s);
+        CsvRowProvider<Commit, Snapshot, SnapshotCommitsColumns> rowProvider = new CsvRowProvider<>(SnapshotCommitsColumns.class, s);
 
         CsvFileWriterHelper writer = new CsvFileWriterHelper() {
             @Override
             protected void actuallyDoStuff(CSVPrinter csv) throws IOException {
                 csv.printRecord(rowProvider.headerRow());
-                for (String commitHash : s.getCommitHashes()) {
-                    csv.printRecord(rowProvider.dataRow(commitHash));
+                for (Commit commit : s.getCommits()) {
+                    csv.printRecord(rowProvider.dataRow(commit));
                 }
             }
         };
@@ -126,7 +132,7 @@ public class SnapshotCreatingCommitWalker<TConfig extends IHasRepoDir & IHasSnap
     private void validateWrittenSnapshots() {
         final int numExpectedSnapshots = snapshots.size();
 
-        final List<Snapshot> snapshotsRead = SnapshotReader.readSnapshots(config);
+        final List<Snapshot> snapshotsRead = SnapshotReader.readSnapshots(commitsDistanceDb, config);
         if (snapshotsRead.size() != numExpectedSnapshots) {
             throw new RuntimeException("Read wrong number of snapshots. Expected: " + numExpectedSnapshots + " got: " + snapshotsRead.size());
         }
@@ -137,11 +143,11 @@ public class SnapshotCreatingCommitWalker<TConfig extends IHasRepoDir & IHasSnap
                 throw new RuntimeException("Snapshot indexes don't match. Expected: " + expectedSnapshot + " got: " + actualSnapshot);
             }
 
-            if (!expectedSnapshot.getStartHash().equals(actualSnapshot.getStartHash())) {
+            if (!expectedSnapshot.getStartCommit().equals(actualSnapshot.getStartCommit())) {
                 throw new RuntimeException("Snapshot start commit hashes don't match. Expected: " + expectedSnapshot + " got: " + actualSnapshot);
             }
 
-            if (!expectedSnapshot.getCommitHashes().equals(actualSnapshot.getCommitHashes())) {
+            if (!expectedSnapshot.getCommits().equals(actualSnapshot.getCommits())) {
                 throw new RuntimeException("Snapshot commit hashes don't match. Expected: " + expectedSnapshot + " got: " + actualSnapshot);
             }
 
@@ -154,7 +160,7 @@ public class SnapshotCreatingCommitWalker<TConfig extends IHasRepoDir & IHasSnap
 
     @Override
     protected void processCurrentCommit() {
-        this.commitsInCurrentSnapshot.add(this.currentCommit.commitHash);
+        this.commitsInCurrentSnapshot.add(this.currentCommit);
         if ((this.commitsInCurrentSnapshot.size() % snapshotSize) == 0) {
             createSnapshotFromCurrentCommits();
             startNewSnapshot();
@@ -167,8 +173,8 @@ public class SnapshotCreatingCommitWalker<TConfig extends IHasRepoDir & IHasSnap
 
     private void createSnapshotFromCurrentCommits() {
         final int branch = -1;
-        final String startCommitHash = this.commitsInCurrentSnapshot.get(0);
-        Calendar snapshotDateCal = GitUtil.getAuthorDateOfCommit(config.getRepoDir(), startCommitHash);
+        final Commit startCommit = this.commitsInCurrentSnapshot.get(0);
+        Calendar snapshotDateCal = GitUtil.getAuthorDateOfCommit(config.getRepoDir(), startCommit.commitHash);
         snapshotDateCal = ensureSnapshotDatesAreUnique(snapshotDateCal);
         Date snapshotDate = snapshotDateCal.getTime();
         Snapshot s = new Snapshot(this.snapshots.size(), branch, snapshotDate,

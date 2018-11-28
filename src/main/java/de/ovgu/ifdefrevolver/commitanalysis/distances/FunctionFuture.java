@@ -37,7 +37,7 @@ public class FunctionFuture {
         this.changesToFunctionAndAliases = changesToFunctionAndAliases;
     }
 
-    public Set<FunctionChangeRow> getChangesFilteredByCommitIds(Set<String> commitIds) {
+    public Set<FunctionChangeRow> getChangesFilteredByCommitIds(Set<Commit> commitIds) {
         Set<FunctionChangeRow> relevantChanges = new LinkedHashSet<>();
         for (FunctionChangeRow change : changesToFunctionAndAliases) {
             if (commitIds.contains(change.commit)) {

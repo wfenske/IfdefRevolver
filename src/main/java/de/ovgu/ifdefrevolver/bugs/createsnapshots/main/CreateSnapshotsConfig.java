@@ -2,6 +2,7 @@ package de.ovgu.ifdefrevolver.bugs.createsnapshots.main;
 
 import de.ovgu.ifdefrevolver.bugs.correlate.main.ProjectInformationConfig;
 import de.ovgu.ifdefrevolver.bugs.createsnapshots.data.Smell;
+import de.ovgu.ifdefrevolver.commitanalysis.IHasRepoDir;
 
 import java.io.File;
 import java.util.Optional;
@@ -9,18 +10,19 @@ import java.util.Optional;
 /**
  * Created by wfenske on 06.04.17.
  */
-public class CreateSnapshotsConfig extends ProjectInformationConfig {
+public class CreateSnapshotsConfig extends ProjectInformationConfig implements IHasRepoDir {
     public static final String GIT_PROG = "git";
     public static final String CPP_SKUNK_PROG = "cppSkunk.sh";
     public static final String SKUNK_PROG = "skunk.sh";
+    private String repoDir;
 
-    public void setReposDir(String reposDir) {
-        this.reposDir = reposDir;
-    }
+//    public void setReposDir(String reposDir) {
+//        this.reposDir = reposDir;
+//    }
 
-    private String reposDir = null;
+//    private String reposDir = null;
 
-    public static final String DEFAULT_REPOS_DIR_NAME = "repos";
+//    public static final String DEFAULT_REPOS_DIR_NAME = "repos";
 
     private String smellConfig = null;
     public static final String DEFAULT_SMELL_CONFIGS_DIR_NAME = "smellconfigs";
@@ -38,9 +40,9 @@ public class CreateSnapshotsConfig extends ProjectInformationConfig {
         return getSmell().fileName;
     }
 
-    public File projectRepoDir() {
-        return new File(reposDir, getProject());
-    }
+//    public File projectRepoDir() {
+//        return new File(reposDir, getProject());
+//    }
 
     public CommitWindowSizeMode commitWindowSizeMode() {
         return this.commitWindowSizeMode;
@@ -95,5 +97,20 @@ public class CreateSnapshotsConfig extends ProjectInformationConfig {
 
     public int getNumberOfWorkerThreads() {
         return numberOfWorkerThreads.get();
+    }
+
+    @Override
+    public void validateRepoDir() {
+        ProjectInformationConfig.validateRepoDir(getRepoDir());
+    }
+
+    @Override
+    public String getRepoDir() {
+        return repoDir;
+    }
+
+    @Override
+    public void setRepoDir(String repoDir) {
+        this.repoDir = repoDir;
     }
 }

@@ -57,20 +57,20 @@ public enum FunctionChangeHunksColumns implements CsvColumnValueProvider<Functio
             return changedFunc.getHunk().getHunkNo();
         }
     },
-    /**
-     * Contains <code>1</code> if the commit is a bug-fix commit, else <code>0</code>
-     */
-    BUGFIX {
-        @Override
-        public Integer csvColumnValue(FunctionChangeHunk changedFunc, IMinimalSnapshot snapshot) {
-            String commitId = changedFunc.getHunk().getChangeId().commitId;
-            if (snapshot.isBugfixCommit(commitId)) {
-                return 1;
-            } else {
-                return 0;
-            }
-        }
-    },
+//    /**
+//     * Contains <code>1</code> if the commit is a bug-fix commit, else <code>0</code>
+//     */
+//    BUGFIX {
+//        @Override
+//        public Integer csvColumnValue(FunctionChangeHunk changedFunc, IMinimalSnapshot snapshot) {
+//            String commitId = changedFunc.getHunk().getChangeId().commitId;
+//            if (snapshot.isBugfixCommit(commitId)) {
+//                return 1;
+//            } else {
+//                return 0;
+//            }
+//        }
+//    },
     /**
      * Tally of lines deleted and lines added to the function (will be positive if more lines were added than deleted)
      */

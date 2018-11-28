@@ -5,6 +5,7 @@ import de.ovgu.ifdefrevolver.bugs.createsnapshots.data.ProperSnapshot;
 import de.ovgu.ifdefrevolver.bugs.createsnapshots.data.Smell;
 import de.ovgu.ifdefrevolver.bugs.createsnapshots.input.FileFinder;
 import de.ovgu.ifdefrevolver.bugs.createsnapshots.input.RevisionsCsvReader;
+import de.ovgu.ifdefrevolver.bugs.minecommits.CommitsDistanceDb;
 import org.apache.log4j.Logger;
 
 import java.io.File;
@@ -22,15 +23,17 @@ class DetectSmellsStrategy implements ISnapshotProcessingModeStrategy {
     private static Logger LOG = Logger.getLogger(DetectSmellsStrategy.class);
     private RevisionsCsvReader revisionsCsvReader;
 
+    private final CommitsDistanceDb commitsDb;
     private final CreateSnapshotsConfig conf;
 
-    public DetectSmellsStrategy(CreateSnapshotsConfig conf) {
+    public DetectSmellsStrategy(CommitsDistanceDb commitsDb, CreateSnapshotsConfig conf) {
+        this.commitsDb = commitsDb;
         this.conf = conf;
     }
 
     @Override
     public void readAllRevisionsAndComputeSnapshots() {
-        this.revisionsCsvReader = new RevisionsCsvReader(conf.revisionCsvFile());
+        this.revisionsCsvReader = new RevisionsCsvReader(commitsDb, conf.revisionCsvFile());
         this.revisionsCsvReader.readAllCommits();
         this.revisionsCsvReader.readPrecomputedSnapshots(conf);
     }

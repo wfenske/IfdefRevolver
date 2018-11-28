@@ -5,6 +5,7 @@ import de.ovgu.ifdefrevolver.bugs.correlate.data.Feature;
 import de.ovgu.ifdefrevolver.bugs.correlate.data.IMinimalSnapshot;
 import de.ovgu.ifdefrevolver.bugs.correlate.main.Config;
 import de.ovgu.ifdefrevolver.bugs.correlate.main.Smell;
+import de.ovgu.ifdefrevolver.bugs.minecommits.CommitsDistanceDb;
 import org.apache.log4j.Logger;
 
 import java.io.File;
@@ -40,8 +41,8 @@ public class CSVHelper extends ProjectInformationReader<Config> {
      */
     private static final int SFL_COLUMN_IX_NOCU = 10;
 
-    public CSVHelper(Config conf) {
-        super(conf);
+    public CSVHelper(Config conf, CommitsDistanceDb commitsDb) {
+        super(conf, commitsDb);
     }
 
     /**
@@ -359,10 +360,9 @@ public class CSVHelper extends ProjectInformationReader<Config> {
     }
 
     /**
-     * Names of the files that exhibit the given smell in the given snapshot,
-     * along with the smelliness scores assigned to them. Files that are not
-     * smelly are not included in the returned map. Put differently, the map
-     * values are always non-empty.
+     * Names of the files that exhibit the given smell in the given snapshot, along with the smelliness scores assigned
+     * to them. Files that are not smelly are not included in the returned map. Put differently, the map values are
+     * always non-empty.
      *
      * @param snapshot
      * @param smell

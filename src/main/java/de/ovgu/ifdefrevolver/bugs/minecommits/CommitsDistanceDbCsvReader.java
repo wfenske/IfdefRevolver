@@ -2,6 +2,7 @@ package de.ovgu.ifdefrevolver.bugs.minecommits;
 
 import com.opencsv.CSVReader;
 import de.ovgu.ifdefrevolver.bugs.correlate.input.CSVHelper;
+import de.ovgu.ifdefrevolver.bugs.correlate.main.IHasResultsDir;
 import org.apache.log4j.Logger;
 
 import java.io.File;
@@ -20,7 +21,13 @@ public class CommitsDistanceDbCsvReader {
         return dbFromCsv(csvFile);
     }
 
-    public CommitsDistanceDb dbFromCsv(File csvFile) {
+    public CommitsDistanceDb dbFromCsv(IHasResultsDir config) {
+        File commitParentsFile = new File(config.projectResultsDir(), "commitParents.csv");
+        LOG.debug("Reading information about commit parent-child relationships from " + commitParentsFile);
+        return dbFromCsv(commitParentsFile);
+    }
+
+    protected CommitsDistanceDb dbFromCsv(File csvFile) {
         CommitsDistanceDb db = new CommitsDistanceDb();
         CSVReader reader = null;
         FileReader fileReader = null;

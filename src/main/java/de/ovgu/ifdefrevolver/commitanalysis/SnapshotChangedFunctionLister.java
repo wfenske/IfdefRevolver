@@ -18,6 +18,7 @@ import java.util.Collection;
 import java.util.Iterator;
 import java.util.List;
 import java.util.function.Consumer;
+import java.util.stream.Collectors;
 
 public class SnapshotChangedFunctionLister {
     private static final Logger LOG = Logger.getLogger(SnapshotChangedFunctionLister.class);
@@ -82,8 +83,10 @@ public class SnapshotChangedFunctionLister {
             protected void actuallyDoStuff(CSVPrinter csv) throws IOException {
                 csv.printRecord(csvRowProvider.headerRow());
                 Consumer<FunctionChangeHunk> csvRowFromFunction = newThreadSafeFunctionToCsvWriter(csv, csvRowProvider);
+                List<String> commitIds = snapshot.getCommits().stream().map(c -> c.commitHash).collect(Collectors.toList());
+
                 try {
-                    listChangedFunctions(snapshot.getCommitHashes(), csvRowFromFunction);
+                    listChangedFunctions(commitIds, csvRowFromFunction);
                 } catch (UncaughtWorkerThreadException ex) {
                     increaseErrorCount();
                     LOG.error(uncaughtExceptionErrorMessage, ex);

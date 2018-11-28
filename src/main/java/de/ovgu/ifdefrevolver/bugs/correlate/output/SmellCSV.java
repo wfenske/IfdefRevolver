@@ -5,6 +5,7 @@ import de.ovgu.ifdefrevolver.bugs.correlate.data.LargeFeatureCsvColumns;
 import de.ovgu.ifdefrevolver.bugs.correlate.input.CSVHelper;
 import de.ovgu.ifdefrevolver.bugs.correlate.main.Config;
 import de.ovgu.ifdefrevolver.bugs.correlate.main.Smell;
+import de.ovgu.ifdefrevolver.bugs.minecommits.CommitsDistanceDb;
 import org.apache.log4j.Logger;
 import org.w3c.dom.Document;
 import org.w3c.dom.Element;
@@ -25,9 +26,11 @@ import java.util.Map.Entry;
 public class SmellCSV {
     private static Logger log = Logger.getLogger(SmellCSV.class);
     private final Config conf;
+    private final CommitsDistanceDb commitsDb;
 
-    public SmellCSV(Config conf) {
+    public SmellCSV(Config conf, CommitsDistanceDb commitsDb) {
         this.conf = conf;
+        this.commitsDb = commitsDb;
     }
 
     /**
@@ -63,8 +66,7 @@ public class SmellCSV {
     }
 
     /**
-     * Perform Large Feature detection and write the results to a CSV file
-     * (parameter largeFeatureCsvOut)
+     * Perform Large Feature detection and write the results to a CSV file (parameter largeFeatureCsvOut)
      *
      * @param origFeatureLocationCsv Large feature detection results CSV file, as produced by Skunk
      * @param featureLocationXml     Locations of all features as an XML file, produced by Skunk
@@ -78,7 +80,7 @@ public class SmellCSV {
 
         // Erste Spalte FileName - zweite Spalte SmellScore
 
-        Map<String, Feature> featureMap = (new CSVHelper(conf))
+        Map<String, Feature> featureMap = (new CSVHelper(conf, commitsDb))
                 .getFeaturesByName(origFeatureLocationCsv);
         Map<String, Feature> largeFeatures = filterLargeFeatures(featureMap);
 
@@ -221,8 +223,7 @@ public class SmellCSV {
     }
 
     /**
-     * @param featureLocationDoc the already-parsed Skunk document containing feature location
-     *                           information
+     * @param featureLocationDoc the already-parsed Skunk document containing feature location information
      * @param featureName        the name of the feature in question
      * @return
      * @throws ParserConfigurationException

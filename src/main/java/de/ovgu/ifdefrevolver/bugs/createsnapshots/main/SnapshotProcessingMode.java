@@ -1,6 +1,7 @@
 package de.ovgu.ifdefrevolver.bugs.createsnapshots.main;
 
 import de.ovgu.ifdefrevolver.bugs.correlate.main.SnapshotDirMissingStrategy;
+import de.ovgu.ifdefrevolver.bugs.minecommits.CommitsDistanceDb;
 
 /**
  * Controls what is to be done with a project, i.e., check it out and create snapshots, preprocess its snapshots, detect
@@ -12,8 +13,8 @@ public enum SnapshotProcessingMode {
 
     CHECKOUT(1) {
         @Override
-        public ISnapshotProcessingModeStrategy getNewStrategyInstance(CreateSnapshotsConfig conf) {
-            return new CheckoutStrategy(conf);
+        public ISnapshotProcessingModeStrategy getNewStrategyInstance(CommitsDistanceDb commitsDb, CreateSnapshotsConfig conf) {
+            return new CheckoutStrategy(commitsDb, conf);
         }
 
         @Override
@@ -24,15 +25,15 @@ public enum SnapshotProcessingMode {
 
     PREPROCESS(2) {
         @Override
-        public ISnapshotProcessingModeStrategy getNewStrategyInstance(CreateSnapshotsConfig conf) {
-            return new PreprocessStrategy(conf);
+        public ISnapshotProcessingModeStrategy getNewStrategyInstance(CommitsDistanceDb commitsDb, CreateSnapshotsConfig conf) {
+            return new PreprocessStrategy(commitsDb, conf);
         }
     },
 
     DETECTSMELLS(4) {
         @Override
-        public ISnapshotProcessingModeStrategy getNewStrategyInstance(CreateSnapshotsConfig conf) {
-            return new DetectSmellsStrategy(conf);
+        public ISnapshotProcessingModeStrategy getNewStrategyInstance(CommitsDistanceDb commitsDb, CreateSnapshotsConfig conf) {
+            return new DetectSmellsStrategy(commitsDb, conf);
         }
     };
 
@@ -42,7 +43,7 @@ public enum SnapshotProcessingMode {
 
     private final int defaultNumberOfWorkerThreads;
 
-    public abstract ISnapshotProcessingModeStrategy getNewStrategyInstance(CreateSnapshotsConfig conf);
+    public abstract ISnapshotProcessingModeStrategy getNewStrategyInstance(CommitsDistanceDb commitsDb, CreateSnapshotsConfig conf);
 
     public int defaultNumberOfWorkerThreads() {
         return this.defaultNumberOfWorkerThreads;

@@ -3,6 +3,8 @@ package de.ovgu.ifdefrevolver.commitanalysis.branchtraversal;
 import de.ovgu.ifdefrevolver.bugs.correlate.data.Snapshot;
 import de.ovgu.ifdefrevolver.bugs.correlate.main.IHasResultsDir;
 import de.ovgu.ifdefrevolver.bugs.correlate.main.IHasSnapshotsDir;
+import de.ovgu.ifdefrevolver.bugs.minecommits.CommitsDistanceDb;
+import de.ovgu.ifdefrevolver.bugs.minecommits.CommitsDistanceDb.Commit;
 import de.ovgu.ifdefrevolver.util.SimpleCsvFileReader;
 import de.ovgu.skunk.detection.output.CsvEnumUtils;
 
@@ -13,8 +15,15 @@ import java.util.*;
 
 public class SnapshotReader {
 
-    private static class SnapshotCommitsCsvReader extends SimpleCsvFileReader<Set<String>> {
-        private LinkedHashSet<String> result;
+    private static class SnapshotCommitsCsvReader extends SimpleCsvFileReader<Set<Commit>> {
+        private final IHasResultsDir config;
+        private LinkedHashSet<Commit> result;
+        private final CommitsDistanceDb commitsDistanceDb;
+
+        private SnapshotCommitsCsvReader(CommitsDistanceDb commitsDistanceDb, IHasResultsDir config) {
+            this.commitsDistanceDb = commitsDistanceDb;
+            this.config = config;
+        }
 
         @Override
         protected void initializeResult() {
@@ -23,7 +32,7 @@ public class SnapshotReader {
         }
 
         @Override
-        protected Set<String> finalizeResult() {
+        protected Set<Commit> finalizeResult() {
             return result;
         }
 
@@ -40,10 +49,11 @@ public class SnapshotReader {
         @Override
         protected void processContentLine(String[] line) {
             String commitHash = line[SnapshotCommitsColumns.COMMIT_HASH.ordinal()];
-            result.add(commitHash);
+            Commit commit = commitsDistanceDb.internCommit(commitHash);
+            result.add(commit);
         }
 
-        public Set<String> readFile(IHasResultsDir config, Date snapshotDate) {
+        public Set<Commit> readFile(Date snapshotDate) {
             File f = new File(config.snapshotResultsDirForDate(snapshotDate), SnapshotCommitsColumns.FILE_BASENAME);
             return readFile(f);
         }
@@ -51,10 +61,16 @@ public class SnapshotReader {
 
     private static class SnapshotCsvReader<TConfig extends IHasResultsDir & IHasSnapshotsDir> extends SimpleCsvFileReader<List<Snapshot>> {
 
+        private final CommitsDistanceDb commitsDistanceDb;
         private File file;
-        private TConfig config;
+        private final TConfig config;
 
         private List<Snapshot> result;
+
+        public SnapshotCsvReader(CommitsDistanceDb commitsDistanceDb, TConfig config) {
+            this.commitsDistanceDb = commitsDistanceDb;
+            this.config = config;
+        }
 
         @Override
         protected void initializeResult() {
@@ -83,8 +99,8 @@ public class SnapshotReader {
         protected void processContentLine(String[] line) {
             Date snapshotDate = parseSnapshotDate(line);
             int snapshotIndex = parseSnapshotIndex(line);
-            SnapshotCommitsCsvReader commitsReader = new SnapshotCommitsCsvReader();
-            Set<String> commits = commitsReader.readFile(config, snapshotDate);
+            SnapshotCommitsCsvReader commitsReader = new SnapshotCommitsCsvReader(commitsDistanceDb, config);
+            Set<Commit> commits = commitsReader.readFile(snapshotDate);
             Snapshot snapshot = new Snapshot(snapshotIndex, -1, snapshotDate, commits, config.projectSnapshotsDir());
             result.add(snapshot);
         }
@@ -107,15 +123,14 @@ public class SnapshotReader {
             }
         }
 
-        public List<Snapshot> readFile(TConfig config) {
-            this.config = config;
+        public List<Snapshot> readFile() {
             this.file = new File(config.projectResultsDir(), SnapshotsColumns.FILE_BASENAME);
             return readFile(file);
         }
     }
 
-    public static <TConfig extends IHasResultsDir & IHasSnapshotsDir> List<Snapshot> readSnapshots(TConfig config) {
-        SnapshotCsvReader<TConfig> reader = new SnapshotCsvReader<>();
-        return reader.readFile(config);
+    public static <TConfig extends IHasResultsDir & IHasSnapshotsDir> List<Snapshot> readSnapshots(CommitsDistanceDb commitsDistanceDb, TConfig config) {
+        SnapshotCsvReader<TConfig> reader = new SnapshotCsvReader<>(commitsDistanceDb, config);
+        return reader.readFile();
     }
 }

@@ -49,13 +49,8 @@ public class ListChangedFunctionsConfig extends ProjectInformationConfig impleme
 
     @Override
     public void validateRepoDir() {
-        File repoFile = new File(getRepoDir());
-        if (!repoFile.exists()) {
-            throw new IllegalArgumentException("Repository directory does not exist: " + getRepoDir());
-        }
-        if (!repoFile.isDirectory()) {
-            throw new IllegalArgumentException("Repository is not a directory: " + getRepoDir());
-        }
+        final String repoDir = getRepoDir();
+        validateRepoDir(repoDir);
     }
 
     public int getNumThreads() {

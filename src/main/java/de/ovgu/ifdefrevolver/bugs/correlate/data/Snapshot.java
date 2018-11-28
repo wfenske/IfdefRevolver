@@ -1,11 +1,11 @@
 package de.ovgu.ifdefrevolver.bugs.correlate.data;
 
 import de.ovgu.ifdefrevolver.bugs.createsnapshots.input.FileFinder;
+import de.ovgu.ifdefrevolver.bugs.minecommits.CommitsDistanceDb.Commit;
 
 import java.io.File;
 import java.text.SimpleDateFormat;
 import java.util.Date;
-import java.util.HashSet;
 import java.util.List;
 import java.util.Set;
 
@@ -20,17 +20,17 @@ public class Snapshot implements Comparable<Snapshot>, IMinimalSnapshot {
     private final int snapshotIndex;
     private final int branch;
     private final Date snapshotDate;
-    private final Set<String> commitHashes;
-    private final String startHash;
+    private final Set<Commit> commits;
+    private final Commit startCommit;
     private final File snapshotDir;
-    private Set<String> bugfixCommits = new HashSet<>();
+    //private Set<String> bugfixCommits = new HashSet<>();
 
-    public Snapshot(int snapshotIndex, int branch, Date snapshotDate, Set<String> commitHashes, File snapshotDir) {
+    public Snapshot(int snapshotIndex, int branch, Date snapshotDate, Set<Commit> commits, File snapshotDir) {
         this.snapshotIndex = snapshotIndex;
         this.branch = branch;
         this.snapshotDate = snapshotDate;
-        this.commitHashes = commitHashes;
-        this.startHash = commitHashes.iterator().next();
+        this.commits = commits;
+        this.startCommit = commits.iterator().next();
         this.snapshotDir = snapshotDir;
     }
 
@@ -56,12 +56,12 @@ public class Snapshot implements Comparable<Snapshot>, IMinimalSnapshot {
     }
 
     @Override
-    public Set<String> getCommitHashes() {
-        return commitHashes;
+    public Set<Commit> getCommits() {
+        return commits;
     }
 
-    public String getStartHash() {
-        return startHash;
+    public Commit getStartCommit() {
+        return startCommit;
     }
 
     /*
@@ -70,7 +70,7 @@ public class Snapshot implements Comparable<Snapshot>, IMinimalSnapshot {
     @Override
     public String toString() {
         return String.format("Snapshot [index=%s, date=%s, startHash=%s]", snapshotIndex,
-                getFormattedSnapshotDate(), startHash);
+                getFormattedSnapshotDate(), startCommit);
     }
 
     /*
@@ -82,7 +82,7 @@ public class Snapshot implements Comparable<Snapshot>, IMinimalSnapshot {
         int result = 1;
         result = prime * result + ((snapshotDate == null) ? 0 : snapshotDate.hashCode());
         result = prime * result + snapshotIndex;
-        result = prime * result + ((startHash == null) ? 0 : startHash.hashCode());
+        result = prime * result + ((startCommit == null) ? 0 : startCommit.hashCode());
         return result;
     }
 
@@ -105,10 +105,10 @@ public class Snapshot implements Comparable<Snapshot>, IMinimalSnapshot {
             return false;
         if (snapshotIndex != other.snapshotIndex)
             return false;
-        if (startHash == null) {
-            if (other.startHash != null)
+        if (startCommit == null) {
+            if (other.startCommit != null)
                 return false;
-        } else if (!startHash.equals(other.startHash))
+        } else if (!startCommit.equals(other.startCommit))
             return false;
         return true;
     }
@@ -126,12 +126,12 @@ public class Snapshot implements Comparable<Snapshot>, IMinimalSnapshot {
         return FileFinder.find(srcmlFolder, ".*\\.c\\.xml$");
     }
 
-    public void addBugfixCommit(String commitId) {
-        this.bugfixCommits.add(commitId);
-    }
-
-    @Override
-    public boolean isBugfixCommit(String commitId) {
-        return this.bugfixCommits.contains(commitId);
-    }
+//    public void addBugfixCommit(String commitId) {
+//        this.bugfixCommits.add(commitId);
+//    }
+//
+//    @Override
+//    public boolean isBugfixCommit(String commitId) {
+//        return this.bugfixCommits.contains(commitId);
+//    }
 }

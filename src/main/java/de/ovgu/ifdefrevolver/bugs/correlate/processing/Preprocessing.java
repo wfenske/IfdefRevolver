@@ -29,7 +29,7 @@ public class Preprocessing {
     }
 
     public void preprocessDataForSmell(Smell smell) {
-        SmellCSV smellProcessor = new SmellCSV(conf);
+        SmellCSV smellProcessor = new SmellCSV(conf, csvReader.commitsDb());
 
         // Anzahl der .csv Dateien checken
         final File pathFind = new File(conf.projectResultsDir(), smell.name() + "Res");
@@ -171,8 +171,7 @@ public class Preprocessing {
     }
 
     /**
-     * Lädt alle Dateien aus einer TreeMap<ChangedFile, String> zwischen zwei
-     * Daten in ein Set
+     * Lädt alle Dateien aus einer TreeMap<ChangedFile, String> zwischen zwei Daten in ein Set
      *
      * @param bugMap    TreeMap mit allen Dateien im ChangedFile-Objektformat
      * @param startDate
@@ -202,8 +201,7 @@ public class Preprocessing {
     }
 
     /**
-     * Lädt alle Dateien aus einer TreeMap<ChangedFile, String> zwischen zwei
-     * Daten in ein Set
+     * Lädt alle Dateien aus einer TreeMap<ChangedFile, String> zwischen zwei Daten in ein Set
      *
      * @param bugMap    TreeMap mit allen Dateien im ChangedFile-Objektformat
      * @param startDate

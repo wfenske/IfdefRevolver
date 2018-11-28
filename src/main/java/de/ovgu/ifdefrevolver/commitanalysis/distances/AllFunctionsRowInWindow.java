@@ -15,7 +15,7 @@ public class AllFunctionsRowInWindow extends AllFunctionsRow {
                                    List<Snapshot> snapshotsIncludingAndAfter) {
         this.functionId = function.functionId;
         this.loc = function.loc;
-        this.firstSnapshotCommit = snapshotsIncludingAndAfter.get(0).getStartHash();
+        this.firstSnapshotCommit = snapshotsIncludingAndAfter.get(0).getStartCommit().commitHash;
 
 //        this.commitsBefore = new HashSet<>();
 //        for (Snapshot s : snapshotsBefore) {

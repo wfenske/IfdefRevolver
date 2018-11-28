@@ -1,19 +1,20 @@
 package de.ovgu.ifdefrevolver.commitanalysis.branchtraversal;
 
 import de.ovgu.ifdefrevolver.bugs.correlate.data.Snapshot;
+import de.ovgu.ifdefrevolver.bugs.minecommits.CommitsDistanceDb.Commit;
 import de.ovgu.skunk.detection.output.CsvColumnValueProvider;
 
-public enum SnapshotCommitsColumns implements CsvColumnValueProvider<String, Snapshot> {
+public enum SnapshotCommitsColumns implements CsvColumnValueProvider<Commit, Snapshot> {
     SNAPSHOT_INDEX {
         @Override
-        public Integer csvColumnValue(String ignored, Snapshot s) {
+        public Integer csvColumnValue(Commit ignored, Snapshot s) {
             return s.getSnapshotIndex();
         }
     },
     COMMIT_HASH {
         @Override
-        public String csvColumnValue(String commitHash, Snapshot s) {
-            return commitHash;
+        public String csvColumnValue(Commit commit, Snapshot s) {
+            return commit.commitHash;
         }
     };
 

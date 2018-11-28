@@ -104,15 +104,15 @@ public class AddChangeDistances {
         File commitParentsFile = new File(config.projectResultsDir(), "commitParents.csv");
         LOG.debug("Reading information about commit parent-child relationships from " + commitParentsFile);
         CommitsDistanceDbCsvReader distanceReader = new CommitsDistanceDbCsvReader();
-        this.commitsDistanceDb = distanceReader.dbFromCsv(commitParentsFile);
+        this.commitsDistanceDb = distanceReader.dbFromCsv(config);
         LOG.debug("Preprocessing commit distance information.");
         this.commitsDistanceDb.ensurePreprocessed();
         LOG.debug("Done reading commit parent-child relationships.");
 
-        RevisionsCsvReader revisionsReader = new RevisionsCsvReader(config.revisionCsvFile());
+        RevisionsCsvReader revisionsReader = new RevisionsCsvReader(commitsDistanceDb, config.revisionCsvFile());
         revisionsReader.readAllCommits();
 
-        projectInfo = new ProjectInformationReader<>(config);
+        projectInfo = new ProjectInformationReader<>(config, commitsDistanceDb);
         LOG.debug("Reading project information");
         projectInfo.readSnapshotsAndRevisionsFile();
         LOG.debug("Done reading project information");
@@ -184,7 +184,7 @@ public class AddChangeDistances {
     private Map<Commit, List<AllFunctionsRow>> groupAllFunctionsBySnapshotStartCommit() {
         Map<Commit, List<AllFunctionsRow>> result = new HashMap<>();
         for (Snapshot s : projectInfo.getSnapshots().values()) {
-            Commit startCommit = commitsDistanceDb.internCommit(s.getStartHash());
+            Commit startCommit = s.getStartCommit();
             List<AllFunctionsRow> funcs = allFunctionsInSnapshots.get(s.getSnapshotDate());
             result.put(startCommit, funcs);
         }
@@ -366,7 +366,7 @@ public class AddChangeDistances {
     private Set<Commit> getAllStartCommits() {
         Set<Commit> startCommits = new HashSet<>();
         for (Snapshot s : projectInfo.getSnapshots().values()) {
-            Commit startCommit = commitsDistanceDb.internCommit(s.getStartHash());
+            Commit startCommit = s.getStartCommit();
             startCommits.add(startCommit);
         }
         return startCommits;
@@ -386,8 +386,8 @@ public class AddChangeDistances {
         }
 
         Set<Commit> commitsInSnapshot = new LinkedHashSet<>();
-        for (String h : s.getCommitHashes()) {
-            commitsInSnapshot.add(commitsDistanceDb.internCommit(h));
+        for (Commit c : s.getCommits()) {
+            commitsInSnapshot.add(c);
         }
 
         final List<FunctionChangeRow> changesInSnapshot = changesInSnapshots.get(snapshotDate);
@@ -399,7 +399,7 @@ public class AddChangeDistances {
                 new LinkedGroupingListMap<>();
         changesInSnapshot.forEach((r) -> changesByFunctionId.put(r.functionId, r));
 
-        final Commit startCommit = commitsDistanceDb.internCommit(s.getStartHash());
+        final Commit startCommit = s.getStartCommit();
 
         Map<FunctionId, SnapshotFunctionGenealogy> genealogiesByFirstFunctionId = new LinkedHashMap<>();
 
@@ -672,8 +672,7 @@ public class AddChangeDistances {
         for (Map.Entry<Date, List<AllFunctionsRow>> snapshotEntry : allFunctionsInSnapshots.entrySet()) {
             final Date snapshotDate = snapshotEntry.getKey();
             final Snapshot snapshot = projectInfo.getSnapshots().get(snapshotDate);
-            final String startHash = snapshot.getStartHash();
-            Commit startCommit = commitsDistanceDb.internCommit(startHash);
+            final Commit startCommit = snapshot.getStartCommit();
             for (AllFunctionsRow row : snapshotEntry.getValue()) {
                 FunctionIdWithCommit fidWithCommit = new FunctionIdWithCommit(row.functionId, startCommit, false);
                 allFunctionsEver.add(fidWithCommit);
@@ -786,10 +785,10 @@ public class AddChangeDistances {
 
     static class CommitWindow {
         public final Set<AllFunctionsRowInWindow> allFunctions;
-        public final Set<String> commits;
+        public final Set<Commit> commits;
         public final Date date;
 
-        public CommitWindow(Date date, Set<String> commits, Set<AllFunctionsRowInWindow> allFunctions) {
+        public CommitWindow(Date date, Set<Commit> commits, Set<AllFunctionsRowInWindow> allFunctions) {
             this.allFunctions = allFunctions;
             this.commits = commits;
             this.date = date;
@@ -864,7 +863,7 @@ public class AddChangeDistances {
 
     private CommitWindow windowFromSnapshots(List<Snapshot> snapshots) {
         Map<FunctionId, AllFunctionsRowInWindow> allFunctionsMap = new LinkedHashMap<>();
-        Set<String> commits = new LinkedHashSet<>();
+        Set<Commit> commits = new LinkedHashSet<>();
         int iSnapshot = 0;
         final int numSnapshots = snapshots.size();
         for (Snapshot s : snapshots) {
@@ -877,7 +876,7 @@ public class AddChangeDistances {
                     allFunctionsMap.put(f.functionId, extendedF);
                 }
             }
-            commits.addAll(s.getCommitHashes());
+            commits.addAll(s.getCommits());
             iSnapshot++;
         }
         Set<AllFunctionsRowInWindow> allFunctions = new LinkedHashSet<>(allFunctionsMap.values());
@@ -1003,8 +1002,7 @@ public class AddChangeDistances {
     private void rememberFunctionsKnownToExistAt(Date snapshotDate, List<AllFunctionsRow> functions) {
         SortedMap<Date, Snapshot> snapshots = projectInfo.getSnapshots();
         Snapshot snapshot = snapshots.get(snapshotDate);
-        String startHash = snapshot.getStartHash();
-        Commit startCommit = commitsDistanceDb.internCommit(startHash);
+        Commit startCommit = snapshot.getStartCommit();
         for (AllFunctionsRow row : functions) {
             moveResolver.putFunctionKnownToExistAt(row.functionId, startCommit);
 //            if (startHash.equalsIgnoreCase("0098ed12c242cabb34646a4453f2c1b012c919c7")) {

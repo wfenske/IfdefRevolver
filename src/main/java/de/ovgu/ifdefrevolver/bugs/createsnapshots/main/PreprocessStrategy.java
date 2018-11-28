@@ -3,6 +3,7 @@ package de.ovgu.ifdefrevolver.bugs.createsnapshots.main;
 import de.ovgu.ifdefrevolver.bugs.createsnapshots.data.ISnapshot;
 import de.ovgu.ifdefrevolver.bugs.createsnapshots.data.ProperSnapshot;
 import de.ovgu.ifdefrevolver.bugs.createsnapshots.input.RevisionsCsvReader;
+import de.ovgu.ifdefrevolver.bugs.minecommits.CommitsDistanceDb;
 import de.ovgu.ifdefrevolver.util.FileUtils;
 import org.apache.log4j.Logger;
 
@@ -19,14 +20,16 @@ class PreprocessStrategy implements ISnapshotProcessingModeStrategy {
     private RevisionsCsvReader revisionsCsvReader;
 
     private final CreateSnapshotsConfig conf;
+    private final CommitsDistanceDb commitsDb;
 
-    public PreprocessStrategy(CreateSnapshotsConfig conf) {
+    public PreprocessStrategy(CommitsDistanceDb commitsDb, CreateSnapshotsConfig conf) {
+        this.commitsDb = commitsDb;
         this.conf = conf;
     }
 
     @Override
     public void readAllRevisionsAndComputeSnapshots() {
-        this.revisionsCsvReader = new RevisionsCsvReader(conf.revisionCsvFile());
+        this.revisionsCsvReader = new RevisionsCsvReader(commitsDb, conf.revisionCsvFile());
         this.revisionsCsvReader.readAllCommits();
         this.revisionsCsvReader.readPrecomputedSnapshots(conf);
     }

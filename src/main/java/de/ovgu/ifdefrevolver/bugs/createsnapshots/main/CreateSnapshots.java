@@ -5,7 +5,10 @@ import de.ovgu.ifdefrevolver.bugs.createsnapshots.data.ISnapshot;
 import de.ovgu.ifdefrevolver.bugs.createsnapshots.data.NullSnapshot;
 import de.ovgu.ifdefrevolver.bugs.createsnapshots.data.ProperSnapshot;
 import de.ovgu.ifdefrevolver.bugs.createsnapshots.data.Smell;
+import de.ovgu.ifdefrevolver.bugs.minecommits.CommitsDistanceDb;
+import de.ovgu.ifdefrevolver.bugs.minecommits.CommitsDistanceDbCsvReader;
 import de.ovgu.ifdefrevolver.bugs.minecommits.main.FindBugfixCommits;
+import de.ovgu.ifdefrevolver.commitanalysis.ListChangedFunctionsConfig;
 import org.apache.commons.cli.*;
 import org.apache.commons.lang3.mutable.MutableInt;
 import org.apache.log4j.Logger;
@@ -14,6 +17,7 @@ import java.io.File;
 import java.io.IOException;
 import java.io.InputStream;
 import java.io.PrintWriter;
+import java.nio.file.Paths;
 import java.util.Collection;
 import java.util.Iterator;
 import java.util.List;
@@ -23,6 +27,7 @@ public class CreateSnapshots {
 
     private static Logger LOG = Logger.getLogger(CreateSnapshots.class);
 
+    private CommitsDistanceDb commitsDb;
     private CreateSnapshotsConfig conf;
     private int erroneousSnapshots = 0;
 
@@ -55,7 +60,8 @@ public class CreateSnapshots {
 
     private void run(String[] args) {
         this.conf = this.parseCommandLineArgs(args);
-        final ISnapshotProcessingModeStrategy skunkStrategy = conf.skunkMode().getNewStrategyInstance(conf);
+        this.commitsDb = (new CommitsDistanceDbCsvReader().dbFromCsv(conf));
+        final ISnapshotProcessingModeStrategy skunkStrategy = conf.skunkMode().getNewStrategyInstance(commitsDb, conf);
         applyStrategyToSnapshots(skunkStrategy);
     }
 
@@ -464,19 +470,26 @@ public class CreateSnapshots {
         ProjectInformationConfig.parseSnapshotsDirFromCommandLine(line, res, res.skunkMode().snapshotDirMissingStrategy());
         ProjectInformationConfig.parseProjectResultsDirFromCommandLine(line, res);
 
-        final String reposDirName;
-        if (line.hasOption(OPT_REPOS_DIR_L)) {
-            reposDirName = line.getOptionValue(OPT_REPOS_DIR_L);
+//        final String reposDirName;
+//        if (line.hasOption(OPT_REPOS_DIR_L)) {
+//            reposDirName = line.getOptionValue(OPT_REPOS_DIR_L);
+//        } else {
+//            reposDirName = CreateSnapshotsConfig.DEFAULT_REPOS_DIR_NAME;
+//        }
+//
+//        File reposDir = new File(reposDirName);
+//        if (!reposDir.exists() || !reposDir.isDirectory()) {
+//            throw new RuntimeException(
+//                    "The repository directory does not exist or is not a directory: " + reposDir.getAbsolutePath());
+//        }
+//        res.setReposDir(reposDir.getAbsolutePath());
+        if (line.hasOption(ListChangedFunctionsConfig.OPT_REPO)) {
+            res.setRepoDir(line.getOptionValue(ListChangedFunctionsConfig.OPT_REPO));
         } else {
-            reposDirName = CreateSnapshotsConfig.DEFAULT_REPOS_DIR_NAME;
+            res.setRepoDir(Paths.get(ListChangedFunctionsConfig.DEFAULT_REPOS_DIR_NAME, res.getProject(), ".git").toString());
         }
+        res.validateRepoDir();
 
-        File reposDir = new File(reposDirName);
-        if (!reposDir.exists() || !reposDir.isDirectory()) {
-            throw new RuntimeException(
-                    "The repository directory does not exist or is not a directory: " + reposDir.getAbsolutePath());
-        }
-        res.setReposDir(reposDir.getAbsolutePath());
 
         List<String> snapshotDateNames = line.getArgList();
         if (!snapshotDateNames.isEmpty()) {
@@ -606,10 +619,18 @@ public class CreateSnapshots {
                                 + "Skunk. [Default=" + CreateSnapshotsConfig.DEFAULT_SMELL_CONFIGS_DIR_NAME + "]")
                         .hasArg().argName("DIR").build());
 
-        options.addOption(Option.builder().longOpt(OPT_REPOS_DIR_L)
-                .desc("Directory below which the repository of the project (specified via `--" + ProjectInformationConfig.OPT_PROJECT_L
-                        + "') can be found." + " [Default=" + CreateSnapshotsConfig.DEFAULT_REPOS_DIR_NAME + "]")
-                .hasArg().argName("DIR").build());
+//        options.addOption(Option.builder().longOpt(OPT_REPOS_DIR_L)
+//                .desc("Directory below which the repository of the project (specified via `--" + ProjectInformationConfig.OPT_PROJECT_L
+//                        + "') can be found." + " [Default=" + CreateSnapshotsConfig.DEFAULT_REPOS_DIR_NAME + "]")
+//                .hasArg().argName("DIR").build());
+        options.addOption(Option.builder(String.valueOf(ListChangedFunctionsConfig.OPT_REPO))
+                .longOpt(ListChangedFunctionsConfig.OPT_REPO_L)
+                .desc("Directory containing the git repository to analyze." + " [Default="
+                        + ListChangedFunctionsConfig.DEFAULT_REPOS_DIR_NAME + "/<project>/.git]")
+                .hasArg().argName("DIR")
+                //.required(required)
+                .build());
+
 
         options.addOption(Option.builder().longOpt(OPT_COMMIT_WINDOW_SIZE_MODE_L)
                 .desc("How the size of the commit windows is determined. This option is only relevant during" +

@@ -1,13 +1,16 @@
 package de.ovgu.ifdefrevolver.bugs.createsnapshots.input;
 
+import de.ovgu.ifdefrevolver.bugs.correlate.data.Snapshot;
 import de.ovgu.ifdefrevolver.bugs.correlate.input.ProjectInformationReader;
 import de.ovgu.ifdefrevolver.bugs.correlate.input.RawSnapshotInfo;
 import de.ovgu.ifdefrevolver.bugs.createsnapshots.data.Commit;
 import de.ovgu.ifdefrevolver.bugs.createsnapshots.data.ProperSnapshot;
 import de.ovgu.ifdefrevolver.bugs.createsnapshots.main.CommitWindowSizeMode;
 import de.ovgu.ifdefrevolver.bugs.createsnapshots.main.CreateSnapshotsConfig;
+import de.ovgu.ifdefrevolver.bugs.minecommits.CommitsDistanceDb;
 import de.ovgu.ifdefrevolver.bugs.minecommits.OrderedRevisionsColumns;
 import de.ovgu.ifdefrevolver.commitanalysis.IHasSnapshotFilter;
+import de.ovgu.ifdefrevolver.commitanalysis.branchtraversal.SnapshotCreatingCommitWalker;
 import de.ovgu.skunk.detection.output.CsvEnumUtils;
 import org.apache.log4j.Logger;
 
@@ -23,6 +26,8 @@ import java.util.*;
 public class RevisionsCsvReader {
     private static Logger LOG = Logger.getLogger(RevisionsCsvReader.class);
 
+    private final CommitsDistanceDb commitsDb;
+
     private final File revisionsCsv;
 
     /**
@@ -37,14 +42,16 @@ public class RevisionsCsvReader {
     /**
      * Initialized by {@link #computeSnapshots(CreateSnapshotsConfig)} and {@link #readPrecomputedSnapshots(CreateSnapshotsConfig)}
      */
-    private List<ProperSnapshot> snapshots;
+    private List<Snapshot> snapshots;
 
     /**
      * Instantiates a new CSVReader
      *
+     * @param commitsDb
      * @param revisionsCsv the path of the revisionsFull.csv
      */
-    public RevisionsCsvReader(File revisionsCsv) {
+    public RevisionsCsvReader(CommitsDistanceDb commitsDb, File revisionsCsv) {
+        this.commitsDb = commitsDb;
         this.revisionsCsv = revisionsCsv;
     }
 
@@ -152,14 +159,12 @@ public class RevisionsCsvReader {
     }
 
     public void computeSnapshots(CreateSnapshotsConfig conf) {
-        LOG.info("Computing snapshots from " + revisionsCsv.getAbsolutePath());
+        LOG.info("Computing snapshots");
         snapshots = new ArrayList<>();
         final CommitWindowSizeMode commitWindowSizeMode = conf.commitWindowSizeMode();
-        final int commitWindowSize = conf.commitWindowSize();
+        final int snapshotSize = conf.commitWindowSize();
+        SnapshotCreatingCommitWalker<CreateSnapshotsConfig> snapshotsCreator = new SnapshotCreatingCommitWalker<>(commitsDb, conf, snapshotSize);
 
-        if (commitWindowSize <= 0) {
-            throw new IllegalArgumentException("Invalid commit window size (should be >= 1): " + commitWindowSize);
-        }
 
         final SortedMap<Integer, SortedSet<Commit>> commitsByBranch = groupCommitsByBranch();
         final int totalNumberOfCommits = commitWindowSizeMode.countRelevantCommits(commits);
@@ -261,8 +266,7 @@ public class RevisionsCsvReader {
     }
 
     /**
-     * Validate the snapshots in {@link #snapshots}. If something is wrong,
-     * throw an {@link AssertionError}
+     * Validate the snapshots in {@link #snapshots}. If something is wrong, throw an {@link AssertionError}
      *
      * @throws AssertionError if the contents of {@link #snapshots} are invalid
      */
@@ -294,7 +298,7 @@ public class RevisionsCsvReader {
      * @return The list of snapshots, in ascending order by date. Each snapshot contains at least one commit, i.e., the
      * maps are guaranteed to be non-empty.
      */
-    public List<ProperSnapshot> getSnapshots() {
+    public List<Snapshot> getSnapshots() {
         return snapshots;
     }
 
@@ -333,7 +337,7 @@ public class RevisionsCsvReader {
     public void readPrecomputedSnapshots(CreateSnapshotsConfig conf) {
         LOG.debug("Reading precomputed snapshots dates from " + conf.projectResultsDir().getAbsolutePath());
 
-        ProjectInformationReader helperReader = new ProjectInformationReader(conf);
+        ProjectInformationReader helperReader = new ProjectInformationReader(conf, commitsDb);
         List<RawSnapshotInfo> rawSnapshotInfos = helperReader.readRawSnapshotInfos();
 
         this.snapshots = new ArrayList<>();

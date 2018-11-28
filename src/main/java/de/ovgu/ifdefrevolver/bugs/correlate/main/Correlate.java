@@ -8,6 +8,8 @@ import de.ovgu.ifdefrevolver.bugs.correlate.processing.Evaluation;
 import de.ovgu.ifdefrevolver.bugs.correlate.processing.Preprocessing;
 import de.ovgu.ifdefrevolver.bugs.createsnapshots.input.FileFinder;
 import de.ovgu.ifdefrevolver.bugs.createsnapshots.main.CreateSnapshots;
+import de.ovgu.ifdefrevolver.bugs.minecommits.CommitsDistanceDb;
+import de.ovgu.ifdefrevolver.bugs.minecommits.CommitsDistanceDbCsvReader;
 import org.apache.commons.cli.*;
 import org.apache.log4j.Logger;
 
@@ -20,6 +22,7 @@ import java.util.*;
 public class Correlate {
 
     private static Logger log = Logger.getLogger(Correlate.class);
+    private CommitsDistanceDb commitsDb;
 
     /**
      * The main method.
@@ -51,7 +54,8 @@ public class Correlate {
 
         deleteOutputFiles();
 
-        final CSVHelper csvHelper = new CSVHelper(conf);
+        this.commitsDb = (new CommitsDistanceDbCsvReader().dbFromCsv(conf));
+        final CSVHelper csvHelper = new CSVHelper(conf, commitsDb);
         csvHelper.readSnapshotsAndRevisionsFile();
 
         /* PREPROCESSING of the Smell Data */
@@ -180,8 +184,7 @@ public class Correlate {
      * </p>
      * <p>
      * <p>
-     * Taken from <a href=
-     * "http://stackoverflow.com/questions/453018/number-of-lines-in-a-file-in-java">
+     * Taken from <a href= "http://stackoverflow.com/questions/453018/number-of-lines-in-a-file-in-java">
      * Stackoverflow</a>
      * </p>
      *
@@ -492,8 +495,7 @@ public class Correlate {
     }
 
     /**
-     * Large file evaluation: percentage of files (LOC-wise) to be considered
-     * large
+     * Large file evaluation: percentage of files (LOC-wise) to be considered large
      *
      * @see Config#getLargeFileSizePercentage()
      */
