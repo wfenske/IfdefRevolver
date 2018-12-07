@@ -65,7 +65,7 @@ public class SnapshotChangedFunctionLister {
     }
 
     private File listChangedFunctionsInSnapshot() {
-        File outputFileDir = config.snapshotResultsDirForDate(snapshot.getSnapshotDate());
+        File outputFileDir = config.snapshotResultsDirForDate(snapshot.getStartDate());
         File outputFile = new File(outputFileDir, FunctionChangeHunksColumns.FILE_BASENAME);
         CsvFileWriterHelper helper = newCsvFileWriterForSnapshot(outputFile);
         helper.write(outputFile);
@@ -216,7 +216,7 @@ public class SnapshotChangedFunctionLister {
     }
 
     private void openRepo(String repoDir) throws IOException {
-        git = Git.open(new File(config.getRepoDir()));
+        git = Git.open(new File(config.getRepoDir(), ".git"));
         repo = git.getRepository();
     }
 

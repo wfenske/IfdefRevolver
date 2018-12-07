@@ -1,11 +1,12 @@
 package de.ovgu.ifdefrevolver.bugs.createsnapshots.data;
 
+import de.ovgu.ifdefrevolver.bugs.minecommits.CommitsDistanceDb.Commit;
+
 import java.util.Date;
-import java.util.SortedSet;
+import java.util.Set;
 
 /**
- * Represents a snapshot, which is a collection of {@link Commit} instances,
- * ordered in ascending order by date.
+ * Represents a snapshot, which is a collection of {@link Commit} instances, ordered in ascending order by date.
  *
  * @author wfenske
  */
@@ -16,31 +17,19 @@ public interface ISnapshot {
      * the {@link NullSnapshot} , <code>null</code> is returned, otherwise, the return value is always
      * non-<code>null</code>.
      */
-    String revisionHash();
-
-    /**
-     * @return Nullable date of this snapshot. If this is the {@link NullSnapshot}, <code>null</code> is returned,
-     * otherwise, the return value is always non-<code>null</code>.
-     */
-    Date revisionDate();
+    Commit getStartCommit();
 
     /**
      * @return Nullable formatted date of this snapshot. If this the {@link NullSnapshot}, <code>null</code> is
      * returned, otherwise, the return value is always non-<code>null</code>.
      */
-    String revisionDateString();
+    String getStartDateString();
 
     /**
      * @return Nullable date of the first commit of this snapshot. If this is the {@link NullSnapshot},
      * <code>null</code> is returned, otherwise, the return value is always non-<code>null</code>.
      */
-    Date startDate();
-
-    /**
-     * @return Nullable date of the last commit of this snapshot. If this is the {@link NullSnapshot}, <code>null</code>
-     * is returned, otherwise, the return value is always non-<code>null</code>.
-     */
-    Date endDate();
+    Date getStartDate();
 
     /**
      * <p>
@@ -53,5 +42,5 @@ public interface ISnapshot {
      * @return The set of commits contained in this snapshot. This map is always non-<code>null</code>. Unless this is
      * the {@link NullSnapshot}, this map is also non-empty.
      */
-    SortedSet<Commit> getCommits();
+    Set<Commit> getCommits();
 }

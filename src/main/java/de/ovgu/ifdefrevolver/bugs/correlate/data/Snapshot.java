@@ -1,5 +1,6 @@
 package de.ovgu.ifdefrevolver.bugs.correlate.data;
 
+import de.ovgu.ifdefrevolver.bugs.createsnapshots.data.ISnapshot;
 import de.ovgu.ifdefrevolver.bugs.createsnapshots.input.FileFinder;
 import de.ovgu.ifdefrevolver.bugs.minecommits.CommitsDistanceDb.Commit;
 
@@ -14,45 +15,45 @@ import java.util.Set;
  *
  * @author wfenske
  */
-public class Snapshot implements Comparable<Snapshot>, IMinimalSnapshot {
+public class Snapshot implements Comparable<Snapshot>, IMinimalSnapshot, ISnapshot {
     private static final SimpleDateFormat dateFormatter = new SimpleDateFormat("yyyy-MM-dd");
 
     private final int snapshotIndex;
-    private final int branch;
-    private final Date snapshotDate;
+    //    private final int branch;
+    private final Date startDate;
     private final Set<Commit> commits;
     private final Commit startCommit;
     private final File snapshotDir;
     //private Set<String> bugfixCommits = new HashSet<>();
 
-    public Snapshot(int snapshotIndex, int branch, Date snapshotDate, Set<Commit> commits, File snapshotDir) {
+    public Snapshot(int snapshotIndex, Date startDate, Set<Commit> commits, File snapshotDir) {
         this.snapshotIndex = snapshotIndex;
-        this.branch = branch;
-        this.snapshotDate = snapshotDate;
+//        this.branch = branch;
+        this.startDate = startDate;
         this.commits = commits;
         this.startCommit = commits.iterator().next();
         this.snapshotDir = snapshotDir;
     }
 
-    public synchronized String getFormattedSnapshotDate() {
-        return dateFormatter.format(snapshotDate);
+    public synchronized String getStartDateString() {
+        return dateFormatter.format(startDate);
     }
 
     /**
      * @return The (unique) sort index of this snapshot. Earlier snapshots have smaller sort indices than later
      * snapshots.
      */
-    public int getSnapshotIndex() {
+    public int getIndex() {
         return snapshotIndex;
     }
 
-    public int getBranch() {
-        return branch;
-    }
+//    public int getBranch() {
+//        return branch;
+//    }
 
     @Override
-    public Date getSnapshotDate() {
-        return snapshotDate;
+    public Date getStartDate() {
+        return startDate;
     }
 
     @Override
@@ -70,7 +71,7 @@ public class Snapshot implements Comparable<Snapshot>, IMinimalSnapshot {
     @Override
     public String toString() {
         return String.format("Snapshot [index=%s, date=%s, startHash=%s]", snapshotIndex,
-                getFormattedSnapshotDate(), startCommit);
+                getStartDateString(), startCommit);
     }
 
     /*
@@ -80,7 +81,7 @@ public class Snapshot implements Comparable<Snapshot>, IMinimalSnapshot {
     public int hashCode() {
         final int prime = 31;
         int result = 1;
-        result = prime * result + ((snapshotDate == null) ? 0 : snapshotDate.hashCode());
+        result = prime * result + ((startDate == null) ? 0 : startDate.hashCode());
         result = prime * result + snapshotIndex;
         result = prime * result + ((startCommit == null) ? 0 : startCommit.hashCode());
         return result;
@@ -98,10 +99,10 @@ public class Snapshot implements Comparable<Snapshot>, IMinimalSnapshot {
         if (!(obj instanceof Snapshot))
             return false;
         Snapshot other = (Snapshot) obj;
-        if (snapshotDate == null) {
-            if (other.snapshotDate != null)
+        if (startDate == null) {
+            if (other.startDate != null)
                 return false;
-        } else if (!snapshotDate.equals(other.snapshotDate))
+        } else if (!startDate.equals(other.startDate))
             return false;
         if (snapshotIndex != other.snapshotIndex)
             return false;
@@ -115,7 +116,7 @@ public class Snapshot implements Comparable<Snapshot>, IMinimalSnapshot {
 
     @Override
     public int compareTo(Snapshot other) {
-        return this.getSnapshotIndex() - other.getSnapshotIndex();
+        return this.getIndex() - other.getIndex();
     }
 
     /**

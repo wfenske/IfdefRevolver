@@ -13,21 +13,21 @@ public enum JointFunctionAbSmellAgeSnapshotColumns implements CsvColumnValueProv
     SNAPSHOT_DATE {
         @Override
         public Object csvColumnValue(AddChangeDistances.SnapshotFunctionGenealogy in, Void ctx) {
-            return in.getSnapshot().getFormattedSnapshotDate();
+            return in.getSnapshot().getStartDateString();
         }
     },
     SNAPSHOT_INDEX {
         @Override
         public Integer csvColumnValue(AddChangeDistances.SnapshotFunctionGenealogy in, Void ctx) {
-            return in.getSnapshot().getSnapshotIndex();
+            return in.getSnapshot().getIndex();
         }
     },
-    SNAPSHOT_BRANCH {
-        @Override
-        public Integer csvColumnValue(AddChangeDistances.SnapshotFunctionGenealogy in, Void ctx) {
-            return in.getSnapshot().getBranch();
-        }
-    },
+    //    SNAPSHOT_BRANCH {
+//        @Override
+//        public Integer csvColumnValue(AddChangeDistances.SnapshotFunctionGenealogy in, Void ctx) {
+//            return in.getSnapshot().getBranch();
+//        }
+//    },
     START_FUNCTION_SIGNATURE {
         @Override
         public String csvColumnValue(AddChangeDistances.SnapshotFunctionGenealogy in, Void ctx) {

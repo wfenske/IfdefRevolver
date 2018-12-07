@@ -101,7 +101,7 @@ public class SnapshotReader {
             int snapshotIndex = parseSnapshotIndex(line);
             SnapshotCommitsCsvReader commitsReader = new SnapshotCommitsCsvReader(commitsDistanceDb, config);
             Set<Commit> commits = commitsReader.readFile(snapshotDate);
-            Snapshot snapshot = new Snapshot(snapshotIndex, -1, snapshotDate, commits, config.projectSnapshotsDir());
+            Snapshot snapshot = new Snapshot(snapshotIndex, snapshotDate, commits, config.snapshotDirForDate(snapshotDate));
             result.add(snapshot);
         }
 

@@ -1,7 +1,7 @@
 package de.ovgu.ifdefrevolver.bugs.createsnapshots.main;
 
+import de.ovgu.ifdefrevolver.bugs.correlate.data.Snapshot;
 import de.ovgu.ifdefrevolver.bugs.createsnapshots.data.ISnapshot;
-import de.ovgu.ifdefrevolver.bugs.createsnapshots.data.ProperSnapshot;
 import de.ovgu.ifdefrevolver.bugs.createsnapshots.input.RevisionsCsvReader;
 import de.ovgu.ifdefrevolver.bugs.minecommits.CommitsDistanceDb;
 import de.ovgu.ifdefrevolver.util.FileUtils;
@@ -30,18 +30,18 @@ class PreprocessStrategy implements ISnapshotProcessingModeStrategy {
     @Override
     public void readAllRevisionsAndComputeSnapshots() {
         this.revisionsCsvReader = new RevisionsCsvReader(commitsDb, conf.revisionCsvFile());
-        this.revisionsCsvReader.readAllCommits();
+        this.revisionsCsvReader.readCommitsThatModifyCFiles();
         this.revisionsCsvReader.readPrecomputedSnapshots(conf);
     }
 
     @Override
-    public Collection<ProperSnapshot> getSnapshotsToProcess() {
+    public Collection<Snapshot> getSnapshotsToProcess() {
         return this.revisionsCsvReader.getSnapshotsFiltered(conf);
     }
 
     @Override
-    public boolean snapshotAlreadyProcessed(ProperSnapshot snapshot) {
-        File snapshotResultsDir = conf.snapshotResultsDirForDate(snapshot.revisionDate());
+    public boolean snapshotAlreadyProcessed(Snapshot snapshot) {
+        File snapshotResultsDir = conf.snapshotResultsDirForDate(snapshot.getStartDate());
         File featuresXml = new File(snapshotResultsDir, "skunk_intermediate_features.xml");
         File filesXml = new File(snapshotResultsDir, "skunk_intermediate_files.xml");
         File functionsXml = new File(snapshotResultsDir, "skunk_intermediate_functions.xml");
@@ -67,14 +67,14 @@ class PreprocessStrategy implements ISnapshotProcessingModeStrategy {
     }
 
     @Override
-    public void ensureSnapshot(ProperSnapshot currentSnapshot) {
+    public void ensureSnapshot(Snapshot currentSnapshot) {
         // The snapshot has already been created in a previous run in CHECKOUT
         // mode --> Nothing to do.
     }
 
     @Override
-    public void processSnapshot(ProperSnapshot currentSnapshot) {
-        Date snapshotDate = currentSnapshot.revisionDate();
+    public void processSnapshot(Snapshot currentSnapshot) {
+        Date snapshotDate = currentSnapshot.getStartDate();
         File workingDir = conf.snapshotResultsDirForDate(snapshotDate);
         File snapshotDir = conf.snapshotDirForDate(snapshotDate);
         if (!workingDir.isDirectory()) {

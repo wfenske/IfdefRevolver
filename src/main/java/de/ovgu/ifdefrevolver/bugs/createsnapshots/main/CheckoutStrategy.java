@@ -1,9 +1,7 @@
 package de.ovgu.ifdefrevolver.bugs.createsnapshots.main;
 
 import de.ovgu.ifdefrevolver.bugs.correlate.data.Snapshot;
-import de.ovgu.ifdefrevolver.bugs.createsnapshots.data.Commit;
 import de.ovgu.ifdefrevolver.bugs.createsnapshots.data.ISnapshot;
-import de.ovgu.ifdefrevolver.bugs.createsnapshots.data.ProperSnapshot;
 import de.ovgu.ifdefrevolver.bugs.createsnapshots.input.FileFinder;
 import de.ovgu.ifdefrevolver.bugs.createsnapshots.input.RevisionsCsvReader;
 import de.ovgu.ifdefrevolver.bugs.minecommits.CommitsDistanceDb;
@@ -43,8 +41,8 @@ class CheckoutStrategy implements ISnapshotProcessingModeStrategy {
     @Override
     public void readAllRevisionsAndComputeSnapshots() {
         this.revisionsCsvReader = new RevisionsCsvReader(commitsDb, conf.revisionCsvFile());
-        this.revisionsCsvReader.readAllCommits();
-        this.revisionsCsvReader.computeSnapshots(conf);
+        this.revisionsCsvReader.readCommitsThatModifyCFiles();
+        this.revisionsCsvReader.computeAndPersistSnapshots(conf);
     }
 
     @Override
@@ -56,7 +54,7 @@ class CheckoutStrategy implements ISnapshotProcessingModeStrategy {
     }
 
     @Override
-    public boolean snapshotAlreadyProcessed(ProperSnapshot snapshot) {
+    public boolean snapshotAlreadyProcessed(Snapshot snapshot) {
         File cppstatsConfigFile = cppstatsConfigFile(snapshot);
         File snapshotDir = snapshotDir(snapshot);
         File cppstatsGeneralCsv = new File(snapshotDir, "cppstats.csv");
@@ -93,7 +91,7 @@ class CheckoutStrategy implements ISnapshotProcessingModeStrategy {
     }
 
     @Override
-    public void ensureSnapshot(ProperSnapshot currentSnapshot) {
+    public void ensureSnapshot(Snapshot currentSnapshot) {
         // GIT CHECKOUT
         gitCheckout(currentSnapshot);
         // Anzahl der .c Dateien checken
@@ -104,8 +102,8 @@ class CheckoutStrategy implements ISnapshotProcessingModeStrategy {
         LOG.info(String.format("Found %d .c file%s in %s", filesCount, filesCount == 1 ? "" : "s",
                 projectRepoDir.getAbsolutePath()));
         conf.projectResultsDir().mkdirs();
-        appendToProjectCsv(currentSnapshot, filesFound);
-        appendToProjectAnalysisCsv(currentSnapshot, filesFound);
+//        appendToProjectCsv(currentSnapshot, filesFound);
+//        appendToProjectAnalysisCsv(currentSnapshot, filesFound);
         final File currentSnapshotDir = snapshotDir(currentSnapshot);
         currentSnapshotDir.mkdirs();
         copyCheckoutToTmpSnapshotDir(filesFound, currentSnapshot);
@@ -117,49 +115,49 @@ class CheckoutStrategy implements ISnapshotProcessingModeStrategy {
      *
      * @param snapshot
      */
-    private void gitCheckout(ProperSnapshot snapshot) {
-        String hash = snapshot.revisionHash();
+    private void gitCheckout(Snapshot snapshot) {
+        String hash = snapshot.getStartCommit().commitHash;
         File projectRepoDir = new File(conf.getRepoDir());
         CreateSnapshots.runExternalCommand(CreateSnapshotsConfig.GIT_PROG, projectRepoDir.getAbsoluteFile(), "checkout", "--force", hash);
     }
 
-    private void appendToProjectAnalysisCsv(ProperSnapshot snapshot, List<File> filesFound) {
-        final File csvOutFile = conf.projectAnalysisCsv();
-        final File projectRepoDir = new File(conf.getRepoDir());
-        FileWriter fileWriter = null;
-        BufferedWriter buff = null;
-        try {
-            fileWriter = new FileWriter(csvOutFile, true);
-            buff = new BufferedWriter(fileWriter);
-            for (File f : filesFound) {
-                String relativeFileName = CreateSnapshots.pathRelativeTo(f, projectRepoDir);
-                buff.write(relativeFileName + "," + snapshot.revisionDateString());
-                buff.newLine();
-            }
-        } catch (IOException e1) {
-            throw new RuntimeException("Error writing stuff to " + csvOutFile.getAbsolutePath(), e1);
-        } finally {
-            closeBufferedWriter(buff, fileWriter);
-        }
-    }
+//    private void appendToProjectAnalysisCsv(ProperSnapshot snapshot, List<File> filesFound) {
+//        final File csvOutFile = conf.projectAnalysisCsv();
+//        final File projectRepoDir = new File(conf.getRepoDir());
+//        FileWriter fileWriter = null;
+//        BufferedWriter buff = null;
+//        try {
+//            fileWriter = new FileWriter(csvOutFile, true);
+//            buff = new BufferedWriter(fileWriter);
+//            for (File f : filesFound) {
+//                String relativeFileName = CreateSnapshots.pathRelativeTo(f, projectRepoDir);
+//                buff.write(relativeFileName + "," + snapshot.getStartDateString());
+//                buff.newLine();
+//            }
+//        } catch (IOException e1) {
+//            throw new RuntimeException("Error writing stuff to " + csvOutFile.getAbsolutePath(), e1);
+//        } finally {
+//            closeBufferedWriter(buff, fileWriter);
+//        }
+//    }
 
-    private void appendToProjectCsv(final ProperSnapshot snapshot, List<File> filesFound) {
-        BufferedWriter buff = null;
-        FileWriter fileWriter = null;
-        try {
-            fileWriter = new FileWriter(conf.projectInfoCsv(), true);
-            buff = new BufferedWriter(fileWriter);
-            buff.write(snapshot.revisionHash() + "," + snapshot.revisionDateString() + "," + filesFound.size());
-            buff.newLine();
-            LOG.debug("Added snapshot " + snapshot.revisionDateString() + " to "
-                    + conf.projectInfoCsv().getAbsolutePath());
-        } catch (IOException e1) {
-            throw new RuntimeException("Error appending snapshot " + snapshot.revisionDateString() + " to "
-                    + conf.projectInfoCsv().getAbsolutePath(), e1);
-        } finally {
-            closeBufferedWriter(buff, fileWriter);
-        }
-    }
+//    private void appendToProjectCsv(final Snapshot snapshot, List<File> filesFound) {
+//        BufferedWriter buff = null;
+//        FileWriter fileWriter = null;
+//        try {
+//            fileWriter = new FileWriter(conf.projectInfoCsv(), true);
+//            buff = new BufferedWriter(fileWriter);
+//            buff.write(snapshot.getStartCommit() + "," + snapshot.getStartDateString() + "," + filesFound.size());
+//            buff.newLine();
+//            LOG.debug("Added snapshot " + snapshot.getStartDateString() + " to "
+//                    + conf.projectInfoCsv().getAbsolutePath());
+//        } catch (IOException e1) {
+//            throw new RuntimeException("Error appending snapshot " + snapshot.getStartDateString() + " to "
+//                    + conf.projectInfoCsv().getAbsolutePath(), e1);
+//        } finally {
+//            closeBufferedWriter(buff, fileWriter);
+//        }
+//    }
 
     private void closeBufferedWriter(BufferedWriter buff, FileWriter fileWriter) {
         if (buff != null) {
@@ -179,7 +177,7 @@ class CheckoutStrategy implements ISnapshotProcessingModeStrategy {
         }
     }
 
-    private void copyCheckoutToTmpSnapshotDir(List<File> filesInCurrentCheckout, ProperSnapshot currentSnapshot) {
+    private void copyCheckoutToTmpSnapshotDir(List<File> filesInCurrentCheckout, Snapshot currentSnapshot) {
         final File cppstatsDir = new File(snapshotDir(currentSnapshot), "source");
         copyAllFiles(filesInCurrentCheckout, cppstatsDir);
     }
@@ -215,7 +213,7 @@ class CheckoutStrategy implements ISnapshotProcessingModeStrategy {
      *
      * @param snapshot Snapshot for which to create the cppstats config file
      */
-    private void writeCppstatsConfigFile(ProperSnapshot snapshot) {
+    private void writeCppstatsConfigFile(Snapshot snapshot) {
         final File snapshotDir = snapshotDir(snapshot);
         final File cppstatsConfigFile = cppstatsConfigFile(snapshot);
         PrintWriter writer = null;
@@ -230,25 +228,25 @@ class CheckoutStrategy implements ISnapshotProcessingModeStrategy {
         LOG.info("Wrote " + cppstatsConfigFile.getAbsolutePath());
     }
 
-    private File cppstatsConfigFile(ProperSnapshot snapshot) {
+    private File cppstatsConfigFile(Snapshot snapshot) {
         File snapshotDir = snapshotDir(snapshot);
         return new File(snapshotDir, CPPSTATS_INPUT_TXT);
     }
 
-    private File snapshotDir(ProperSnapshot snapshot) {
-        return conf.snapshotDirForDate(snapshot.revisionDate());
+    private File snapshotDir(Snapshot snapshot) {
+        return conf.snapshotDirForDate(snapshot.getStartDate());
     }
 
     @Override
-    public void processSnapshot(ProperSnapshot currentSnapshot) {
-        final Date snapshotDate = currentSnapshot.revisionDate();
+    public void processSnapshot(Snapshot currentSnapshot) {
+        final Date snapshotDate = currentSnapshot.getStartDate();
         final File resultsSnapshotDir = conf.snapshotResultsDirForDate(snapshotDate);
         final File tmpSnapshotDir = conf.snapshotDirForDate(snapshotDate);
         resultsSnapshotDir.mkdirs();
         List<String> args = new ArrayList<>();
         //args.add(conf.smellConfig /* ARG1 */);
         //args.add(snapshotResultsDirForDate.getAbsolutePath() /* ARG2 */);
-        final Date prevSnapshotDate = previousSnapshot.revisionDate();
+        final Date prevSnapshotDate = previousSnapshot.getStartDate();
         if (prevSnapshotDate != null) {
             final File prevSnapshotDir = conf.snapshotDirForDate(prevSnapshotDate);
             final File prevCppstatsInputList = new File(prevSnapshotDir, CPPSTATS_INPUT_TXT);
@@ -257,38 +255,10 @@ class CheckoutStrategy implements ISnapshotProcessingModeStrategy {
             args.add("--lazyPreparation");
         }
         CreateSnapshots.runExternalCommand(CreateSnapshotsConfig.CPP_SKUNK_PROG, tmpSnapshotDir /* WD */, args.toArray(new String[args.size()]));
-        saveSnapshotCommitsHashes(currentSnapshot);
     }
 
     @Override
     public String activityDisplayName() {
         return "Checking out sources and running cppstats";
     }
-
-    private void saveSnapshotCommitsHashes(ProperSnapshot snapshot) {
-        File projSnapshotMetadataDir = new File(conf.projectResultsDir(), "snapshots");
-        if (!projSnapshotMetadataDir.isDirectory()) {
-            projSnapshotMetadataDir.mkdir();
-        }
-        File out = new File(projSnapshotMetadataDir, snapshot.revisionDateString() + ".csv");
-        BufferedWriter buff = null;
-        FileWriter fileWriter = null;
-        try {
-            fileWriter = new FileWriter(out);
-            buff = new BufferedWriter(fileWriter);
-            buff.write(snapshot.getSortIndex() + "," + snapshot.revisionDateString());
-            buff.newLine();
-            for (Commit commit : snapshot.getCommits()) {
-                buff.write(commit.getHash());
-                buff.newLine();
-            }
-            LOG.info("Stored commit hashes of snapshot " + snapshot + " to " + out.getAbsolutePath());
-        } catch (IOException e1) {
-            throw new RuntimeException("Error appending snapshot " + snapshot.revisionDateString() + " to "
-                    + conf.projectInfoCsv().getAbsolutePath(), e1);
-        } finally {
-            closeBufferedWriter(buff, fileWriter);
-        }
-    }
-
 }

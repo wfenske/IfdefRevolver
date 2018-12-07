@@ -1,7 +1,7 @@
 package de.ovgu.ifdefrevolver.bugs.createsnapshots.main;
 
+import de.ovgu.ifdefrevolver.bugs.correlate.data.Snapshot;
 import de.ovgu.ifdefrevolver.bugs.createsnapshots.data.ISnapshot;
-import de.ovgu.ifdefrevolver.bugs.createsnapshots.data.ProperSnapshot;
 import de.ovgu.ifdefrevolver.bugs.createsnapshots.data.Smell;
 import de.ovgu.ifdefrevolver.bugs.createsnapshots.input.FileFinder;
 import de.ovgu.ifdefrevolver.bugs.createsnapshots.input.RevisionsCsvReader;
@@ -34,12 +34,12 @@ class DetectSmellsStrategy implements ISnapshotProcessingModeStrategy {
     @Override
     public void readAllRevisionsAndComputeSnapshots() {
         this.revisionsCsvReader = new RevisionsCsvReader(commitsDb, conf.revisionCsvFile());
-        this.revisionsCsvReader.readAllCommits();
+        this.revisionsCsvReader.readCommitsThatModifyCFiles();
         this.revisionsCsvReader.readPrecomputedSnapshots(conf);
     }
 
     @Override
-    public Collection<ProperSnapshot> getSnapshotsToProcess() {
+    public Collection<Snapshot> getSnapshotsToProcess() {
         return this.revisionsCsvReader.getSnapshotsFiltered(conf);
     }
 
@@ -59,14 +59,14 @@ class DetectSmellsStrategy implements ISnapshotProcessingModeStrategy {
     }
 
     @Override
-    public void ensureSnapshot(ProperSnapshot currentSnapshot) {
+    public void ensureSnapshot(Snapshot currentSnapshot) {
         // The snapshot has already been created in a previous run in CHECKOUT
         // mode --> Nothing to do.
     }
 
     @Override
-    public void processSnapshot(ProperSnapshot currentSnapshot) {
-        Date snapshotDate = currentSnapshot.revisionDate();
+    public void processSnapshot(Snapshot currentSnapshot) {
+        Date snapshotDate = currentSnapshot.getStartDate();
         File resultsDir = conf.snapshotResultsDirForDate(snapshotDate);
         CreateSnapshots.runExternalCommand(CreateSnapshotsConfig.SKUNK_PROG, resultsDir, "--processed=.", "--config=" + conf.smellConfig());
         moveSnapshotSmellDetectionResults(currentSnapshot);
@@ -77,15 +77,15 @@ class DetectSmellsStrategy implements ISnapshotProcessingModeStrategy {
         return "Detecting smell " + conf.getSmell();
     }
 
-    private void moveSnapshotSmellDetectionResults(ProperSnapshot curSnapshot) {
-        File sourcePath = conf.snapshotResultsDirForDate(curSnapshot.startDate());
+    private void moveSnapshotSmellDetectionResults(Snapshot curSnapshot) {
+        File sourcePath = conf.snapshotResultsDirForDate(curSnapshot.getStartDate());
         File smellResultsDir = new File(conf.projectResultsDir(), conf.getSmell().name() + "Res");
         smellResultsDir.mkdirs(); // Create target directory
         moveSnapshotSmellDetectionResults(curSnapshot, sourcePath, smellResultsDir);
     }
 
-    private void moveSnapshotSmellDetectionResults(ProperSnapshot snapshot, File sourcePath, File smellResultsDir) {
-        final String snapshotDateString = snapshot.revisionDateString();
+    private void moveSnapshotSmellDetectionResults(Snapshot snapshot, File sourcePath, File smellResultsDir) {
+        final String snapshotDateString = snapshot.getStartDateString();
         List<File> filesFindCSV = FileFinder.find(sourcePath, "(.*\\.csv$)");
         // Rename and move CSV files (smell severity)
         for (File f : filesFindCSV) {
@@ -124,7 +124,7 @@ class DetectSmellsStrategy implements ISnapshotProcessingModeStrategy {
     }
 
     @Override
-    public boolean snapshotAlreadyProcessed(ProperSnapshot snapshot) {
+    public boolean snapshotAlreadyProcessed(Snapshot snapshot) {
         // Too much hassle. Just have everything recomputed.
         return false;
     }

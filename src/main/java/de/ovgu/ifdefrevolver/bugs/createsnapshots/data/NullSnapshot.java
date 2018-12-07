@@ -3,9 +3,11 @@
  */
 package de.ovgu.ifdefrevolver.bugs.createsnapshots.data;
 
+import de.ovgu.ifdefrevolver.bugs.minecommits.CommitsDistanceDb.Commit;
+
 import java.util.Collections;
 import java.util.Date;
-import java.util.SortedSet;
+import java.util.Set;
 
 /**
  * @author wfenske
@@ -26,32 +28,22 @@ public class NullSnapshot implements ISnapshot {
     }
 
     @Override
-    public Date revisionDate() {
+    public String getStartDateString() {
         return null;
     }
 
     @Override
-    public String revisionDateString() {
+    public Set<Commit> getCommits() {
+        return Collections.emptySet();
+    }
+
+    @Override
+    public Date getStartDate() {
         return null;
     }
 
     @Override
-    public SortedSet<Commit> getCommits() {
-        return Collections.emptySortedSet();
-    }
-
-    @Override
-    public Date startDate() {
-        return null;
-    }
-
-    @Override
-    public Date endDate() {
-        return null;
-    }
-
-    @Override
-    public String revisionHash() {
+    public Commit getStartCommit() {
         return null;
     }
 

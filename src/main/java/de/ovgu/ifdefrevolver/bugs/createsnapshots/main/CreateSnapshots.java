@@ -1,9 +1,9 @@
 package de.ovgu.ifdefrevolver.bugs.createsnapshots.main;
 
+import de.ovgu.ifdefrevolver.bugs.correlate.data.Snapshot;
 import de.ovgu.ifdefrevolver.bugs.correlate.main.ProjectInformationConfig;
 import de.ovgu.ifdefrevolver.bugs.createsnapshots.data.ISnapshot;
 import de.ovgu.ifdefrevolver.bugs.createsnapshots.data.NullSnapshot;
-import de.ovgu.ifdefrevolver.bugs.createsnapshots.data.ProperSnapshot;
 import de.ovgu.ifdefrevolver.bugs.createsnapshots.data.Smell;
 import de.ovgu.ifdefrevolver.bugs.minecommits.CommitsDistanceDb;
 import de.ovgu.ifdefrevolver.bugs.minecommits.CommitsDistanceDbCsvReader;
@@ -83,8 +83,8 @@ public class CreateSnapshots {
     }
 
     private Thread[] createSnapshotProcessingWorkers(ISnapshotProcessingModeStrategy skunkStrategy) {
-        Collection<ProperSnapshot> snapshotsToProcess = skunkStrategy.getSnapshotsToProcess();
-        Iterator<ProperSnapshot> snapshotIterator = snapshotsToProcess.iterator();
+        Collection<Snapshot> snapshotsToProcess = skunkStrategy.getSnapshotsToProcess();
+        Iterator<Snapshot> snapshotIterator = snapshotsToProcess.iterator();
         Thread[] workers = new Thread[conf.getNumberOfWorkerThreads()];
 
         final MutableInt progressCounter = new MutableInt(1);
@@ -115,10 +115,10 @@ public class CreateSnapshots {
 
         ISnapshot previousSnapshot = NullSnapshot.getInstance();
 
-        Collection<ProperSnapshot> snapshotsToProcess = skunkStrategy.getSnapshotsToProcess();
+        Collection<Snapshot> snapshotsToProcess = skunkStrategy.getSnapshotsToProcess();
         final int totalNumberOfSnapshots = snapshotsToProcess.size();
         int myProgressPosition = 1;
-        for (ProperSnapshot currentSnapshot : snapshotsToProcess) {
+        for (Snapshot currentSnapshot : snapshotsToProcess) {
             LOG.info(skunkStrategy.activityDisplayName() + " on snapshot " +
                     myProgressPosition + "/" + totalNumberOfSnapshots + ": " + currentSnapshot);
             skunkStrategy.setPreviousSnapshot(previousSnapshot);
@@ -134,12 +134,12 @@ public class CreateSnapshots {
     }
 
     private Runnable newSkunkStrategyExecutorRunnable(ISnapshotProcessingModeStrategy skunkStrategy,
-                                                      Iterator<ProperSnapshot> snapshotIterator,
+                                                      Iterator<Snapshot> snapshotIterator,
                                                       final MutableInt progressCounter,
                                                       final int totalNumberOfSnapshots) {
         return () -> {
             while (true) {
-                final ProperSnapshot snapshot;
+                final Snapshot snapshot;
                 final int myProgressPosition;
                 synchronized (snapshotIterator) {
                     if (!snapshotIterator.hasNext()) {
@@ -169,7 +169,7 @@ public class CreateSnapshots {
         };
     }
 
-    synchronized void onSnapshotError(ProperSnapshot snapshot, Throwable t) {
+    synchronized void onSnapshotError(ISnapshot snapshot, Throwable t) {
         LOG.warn("Error processing " + snapshot, t);
         erroneousSnapshots++;
     }
@@ -390,7 +390,7 @@ public class CreateSnapshots {
 
     /**
      * How the size of a commit window is counted.  Requires an arg, as determined by the values in {@link
-     * CommitWindowSizeMode}
+     * SnapshotSizeMode}
      */
     private static final String OPT_COMMIT_WINDOW_SIZE_MODE_L = "sizemode";
 
@@ -486,7 +486,7 @@ public class CreateSnapshots {
         if (line.hasOption(ListChangedFunctionsConfig.OPT_REPO)) {
             res.setRepoDir(line.getOptionValue(ListChangedFunctionsConfig.OPT_REPO));
         } else {
-            res.setRepoDir(Paths.get(ListChangedFunctionsConfig.DEFAULT_REPOS_DIR_NAME, res.getProject(), ".git").toString());
+            res.setRepoDir(Paths.get(ListChangedFunctionsConfig.DEFAULT_REPOS_DIR_NAME, res.getProject()).toString());
         }
         res.validateRepoDir();
 
@@ -509,16 +509,16 @@ public class CreateSnapshots {
             if (res.skunkMode() != SnapshotProcessingMode.CHECKOUT) {
                 LOG.warn("Ignoring commit window size mode because `--" + OPT_CHECKOUT_L + "' was not specified.");
             } else {
-                CommitWindowSizeMode mode = parseCommitWindowSizeModeValueOrDie(line);
-                res.setCommitWindowSizeMode(mode);
+                SnapshotSizeMode mode = parseCommitWindowSizeModeValueOrDie(line);
+                res.setSnapshotSizeMode(mode);
             }
         }
     }
 
-    private CommitWindowSizeMode parseCommitWindowSizeModeValueOrDie(CommandLine line) {
+    private SnapshotSizeMode parseCommitWindowSizeModeValueOrDie(CommandLine line) {
         String modeName = line.getOptionValue(OPT_COMMIT_WINDOW_SIZE_MODE_L);
         try {
-            return CommitWindowSizeMode.valueOf(modeName.toUpperCase());
+            return SnapshotSizeMode.valueOf(modeName.toUpperCase());
         } catch (IllegalArgumentException iae) {
             throw new RuntimeException("Invalid value for option `--" + OPT_COMMIT_WINDOW_SIZE_MODE_L
                     + "': Expected: " + getCommitWindowSizeModeArgs() + " got: " + modeName);
@@ -531,10 +531,10 @@ public class CreateSnapshots {
                 LOG.warn("Ignoring custom commit window size because `--" + OPT_CHECKOUT_L + "' was not specified.");
             } else {
                 int windowSizeNum = parseCommitWindowSizeValueOrDie(line);
-                res.setCommitWindowSize(windowSizeNum);
+                res.setSnapshotSize(windowSizeNum);
             }
         } else {
-            res.setCommitWindowSize(defaultValue);
+            res.setSnapshotSize(defaultValue);
         }
     }
 
@@ -671,7 +671,7 @@ public class CreateSnapshots {
 
     private String getCommitWindowSizeDefaults() {
         StringBuilder result = new StringBuilder();
-        for (CommitWindowSizeMode m : CommitWindowSizeMode.values()) {
+        for (SnapshotSizeMode m : SnapshotSizeMode.values()) {
             if (result.length() > 0) {
                 result.append(", ");
             }
@@ -694,7 +694,7 @@ public class CreateSnapshots {
 
     private static String getCommitWindowSizeModeArgs() {
         StringBuilder result = new StringBuilder();
-        for (CommitWindowSizeMode m : CommitWindowSizeMode.values()) {
+        for (SnapshotSizeMode m : SnapshotSizeMode.values()) {
             if (result.length() > 0) {
                 result.append("|");
             }

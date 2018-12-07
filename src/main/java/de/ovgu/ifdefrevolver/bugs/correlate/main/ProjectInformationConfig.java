@@ -72,12 +72,12 @@ public class ProjectInformationConfig implements IHasSnapshotsDir, IHasResultsDi
     protected Optional<List<Date>> snapshotFilter = Optional.empty();
 
     public static void validateRepoDir(String repoDir) {
-        File repoFile = new File(repoDir);
+        File repoFile = new File(repoDir, ".git");
         if (!repoFile.exists()) {
-            throw new IllegalArgumentException("Repository directory does not exist: " + repoDir);
+            throw new IllegalArgumentException("Repository directory does not exist: " + repoFile.getPath());
         }
         if (!repoFile.isDirectory()) {
-            throw new IllegalArgumentException("Repository is not a directory: " + repoDir);
+            throw new IllegalArgumentException("Repository is not a directory: " + repoFile.getPath());
         }
     }
 

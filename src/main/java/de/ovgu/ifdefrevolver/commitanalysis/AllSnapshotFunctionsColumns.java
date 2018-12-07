@@ -20,7 +20,7 @@ public enum AllSnapshotFunctionsColumns implements CsvColumnValueProvider<Method
         @Override
         public String csvColumnValue(Method func, IHasSnapshotDate snapshot) {
             synchronized (dateFormatter) {
-                return dateFormatter.format(snapshot.getSnapshotDate());
+                return dateFormatter.format(snapshot.getStartDate());
             }
         }
     },

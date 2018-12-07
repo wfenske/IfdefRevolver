@@ -41,7 +41,7 @@ class CachingFunctionsLister {
         CsvFileWriterHelper writer = new CsvFileWriterHelper() {
             IHasSnapshotDate dateProvider = new IHasSnapshotDate() {
                 @Override
-                public Date getSnapshotDate() {
+                public Date getStartDate() {
                     return commitDate;
                 }
             };

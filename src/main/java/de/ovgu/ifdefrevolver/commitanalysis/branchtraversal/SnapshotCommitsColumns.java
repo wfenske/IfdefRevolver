@@ -8,7 +8,7 @@ public enum SnapshotCommitsColumns implements CsvColumnValueProvider<Commit, Sna
     SNAPSHOT_INDEX {
         @Override
         public Integer csvColumnValue(Commit ignored, Snapshot s) {
-            return s.getSnapshotIndex();
+            return s.getIndex();
         }
     },
     COMMIT_HASH {

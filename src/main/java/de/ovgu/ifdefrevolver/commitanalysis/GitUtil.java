@@ -46,7 +46,7 @@ public final class GitUtil {
     protected static <TResult> Optional<TResult> computeUsingRepoAndCommit(String repoDir, String commitId, BiFunction<Repository, RevCommit, TResult> produceResultUsingCommit) {
         Git git;
         try {
-            git = Git.open(new File(repoDir));
+            git = Git.open(new File(repoDir, ".git"));
         } catch (IOException ioe) {
             LOG.warn("Failed to open repository " + repoDir, ioe);
             return Optional.empty();

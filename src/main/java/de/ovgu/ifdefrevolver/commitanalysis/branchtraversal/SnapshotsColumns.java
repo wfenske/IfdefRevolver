@@ -7,13 +7,13 @@ public enum SnapshotsColumns implements CsvColumnValueProvider<Snapshot, Void> {
     SNAPSHOT_INDEX {
         @Override
         public Integer csvColumnValue(Snapshot s, Void ctx) {
-            return s.getSnapshotIndex();
+            return s.getIndex();
         }
     },
     SNAPSHOT_DATE {
         @Override
         public String csvColumnValue(Snapshot s, Void ctx) {
-            return s.getFormattedSnapshotDate();
+            return s.getStartDateString();
         }
     },
     START_COMMIT_HASH {

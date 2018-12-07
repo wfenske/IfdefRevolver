@@ -12,6 +12,7 @@ import de.ovgu.ifdefrevolver.bugs.minecommits.CommitsDistanceDbCsvReader;
 import de.ovgu.ifdefrevolver.commitanalysis.*;
 import de.ovgu.ifdefrevolver.commitanalysis.branchtraversal.GenealogyTracker;
 import de.ovgu.ifdefrevolver.commitanalysis.branchtraversal.SnapshotCreatingCommitWalker;
+import de.ovgu.ifdefrevolver.commitanalysis.branchtraversal.WriteSnapshotsToCsvFilesStrategy;
 import de.ovgu.ifdefrevolver.util.ProgressMonitor;
 import de.ovgu.ifdefrevolver.util.ThreadProcessor;
 import de.ovgu.ifdefrevolver.util.UncaughtWorkerThreadException;
@@ -52,6 +53,7 @@ public class AddChangeDistances {
      * Number of commit snapshots per commit window
      */
     private static final int WINDOW_SIZE = 10;
+    private RevisionsCsvReader revisionsReader;
 
     public static void main(String[] args) {
         AddChangeDistances main = new AddChangeDistances();
@@ -109,8 +111,8 @@ public class AddChangeDistances {
         this.commitsDistanceDb.ensurePreprocessed();
         LOG.debug("Done reading commit parent-child relationships.");
 
-        RevisionsCsvReader revisionsReader = new RevisionsCsvReader(commitsDistanceDb, config.revisionCsvFile());
-        revisionsReader.readAllCommits();
+        this.revisionsReader = new RevisionsCsvReader(commitsDistanceDb, config.revisionCsvFile());
+        revisionsReader.readCommitsThatModifyCFiles();
 
         projectInfo = new ProjectInformationReader<>(config, commitsDistanceDb);
         LOG.debug("Reading project information");
@@ -168,7 +170,7 @@ public class AddChangeDistances {
     }
 
     private void createSnapshots() {
-        SnapshotCreatingCommitWalker<ListChangedFunctionsConfig> walker = new SnapshotCreatingCommitWalker<ListChangedFunctionsConfig>(commitsDistanceDb, config);
+        SnapshotCreatingCommitWalker<ListChangedFunctionsConfig> walker = new SnapshotCreatingCommitWalker<ListChangedFunctionsConfig>(commitsDistanceDb, config, 200, revisionsReader.getCommitsThatModifyCFiles(), new WriteSnapshotsToCsvFilesStrategy<>(commitsDistanceDb, config));
         walker.processCommits();
     }
 
@@ -185,7 +187,7 @@ public class AddChangeDistances {
         Map<Commit, List<AllFunctionsRow>> result = new HashMap<>();
         for (Snapshot s : projectInfo.getSnapshots().values()) {
             Commit startCommit = s.getStartCommit();
-            List<AllFunctionsRow> funcs = allFunctionsInSnapshots.get(s.getSnapshotDate());
+            List<AllFunctionsRow> funcs = allFunctionsInSnapshots.get(s.getStartDate());
             result.put(startCommit, funcs);
         }
         return result;
@@ -251,7 +253,7 @@ public class AddChangeDistances {
             }
         };
 
-        File resultFile = new File(config.snapshotResultsDirForDate(snapshot.snapshot.getSnapshotDate()),
+        File resultFile = new File(config.snapshotResultsDirForDate(snapshot.snapshot.getStartDate()),
                 JointFunctionAbSmellAgeSnapshotColumns.FILE_BASENAME);
         writerHelper.write(resultFile);
     }
@@ -373,7 +375,7 @@ public class AddChangeDistances {
     }
 
     private SnapshotWithFunctions mergeGenealogiesWithSnapshotData(Snapshot s) {
-        final Date snapshotDate = s.getSnapshotDate();
+        final Date snapshotDate = s.getStartDate();
 
         Map<FunctionId, AllFunctionsRow> allFunctionsByFunctionId = new LinkedHashMap<>();
         for (AllFunctionsRow r : allFunctionsInSnapshots.get(snapshotDate)) {
@@ -798,7 +800,7 @@ public class AddChangeDistances {
     private List<List<Snapshot>> groupSnapshots1() {
         LinkedGroupingListMap<Integer, Snapshot> snapshotsByBranch = new LinkedGroupingListMap<>();
         for (Snapshot s : projectInfo.getSnapshots().values()) {
-            snapshotsByBranch.put(s.getBranch(), s);
+            snapshotsByBranch.put(0, s);
         }
 
         int totalSnapshots = projectInfo.getSnapshots().size();
@@ -828,7 +830,7 @@ public class AddChangeDistances {
     private List<CommitWindow> groupSnapshots() {
         LinkedGroupingListMap<Integer, Snapshot> snapshotsByBranch = new LinkedGroupingListMap<>();
         for (Snapshot s : projectInfo.getSnapshots().values()) {
-            snapshotsByBranch.put(s.getBranch(), s);
+            snapshotsByBranch.put(0, s);
         }
 
         int totalSnapshots = projectInfo.getSnapshots().size();
@@ -867,7 +869,7 @@ public class AddChangeDistances {
         int iSnapshot = 0;
         final int numSnapshots = snapshots.size();
         for (Snapshot s : snapshots) {
-            List<AllFunctionsRow> funcs = allFunctionsInSnapshots.get(s.getSnapshotDate());
+            List<AllFunctionsRow> funcs = allFunctionsInSnapshots.get(s.getStartDate());
             List<Snapshot> snapshotsBefore = snapshots.subList(0, iSnapshot);
             List<Snapshot> snapshotsIncludingAndAfter = snapshots.subList(iSnapshot, numSnapshots);
             for (AllFunctionsRow f : funcs) {
@@ -880,7 +882,7 @@ public class AddChangeDistances {
             iSnapshot++;
         }
         Set<AllFunctionsRowInWindow> allFunctions = new LinkedHashSet<>(allFunctionsMap.values());
-        return new CommitWindow(snapshots.get(0).getSnapshotDate(), commits, allFunctions);
+        return new CommitWindow(snapshots.get(0).getStartDate(), commits, allFunctions);
     }
 
     private class AllFunctionsProcessor extends ThreadProcessor<CommitWindow> {

@@ -321,7 +321,7 @@ public class CSVHelper extends ProjectInformationReader<Config> {
 
     public Set<String> getFilesInSnapshot(IMinimalSnapshot snapshot) {
         Set<String> resultSet = new HashSet<>();
-        Date snapshotDate = snapshot.getSnapshotDate();
+        Date snapshotDate = snapshot.getStartDate();
 
         CSVReader reader = null;
         try {
@@ -371,7 +371,7 @@ public class CSVHelper extends ProjectInformationReader<Config> {
      */
     public Map<String, List<Double>> getSmells(IMinimalSnapshot snapshot, final Smell smell) {
         Map<String, List<Double>> scoresByFilename = new HashMap<>();
-        Date snapshotDate = snapshot.getSnapshotDate();
+        Date snapshotDate = snapshot.getStartDate();
 
         CSVReader reader = null;
         File csvFile = conf.smellOverviewFile(smell);

@@ -68,7 +68,7 @@ public class ListAllFunctions {
         int numSnapshot = 1;
         for (final Snapshot s : snapshots) {
             LOG.info("Listing functions in snapshot " + (numSnapshot++) + "/" + totalSnapshots + ".");
-            File outputFileDir = config.snapshotResultsDirForDate(s.getSnapshotDate());
+            File outputFileDir = config.snapshotResultsDirForDate(s.getStartDate());
             File outputFile = new File(outputFileDir, AllSnapshotFunctionsColumns.FILE_BASENAME);
             CsvFileWriterHelper helper = newCsvFileWriterForSnapshot(s, outputFile);
             helper.write(outputFile);

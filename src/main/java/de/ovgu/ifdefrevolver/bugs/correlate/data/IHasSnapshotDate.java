@@ -6,5 +6,5 @@ public interface IHasSnapshotDate {
     /**
      * @return The (start) date of this snapshot
      */
-    Date getSnapshotDate();
+    Date getStartDate();
 }

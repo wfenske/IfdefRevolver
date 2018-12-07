@@ -98,6 +98,10 @@ public class CommitsDistanceDb {
         public boolean isMerge() {
             return this.parents.length > 1;
         }
+
+        public boolean isBugfix() {
+            return false;
+        }
     }
 
     /**

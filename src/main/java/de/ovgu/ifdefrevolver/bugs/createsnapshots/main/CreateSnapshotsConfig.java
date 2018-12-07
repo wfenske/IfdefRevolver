@@ -30,9 +30,9 @@ public class CreateSnapshotsConfig extends ProjectInformationConfig implements I
     private SnapshotProcessingMode snapshotProcessingMode = null;
     private Smell smell = null;
 
-    private int commitWindowSize = -1;
-    public static final CommitWindowSizeMode DEFAULT_COMMIT_WINDOW_SIZE_MODE = CommitWindowSizeMode.COMMITS;
-    private CommitWindowSizeMode commitWindowSizeMode = DEFAULT_COMMIT_WINDOW_SIZE_MODE;
+    private int snapshotSize = -1;
+    public static final SnapshotSizeMode DEFAULT_COMMIT_WINDOW_SIZE_MODE = SnapshotSizeMode.COMMITS;
+    private SnapshotSizeMode snapshotSizeMode = DEFAULT_COMMIT_WINDOW_SIZE_MODE;
 
     private Optional<Integer> numberOfWorkerThreads = Optional.empty();
 
@@ -44,12 +44,12 @@ public class CreateSnapshotsConfig extends ProjectInformationConfig implements I
 //        return new File(reposDir, getProject());
 //    }
 
-    public CommitWindowSizeMode commitWindowSizeMode() {
-        return this.commitWindowSizeMode;
+    public SnapshotSizeMode commitWindowSizeMode() {
+        return this.snapshotSizeMode;
     }
 
-    public void setCommitWindowSize(int commitWindowSize) {
-        this.commitWindowSize = commitWindowSize;
+    public void setSnapshotSize(int snapshotSize) {
+        this.snapshotSize = snapshotSize;
     }
 
     public File projectInfoCsv() {
@@ -60,12 +60,12 @@ public class CreateSnapshotsConfig extends ProjectInformationConfig implements I
         return new File(projectResultsDir(), "projectAnalysis.csv");
     }
 
-    public int commitWindowSize() {
-        return commitWindowSize;
+    public int getSnapshotSize() {
+        return snapshotSize;
     }
 
-    public void setCommitWindowSizeMode(CommitWindowSizeMode commitWindowSizeMode) {
-        this.commitWindowSizeMode = commitWindowSizeMode;
+    public void setSnapshotSizeMode(SnapshotSizeMode snapshotSizeMode) {
+        this.snapshotSizeMode = snapshotSizeMode;
     }
 
     public SnapshotProcessingMode skunkMode() {

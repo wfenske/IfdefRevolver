@@ -85,7 +85,7 @@ public class ListChangedFunctions {
             final Date d = new Date(0);
 
             @Override
-            public Date getSnapshotDate() {
+            public Date getStartDate() {
                 return d;
             }
 
@@ -102,7 +102,7 @@ public class ListChangedFunctions {
     }
 
     private void ensureSnapshotDirectoryOrDie(IMinimalSnapshot snapshot) {
-        File outputFileDir = config.snapshotResultsDirForDate(snapshot.getSnapshotDate());
+        File outputFileDir = config.snapshotResultsDirForDate(snapshot.getStartDate());
         if (!outputFileDir.isDirectory()) {
             if (outputFileDir.exists()) {
                 throw new RuntimeException("File already exists, but is not a directory: " + outputFileDir);
@@ -248,7 +248,7 @@ public class ListChangedFunctions {
         if (line.hasOption(ListChangedFunctionsConfig.OPT_REPO)) {
             config.setRepoDir(line.getOptionValue(ListChangedFunctionsConfig.OPT_REPO));
         } else {
-            config.setRepoDir(Paths.get(ListChangedFunctionsConfig.DEFAULT_REPOS_DIR_NAME, this.config.getProject(), ".git").toString());
+            config.setRepoDir(Paths.get(ListChangedFunctionsConfig.DEFAULT_REPOS_DIR_NAME, this.config.getProject()).toString());
         }
         config.validateRepoDir();
 

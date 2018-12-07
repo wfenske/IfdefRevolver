@@ -112,10 +112,10 @@ public class Correlate {
 
             Set<String> filesInSnapshot = csvHelper.getFilesInSnapshot(snapshot);
 
-            final String snapshotDateString = dateFormatter.format(snapshot.getSnapshotDate());
+            final String snapshotDateString = dateFormatter.format(snapshot.getStartDate());
             for (String sourceFileName : filesInSnapshot) {
                 MergedFileInfo fileInfo = new MergedFileInfo(sourceFileName,
-                        snapshot.getSnapshotDate());
+                        snapshot.getStartDate());
 
                 Path snapshotsPath = conf.projectSnapshotsDir().toPath();
                 Path filePath = snapshotsPath
@@ -172,7 +172,7 @@ public class Correlate {
             // @formatter:on
 
             PreprocessOutput.writeCorrelationForSnapshot(outputList,
-                    dateFormatter.format(snapshot.getSnapshotDate()), conf);
+                    dateFormatter.format(snapshot.getStartDate()), conf);
         }
 
         evalAllSnapshots();

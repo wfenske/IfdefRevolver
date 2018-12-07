@@ -10,14 +10,14 @@ import java.util.Date;
 /**
  * @author wfenske
  */
-public class Commit implements Comparable<Commit> {
+class _Commit implements Comparable<_Commit> {
     private final String hash;
     private Date timestamp;
     private final boolean bugfix;
     private final int branch;
     private final int positionInBranch;
 
-    public Commit(int branch, int positionInBranch, String hash, Date timestamp, boolean bugfix) {
+    public _Commit(int branch, int positionInBranch, String hash, Date timestamp, boolean bugfix) {
         this.branch = branch;
         this.positionInBranch = positionInBranch;
         this.hash = hash;
@@ -57,9 +57,9 @@ public class Commit implements Comparable<Commit> {
             return true;
         if (obj == null)
             return false;
-        if (!(obj instanceof Commit))
+        if (!(obj instanceof _Commit))
             return false;
-        Commit other = (Commit) obj;
+        _Commit other = (_Commit) obj;
         if (hash == null) {
             if (other.hash != null)
                 return false;
@@ -73,7 +73,7 @@ public class Commit implements Comparable<Commit> {
     }
 
     @Override
-    public int compareTo(Commit o) {
+    public int compareTo(_Commit o) {
         int cmp = this.branch - o.branch;
         if (cmp != 0)
             return cmp;
@@ -81,7 +81,7 @@ public class Commit implements Comparable<Commit> {
         return cmp;
     }
 
-    public boolean isAtLeastOneDayBefore(Commit other) {
+    public boolean isAtLeastOneDayBefore(_Commit other) {
         return DateUtils.isAtLeastOneDayBefore(this.getTimestamp(), other.getTimestamp());
     }
 

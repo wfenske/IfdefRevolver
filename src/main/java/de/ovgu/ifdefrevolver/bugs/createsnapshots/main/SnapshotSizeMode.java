@@ -1,16 +1,16 @@
 package de.ovgu.ifdefrevolver.bugs.createsnapshots.main;
 
-import de.ovgu.ifdefrevolver.bugs.createsnapshots.data.Commit;
 import de.ovgu.ifdefrevolver.bugs.createsnapshots.data.ISnapshot;
+import de.ovgu.ifdefrevolver.bugs.minecommits.CommitsDistanceDb.Commit;
 
 import java.util.Collection;
 import java.util.Iterator;
-import java.util.SortedSet;
+import java.util.Set;
 
 /**
  * Created by wfenske on 05.04.17.
  */
-public enum CommitWindowSizeMode {
+public enum SnapshotSizeMode {
     /**
      * Commit windows have a fixed size. The number of fixes per window varies.
      */
@@ -22,7 +22,7 @@ public enum CommitWindowSizeMode {
 
         @Override
         public void validateSnapshotSize(ISnapshot snapshot, int expectedSize) {
-            SortedSet<Commit> commits = snapshot.getCommits();
+            Set<Commit> commits = snapshot.getCommits();
             int size = commits.size();
             if (size != expectedSize) {
                 throw new AssertionError("Snapshot contains " + size + " commits, expected " + expectedSize
@@ -120,8 +120,8 @@ public enum CommitWindowSizeMode {
     public abstract int countRelevantCommits(Collection<Commit> commits);
 
     /**
-     * Call {@link Iterator#next()} until n-many relevant commits have been seen,
-     * or until the iterator does not provide any more elements.
+     * Call {@link Iterator#next()} until n-many relevant commits have been seen, or until the iterator does not provide
+     * any more elements.
      *
      * @param iter an Iterator
      * @param n    A non-negative number indicating the number of commits which should be skipped. If 0, the iterator
