@@ -11,7 +11,7 @@ import java.io.IOException;
  * Created by wfenske on 22.03.18.
  */
 public abstract class SimpleCsvFileReader<TResult> {
-    public TResult readFile(File file) {
+    protected TResult readFile(File file) {
         CSVReader reader = null;
         FileReader fileReader = null;
         try {

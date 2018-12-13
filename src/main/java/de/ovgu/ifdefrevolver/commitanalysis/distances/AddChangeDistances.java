@@ -178,7 +178,7 @@ public class AddChangeDistances {
         List<FunctionChangeRow>[] changesByCommitKey = groupChangesByCommitKey();
         //Map<Commit, List<AllFunctionsRow>> allFunctionsBySnapshotStartCommit = groupAllFunctionsBySnapshotStartCommit();
 
-        GenealogyTracker gt = new GenealogyTracker(commitsDistanceDb, changesByCommitKey,
+        GenealogyTracker gt = new GenealogyTracker(projectInfo.getAllSnapshots(), changesByCommitKey,
                 config);
         gt.processCommits();
     }

@@ -1,6 +1,6 @@
 package de.ovgu.ifdefrevolver.commitanalysis.branchtraversal;
 
-import de.ovgu.ifdefrevolver.bugs.minecommits.CommitsDistanceDb;
+import de.ovgu.ifdefrevolver.bugs.correlate.data.Snapshot;
 import de.ovgu.ifdefrevolver.bugs.minecommits.CommitsDistanceDb.Commit;
 import de.ovgu.ifdefrevolver.commitanalysis.FunctionChangeRow;
 import de.ovgu.ifdefrevolver.commitanalysis.FunctionId;
@@ -10,38 +10,51 @@ import org.apache.log4j.Logger;
 
 import java.util.*;
 
-public class GenealogyTracker extends AbstractCommitWalker {
+public class GenealogyTracker {
     private static Logger LOG = Logger.getLogger(GenealogyTracker.class);
     private final List<FunctionChangeRow>[] changesByCommitKey;
     private final IHasRepoAndResultsDir config;
 
+    private List<Snapshot> snapshots;
+    private List<Commit> allCommits;
+    private Commit currentCommit;
     private Branch currentBranch;
     private FunctionInBranchFactory functionFactory;
     private Branch[] branchesByCommitKey;
     private MoveConflictStats moveConflictStats;
     protected int changesProcessed;
 
-    public GenealogyTracker(CommitsDistanceDb commitsDistanceDb, List<FunctionChangeRow>[] changesByCommitKey, IHasRepoAndResultsDir config) {
-        super(commitsDistanceDb);
+    public GenealogyTracker(Collection<Snapshot> snapshots, List<FunctionChangeRow>[] changesByCommitKey, IHasRepoAndResultsDir config) {
         this.changesByCommitKey = changesByCommitKey;
+        this.snapshots = new ArrayList<>(snapshots);
+        Collections.sort(this.snapshots);
         this.config = config;
     }
 
-    @Override
     public void processCommits() {
+        this.allCommits = new ArrayList<>();
+        for (Snapshot s : snapshots) {
+            allCommits.addAll(s.getCommits());
+        }
+
         this.moveConflictStats = new MoveConflictStats();
-        this.branchesByCommitKey = new Branch[getNumAllCommits()];
+        this.branchesByCommitKey = new Branch[allCommits.size()];
         this.functionFactory = new FunctionInBranchFactory();
         this.changesProcessed = 0;
 
-        super.processCommits();
+        for (Commit c : allCommits) {
+            processCommit(c);
+        }
+
+        onAllCommitsProcessed();
     }
 
-    @Override
-    protected void processCurrentCommit() {
-        LOG.debug("Processing " + currentCommit);
+
+    protected void processCommit(Commit c) {
+        LOG.debug("Processing " + c);
+        this.currentCommit = c;
         this.currentBranch = assignBranch(currentCommit);
-        GenealogyTracker.LOG.debug("Current branch of " + currentCommit + " is " + this.currentBranch);
+        LOG.debug("Current branch of " + currentCommit + " is " + this.currentBranch);
 
         processChangesOfCurrentCommit();
 
@@ -56,13 +69,13 @@ public class GenealogyTracker extends AbstractCommitWalker {
         }
     }
 
-    @Override
     protected void onAllCommitsProcessed() {
-        super.onAllCommitsProcessed();
-
+        LOG.debug("Successfully processed " + allCommits.size() + " commits and " + changesProcessed + " changes.");
         maybeReportBranchStats();
-        LOG.debug("Processed " + changesProcessed + " changes.");
+        reportMoveConflicts();
+    }
 
+    private void reportMoveConflicts() {
         if (moveConflictStats.allMoveConflicts > 0) {
             int perentage = (int) Math.round((100.0 * moveConflictStats.moveConflictsThatProbablyResolveMergeConflicts) / moveConflictStats.allMoveConflicts);
             LOG.debug("Encountered " + moveConflictStats.allMoveConflicts + " MOVE conflicts of which " +
@@ -135,7 +148,6 @@ public class GenealogyTracker extends AbstractCommitWalker {
         final int numActualIds = actualIds.size();
         LOG.info("After merge: # actual function ids: " + numActualIds + " " + this.currentBranch);
         LOG.info("After merge: # identical function ids: " + identicalFunctions.size() + "/" + numActualIds + " " + this.currentBranch);
-
 
         if (functionsThatAreMissing.isEmpty() && functionsThatShouldNotExist.isEmpty()) {
             LOG.info("After merge: Computed and actual function ids match exactly. " + this.currentBranch);

@@ -80,6 +80,7 @@ public class SnapshotReader {
 
         @Override
         protected List<Snapshot> finalizeResult() {
+            Collections.sort(result);
             return result;
         }
 
