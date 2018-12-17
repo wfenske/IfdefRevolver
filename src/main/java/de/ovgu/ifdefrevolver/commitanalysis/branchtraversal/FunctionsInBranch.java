@@ -1,6 +1,7 @@
 package de.ovgu.ifdefrevolver.commitanalysis.branchtraversal;
 
 import de.ovgu.ifdefrevolver.bugs.minecommits.CommitsDistanceDb.Commit;
+import de.ovgu.ifdefrevolver.commitanalysis.AbResRow;
 import de.ovgu.ifdefrevolver.commitanalysis.FunctionChangeRow;
 import de.ovgu.ifdefrevolver.commitanalysis.FunctionId;
 import de.ovgu.skunk.util.GroupingHashSetMap;
@@ -556,36 +557,35 @@ class FunctionsInBranch {
         return new HashSet<>(this.functionsById.keySet());
     }
 
-    public void assignJointFunctionAbSmellRows(List<JointFunctionAbSmellRow> jointFunctionAbSmellRows) {
-        for (JointFunctionAbSmellRow jointFunctionAbSmellRow : jointFunctionAbSmellRows) {
-            assignJointFunctionAbSmellRow(jointFunctionAbSmellRow);
+    public void assignJointFunctionAbSmellRows(Commit commit, List<AbResRow> jointFunctionAbSmellRows) {
+        for (AbResRow jointFunctionAbSmellRow : jointFunctionAbSmellRows) {
+            assignJointFunctionAbSmellRow(commit, jointFunctionAbSmellRow);
         }
     }
 
-    private void assignJointFunctionAbSmellRow(JointFunctionAbSmellRow jointFunctionAbSmellRow) {
-        final FunctionId functionId = jointFunctionAbSmellRow.functionId;
+    private void assignJointFunctionAbSmellRow(Commit commit, AbResRow jointFunctionAbSmellRow) {
+        final FunctionId functionId = jointFunctionAbSmellRow.getFunctionId();
         LOG.debug("Assigning joint function with AB smell " + functionId);
         FunctionInBranch function = this.functionsById.get(functionId);
         if (function == null) {
-            function = createFunctionBecauseItIsInAllFunctionsRows(jointFunctionAbSmellRow);
+            function = createFunctionBecauseItIsInAllFunctionsRows(commit, jointFunctionAbSmellRow);
         }
-        function.addJointFunctionAbSmellRow(jointFunctionAbSmellRow);
+        function.addJointFunctionAbSmellRow(commit, jointFunctionAbSmellRow);
     }
 
-    private FunctionInBranch createFunctionBecauseItIsInAllFunctionsRows(JointFunctionAbSmellRow jointFunctionAbSmellRow) {
-        final FunctionId functionId = jointFunctionAbSmellRow.functionId;
-        final Commit commit = jointFunctionAbSmellRow.commit;
+    private FunctionInBranch createFunctionBecauseItIsInAllFunctionsRows(final Commit commit, AbResRow jointFunctionAbSmellRow) {
+        final FunctionId functionId = jointFunctionAbSmellRow.getFunctionId();
         LOG.warn("Function exists in all functions and/or AB smells but does not exist in branch tracker: " + functionId);
 
-        FunctionInBranch f = undeleteFunction(functionId, commit);
-        if (f == null) {
-            f = findFunctionInParentBranches(functionId);
-            if (f == null) {
-                f = functionFactory.create(functionId);
+        FunctionInBranch function = undeleteFunction(functionId, commit);
+        if (function == null) {
+            function = findFunctionInParentBranches(functionId);
+            if (function == null) {
+                function = functionFactory.create(functionId);
             }
         }
 
-        this.functionsById.put(functionId, f);
-        return f;
+        this.functionsById.put(functionId, function);
+        return function;
     }
 }

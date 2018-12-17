@@ -35,7 +35,7 @@ import java.util.*;
 
 public class AddChangeDistances {
     private static final Logger LOG = Logger.getLogger(AddChangeDistances.class);
-    private ListChangedFunctionsConfig config;
+    private AddChangeDistancesConfig config;
     private int errors;
     private CommitsDistanceDb commitsDistanceDb;
 
@@ -43,10 +43,9 @@ public class AddChangeDistances {
 
     private AgeRequestStats ageRequestStats = new AgeRequestStats();
     private Map<Date, List<FunctionChangeRow>> changesInSnapshots;
-    private ProjectInformationReader<ListChangedFunctionsConfig> projectInfo;
+    private ProjectInformationReader<AddChangeDistancesConfig> projectInfo;
     private Map<Date, List<AllFunctionsRow>> allFunctionsInSnapshots;
     private Map<Date, List<AbResRow>> annotationDataInSnapshots;
-    //private List<List<FunctionIdWithCommit>> functionGenealogies;
 
     /**
      * Number of commit snapshots per commit window
@@ -211,8 +210,12 @@ public class AddChangeDistances {
     }
 
     private void writeAbSmellAgeSnapshotCsv(LinkedGroupingListMap<Snapshot, FunctionGenealogy> functionGenealogiesBySnapshot) {
+        final int WINDOW_SIZE = config.getWindowSize();
+        final int SLIDE = config.getWindowSlide();
+
         final Collection<Snapshot> snapshots = this.projectInfo.getSnapshots().values();
-        ProgressMonitor pm = new ProgressMonitor(snapshots.size()) {
+        final int numWindows = Math.max(snapshots.size() - WINDOW_SIZE, 0) / SLIDE + 1;
+        ProgressMonitor pm = new ProgressMonitor(numWindows) {
             @Override
             protected void reportIntermediateProgress() {
                 LOG.info("Wrote CSV with merged snapshot data " + this.ticksDone + "/" + this.ticksTotal + " (" + this.percentage() + "%)");
@@ -220,24 +223,29 @@ public class AddChangeDistances {
 
             @Override
             protected void reportFinished() {
-                LOG.info("Wrote all " + this.ticksTotal + " CSVs with merged snapshot data.");
+                LOG.info("Wrote all " + this.ticksTotal + " CSVs with merged snapshot data. Window size = " + WINDOW_SIZE + ", slide = " + SLIDE);
             }
         };
 
-        for (Snapshot snapshot : snapshots) {
-            final List<FunctionGenealogy> functionsInSnapshot = functionGenealogiesBySnapshot.get(snapshot);
-            writeAbSmellAgeSnapshotCsv(snapshot, functionsInSnapshot);
+        List<Snapshot> allSnapshots = new ArrayList<>(snapshots);
+        final int lastStartIndex = allSnapshots.size() - WINDOW_SIZE;
+
+        for (int startIndex = 0; startIndex <= lastStartIndex; startIndex += SLIDE) {
+            final List<Snapshot> window = allSnapshots.subList(startIndex, startIndex + WINDOW_SIZE);
+            final Snapshot firstSnapshot = allSnapshots.get(startIndex);
+            final List<FunctionGenealogy> functionsInFirstSnapshot = functionGenealogiesBySnapshot.get(firstSnapshot);
+            writeAbSmellAgeSnapshotCsv(window, functionsInFirstSnapshot);
             pm.increaseDone();
         }
     }
 
-    private void writeAbSmellAgeSnapshotCsv(Snapshot snapshot, List<FunctionGenealogy> functionsInSnapshot) {
+    private void writeAbSmellAgeSnapshotCsv(List<Snapshot> window, List<FunctionGenealogy> functionsInSnapshot) {
         CsvFileWriterHelper writerHelper = new CsvFileWriterHelper() {
             @Override
             protected void actuallyDoStuff(CSVPrinter csv) throws IOException {
                 final Object[] headerRow = CsvEnumUtils.headerRow(JointFunctionAbSmellAgeSnapshotColumns.class);
                 csv.printRecord(headerRow);
-                CsvRowProvider<FunctionGenealogy, Snapshot, JointFunctionAbSmellAgeSnapshotColumns> rowProvider = new CsvRowProvider<>(JointFunctionAbSmellAgeSnapshotColumns.class, snapshot);
+                CsvRowProvider<FunctionGenealogy, List<Snapshot>, JointFunctionAbSmellAgeSnapshotColumns> rowProvider = new CsvRowProvider<>(JointFunctionAbSmellAgeSnapshotColumns.class, window);
                 for (FunctionGenealogy functionGenealogy : functionsInSnapshot) {
                     Object[] row = rowProvider.dataRow(functionGenealogy);
                     csv.printRecord(row);
@@ -245,7 +253,8 @@ public class AddChangeDistances {
             }
         };
 
-        File resultFile = new File(config.snapshotResultsDirForDate(snapshot.getStartDate()),
+        Snapshot firstSnapshot = window.get(0);
+        File resultFile = new File(config.snapshotResultsDirForDate(firstSnapshot.getStartDate()),
                 JointFunctionAbSmellAgeSnapshotColumns.FILE_BASENAME);
         writerHelper.write(resultFile);
     }
@@ -1017,7 +1026,7 @@ public class AddChangeDistances {
         CommandLine line;
         try {
             CommandLine dummyLine = parser.parse(fakeOptionsForHelp, args);
-            if (dummyLine.hasOption(ListChangedFunctionsConfig.OPT_HELP)) {
+            if (dummyLine.hasOption(AddChangeDistancesConfig.OPT_HELP)) {
                 System.out.flush();
                 System.err.flush();
                 HelpFormatter formatter = new HelpFormatter();
@@ -1054,7 +1063,7 @@ public class AddChangeDistances {
             // call.
             return;
         }
-        this.config = new ListChangedFunctionsConfig();
+        this.config = new AddChangeDistancesConfig();
 
         ProjectInformationConfig.parseProjectNameFromCommandLine(line, this.config);
         ProjectInformationConfig.parseProjectResultsDirFromCommandLine(line, this.config);
@@ -1067,26 +1076,29 @@ public class AddChangeDistances {
         }
         config.validateRepoDir();
 
-        if (line.hasOption(ListChangedFunctionsConfig.OPT_THREADS)) {
-            String threadsString = line.getOptionValue(ListChangedFunctionsConfig.OPT_THREADS);
-            int numThreads;
-            try {
-                numThreads = Integer.valueOf(threadsString);
-            } catch (NumberFormatException e) {
-                throw new RuntimeException("Invalid value for option `-" + ListChangedFunctionsConfig.OPT_THREADS
-                        + "': Not a valid integer: " + threadsString);
-            }
-            if (numThreads < 1) {
-                throw new RuntimeException("Invalid value for option `-" + ListChangedFunctionsConfig.OPT_THREADS
-                        + "': Number of threads must be an integer >= 1.");
-            }
-            config.setNumThreads(numThreads);
-        }
+        AddChangeDistancesConfig.parseWindowSizeFromCommandLine(line, config);
+        AddChangeDistancesConfig.parseWindowSlideFromCommandLine(line, config);
 
-        List<String> snapshotDateNames = line.getArgList();
-        if (!snapshotDateNames.isEmpty()) {
-            ListChangedFunctionsConfig.parseSnapshotFilterDates(snapshotDateNames, config);
-        }
+//        if (line.hasOption(AddChangeDistancesConfig.OPT_THREADS)) {
+//            String threadsString = line.getOptionValue(ListChangedFunctionsConfig.OPT_THREADS);
+//            int numThreads;
+//            try {
+//                numThreads = Integer.valueOf(threadsString);
+//            } catch (NumberFormatException e) {
+//                throw new RuntimeException("Invalid value for option `-" + ListChangedFunctionsConfig.OPT_THREADS
+//                        + "': Not a valid integer: " + threadsString);
+//            }
+//            if (numThreads < 1) {
+//                throw new RuntimeException("Invalid value for option `-" + ListChangedFunctionsConfig.OPT_THREADS
+//                        + "': Number of threads must be an integer >= 1.");
+//            }
+//            config.setNumThreads(numThreads);
+//        }
+
+//        List<String> snapshotDateNames = line.getArgList();
+//        if (!snapshotDateNames.isEmpty()) {
+//            ListChangedFunctionsConfig.parseSnapshotFilterDates(snapshotDateNames, config);
+//        }
     }
 
     private Options makeOptions(boolean forHelp) {
@@ -1111,14 +1123,26 @@ public class AddChangeDistances {
                 //.required(required)
                 .build());
 
-        // --threads=1 options
-        options.addOption(Option.builder(String.valueOf(ListChangedFunctionsConfig.OPT_THREADS))
-                .longOpt(ListChangedFunctionsConfig.OPT_THREADS_L)
-                .desc("Number of parallel analysis threads. Must be at least 1." + " [Default="
-                        + ListChangedFunctionsConfig.DEFAULT_NUM_THREADS + "]")
-                .hasArg().argName("NUM")
-                .type(Integer.class)
-                .build());
+        options.addOption(Option.builder(
+                String.valueOf(AddChangeDistancesConfig.OPT_COMMIT_WINDOW_SIZE))
+                .longOpt(AddChangeDistancesConfig.OPT_COMMIT_WINDOW_SIZE_L)
+                .desc("Number of snapshots in a commit window, specified as a positive integer. [Default=" + AddChangeDistancesConfig.DEFAULT_WINDOW_SIZE + "]")
+                .hasArg().argName("NUM").build());
+
+        options.addOption(Option.builder(
+                String.valueOf(AddChangeDistancesConfig.OPT_COMMIT_WINDOW_SLIDE))
+                .longOpt(AddChangeDistancesConfig.OPT_COMMIT_WINDOW_SLIDE_L)
+                .desc("Number of snapshots to slide over when creating the next commit window, specified as a positive integer. [Default=" + AddChangeDistancesConfig.DEFAULT_WINDOW_SLIDE + "]")
+                .hasArg().argName("NUM").build());
+
+//        // --threads=1 options
+//        options.addOption(Option.builder(String.valueOf(ListChangedFunctionsConfig.OPT_THREADS))
+//                .longOpt(ListChangedFunctionsConfig.OPT_THREADS_L)
+//                .desc("Number of parallel analysis threads. Must be at least 1." + " [Default="
+//                        + ListChangedFunctionsConfig.DEFAULT_NUM_THREADS + "]")
+//                .hasArg().argName("NUM")
+//                .type(Integer.class)
+//                .build());
 
         // @formatter:on
         return options;

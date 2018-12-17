@@ -2,6 +2,7 @@ package de.ovgu.ifdefrevolver.commitanalysis.branchtraversal;
 
 
 import de.ovgu.ifdefrevolver.bugs.minecommits.CommitsDistanceDb.Commit;
+import de.ovgu.ifdefrevolver.commitanalysis.AbResRow;
 import de.ovgu.ifdefrevolver.commitanalysis.FunctionChangeRow;
 import de.ovgu.ifdefrevolver.commitanalysis.FunctionId;
 import de.ovgu.skunk.util.LinkedGroupingListMap;
@@ -15,7 +16,7 @@ class FunctionInBranch {
     private final FunctionInBranchFactory factory;
     int uid;
     public final FunctionId firstId;
-    private Map<Commit, JointFunctionAbSmellRow> jointFunctionAbSmellRows = new LinkedHashMap<>();
+    private Map<Commit, AbResRow> jointFunctionAbSmellRows = new LinkedHashMap<>();
     private LinkedGroupingListMap<Commit, FunctionChangeRow> changes = new LinkedGroupingListMap<>();
 
     protected FunctionInBranch(FunctionId firstId, int uid, FunctionInBranchFactory factory) {
@@ -49,11 +50,11 @@ class FunctionInBranch {
                 '}';
     }
 
-    public Map<Commit, JointFunctionAbSmellRow> getJointFunctionAbSmellRows() {
+    public Map<Commit, AbResRow> getJointFunctionAbSmellRows() {
         return this.jointFunctionAbSmellRows;
     }
 
-    public void addJointFunctionAbSmellRow(JointFunctionAbSmellRow jointFunctionAbSmellRow) {
-        this.jointFunctionAbSmellRows.put(jointFunctionAbSmellRow.commit, jointFunctionAbSmellRow);
+    public void addJointFunctionAbSmellRow(Commit commit, AbResRow jointFunctionAbSmellRow) {
+        this.jointFunctionAbSmellRows.put(commit, jointFunctionAbSmellRow);
     }
 }

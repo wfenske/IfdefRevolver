@@ -1,6 +1,7 @@
 package de.ovgu.ifdefrevolver.commitanalysis.branchtraversal;
 
 import de.ovgu.ifdefrevolver.bugs.minecommits.CommitsDistanceDb.Commit;
+import de.ovgu.ifdefrevolver.commitanalysis.AbResRow;
 import de.ovgu.ifdefrevolver.commitanalysis.FunctionChangeRow;
 import de.ovgu.ifdefrevolver.commitanalysis.FunctionId;
 
@@ -214,7 +215,7 @@ class Branch {
         return this.functions.getCurrentlyActiveFunctionIds();
     }
 
-    public void assignJointFunctionAbSmellRows(List<JointFunctionAbSmellRow> jointFunctionAbSmellRows) {
-        this.functions.assignJointFunctionAbSmellRows(jointFunctionAbSmellRows);
+    public void assignJointFunctionAbSmellRows(Commit commit, List<AbResRow> jointFunctionAbSmellRows) {
+        this.functions.assignJointFunctionAbSmellRows(commit, jointFunctionAbSmellRows);
     }
 }

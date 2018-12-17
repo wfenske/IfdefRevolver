@@ -2,6 +2,8 @@ package de.ovgu.ifdefrevolver.commitanalysis;
 
 import java.util.ArrayList;
 import java.util.Collection;
+import java.util.List;
+import java.util.function.ToIntFunction;
 
 public class AggregatedAbResRow implements IAbResRow {
     private final FunctionId functionId;
@@ -14,97 +16,60 @@ public class AggregatedAbResRow implements IAbResRow {
         this.functionId = left.getContainedRows().iterator().next().getFunctionId();
     }
 
+    public AggregatedAbResRow(AbResRow first, List<AbResRow> rest) {
+        this.containedRows = new ArrayList<>();
+        this.containedRows.add(first);
+        this.containedRows.addAll(rest);
+        this.functionId = first.getFunctionId();
+    }
+
     @Override
     public FunctionId getFunctionId() {
         return functionId;
     }
 
+    private int average(ToIntFunction<AbResRow> getAttr) {
+        return (int) Math.round(containedRows.stream().mapToInt(getAttr).average().getAsDouble());
+    }
+
     @Override
     public int getLoc() {
-        int agg = 0;
-        int sz = 0;
-        for (AbResRow r : containedRows) {
-            agg += r.getLoc();
-            sz++;
-        }
-        return Math.round(agg / ((float) sz));
+        return average(IAbResRow::getLoc);
     }
 
     @Override
     public int getLoac() {
-        int agg = 0;
-        int sz = 0;
-        for (AbResRow r : containedRows) {
-            agg += r.getLoac();
-            sz++;
-        }
-        return Math.round(agg / ((float) sz));
+        return average(IAbResRow::getLoac);
     }
 
     @Override
     public int getLofc() {
-        int agg = 0;
-        int sz = 0;
-        for (AbResRow r : containedRows) {
-            agg += r.getLofc();
-            sz++;
-        }
-        return Math.round(agg / ((float) sz));
+        return average(IAbResRow::getLofc);
     }
 
     @Override
     public int getNoFl() {
-        int agg = 0;
-        int sz = 0;
-        for (AbResRow r : containedRows) {
-            agg += r.getNoFl();
-            sz++;
-        }
-        return Math.round(agg / ((float) sz));
+        return average(IAbResRow::getNoFl);
     }
 
     @Override
     public int getNoFcDup() {
-        int agg = 0;
-        int sz = 0;
-        for (AbResRow r : containedRows) {
-            agg += r.getNoFcDup();
-            sz++;
-        }
-        return Math.round(agg / ((float) sz));
+        return average(IAbResRow::getNoFcDup);
     }
 
     @Override
     public int getNoFcNonDup() {
-        int agg = 0;
-        int sz = 0;
-        for (AbResRow r : containedRows) {
-            agg += r.getNoFcNonDup();
-            sz++;
-        }
-        return Math.round(agg / ((float) sz));
+        return average(IAbResRow::getNoFcNonDup);
     }
 
     @Override
     public int getNoNest() {
-        int agg = 0;
-        int sz = 0;
-        for (AbResRow r : containedRows) {
-            agg += r.getNoNest();
-            sz++;
-        }
-        return Math.round(agg / ((float) sz));
+        return average(IAbResRow::getNoNest);
     }
 
     @Override
     public int getNoNeg() {
-        int agg = 0;
-        int sz = 0;
-        for (AbResRow r : containedRows) {
-            agg += r.getNoNeg();
-            sz++;
-        }
-        return Math.round(agg / ((float) sz));
+        return average(IAbResRow::getNoNeg);
     }
 
     @Override

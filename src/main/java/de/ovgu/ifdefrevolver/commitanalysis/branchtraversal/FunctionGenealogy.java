@@ -2,9 +2,7 @@ package de.ovgu.ifdefrevolver.commitanalysis.branchtraversal;
 
 import de.ovgu.ifdefrevolver.bugs.correlate.data.Snapshot;
 import de.ovgu.ifdefrevolver.bugs.minecommits.CommitsDistanceDb.Commit;
-import de.ovgu.ifdefrevolver.commitanalysis.FunctionChangeHunk;
-import de.ovgu.ifdefrevolver.commitanalysis.FunctionChangeRow;
-import de.ovgu.ifdefrevolver.commitanalysis.FunctionId;
+import de.ovgu.ifdefrevolver.commitanalysis.*;
 import de.ovgu.skunk.util.LinkedGroupingListMap;
 import org.apache.log4j.Logger;
 
@@ -19,10 +17,10 @@ public class FunctionGenealogy {
     private final int uid;
     private final FunctionId firstId;
     private final Set<FunctionId> functionIds;
-    private final Map<Snapshot, JointFunctionAbSmellRow> jointFunctionAbSmellRowsBySnapshot;
+    private final Map<Snapshot, AbResRow> jointFunctionAbSmellRowsBySnapshot;
     private final LinkedGroupingListMap<Snapshot, FunctionChangeRow> changesBySnapshot;
 
-    public FunctionGenealogy(int uid, Set<FunctionId> functionIds, Map<Snapshot, JointFunctionAbSmellRow> jointFunctionAbSmellRowsBySnapshot, LinkedGroupingListMap<Snapshot, FunctionChangeRow> changesBySnapshot) {
+    public FunctionGenealogy(int uid, Set<FunctionId> functionIds, Map<Snapshot, AbResRow> jointFunctionAbSmellRowsBySnapshot, LinkedGroupingListMap<Snapshot, FunctionChangeRow> changesBySnapshot) {
         this.uid = uid;
         this.functionIds = functionIds;
         this.jointFunctionAbSmellRowsBySnapshot = jointFunctionAbSmellRowsBySnapshot;
@@ -42,7 +40,7 @@ public class FunctionGenealogy {
         return jointFunctionAbSmellRowsBySnapshot.containsKey(s);
     }
 
-    public JointFunctionAbSmellRow getStaticMetrics(Snapshot s) {
+    public AbResRow getStaticMetrics(Snapshot s) {
         assertExistsAtStartOfSnapshot(s);
         return jointFunctionAbSmellRowsBySnapshot.get(s);
     }
@@ -180,5 +178,52 @@ public class FunctionGenealogy {
         sb.append(", numSnapshots=").append(numSnapshots);
         sb.append('}');
         return sb.toString();
+    }
+
+    public OptionalInt age(List<Snapshot> window) {
+        return age(window.get(0));
+    }
+
+    public OptionalInt distanceToMostRecentEdit(List<Snapshot> window) {
+        return distanceToMostRecentEdit(window.get(0));
+    }
+
+    private int sum(List<Snapshot> window, ToIntFunction<Snapshot> getAttr) {
+        int first = getAttr.applyAsInt(window.get(0));
+        if (window.size() == 1) {
+            return first;
+        } else {
+            int rest = window.stream().skip(1).filter(s -> existsAtStartOfSnapshot(s)).mapToInt(getAttr).sum();
+            return first + rest;
+        }
+    }
+
+    public int countCommitsInWindow(List<Snapshot> window) {
+        return sum(window, s -> countCommitsInSnapshot(s));
+    }
+
+    public int countLinesChangedInWindow(List<Snapshot> window) {
+        return sum(window, s -> countLinesChangedInSnapshot(s));
+    }
+
+    public int countLinesAddedInWindow(List<Snapshot> window) {
+        return sum(window, s -> countLinesAddedInSnapshot(s));
+    }
+
+    public int countLinesDeletedInWindow(List<Snapshot> window) {
+        return sum(window, s -> countLinesDeletedInSnapshot(s));
+    }
+
+    public IAbResRow getStaticMetrics(List<Snapshot> window) {
+        final AbResRow first = getStaticMetrics(window.get(0));
+        if (window.size() == 1) {
+            return first;
+        } else {
+            List<AbResRow> rest = window.stream()
+                    .skip(1)
+                    .filter(s -> existsAtStartOfSnapshot(s))
+                    .map(this::getStaticMetrics).collect(Collectors.toList());
+            return new AggregatedAbResRow(first, rest);
+        }
     }
 }

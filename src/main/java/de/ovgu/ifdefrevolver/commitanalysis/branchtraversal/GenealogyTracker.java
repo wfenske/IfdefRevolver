@@ -68,15 +68,15 @@ public class GenealogyTracker {
 
         int functionUid = 0;
         for (Set<FunctionInBranch> equivalentFunctions : functionFactory.getFunctionsWithSameUid()) {
-            Map<Commit, JointFunctionAbSmellRow> jointFunctionAbSmellRowsByCommit = mergeJointFunctionAbSmellRows(equivalentFunctions);
+            Map<Commit, AbResRow> jointFunctionAbSmellRowsByCommit = mergeJointFunctionAbSmellRows(equivalentFunctions);
             LinkedGroupingListMap<Commit, FunctionChangeRow> changesByCommit = mergeFunctionChangeRows(equivalentFunctions);
 
-            final Map<Snapshot, JointFunctionAbSmellRow> jointFunctionAbSmellRowsBySnapshot = new LinkedHashMap<>();
+            final Map<Snapshot, AbResRow> jointFunctionAbSmellRowsBySnapshot = new LinkedHashMap<>();
             final LinkedGroupingListMap<Snapshot, FunctionChangeRow> changesBySnapshot = new LinkedGroupingListMap<>();
             for (Map.Entry<Commit, Snapshot> e : this.snapshotsByStartCommit.entrySet()) {
                 final Commit startCommit = e.getKey();
                 final Snapshot snapshot = e.getValue();
-                final JointFunctionAbSmellRow jointFunctionAbSmellRow = jointFunctionAbSmellRowsByCommit.get(startCommit);
+                final AbResRow jointFunctionAbSmellRow = jointFunctionAbSmellRowsByCommit.get(startCommit);
                 final boolean functionExistsAtStartOfSnapshot = jointFunctionAbSmellRow != null;
                 if (functionExistsAtStartOfSnapshot) {
                     jointFunctionAbSmellRowsBySnapshot.put(snapshot, jointFunctionAbSmellRow);
@@ -89,7 +89,7 @@ public class GenealogyTracker {
             if (jointFunctionAbSmellRowsBySnapshot.isEmpty()) continue;
 
             final Set<FunctionId> functionIds = jointFunctionAbSmellRowsBySnapshot.values().stream()
-                    .map(r -> r.functionId)
+                    .map(r -> r.getFunctionId())
                     .collect(Collectors.toCollection(LinkedHashSet::new));
 
             FunctionGenealogy genealogy = new FunctionGenealogy(functionUid, functionIds, jointFunctionAbSmellRowsBySnapshot, changesBySnapshot);
@@ -152,8 +152,8 @@ public class GenealogyTracker {
         return result;
     }
 
-    private LinkedHashMap<Commit, JointFunctionAbSmellRow> mergeJointFunctionAbSmellRows(Set<FunctionInBranch> equivalentFunctions) {
-        Map<Commit, JointFunctionAbSmellRow> rawResult = new HashMap<>();
+    private LinkedHashMap<Commit, AbResRow> mergeJointFunctionAbSmellRows(Set<FunctionInBranch> equivalentFunctions) {
+        Map<Commit, AbResRow> rawResult = new HashMap<>();
         for (FunctionInBranch equivalentFunction : equivalentFunctions) {
             rawResult.putAll(equivalentFunction.getJointFunctionAbSmellRows());
         }
@@ -189,35 +189,28 @@ public class GenealogyTracker {
     }
 
     private void assignJointFunctionAbSmellRowsForCurrentCommit() {
-        List<JointFunctionAbSmellRow> jointFunctionAbSmellRows = joinAllFunctionWithAbSmellRows(this.currentCommit);
-        this.currentBranch.assignJointFunctionAbSmellRows(jointFunctionAbSmellRows);
+        List<AbResRow> jointFunctionAbSmellRows = joinAllFunctionWithAbSmellRows(this.currentCommit);
+        this.currentBranch.assignJointFunctionAbSmellRows(this.currentCommit, jointFunctionAbSmellRows);
     }
 
-    private List<JointFunctionAbSmellRow> joinAllFunctionWithAbSmellRows(final Commit currentCommit) {
+    private List<AbResRow> joinAllFunctionWithAbSmellRows(final Commit currentCommit) {
         Snapshot snapshot = snapshotsByStartCommit.get(currentCommit);
         final Date snapshotStartDate = snapshot.getStartDate();
-        List<AllFunctionsRow> allFunctionsRows = allFunctionsInSnapshots.get(snapshotStartDate);
         List<AbResRow> abResRows = annotationDataInSnapshots.get(snapshotStartDate);
         Map<FunctionId, AbResRow> abResByFunctionId = new HashMap<>();
         for (AbResRow abResRow : abResRows) {
             abResByFunctionId.put(abResRow.getFunctionId(), abResRow);
         }
 
-        List<JointFunctionAbSmellRow> jointFunctionAbSmellRows = new ArrayList<>();
-
-        for (AllFunctionsRow allFunctionsRow : allFunctionsRows) {
+        for (AllFunctionsRow allFunctionsRow : allFunctionsInSnapshots.get(snapshotStartDate)) {
             final FunctionId functionId = allFunctionsRow.functionId;
-            final JointFunctionAbSmellRow jointFunctionAbSmellRow;
-            AbResRow abRes = abResByFunctionId.get(functionId);
-            if (abRes != null) {
-                jointFunctionAbSmellRow = new JointFunctionAbSmellRow(currentCommit, allFunctionsRow, abRes);
-            } else {
-                jointFunctionAbSmellRow = new JointFunctionAbSmellRow(currentCommit, allFunctionsRow);
+            if (!abResByFunctionId.containsKey(functionId)) {
+                AbResRow dummy = AbResRow.dummyRow(functionId, allFunctionsRow.loc);
+                abResByFunctionId.put(functionId, dummy);
             }
-            jointFunctionAbSmellRows.add(jointFunctionAbSmellRow);
         }
 
-        return jointFunctionAbSmellRows;
+        return new ArrayList<>(abResByFunctionId.values());
     }
 
     protected void onAllCommitsProcessed() {

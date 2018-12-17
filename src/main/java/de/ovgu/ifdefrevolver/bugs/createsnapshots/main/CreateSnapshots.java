@@ -386,7 +386,7 @@ public class CreateSnapshots {
      * Size of a commit window, requires positive integer argument
      */
     private static final String OPT_COMMIT_WINDOW_SIZE_L = "windowsize";
-    private static final char OPT_COMMIT_WINDOW_SIZE = 's';
+    private static final char OPT_COMMIT_WINDOW_SIZE = 'w';
 
     /**
      * How the size of a commit window is counted.  Requires an arg, as determined by the values in {@link
