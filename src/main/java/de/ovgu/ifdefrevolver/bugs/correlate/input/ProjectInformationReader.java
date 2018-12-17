@@ -93,8 +93,10 @@ public class ProjectInformationReader<TConfig extends IHasProjectInfoFile & IHas
     /**
      * @return Snapshots, ordered by date
      */
-    public Collection<Snapshot> getAllSnapshots() {
-        return this.getSnapshots().values();
+    public List<Snapshot> getAllSnapshots() {
+        final List<Snapshot> result = new ArrayList<>(this.getSnapshots().values());
+        Collections.sort(result);
+        return result;
     }
 
     /**

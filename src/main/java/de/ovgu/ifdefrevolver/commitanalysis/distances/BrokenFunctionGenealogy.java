@@ -7,15 +7,15 @@ import org.apache.log4j.Logger;
 
 import java.util.*;
 
-public class FunctionGenealogy {
-    private static final Logger LOG = Logger.getLogger(FunctionGenealogy.class);
+public class BrokenFunctionGenealogy {
+    private static final Logger LOG = Logger.getLogger(BrokenFunctionGenealogy.class);
 
     public final FunctionIdWithCommit firstId;
     private final Set<FunctionIdWithCommit> functionIdsWithCommits;
     private final List<FunctionIdWithCommit> functionIdsWithCommitsList;
     private final GroupingHashSetMap<FunctionId, Commit> commitsByFunctionId;
 
-    public FunctionGenealogy(Set<FunctionIdWithCommit> functionIdsWithCommits) {
+    public BrokenFunctionGenealogy(Set<FunctionIdWithCommit> functionIdsWithCommits) {
         this.functionIdsWithCommits = functionIdsWithCommits;
         this.functionIdsWithCommitsList = new ArrayList<>(functionIdsWithCommits);
         this.firstId = this.functionIdsWithCommitsList.get(0);
@@ -26,12 +26,12 @@ public class FunctionGenealogy {
         }
     }
 
-    public static FunctionGenealogy merge(FunctionGenealogy earlier, FunctionGenealogy later) {
+    public static BrokenFunctionGenealogy merge(BrokenFunctionGenealogy earlier, BrokenFunctionGenealogy later) {
         Set<FunctionIdWithCommit> mergedIdsWithCommits = merge(earlier.functionIdsWithCommitsList, later.functionIdsWithCommitsList);
         if (!earlier.firstId.equals(mergedIdsWithCommits.iterator().next())) {
             throw new RuntimeException("Bad merge!");
         }
-        return new FunctionGenealogy(mergedIdsWithCommits);
+        return new BrokenFunctionGenealogy(mergedIdsWithCommits);
     }
 
     private static Set<FunctionIdWithCommit> merge(List<FunctionIdWithCommit> l1, List<FunctionIdWithCommit> l2) {
@@ -65,7 +65,7 @@ public class FunctionGenealogy {
         return result;
     }
 
-    public int isSuccessor(FunctionGenealogy earlierGenealogy) {
+    public int isSuccessor(BrokenFunctionGenealogy earlierGenealogy) {
         if (this.firstId.commit == earlierGenealogy.firstId.commit) return -1;
         if (!this.firstId.commit.isDescendant(earlierGenealogy.firstId.commit)) return -1;
 //        if (!earlierGenealogy.commitsByFunctionId.containsKey(firstId.functionId)) return -1;
@@ -97,7 +97,7 @@ public class FunctionGenealogy {
         return -1;
     }
 
-    private boolean functionsIdsWithCommitsIntersect(FunctionGenealogy earlierGenealogy) {
+    private boolean functionsIdsWithCommitsIntersect(BrokenFunctionGenealogy earlierGenealogy) {
         return !Collections.disjoint(this.functionIdsWithCommits, earlierGenealogy.functionIdsWithCommits);
     }
 

@@ -213,4 +213,8 @@ class Branch {
     public Set<FunctionId> getCurrentlyActiveFunctionIds() {
         return this.functions.getCurrentlyActiveFunctionIds();
     }
+
+    public void assignJointFunctionAbSmellRows(List<JointFunctionAbSmellRow> jointFunctionAbSmellRows) {
+        this.functions.assignJointFunctionAbSmellRows(jointFunctionAbSmellRows);
+    }
 }

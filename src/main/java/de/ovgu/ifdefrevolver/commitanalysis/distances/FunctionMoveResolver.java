@@ -5,9 +5,9 @@ import de.ovgu.ifdefrevolver.bugs.minecommits.CommitsDistanceDb.Commit;
 import de.ovgu.ifdefrevolver.commitanalysis.FunctionChangeHunk;
 import de.ovgu.ifdefrevolver.commitanalysis.FunctionChangeRow;
 import de.ovgu.ifdefrevolver.commitanalysis.FunctionId;
+import de.ovgu.ifdefrevolver.util.ProgressMonitor;
 import de.ovgu.skunk.util.GroupingHashSetMap;
 import de.ovgu.skunk.util.GroupingListMap;
-import de.ovgu.ifdefrevolver.util.ProgressMonitor;
 import org.apache.log4j.Logger;
 
 import java.util.*;
@@ -190,18 +190,18 @@ public class FunctionMoveResolver {
 
 
     private static class GenealogySet {
-        Set<FunctionGenealogy> rawResult = new HashSet<>();
-        GroupingHashSetMap<FunctionId, FunctionGenealogy> genealogiesByFunctionId = new GroupingHashSetMap<>();
+        Set<BrokenFunctionGenealogy> rawResult = new HashSet<>();
+        GroupingHashSetMap<FunctionId, BrokenFunctionGenealogy> genealogiesByFunctionId = new GroupingHashSetMap<>();
 
-//        public Set<FunctionGenealogy> findMatchingGenealogies(FunctionIdWithCommit id) {
-//            Collection<FunctionGenealogy> possiblyMatchingGenealogies = genealogiesByFunctionId.get(id.functionId);
+//        public Set<BrokenFunctionGenealogy> findMatchingGenealogies(FunctionIdWithCommit id) {
+//            Collection<BrokenFunctionGenealogy> possiblyMatchingGenealogies = genealogiesByFunctionId.get(id.functionId);
 //            if (possiblyMatchingGenealogies == null) {
 //                return Collections.emptySet();
 //            }
 //
-//            Set<FunctionGenealogy> result = new HashSet<>();
+//            Set<BrokenFunctionGenealogy> result = new HashSet<>();
 //
-//            for (FunctionGenealogy possiblyMatchingGenealogy : possiblyMatchingGenealogies) {
+//            for (BrokenFunctionGenealogy possiblyMatchingGenealogy : possiblyMatchingGenealogies) {
 //                if (possiblyMatchingGenealogy.isRelatedTo(id)) {
 //                    result.add(possiblyMatchingGenealogy);
 //                }
@@ -210,9 +210,9 @@ public class FunctionMoveResolver {
 //            return result;
 //        }
 
-        private void removeGenealogy(FunctionGenealogy genealogy) {
+        private void removeGenealogy(BrokenFunctionGenealogy genealogy) {
             for (FunctionId fId : genealogy.getUniqueFunctionIds()) {
-                Collection<FunctionGenealogy> existingGenealogies = genealogiesByFunctionId.get(fId);
+                Collection<BrokenFunctionGenealogy> existingGenealogies = genealogiesByFunctionId.get(fId);
                 if (existingGenealogies == null) continue;
                 existingGenealogies.remove(genealogy);
                 if (existingGenealogies.isEmpty()) {
@@ -223,17 +223,17 @@ public class FunctionMoveResolver {
             rawResult.remove(genealogy);
         }
 
-        private void putNewGenealogy1(FunctionGenealogy genealogy) {
+        private void putNewGenealogy1(BrokenFunctionGenealogy genealogy) {
             rawResult.add(genealogy);
             for (FunctionId fId : genealogy.getUniqueFunctionIds()) {
                 genealogiesByFunctionId.put(fId, genealogy);
             }
         }
 
-        public int putNewGenealogy(FunctionGenealogy later) {
+        public int putNewGenealogy(BrokenFunctionGenealogy later) {
             int merges = 0;
             while (true) {
-                FunctionGenealogy merged = tryMergeNewGenealogy(later);
+                BrokenFunctionGenealogy merged = tryMergeNewGenealogy(later);
                 if (merged != null) {
                     merges++;
                     later = merged;
@@ -247,10 +247,10 @@ public class FunctionMoveResolver {
             return merges;
         }
 
-        private FunctionGenealogy tryMergeNewGenealogy(FunctionGenealogy later) {
-            Set<FunctionGenealogy> earlierGenealogies = this.genealogiesByFunctionId.get(later.firstId.functionId);
+        private BrokenFunctionGenealogy tryMergeNewGenealogy(BrokenFunctionGenealogy later) {
+            Set<BrokenFunctionGenealogy> earlierGenealogies = this.genealogiesByFunctionId.get(later.firstId.functionId);
             if (earlierGenealogies != null) {
-                for (FunctionGenealogy earlier : earlierGenealogies) {
+                for (BrokenFunctionGenealogy earlier : earlierGenealogies) {
                     if (earlier == later) continue;
                     int successorDistance = later.isSuccessor(earlier);
                     if (successorDistance == 0) {
@@ -261,8 +261,8 @@ public class FunctionMoveResolver {
             return null;
         }
 
-        private FunctionGenealogy mergeGenealogies(FunctionGenealogy earlier, FunctionGenealogy later) {
-            FunctionGenealogy merged = FunctionGenealogy.merge(earlier, later);
+        private BrokenFunctionGenealogy mergeGenealogies(BrokenFunctionGenealogy earlier, BrokenFunctionGenealogy later) {
+            BrokenFunctionGenealogy merged = BrokenFunctionGenealogy.merge(earlier, later);
             removeGenealogy(earlier);
             removeGenealogy(later);
             putNewGenealogy1(merged);
@@ -294,10 +294,10 @@ public class FunctionMoveResolver {
         }
 
         private boolean tryPerfectMerge(ProgressMonitor pm) {
-            for (FunctionGenealogy later : rawResult) {
-                Set<FunctionGenealogy> earlierGenealogies = this.genealogiesByFunctionId.get(later.firstId.functionId);
+            for (BrokenFunctionGenealogy later : rawResult) {
+                Set<BrokenFunctionGenealogy> earlierGenealogies = this.genealogiesByFunctionId.get(later.firstId.functionId);
                 if (earlierGenealogies == null) continue;
-                for (FunctionGenealogy earlier : earlierGenealogies) {
+                for (BrokenFunctionGenealogy earlier : earlierGenealogies) {
                     if (earlier == later) continue;
                     int successorDistance = later.isSuccessor(earlier);
                     if (successorDistance == 0) {
@@ -313,8 +313,8 @@ public class FunctionMoveResolver {
         private void doImperfectMerges(ProgressMonitor pm) {
             class MergePair implements Comparable<MergePair> {
                 int successorDistance;
-                FunctionGenealogy earlier;
-                FunctionGenealogy later;
+                BrokenFunctionGenealogy earlier;
+                BrokenFunctionGenealogy later;
 
                 @Override
                 public int compareTo(MergePair o) {
@@ -336,16 +336,16 @@ public class FunctionMoveResolver {
                     }
                 };
 
-                Set<FunctionGenealogy> merged = new HashSet<>();
+                Set<BrokenFunctionGenealogy> merged = new HashSet<>();
 
                 boolean didMerge = false;
-                for (FunctionGenealogy later : new ArrayList<>(rawResult)) {
+                for (BrokenFunctionGenealogy later : new ArrayList<>(rawResult)) {
                     MergePair winnerMerge = null;
 
-                    Set<FunctionGenealogy> earlierGenealogies = this.genealogiesByFunctionId.get(later.firstId.functionId);
+                    Set<BrokenFunctionGenealogy> earlierGenealogies = this.genealogiesByFunctionId.get(later.firstId.functionId);
                     if (earlierGenealogies == null) continue;
 
-                    for (FunctionGenealogy earlier : earlierGenealogies) {
+                    for (BrokenFunctionGenealogy earlier : earlierGenealogies) {
                         if (earlier == later) continue;
                         int successorDistance = later.isSuccessor(earlier);
                         if (successorDistance < 0) continue;
@@ -415,11 +415,11 @@ public class FunctionMoveResolver {
             Set<FunctionIdWithCommit> otherIds = new LinkedHashSet<>();
             Set<FunctionIdWithCommit> currentAndNewerIds = getCurrentAndNewerFunctionIdsWithCommits1(id);
             otherIds.addAll(currentAndNewerIds);
-            FunctionGenealogy currentGenealogy = new FunctionGenealogy(otherIds);
+            BrokenFunctionGenealogy currentGenealogy = new BrokenFunctionGenealogy(otherIds);
             merges[0] += result.putNewGenealogy(currentGenealogy);
 
 //            while (true) {
-//                FunctionGenealogy mergedGenealogy = result.tryMerge(currentGenealogy);
+//                BrokenFunctionGenealogy mergedGenealogy = result.tryMerge(currentGenealogy);
 //                if (mergedGenealogy == null) break;
 //                else currentGenealogy = mergedGenealogy;
 //            }
@@ -432,14 +432,14 @@ public class FunctionMoveResolver {
 //        while (true) {
 //            boolean merged = false;
 //
-//            for (FunctionGenealogy g : result.rawResult) {
+//            for (BrokenFunctionGenealogy g : result.rawResult) {
 //                Collection<FunctionIdWithCommit> genealogyIds = g.mergeInto(new ArrayList<>());
 //
-//                Set<FunctionGenealogy> genealogiesToMerge = new HashSet<>();
+//                Set<BrokenFunctionGenealogy> genealogiesToMerge = new HashSet<>();
 //                genealogiesToMerge.add(g);
 //
 //                for (FunctionIdWithCommit id : genealogyIds) {
-//                    Set<FunctionGenealogy> matches = result.findMatchingGenealogies(id);
+//                    Set<BrokenFunctionGenealogy> matches = result.findMatchingGenealogies(id);
 //                    genealogiesToMerge.addAll(matches);
 //                }
 //
@@ -456,9 +456,9 @@ public class FunctionMoveResolver {
         return sortedResult;
     }
 
-    private List<List<FunctionIdWithCommit>> sortGenealogies(Set<FunctionGenealogy> rawResult) {
+    private List<List<FunctionIdWithCommit>> sortGenealogies(Set<BrokenFunctionGenealogy> rawResult) {
         List<Set<FunctionIdWithCommit>> rawRawResult = new ArrayList<>();
-        for (FunctionGenealogy g : rawResult) {
+        for (BrokenFunctionGenealogy g : rawResult) {
             Set<FunctionIdWithCommit> gSet = new HashSet<>();
             g.mergeInto(gSet);
             rawRawResult.add(gSet);

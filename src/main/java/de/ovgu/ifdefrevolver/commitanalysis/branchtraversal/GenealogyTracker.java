@@ -1,52 +1,123 @@
 package de.ovgu.ifdefrevolver.commitanalysis.branchtraversal;
 
 import de.ovgu.ifdefrevolver.bugs.correlate.data.Snapshot;
+import de.ovgu.ifdefrevolver.bugs.correlate.input.ProjectInformationReader;
 import de.ovgu.ifdefrevolver.bugs.minecommits.CommitsDistanceDb.Commit;
-import de.ovgu.ifdefrevolver.commitanalysis.FunctionChangeRow;
-import de.ovgu.ifdefrevolver.commitanalysis.FunctionId;
-import de.ovgu.ifdefrevolver.commitanalysis.IHasRepoAndResultsDir;
+import de.ovgu.ifdefrevolver.commitanalysis.*;
 import de.ovgu.skunk.util.GroupingListMap;
+import de.ovgu.skunk.util.LinkedGroupingListMap;
 import org.apache.log4j.Logger;
 
 import java.util.*;
 
 public class GenealogyTracker {
     private static Logger LOG = Logger.getLogger(GenealogyTracker.class);
+
     private final List<FunctionChangeRow>[] changesByCommitKey;
     private final IHasRepoAndResultsDir config;
+    private final ProjectInformationReader projectInfo;
+    private final Map<Date, List<AllFunctionsRow>> allFunctionsInSnapshots;
+    private final Map<Date, List<AbResRow>> annotationDataInSnapshots;
 
     private List<Snapshot> snapshots;
-    private List<Commit> allCommits;
+    private List<Commit> commitsInSnapshots;
+    private Branch[] branchesByCommitKey;
     private Commit currentCommit;
     private Branch currentBranch;
     private FunctionInBranchFactory functionFactory;
-    private Branch[] branchesByCommitKey;
     private MoveConflictStats moveConflictStats;
-    protected int changesProcessed;
+    private int changesProcessed;
+    private Map<Commit, Snapshot> snapshotsByStartCommit;
 
-    public GenealogyTracker(Collection<Snapshot> snapshots, List<FunctionChangeRow>[] changesByCommitKey, IHasRepoAndResultsDir config) {
+    public GenealogyTracker(ProjectInformationReader projectInfo, IHasRepoAndResultsDir config, List<FunctionChangeRow>[] changesByCommitKey, Map<Date, List<AllFunctionsRow>> allFunctionsInSnapshots, Map<Date, List<AbResRow>> annotationDataInSnapshots) {
         this.changesByCommitKey = changesByCommitKey;
-        this.snapshots = new ArrayList<>(snapshots);
-        Collections.sort(this.snapshots);
         this.config = config;
+        this.projectInfo = projectInfo;
+        this.allFunctionsInSnapshots = allFunctionsInSnapshots;
+        this.annotationDataInSnapshots = annotationDataInSnapshots;
     }
 
-    public void processCommits() {
-        this.allCommits = new ArrayList<>();
+    public Collection<FunctionGenealogy> processCommits() {
+        this.snapshots = projectInfo.getAllSnapshots();
+
+        this.snapshotsByStartCommit = new LinkedHashMap<>();
+        this.commitsInSnapshots = new ArrayList<>();
         for (Snapshot s : snapshots) {
-            allCommits.addAll(s.getCommits());
+            commitsInSnapshots.addAll(s.getCommits());
+            snapshotsByStartCommit.put(s.getStartCommit(), s);
         }
 
         this.moveConflictStats = new MoveConflictStats();
-        this.branchesByCommitKey = new Branch[allCommits.size()];
+        this.branchesByCommitKey = new Branch[projectInfo.commitsDb().getCommits().size()];
         this.functionFactory = new FunctionInBranchFactory();
         this.changesProcessed = 0;
 
-        for (Commit c : allCommits) {
+        for (Commit c : commitsInSnapshots) {
             processCommit(c);
         }
 
         onAllCommitsProcessed();
+
+        List<FunctionGenealogy> result = new ArrayList<>();
+        for (Set<FunctionInBranch> equivalentFunctions : functionFactory.getFunctionsWithSameUid()) {
+            Map<Commit, JointFunctionAbSmellRow> jointFunctionAbSmellRowsByCommit = mergeJointFunctionAbSmellRows(equivalentFunctions);
+            LinkedGroupingListMap<Commit, FunctionChangeRow> changesByCommit = mergeFunctionChangeRows(equivalentFunctions);
+
+            final Map<Snapshot, JointFunctionAbSmellRow> jointFunctionAbSmellRowsBySnapshot = new LinkedHashMap<>();
+            final LinkedGroupingListMap<Snapshot, FunctionChangeRow> changesBySnapshot = new LinkedGroupingListMap<>();
+            for (Map.Entry<Commit, Snapshot> e : this.snapshotsByStartCommit.entrySet()) {
+                final Commit startCommit = e.getKey();
+                final JointFunctionAbSmellRow jointFunctionAbSmellRow = jointFunctionAbSmellRowsByCommit.get(startCommit);
+                if (jointFunctionAbSmellRow == null) continue;
+
+                Snapshot snapshot = e.getValue();
+                jointFunctionAbSmellRowsBySnapshot.put(snapshot, jointFunctionAbSmellRow);
+                mergeChangesByCommitIntoChangesBySnapshot(changesByCommit, snapshot, changesBySnapshot);
+            }
+
+            if (jointFunctionAbSmellRowsBySnapshot.isEmpty()) continue;
+
+            final Set<FunctionId> functionIds = new LinkedHashSet<>();
+            jointFunctionAbSmellRowsBySnapshot.values().forEach(r -> functionIds.add(r.functionId));
+
+            FunctionGenealogy g = new FunctionGenealogy(functionIds, jointFunctionAbSmellRowsBySnapshot, changesBySnapshot);
+            result.add(g);
+        }
+
+        return result;
+    }
+
+    private void mergeChangesByCommitIntoChangesBySnapshot(LinkedGroupingListMap<Commit, FunctionChangeRow> changesByCommit, Snapshot snapshot, LinkedGroupingListMap<Snapshot, FunctionChangeRow> changesBySnapshot) {
+        changesBySnapshot.ensureMapping(snapshot);
+        for (Commit commitInSnapshot : snapshot.getCommits()) {
+            final List<FunctionChangeRow> changesForCommit = changesByCommit.get(commitInSnapshot);
+            if (changesForCommit != null) {
+                for (FunctionChangeRow changeRow : changesForCommit) {
+                    changesBySnapshot.put(snapshot, changeRow);
+                }
+            }
+        }
+    }
+
+    private LinkedGroupingListMap<Commit, FunctionChangeRow> mergeFunctionChangeRows(Set<FunctionInBranch> equivalentFunctions) {
+        LinkedGroupingListMap<Commit, FunctionChangeRow> changes = new LinkedGroupingListMap<>();
+        for (FunctionInBranch equivalentFunction : equivalentFunctions) {
+            for (Map.Entry<Commit, List<FunctionChangeRow>> e : equivalentFunction.getChanges().getMap().entrySet()) {
+                final Commit commit = e.getKey();
+                for (FunctionChangeRow changeRow : e.getValue()) {
+                    changes.put(commit, changeRow);
+                }
+            }
+        }
+        return changes;
+    }
+
+    private Map<Commit, JointFunctionAbSmellRow> mergeJointFunctionAbSmellRows(Set<FunctionInBranch> equivalentFunctions) {
+        Map<Commit, JointFunctionAbSmellRow> jointFunctionAbSmellRowsByCommit = new LinkedHashMap<>();
+        for (FunctionInBranch equivalentFunction : equivalentFunctions) {
+            jointFunctionAbSmellRowsByCommit.putAll(equivalentFunction.getJointFunctionAbSmellRows());
+        }
+        return jointFunctionAbSmellRowsByCommit;
     }
 
 
@@ -57,6 +128,10 @@ public class GenealogyTracker {
         LOG.debug("Current branch of " + currentCommit + " is " + this.currentBranch);
 
         processChangesOfCurrentCommit();
+
+        if (isCurrentCommitSnapshotStart()) {
+            assignJointFunctionAbSmellRowsForCurrentCommit();
+        }
 
         if ((currentBranch.getFirstCommit() == currentCommit) && (currentCommit.isMerge())) {
             validateComputedFunctionsAfterMerge();
@@ -69,8 +144,44 @@ public class GenealogyTracker {
         }
     }
 
+    private boolean isCurrentCommitSnapshotStart() {
+        return snapshotsByStartCommit.containsKey(this.currentCommit);
+    }
+
+    private void assignJointFunctionAbSmellRowsForCurrentCommit() {
+        List<JointFunctionAbSmellRow> jointFunctionAbSmellRows = joinAllFunctionWithAbSmellRows(this.currentCommit);
+        this.currentBranch.assignJointFunctionAbSmellRows(jointFunctionAbSmellRows);
+    }
+
+    private List<JointFunctionAbSmellRow> joinAllFunctionWithAbSmellRows(final Commit currentCommit) {
+        Snapshot snapshot = snapshotsByStartCommit.get(currentCommit);
+        final Date snapshotStartDate = snapshot.getStartDate();
+        List<AllFunctionsRow> allFunctionsRows = allFunctionsInSnapshots.get(snapshotStartDate);
+        List<AbResRow> abResRows = annotationDataInSnapshots.get(snapshotStartDate);
+        Map<FunctionId, AbResRow> abResByFunctionId = new HashMap<>();
+        for (AbResRow abResRow : abResRows) {
+            abResByFunctionId.put(abResRow.getFunctionId(), abResRow);
+        }
+
+        List<JointFunctionAbSmellRow> jointFunctionAbSmellRows = new ArrayList<>();
+
+        for (AllFunctionsRow allFunctionsRow : allFunctionsRows) {
+            final FunctionId functionId = allFunctionsRow.functionId;
+            final JointFunctionAbSmellRow jointFunctionAbSmellRow;
+            AbResRow abRes = abResByFunctionId.get(functionId);
+            if (abRes != null) {
+                jointFunctionAbSmellRow = new JointFunctionAbSmellRow(currentCommit, allFunctionsRow, abRes);
+            } else {
+                jointFunctionAbSmellRow = new JointFunctionAbSmellRow(currentCommit, allFunctionsRow);
+            }
+            jointFunctionAbSmellRows.add(jointFunctionAbSmellRow);
+        }
+
+        return jointFunctionAbSmellRows;
+    }
+
     protected void onAllCommitsProcessed() {
-        LOG.debug("Successfully processed " + allCommits.size() + " commits and " + changesProcessed + " changes.");
+        LOG.debug("Successfully processed " + commitsInSnapshots.size() + " commits and " + changesProcessed + " changes.");
         maybeReportBranchStats();
         reportMoveConflicts();
     }
@@ -94,6 +205,7 @@ public class GenealogyTracker {
         int splits = 0;
         int roots = 0;
         for (Branch id : branchesByCommitKey) {
+            if (id == null) continue;
             boolean wasNew = branches.add(id);
             if (wasNew) {
                 switch (id.getParentBranches().length) {

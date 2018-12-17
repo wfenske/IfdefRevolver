@@ -166,6 +166,8 @@ public class RevisionsCsvReader {
 
         snapshotsCreator.processCommits();
 
+        Collections.sort(snapshots);
+
         LOG.info("Successfully created " + snapshots.size() + " snapshots.");
     }
 

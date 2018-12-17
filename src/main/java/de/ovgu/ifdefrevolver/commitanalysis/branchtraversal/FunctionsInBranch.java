@@ -555,4 +555,28 @@ class FunctionsInBranch {
     public Set<FunctionId> getCurrentlyActiveFunctionIds() {
         return new HashSet<>(this.functionsById.keySet());
     }
+
+    public void assignJointFunctionAbSmellRows(List<JointFunctionAbSmellRow> jointFunctionAbSmellRows) {
+        for (JointFunctionAbSmellRow jointFunctionAbSmellRow : jointFunctionAbSmellRows) {
+            assignJointFunctionAbSmellRow(jointFunctionAbSmellRow);
+        }
+    }
+
+    private void assignJointFunctionAbSmellRow(JointFunctionAbSmellRow jointFunctionAbSmellRow) {
+        final FunctionId functionId = jointFunctionAbSmellRow.functionId;
+        LOG.debug("Assigning joint function with AB smell " + functionId);
+        FunctionInBranch function = this.functionsById.get(functionId);
+        if (function == null) {
+            function = createFunctionBecauseItIsInAllFunctionsRows(jointFunctionAbSmellRow);
+        }
+        function.addJointFunctionAbSmellRow(jointFunctionAbSmellRow);
+    }
+
+    private FunctionInBranch createFunctionBecauseItIsInAllFunctionsRows(JointFunctionAbSmellRow jointFunctionAbSmellRow) {
+        final FunctionId functionId = jointFunctionAbSmellRow.functionId;
+        LOG.warn("Function exists in all functions and/or AB smells but does not exist in branch tracker: " + functionId);
+        FunctionInBranch f = functionFactory.create(functionId);
+        this.functionsById.put(functionId, f);
+        return f;
+    }
 }

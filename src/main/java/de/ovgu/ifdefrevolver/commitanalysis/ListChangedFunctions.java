@@ -5,6 +5,7 @@ import de.ovgu.ifdefrevolver.bugs.correlate.data.Snapshot;
 import de.ovgu.ifdefrevolver.bugs.correlate.input.ProjectInformationReader;
 import de.ovgu.ifdefrevolver.bugs.correlate.main.ProjectInformationConfig;
 import de.ovgu.ifdefrevolver.bugs.minecommits.CommitsDistanceDb;
+import de.ovgu.ifdefrevolver.bugs.minecommits.CommitsDistanceDb.Commit;
 import de.ovgu.ifdefrevolver.bugs.minecommits.CommitsDistanceDbCsvReader;
 import org.apache.commons.cli.*;
 import org.apache.log4j.Logger;
@@ -76,7 +77,7 @@ public class ListChangedFunctions {
 
     private IMinimalSnapshot createDummySnapshotToCoverRemainingCommits() {
         Collection<Snapshot> allActualSnapshots = projectInfo.getAllSnapshots();
-        final Set<CommitsDistanceDb.Commit> remainingCommits = new HashSet<>(readAllCommits(config));
+        final Set<Commit> remainingCommits = new HashSet<>(readAllCommits());
         for (IMinimalSnapshot actualSnapshot : allActualSnapshots) {
             remainingCommits.removeAll(actualSnapshot.getCommits());
         }
@@ -90,7 +91,7 @@ public class ListChangedFunctions {
             }
 
             @Override
-            public Set<CommitsDistanceDb.Commit> getCommits() {
+            public Set<Commit> getCommits() {
                 return remainingCommits;
             }
 //
@@ -114,9 +115,8 @@ public class ListChangedFunctions {
         }
     }
 
-    private Set<CommitsDistanceDb.Commit> readAllCommits(ListChangedFunctionsConfig config) {
-        CommitsDistanceDbCsvReader distanceReader = new CommitsDistanceDbCsvReader();
-        CommitsDistanceDb commitsDistanceDb = distanceReader.dbFromCsv(config);
+    private Set<Commit> readAllCommits() {
+        CommitsDistanceDb commitsDistanceDb = this.projectInfo.commitsDb();
         return commitsDistanceDb.getCommits();
     }
 

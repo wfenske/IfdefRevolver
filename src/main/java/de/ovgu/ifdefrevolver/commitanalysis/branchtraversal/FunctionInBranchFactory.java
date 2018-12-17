@@ -4,6 +4,7 @@ import de.ovgu.ifdefrevolver.commitanalysis.FunctionId;
 import de.ovgu.skunk.util.GroupingHashSetMap;
 import org.apache.log4j.Logger;
 
+import java.util.Collection;
 import java.util.LinkedList;
 import java.util.Queue;
 import java.util.Set;
@@ -43,5 +44,9 @@ class FunctionInBranchFactory {
         } else {
             return unusedUids.poll();
         }
+    }
+
+    public Collection<? extends Set<FunctionInBranch>> getFunctionsWithSameUid() {
+        return functionsByUid.getMap().values();
     }
 }

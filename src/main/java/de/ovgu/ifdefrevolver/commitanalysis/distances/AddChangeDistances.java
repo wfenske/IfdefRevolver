@@ -11,8 +11,6 @@ import de.ovgu.ifdefrevolver.bugs.minecommits.CommitsDistanceDb.Commit;
 import de.ovgu.ifdefrevolver.bugs.minecommits.CommitsDistanceDbCsvReader;
 import de.ovgu.ifdefrevolver.commitanalysis.*;
 import de.ovgu.ifdefrevolver.commitanalysis.branchtraversal.GenealogyTracker;
-import de.ovgu.ifdefrevolver.commitanalysis.branchtraversal.SnapshotCreatingCommitWalker;
-import de.ovgu.ifdefrevolver.commitanalysis.branchtraversal.WriteSnapshotsToCsvFilesStrategy;
 import de.ovgu.ifdefrevolver.util.ProgressMonitor;
 import de.ovgu.ifdefrevolver.util.ThreadProcessor;
 import de.ovgu.ifdefrevolver.util.UncaughtWorkerThreadException;
@@ -143,9 +141,6 @@ public class AddChangeDistances {
         Set<FunctionIdWithCommit> leftOverFunctionIdsWithCommits = getFunctionIdsWithCommitFromLeftOverSnapshot(leftOverSnapshotDate);
         Set<FunctionIdWithCommit> functionsAddedInBetween = getFunctionIdsWithCommitsAddedInBetween();
 
-        createSnapshots();
-        System.exit(0);
-
         trackGenealogies();
         System.exit(0);
 
@@ -169,17 +164,11 @@ public class AddChangeDistances {
         LOG.info(ageRequestStats);
     }
 
-    private void createSnapshots() {
-        SnapshotCreatingCommitWalker<ListChangedFunctionsConfig> walker = new SnapshotCreatingCommitWalker<ListChangedFunctionsConfig>(commitsDistanceDb, config, 200, revisionsReader.getCommitsThatModifyCFiles(), new WriteSnapshotsToCsvFilesStrategy<>(commitsDistanceDb, config));
-        walker.processCommits();
-    }
-
     private void trackGenealogies() {
         List<FunctionChangeRow>[] changesByCommitKey = groupChangesByCommitKey();
-        //Map<Commit, List<AllFunctionsRow>> allFunctionsBySnapshotStartCommit = groupAllFunctionsBySnapshotStartCommit();
-
-        GenealogyTracker gt = new GenealogyTracker(projectInfo.getAllSnapshots(), changesByCommitKey,
-                config);
+//        Map<Commit, List<AllFunctionsRow>> allFunctionsBySnapshotStartCommit = groupAllFunctionsBySnapshotStartCommit();
+        GenealogyTracker gt = new GenealogyTracker(projectInfo, config, changesByCommitKey,
+                allFunctionsInSnapshots, annotationDataInSnapshots);
         gt.processCommits();
     }
 
@@ -1071,7 +1060,7 @@ public class AddChangeDistances {
         if (line.hasOption(ListChangedFunctionsConfig.OPT_REPO)) {
             config.setRepoDir(line.getOptionValue(ListChangedFunctionsConfig.OPT_REPO));
         } else {
-            config.setRepoDir(Paths.get(ListChangedFunctionsConfig.DEFAULT_REPOS_DIR_NAME, this.config.getProject(), ".git").toString());
+            config.setRepoDir(Paths.get(ListChangedFunctionsConfig.DEFAULT_REPOS_DIR_NAME, this.config.getProject()).toString());
         }
         config.validateRepoDir();
 
