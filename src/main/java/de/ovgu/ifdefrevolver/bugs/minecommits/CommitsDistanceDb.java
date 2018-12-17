@@ -62,17 +62,23 @@ public class CommitsDistanceDb {
 //            return db.areCommitsRelated(this, other);
 //        }
 
+        /**
+         * Determine whether the <code>this</code> is a descendant of the given commit, <code>possibleAncestor</code>. Note that every commit is its own descendant.
+         *
+         * @param possibleAncestor A commit that might be an ancestor of <code>this</code> commit
+         * @return <code>true</code> if and only if <code>this</code> is a descendant of (or the same as) the given commit
+         */
         public boolean isDescendant(Commit possibleAncestor) {
             return db.isDescendant(this, possibleAncestor);
         }
 
         /**
-         * @param child A commit of which <code>this</code> commit is supposed to be an ancestor
-         * @return distance from this commit to the child commit; or {@link Optional#empty()} if there is no possible
+         * @param descendant A commit that is supposed to be an descendant of <code>this</code>
+         * @return distance from this commit to the descendant commit; or {@link Optional#empty()} if there is no possible
          * path
          */
-        public Optional<Integer> minDistance(Commit child) {
-            return db.minDistance(child, this);
+        public Optional<Integer> minDistance(Commit descendant) {
+            return db.minDistance(descendant, this);
         }
 
         public Commit[] parents() {

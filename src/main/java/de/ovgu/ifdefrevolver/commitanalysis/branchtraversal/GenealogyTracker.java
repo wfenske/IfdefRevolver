@@ -9,6 +9,7 @@ import de.ovgu.skunk.util.LinkedGroupingListMap;
 import org.apache.log4j.Logger;
 
 import java.util.*;
+import java.util.stream.Collectors;
 
 public class GenealogyTracker {
     private static Logger LOG = Logger.getLogger(GenealogyTracker.class);
@@ -37,7 +38,7 @@ public class GenealogyTracker {
         this.annotationDataInSnapshots = annotationDataInSnapshots;
     }
 
-    public Collection<FunctionGenealogy> processCommits() {
+    public LinkedGroupingListMap<Snapshot, FunctionGenealogy> processCommits() {
         this.snapshots = projectInfo.getAllSnapshots();
 
         this.snapshotsByStartCommit = new LinkedHashMap<>();
@@ -58,7 +59,13 @@ public class GenealogyTracker {
 
         onAllCommitsProcessed();
 
-        List<FunctionGenealogy> result = new ArrayList<>();
+        return aggregateResult();
+    }
+
+    private LinkedGroupingListMap<Snapshot, FunctionGenealogy> aggregateResult() {
+        LinkedGroupingListMap<Snapshot, FunctionGenealogy> result = new LinkedGroupingListMap<>();
+        this.snapshots.forEach(s -> result.ensureMapping(s));
+
         for (Set<FunctionInBranch> equivalentFunctions : functionFactory.getFunctionsWithSameUid()) {
             Map<Commit, JointFunctionAbSmellRow> jointFunctionAbSmellRowsByCommit = mergeJointFunctionAbSmellRows(equivalentFunctions);
             LinkedGroupingListMap<Commit, FunctionChangeRow> changesByCommit = mergeFunctionChangeRows(equivalentFunctions);
@@ -67,28 +74,31 @@ public class GenealogyTracker {
             final LinkedGroupingListMap<Snapshot, FunctionChangeRow> changesBySnapshot = new LinkedGroupingListMap<>();
             for (Map.Entry<Commit, Snapshot> e : this.snapshotsByStartCommit.entrySet()) {
                 final Commit startCommit = e.getKey();
+                final Snapshot snapshot = e.getValue();
                 final JointFunctionAbSmellRow jointFunctionAbSmellRow = jointFunctionAbSmellRowsByCommit.get(startCommit);
-                if (jointFunctionAbSmellRow == null) continue;
-
-                Snapshot snapshot = e.getValue();
-                jointFunctionAbSmellRowsBySnapshot.put(snapshot, jointFunctionAbSmellRow);
-                mergeChangesByCommitIntoChangesBySnapshot(changesByCommit, snapshot, changesBySnapshot);
+                final boolean functionExistsAtStartOfSnapshot = jointFunctionAbSmellRow != null;
+                if (functionExistsAtStartOfSnapshot) {
+                    jointFunctionAbSmellRowsBySnapshot.put(snapshot, jointFunctionAbSmellRow);
+                    changesBySnapshot.ensureMapping(snapshot);
+                }
+                aggregateChangesByCommitIntoChangesBySnapshot(changesByCommit, snapshot, changesBySnapshot);
             }
 
+            // Forget all the data if the function does not appear at any snapshot start.
             if (jointFunctionAbSmellRowsBySnapshot.isEmpty()) continue;
 
-            final Set<FunctionId> functionIds = new LinkedHashSet<>();
-            jointFunctionAbSmellRowsBySnapshot.values().forEach(r -> functionIds.add(r.functionId));
+            final Set<FunctionId> functionIds = jointFunctionAbSmellRowsBySnapshot.values().stream()
+                    .map(r -> r.functionId)
+                    .collect(Collectors.toCollection(LinkedHashSet::new));
 
-            FunctionGenealogy g = new FunctionGenealogy(functionIds, jointFunctionAbSmellRowsBySnapshot, changesBySnapshot);
-            result.add(g);
+            FunctionGenealogy genealogy = new FunctionGenealogy(functionIds, jointFunctionAbSmellRowsBySnapshot, changesBySnapshot);
+            jointFunctionAbSmellRowsBySnapshot.keySet().forEach(s -> result.put(s, genealogy));
         }
 
         return result;
     }
 
-    private void mergeChangesByCommitIntoChangesBySnapshot(LinkedGroupingListMap<Commit, FunctionChangeRow> changesByCommit, Snapshot snapshot, LinkedGroupingListMap<Snapshot, FunctionChangeRow> changesBySnapshot) {
-        changesBySnapshot.ensureMapping(snapshot);
+    private void aggregateChangesByCommitIntoChangesBySnapshot(LinkedGroupingListMap<Commit, FunctionChangeRow> changesByCommit, Snapshot snapshot, LinkedGroupingListMap<Snapshot, FunctionChangeRow> changesBySnapshot) {
         for (Commit commitInSnapshot : snapshot.getCommits()) {
             final List<FunctionChangeRow> changesForCommit = changesByCommit.get(commitInSnapshot);
             if (changesForCommit != null) {
@@ -100,24 +110,51 @@ public class GenealogyTracker {
     }
 
     private LinkedGroupingListMap<Commit, FunctionChangeRow> mergeFunctionChangeRows(Set<FunctionInBranch> equivalentFunctions) {
-        LinkedGroupingListMap<Commit, FunctionChangeRow> changes = new LinkedGroupingListMap<>();
+        GroupingListMap<Commit, FunctionChangeRow> unorderedChanges = new GroupingListMap<>();
         for (FunctionInBranch equivalentFunction : equivalentFunctions) {
             for (Map.Entry<Commit, List<FunctionChangeRow>> e : equivalentFunction.getChanges().getMap().entrySet()) {
                 final Commit commit = e.getKey();
                 for (FunctionChangeRow changeRow : e.getValue()) {
-                    changes.put(commit, changeRow);
+                    unorderedChanges.put(commit, changeRow);
                 }
             }
         }
-        return changes;
+
+        return orderByCommitTraversalOrder(unorderedChanges);
     }
 
-    private Map<Commit, JointFunctionAbSmellRow> mergeJointFunctionAbSmellRows(Set<FunctionInBranch> equivalentFunctions) {
-        Map<Commit, JointFunctionAbSmellRow> jointFunctionAbSmellRowsByCommit = new LinkedHashMap<>();
-        for (FunctionInBranch equivalentFunction : equivalentFunctions) {
-            jointFunctionAbSmellRowsByCommit.putAll(equivalentFunction.getJointFunctionAbSmellRows());
+    private <TValue> LinkedGroupingListMap<Commit, TValue> orderByCommitTraversalOrder(GroupingListMap<Commit, TValue> unorderedMappings) {
+        final LinkedGroupingListMap<Commit, TValue> result = new LinkedGroupingListMap<>();
+        final Map<Commit, List<TValue>> rawResultMap = result.getMap();
+        final Map<Commit, List<TValue>> rawUnorderedMappings = unorderedMappings.getMap();
+        for (Commit c : this.commitsInSnapshots) {
+            final List<TValue> values = rawUnorderedMappings.get(c);
+            if (values != null) {
+                rawResultMap.put(c, values);
+            }
         }
-        return jointFunctionAbSmellRowsByCommit;
+
+        return result;
+    }
+
+    private <TValue> LinkedHashMap<Commit, TValue> orderByCommitTraversalOrder(Map<Commit, TValue> unorderedMappings) {
+        final LinkedHashMap<Commit, TValue> result = new LinkedHashMap<>();
+        for (Commit c : this.commitsInSnapshots) {
+            if (unorderedMappings.containsKey(c)) {
+                TValue value = unorderedMappings.get(c);
+                result.put(c, value);
+            }
+        }
+
+        return result;
+    }
+
+    private LinkedHashMap<Commit, JointFunctionAbSmellRow> mergeJointFunctionAbSmellRows(Set<FunctionInBranch> equivalentFunctions) {
+        Map<Commit, JointFunctionAbSmellRow> rawResult = new HashMap<>();
+        for (FunctionInBranch equivalentFunction : equivalentFunctions) {
+            rawResult.putAll(equivalentFunction.getJointFunctionAbSmellRows());
+        }
+        return orderByCommitTraversalOrder(rawResult);
     }
 
 
