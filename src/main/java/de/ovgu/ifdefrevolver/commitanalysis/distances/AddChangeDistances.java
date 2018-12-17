@@ -146,10 +146,10 @@ public class AddChangeDistances {
         System.exit(0);
 
 //        functionGenealogies = computeFunctionGenealogies(allFunctionsEver, leftOverFunctionIdsWithCommits, functionsAddedInBetween);
-        List<SnapshotWithFunctions> snapshotsWithFunctions = mergeGenealogiesWithSnapshotData();
-        List<SnapshotWithFunctions> commitWindowsWithFunctions = formCommitWindows(snapshotsWithFunctions);
-        writeAbSmellAgeSnapshotCsv(commitWindowsWithFunctions);
-        System.exit(0);
+//        List<SnapshotWithFunctions> snapshotsWithFunctions = mergeGenealogiesWithSnapshotData();
+//        List<SnapshotWithFunctions> commitWindowsWithFunctions = formCommitWindows(snapshotsWithFunctions);
+//        writeAbSmellAgeSnapshotCsv(commitWindowsWithFunctions);
+//        System.exit(0);
 
         List<CommitWindow> allWindows = groupSnapshots();
 
@@ -171,6 +171,7 @@ public class AddChangeDistances {
         GenealogyTracker gt = new GenealogyTracker(projectInfo, config, changesByCommitKey,
                 allFunctionsInSnapshots, annotationDataInSnapshots);
         final LinkedGroupingListMap<Snapshot, FunctionGenealogy> functionGenealogiesBySnapshot = gt.processCommits();
+        writeAbSmellAgeSnapshotCsv(functionGenealogiesBySnapshot);
     }
 
     private Map<Commit, List<AllFunctionsRow>> groupAllFunctionsBySnapshotStartCommit() {
@@ -209,8 +210,9 @@ public class AddChangeDistances {
         return changesByCommitKey;
     }
 
-    private void writeAbSmellAgeSnapshotCsv(List<SnapshotWithFunctions> snapshotsWithFunctions) {
-        ProgressMonitor pm = new ProgressMonitor(snapshotsWithFunctions.size()) {
+    private void writeAbSmellAgeSnapshotCsv(LinkedGroupingListMap<Snapshot, FunctionGenealogy> functionGenealogiesBySnapshot) {
+        final Collection<Snapshot> snapshots = this.projectInfo.getSnapshots().values();
+        ProgressMonitor pm = new ProgressMonitor(snapshots.size()) {
             @Override
             protected void reportIntermediateProgress() {
                 LOG.info("Wrote CSV with merged snapshot data " + this.ticksDone + "/" + this.ticksTotal + " (" + this.percentage() + "%)");
@@ -222,28 +224,28 @@ public class AddChangeDistances {
             }
         };
 
-        for (SnapshotWithFunctions snapshot : snapshotsWithFunctions) {
-            writeAbSmellAgeSnapshotCsv(snapshot);
+        for (Snapshot snapshot : snapshots) {
+            final List<FunctionGenealogy> functionsInSnapshot = functionGenealogiesBySnapshot.get(snapshot);
+            writeAbSmellAgeSnapshotCsv(snapshot, functionsInSnapshot);
             pm.increaseDone();
         }
     }
 
-    private void writeAbSmellAgeSnapshotCsv(SnapshotWithFunctions snapshot) {
+    private void writeAbSmellAgeSnapshotCsv(Snapshot snapshot, List<FunctionGenealogy> functionsInSnapshot) {
         CsvFileWriterHelper writerHelper = new CsvFileWriterHelper() {
             @Override
             protected void actuallyDoStuff(CSVPrinter csv) throws IOException {
                 final Object[] headerRow = CsvEnumUtils.headerRow(JointFunctionAbSmellAgeSnapshotColumns.class);
                 csv.printRecord(headerRow);
-                CsvRowProvider<SnapshotFunctionGenealogy, Void, JointFunctionAbSmellAgeSnapshotColumns> rowProvider = new CsvRowProvider<>(JointFunctionAbSmellAgeSnapshotColumns.class, null);
-
-                for (SnapshotFunctionGenealogy functionGenealogy : snapshot.functionsAtStart.values()) {
+                CsvRowProvider<FunctionGenealogy, Snapshot, JointFunctionAbSmellAgeSnapshotColumns> rowProvider = new CsvRowProvider<>(JointFunctionAbSmellAgeSnapshotColumns.class, snapshot);
+                for (FunctionGenealogy functionGenealogy : functionsInSnapshot) {
                     Object[] row = rowProvider.dataRow(functionGenealogy);
                     csv.printRecord(row);
                 }
             }
         };
 
-        File resultFile = new File(config.snapshotResultsDirForDate(snapshot.snapshot.getStartDate()),
+        File resultFile = new File(config.snapshotResultsDirForDate(snapshot.getStartDate()),
                 JointFunctionAbSmellAgeSnapshotColumns.FILE_BASENAME);
         writerHelper.write(resultFile);
     }

@@ -576,12 +576,12 @@ eprintf("Median COMMITS/LCHG of changed functions:\n%.2g,%.2g\n"
       , median(changedData0$LCH))
 
 eprintf("Median AGE/LAST_EDIT of all functions:\n%.0f,%.0f\n"
-      , median(allData$AGE)
-      , median(allData$LAST_EDIT))
+      , median(subset(allData, !is.na(AGE))$AGE)
+      , median(subset(allData, !is.na(LAST_EDIT))$LAST_EDIT))
 
 eprintf("Mean AGE/LAST_EDIT of all functions:\n%.0f,%.0f\n"
-      , mean(allData$AGE)
-      , mean(allData$LAST_EDIT))
+      , mean(subset(allData, !is.na(AGE))$AGE)
+      , mean(subset(allData, !is.na(LAST_EDIT))$LAST_EDIT))
 
 allData$CHURN_PRONE <- allData$LCHratio > medianLCHratio
 
@@ -713,19 +713,13 @@ csvModel <- negbinCsvModel
 
 for (dep in c("COMMITS"
               ##, "HUNKS"
-##              , "LCH"
+            , "LCH"
               )) { 
     dummy <- csvModel(dep, c("log2LOC"))
-    dummy <- csvModel(dep, c("log2LOC", "AGE"))
-##    dummy <- csvModel(dep, c("log2LOC", "log2AGE"))
-##    dummy <- csvModel(dep, c("log2LOC", "LAST_EDIT"))
-    dummy <- csvModel(dep, c("log2LOC", "log2LAST_EDIT"))
-##    dummy <- csvModel(dep, c("log2LOC", "AGE", "LAST_EDIT"))
-##    dummy <- csvModel(dep, c("log2LOC", "log2AGE", "LAST_EDIT"))
+##    dummy <- csvModel(dep, c("log2LOC", "AGE"))
+##    dummy <- csvModel(dep, c("log2LOC", "log2LAST_EDIT"))
     dummy <- csvModel(dep, c("log2LOC", "AGE", "log2LAST_EDIT"))
-##    dummy <- csvModel(dep, c("log2LOC", "log2AGE", "log2LAST_EDIT"))
     dummy <- csvModel(dep, c("FL", "FC", "CND", "NEG", "LOACratio", "log2LOC"))
-    ##dummy <- csvModel(dep, c("FL", "FC", "CND", "NEG", "LOACratio", "log2LOC", "AGE", "LAST_EDIT"))
     dummy <- csvModel(dep, c("FL", "FC", "CND", "NEG", "LOACratio", "log2LOC", "AGE", "log2LAST_EDIT"))
 }
 

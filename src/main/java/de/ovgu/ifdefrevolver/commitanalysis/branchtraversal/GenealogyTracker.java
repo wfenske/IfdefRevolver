@@ -66,6 +66,7 @@ public class GenealogyTracker {
         LinkedGroupingListMap<Snapshot, FunctionGenealogy> result = new LinkedGroupingListMap<>();
         this.snapshots.forEach(s -> result.ensureMapping(s));
 
+        int functionUid = 0;
         for (Set<FunctionInBranch> equivalentFunctions : functionFactory.getFunctionsWithSameUid()) {
             Map<Commit, JointFunctionAbSmellRow> jointFunctionAbSmellRowsByCommit = mergeJointFunctionAbSmellRows(equivalentFunctions);
             LinkedGroupingListMap<Commit, FunctionChangeRow> changesByCommit = mergeFunctionChangeRows(equivalentFunctions);
@@ -91,8 +92,10 @@ public class GenealogyTracker {
                     .map(r -> r.functionId)
                     .collect(Collectors.toCollection(LinkedHashSet::new));
 
-            FunctionGenealogy genealogy = new FunctionGenealogy(functionIds, jointFunctionAbSmellRowsBySnapshot, changesBySnapshot);
+            FunctionGenealogy genealogy = new FunctionGenealogy(functionUid, functionIds, jointFunctionAbSmellRowsBySnapshot, changesBySnapshot);
             jointFunctionAbSmellRowsBySnapshot.keySet().forEach(s -> result.put(s, genealogy));
+
+            functionUid++;
         }
 
         return result;

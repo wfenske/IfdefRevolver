@@ -60,18 +60,16 @@ readSnapshotFile <- function(inputFn) {
                              colClasses=c(
                                  "SNAPSHOT_DATE"="character"
                                , "SNAPSHOT_INDEX"="numeric"
-                               , "SNAPSHOT_BRANCH"="numeric"
-                               , "START_FUNCTION_SIGNATURE"="character"
-                               , "START_FILE"="character"
-                               , "END_FUNCTION_SIGNATURE"="character"
-                               , "END_FILE"="character"
-                               , "FUNCTION_LOC"="numeric"
+                               , "FUNCTION_UID"="numeric"
+                               , "FUNCTION_SIGNATURE"="character"
+                               , "FILE"="character"
                                , "AGE"="numeric"
                                , "LAST_EDIT"="numeric"
                                , "COMMITS"="numeric"
                                , "LINES_CHANGED"="numeric"
-                               , "LINES_DELETED"="numeric"
                                , "LINES_ADDED"="numeric"
+                               , "LINES_DELETED"="numeric"
+                               , "LOC"="numeric"
                                , "LOAC"="numeric"
                                , "LOFC"="numeric"
                                , "FL"="numeric"
@@ -82,7 +80,7 @@ readSnapshotFile <- function(inputFn) {
     snapshotDate <- snapshotData$SNAPSHOT_DATE[1]
     eprintf("INFO: Reading snapshot %s\n", snapshotDate)
     snapshotData["SNAPSHOT"] <- snapshotIx
-    snapshotData[is.na(snapshotData)] = 0
+    ##snapshotData[is.na(snapshotData)] = 0
 
     changedFuncs <- subset(snapshotData, COMMITS > 0)
 
@@ -93,7 +91,7 @@ readSnapshotFile <- function(inputFn) {
     eprintf("DEBUG: median commits of changed functions: %.3f\n", medianChangedFuncsCommits)
     snapshotData["MEDIAN_SNAPSHOT_CH_COMMITS"] <- medianChangedFuncsCommits
 
-    changedFuncs$COMMITSratio <- changedFuncs$COMMITS / changedFuncs$FUNCTION_LOC
+    changedFuncs$COMMITSratio <- changedFuncs$COMMITS / changedFuncs$LOC
     medianChangedFuncsCommitsRatio <- median(changedFuncs$COMMITSratio)
     eprintf("DEBUG: median commit ratio of changed functions: %.3f\n", medianChangedFuncsCommitsRatio)
     snapshotData["MEDIAN_SNAPSHOT_CH_COMMITSratio"] <- medianChangedFuncsCommitsRatio
@@ -103,21 +101,21 @@ readSnapshotFile <- function(inputFn) {
     eprintf("DEBUG: median lines changed of changed functions: %.3f\n", medianChangedFuncsLch)
     snapshotData["MEDIAN_SNAPSHOT_CH_LCH"] <- medianChangedFuncsLch
 
-    changedFuncs$LCHratio <- changedFuncs$LINES_CHANGED / changedFuncs$FUNCTION_LOC
+    changedFuncs$LCHratio <- changedFuncs$LINES_CHANGED / changedFuncs$LOC
     medianChangedFuncsLchRatio <- median(changedFuncs$LCHratio)
     eprintf("DEBUG: median lines changed ratio of changed functions: %.3f\n", medianChangedFuncsLchRatio)
     snapshotData["MEDIAN_SNAPSHOT_CH_LCHratio"] <- medianChangedFuncsLchRatio
     
     ##meanChangedFuncsCommitsRatio <- mean(changedFuncs$COMMITSratio)
-    ##totalMeanChangedFuncsCommitsRatio <- sum(changedFuncs$COMMITS) / sum(changedFuncs$FUNCTION_LOC)
+    ##totalMeanChangedFuncsCommitsRatio <- sum(changedFuncs$COMMITS) / sum(changedFuncs$LOC)
     ##eprintf("DEBUG: mean commit ratio of changed functions: %.3f\n", meanChangedFuncsCommitsRatio)
     ##eprintf("DEBUG: total mean of commit ratio (all commits / all LOC) of changed functions: %.3f\n",
     ##        totalMeanChangedFuncsCommitsRatio)
     ##snapshotData["MEAN_SNAPSHOT_CH_COMMITSratio"] <- meanChangedFuncsCommitsRatio
     ##snapshotData["TOTAL_MEAN_SNAPSHOT_CH_COMMITSratio"] <- totalMeanChangedFuncsCommitsRatio
     
-    ##cat(str(max(as.numeric(snapshotData$FUNCTION_LOC), na.rm=T)))
-    ##cat(str(max(snapshotData$FUNCTION_LOC), na.rm=T))
+    ##cat(str(max(as.numeric(snapshotData$LOC), na.rm=T)))
+    ##cat(str(max(snapshotData$LOC), na.rm=T))
     ## Change the value of the global variable using <<-
     snapshotIx <<- snapshotIx + 1
     return (snapshotData)
@@ -127,7 +125,7 @@ inputFns <- getInputFilenames(args)
 
 allData <- do.call("rbind", lapply(inputFns, readSnapshotFile))
 
-allData$FUNCTION_LOC <- iround(allData$FUNCTION_LOC)
+allData$LOC <- iround(allData$LOC)
 allData$LOAC <- iround(allData$LOAC)
 allData$LOFC <- iround(allData$LOFC)
 allData$FL <- iround(allData$FL)
@@ -136,6 +134,27 @@ allData$FC_NonDup <- iround(allData$FC_NonDup)
 allData$CND <- iround(allData$CND)
 allData$NEG <- iround(allData$NEG)
 
+numMissingAge <- nrow(subset(allData, is.na(AGE)))
+dataWithAge <- subset(allData, !is.na(AGE))
+numHaveAge <- nrow(dataWithAge)
+percentMissingAge <- iround(100*numMissingAge/nrow(allData))
+if (numMissingAge > 0) {
+    eprintf("WARN: missing age: %d, have age: %d (%d%% missing)\n", numMissingAge, numHaveAge, percentMissingAge)
+    ##naSubstVal <- 0 # median(dataWithAge$AGE)
+    ##allData$AGE[is.na(allData$AGE)] <- naSubstVal
+}
+
+numMissingEdit <- nrow(subset(allData, is.na(LAST_EDIT)))
+dataWithEdit <- subset(allData, !is.na(LAST_EDIT))
+numHaveEdit <- nrow(dataWithEdit)
+percentMissingEdit <- iround(100*numMissingEdit/nrow(allData))
+if (numMissingEdit > 0) {
+    eprintf("WARN: missing last edit: %d, have last edit: %d (%d%% missing)\n", numMissingEdit, numHaveEdit, percentMissingEdit)
+    ##naSubstVal <- 0 #median(dataWithEdit$LAST_EDIT)
+    ##allData$LAST_EDIT[is.na(allData$LAST_EDIT)] <- naSubstVal
+}
+
+
 ### Independent variables for taking smell presence into account
 
 ## Independent variables for taking file size into account
@@ -143,12 +162,11 @@ allData$NEG <- iround(allData$NEG)
 ##data$binLARGE <- data$SLOC > topSLOCValue
 
 ### Independent variables
-## FUNCTION_LOC,LOAC,LOFC,NOFL,NOFC_Dup,NOFC_NonDup,NONEST
+## LOC,LOAC,LOFC,NOFL,NOFC_Dup,NOFC_NonDup,NONEST
 
 ## Some renaming
 allData$LCH <- allData$LINES_CHANGED
 
-allData$LOC <- allData$FUNCTION_LOC
 allData$logLOC <- log(allData$LOC)
 
 

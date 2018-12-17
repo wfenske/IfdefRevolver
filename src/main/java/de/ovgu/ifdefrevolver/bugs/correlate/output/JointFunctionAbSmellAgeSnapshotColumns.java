@@ -1,172 +1,140 @@
 package de.ovgu.ifdefrevolver.bugs.correlate.output;
 
-import de.ovgu.ifdefrevolver.bugs.minecommits.CommitsDistanceDb;
-import de.ovgu.ifdefrevolver.commitanalysis.FunctionChangeRow;
-import de.ovgu.ifdefrevolver.commitanalysis.distances.AddChangeDistances;
+import de.ovgu.ifdefrevolver.bugs.correlate.data.Snapshot;
+import de.ovgu.ifdefrevolver.commitanalysis.branchtraversal.FunctionGenealogy;
+import de.ovgu.ifdefrevolver.commitanalysis.branchtraversal.JointFunctionAbSmellRow;
 import de.ovgu.skunk.detection.output.CsvColumnValueProvider;
 
-import java.util.HashSet;
-import java.util.Optional;
-import java.util.Set;
+import java.util.OptionalInt;
 
-public enum JointFunctionAbSmellAgeSnapshotColumns implements CsvColumnValueProvider<AddChangeDistances.SnapshotFunctionGenealogy, Void> {
+public enum JointFunctionAbSmellAgeSnapshotColumns implements CsvColumnValueProvider<FunctionGenealogy, Snapshot> {
     SNAPSHOT_DATE {
         @Override
-        public Object csvColumnValue(AddChangeDistances.SnapshotFunctionGenealogy in, Void ctx) {
-            return in.getSnapshot().getStartDateString();
+        public String csvColumnValue(FunctionGenealogy in, Snapshot s) {
+            return s.getStartDateString();
         }
     },
     SNAPSHOT_INDEX {
         @Override
-        public Integer csvColumnValue(AddChangeDistances.SnapshotFunctionGenealogy in, Void ctx) {
-            return in.getSnapshot().getIndex();
+        public Integer csvColumnValue(FunctionGenealogy in, Snapshot s) {
+            return s.getIndex();
         }
     },
-    //    SNAPSHOT_BRANCH {
-//        @Override
-//        public Integer csvColumnValue(AddChangeDistances.SnapshotFunctionGenealogy in, Void ctx) {
-//            return in.getSnapshot().getBranch();
-//        }
-//    },
-    START_FUNCTION_SIGNATURE {
+    FUNCTION_UID {
         @Override
-        public String csvColumnValue(AddChangeDistances.SnapshotFunctionGenealogy in, Void ctx) {
-            return in.getFunctionIdAtStart().signature;
+        public Integer csvColumnValue(FunctionGenealogy in, Snapshot ignored) {
+            return in.getUid();
         }
     },
-    START_FILE {
+    FUNCTION_SIGNATURE {
         @Override
-        public String csvColumnValue(AddChangeDistances.SnapshotFunctionGenealogy in, Void ctx) {
-            return in.getFunctionIdAtStart().file;
+        public String csvColumnValue(FunctionGenealogy in, Snapshot ignored) {
+            return in.getFirstId().signature;
         }
     },
-    END_FUNCTION_SIGNATURE {
+    FILE {
         @Override
-        public String csvColumnValue(AddChangeDistances.SnapshotFunctionGenealogy in, Void ctx) {
-            return in.getFunctionIdAtEnd().signature;
-        }
-    },
-    END_FILE {
-        @Override
-        public String csvColumnValue(AddChangeDistances.SnapshotFunctionGenealogy in, Void ctx) {
-            return in.getFunctionIdAtEnd().file;
-        }
-    },
-    FUNCTION_LOC {
-        @Override
-        public Integer csvColumnValue(AddChangeDistances.SnapshotFunctionGenealogy in, Void ctx) {
-            return in.getAnnotationData().getLoc();
+        public String csvColumnValue(FunctionGenealogy in, Snapshot s) {
+            return in.getFirstId().file;
         }
     },
     AGE {
         @Override
-        public String csvColumnValue(AddChangeDistances.SnapshotFunctionGenealogy in, Void ctx) {
-            Optional<Integer> v = in.getCommitsSinceCreation();
-            if (v.isPresent()) return Integer.toString(v.get());
+        public String csvColumnValue(FunctionGenealogy in, Snapshot s) {
+            OptionalInt v = in.age(s);
+            if (v.isPresent()) return Integer.toString(v.getAsInt());
             else return "";
         }
     },
     LAST_EDIT {
         @Override
-        public String csvColumnValue(AddChangeDistances.SnapshotFunctionGenealogy in, Void ctx) {
-            Optional<Integer> v = in.getCommitsSinceLastEdit();
-            if (v.isPresent()) return Integer.toString(v.get());
+        public String csvColumnValue(FunctionGenealogy in, Snapshot s) {
+            OptionalInt v = in.distanceToMostRecentEdit(s);
+            if (v.isPresent()) return Integer.toString(v.getAsInt());
             else return "";
         }
     },
-
     //HUNKS,
     COMMITS {
         @Override
-        public Integer csvColumnValue(AddChangeDistances.SnapshotFunctionGenealogy in, Void ctx) {
-            Set<CommitsDistanceDb.Commit> distinctCommits = new HashSet<>();
-            for (FunctionChangeRow r : in.getChanges()) {
-                distinctCommits.add(r.commit);
-            }
-            return distinctCommits.size();
+        public Integer csvColumnValue(FunctionGenealogy in, Snapshot s) {
+            return in.countCommitsInSnapshot(s);
         }
     },
-    //BUGFIXES,
-
     LINES_CHANGED {
         @Override
-        public Integer csvColumnValue(AddChangeDistances.SnapshotFunctionGenealogy in, Void ctx) {
-            int result = 0;
-            for (FunctionChangeRow r : in.getChanges()) {
-                if (isLineChangeCountable(r)) {
-                    result += Math.abs(r.linesAdded);
-                    result += Math.abs(r.linesDeleted);
-                }
-            }
-            return result;
+        public Integer csvColumnValue(FunctionGenealogy in, Snapshot s) {
+            return in.countLinesChangedInSnapshot(s);
+        }
+    },
+    LINES_ADDED {
+        @Override
+        public Integer csvColumnValue(FunctionGenealogy in, Snapshot s) {
+            return in.countLinesAddedInSnapshot(s);
         }
     },
     //LINE_DELTA,
     LINES_DELETED {
         @Override
-        public Integer csvColumnValue(AddChangeDistances.SnapshotFunctionGenealogy in, Void ctx) {
-            int result = 0;
-            for (FunctionChangeRow r : in.getChanges()) {
-                if (isLineChangeCountable(r)) {
-                    result += Math.abs(r.linesDeleted);
-                }
-            }
-            return result;
+        public Integer csvColumnValue(FunctionGenealogy in, Snapshot s) {
+            return in.countLinesDeletedInSnapshot(s);
         }
     },
-    LINES_ADDED {
+    LOC {
         @Override
-        public Integer csvColumnValue(AddChangeDistances.SnapshotFunctionGenealogy in, Void ctx) {
-            int result = 0;
-            for (FunctionChangeRow r : in.getChanges()) {
-                if (isLineChangeCountable(r)) {
-                    result += Math.abs(r.linesAdded);
-                }
-            }
-            return result;
+        public Integer csvColumnValue(FunctionGenealogy in, Snapshot s) {
+            JointFunctionAbSmellRow staticMetrics = in.getStaticMetrics(s);
+            return staticMetrics.abResRow.getLoc();
         }
     },
     //ABSmell,LocationSmell,ConstantsSmell,NestingSmell,
     LOAC {
         @Override
-        public Integer csvColumnValue(AddChangeDistances.SnapshotFunctionGenealogy in, Void ctx) {
-            return in.getAnnotationData().getLoac();
+        public Integer csvColumnValue(FunctionGenealogy in, Snapshot s) {
+            JointFunctionAbSmellRow staticMetrics = in.getStaticMetrics(s);
+            return staticMetrics.abResRow.getLoac();
         }
     },
     LOFC {
         @Override
-        public Integer csvColumnValue(AddChangeDistances.SnapshotFunctionGenealogy in, Void ctx) {
-            return in.getAnnotationData().getLofc();
+        public Integer csvColumnValue(FunctionGenealogy in, Snapshot s) {
+            JointFunctionAbSmellRow staticMetrics = in.getStaticMetrics(s);
+            return staticMetrics.abResRow.getLofc();
         }
     },
     FL {
         @Override
-        public Integer csvColumnValue(AddChangeDistances.SnapshotFunctionGenealogy in, Void ctx) {
-            return in.getAnnotationData().getNoFl();
+        public Integer csvColumnValue(FunctionGenealogy in, Snapshot s) {
+            JointFunctionAbSmellRow staticMetrics = in.getStaticMetrics(s);
+            return staticMetrics.abResRow.getNoFl();
         }
     },
     FC_Dup {
         @Override
-        public Integer csvColumnValue(AddChangeDistances.SnapshotFunctionGenealogy in, Void ctx) {
-            return in.getAnnotationData().getNoFcDup();
+        public Integer csvColumnValue(FunctionGenealogy in, Snapshot s) {
+            JointFunctionAbSmellRow staticMetrics = in.getStaticMetrics(s);
+            return staticMetrics.abResRow.getNoFcDup();
         }
     },
     FC_NonDup {
         @Override
-        public Integer csvColumnValue(AddChangeDistances.SnapshotFunctionGenealogy in, Void ctx) {
-            return in.getAnnotationData().getNoFcNonDup();
+        public Integer csvColumnValue(FunctionGenealogy in, Snapshot s) {
+            JointFunctionAbSmellRow staticMetrics = in.getStaticMetrics(s);
+            return staticMetrics.abResRow.getNoFcNonDup();
         }
     },
     CND {
         @Override
-        public Integer csvColumnValue(AddChangeDistances.SnapshotFunctionGenealogy in, Void ctx) {
-            return in.getAnnotationData().getNoNest();
+        public Integer csvColumnValue(FunctionGenealogy in, Snapshot s) {
+            JointFunctionAbSmellRow staticMetrics = in.getStaticMetrics(s);
+            return staticMetrics.abResRow.getNoNest();
         }
     },
     NEG {
         @Override
-        public Object csvColumnValue(AddChangeDistances.SnapshotFunctionGenealogy in, Void ctx) {
-            return in.getAnnotationData().getNoNeg();
+        public Object csvColumnValue(FunctionGenealogy in, Snapshot s) {
+            JointFunctionAbSmellRow staticMetrics = in.getStaticMetrics(s);
+            return staticMetrics.abResRow.getNoNeg();
         }
     };
 
@@ -175,16 +143,4 @@ public enum JointFunctionAbSmellAgeSnapshotColumns implements CsvColumnValueProv
      * project- and snapshot-specific directory, such as <code>results/busybox/2000-04-08</code>
      */
     public static final String FILE_BASENAME = "joint_function_ab_smell_age_snapshot.csv";
-
-    private static boolean isLineChangeCountable(FunctionChangeRow r) {
-        switch (r.modType) {
-            case ADD:
-            case DEL:
-            case MOVE:
-                return false;
-            //case MOD:
-            default:
-                return true;
-        }
-    }
 }

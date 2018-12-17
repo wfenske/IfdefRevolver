@@ -1,6 +1,6 @@
 package de.ovgu.ifdefrevolver.commitanalysis.branchtraversal;
 
-import de.ovgu.ifdefrevolver.bugs.minecommits.CommitsDistanceDb;
+import de.ovgu.ifdefrevolver.bugs.minecommits.CommitsDistanceDb.Commit;
 import de.ovgu.ifdefrevolver.commitanalysis.FunctionChangeRow;
 import de.ovgu.ifdefrevolver.commitanalysis.FunctionId;
 import de.ovgu.skunk.util.GroupingHashSetMap;
@@ -55,7 +55,7 @@ class FunctionsInBranch {
         }
     }
 
-    private FunctionInBranch undeleteFunction(FunctionId functionId, CommitsDistanceDb.Commit commit) {
+    private FunctionInBranch undeleteFunction(FunctionId functionId, Commit commit) {
         DeletionRecord lastRecord = getLastDeletionRecord(functionId);
         if (lastRecord == null) return null;
 
@@ -74,7 +74,7 @@ class FunctionsInBranch {
         return lastRecord.function;
     }
 
-    private void markNotDeleted(FunctionId functionId, FunctionInBranch function, CommitsDistanceDb.Commit commit) {
+    private void markNotDeleted(FunctionId functionId, FunctionInBranch function, Commit commit) {
         DeletionRecord record = getLastDeletionRecord(functionId);
         if ((record != null) && (record.deletingCommit == commit) && (record.function == function)) {
             record.deactivate();
@@ -313,7 +313,7 @@ class FunctionsInBranch {
         markNotDeleted(newFunctionId, existingFunction, change.commit);
     }
 
-    private DeletionRecord deleteFunction(FunctionId id, FunctionInBranch function, CommitsDistanceDb.Commit commit) {
+    private DeletionRecord deleteFunction(FunctionId id, FunctionInBranch function, Commit commit) {
         DeletionRecord record = new DeletionRecord(function, commit, branch);
         this.deleted.put(id, record);
         return record;
@@ -454,7 +454,7 @@ class FunctionsInBranch {
         for (Iterator<FunctionChangeRow> changeIt = changesOfMergeCommit.iterator(); changeIt.hasNext(); ) {
             final FunctionChangeRow change = changeIt.next();
             if (!change.previousRevision.isPresent()) continue;
-            final CommitsDistanceDb.Commit previousRevision = change.previousRevision.get();
+            final Commit previousRevision = change.previousRevision.get();
             final FunctionId functionId = change.functionId;
             boolean merged = false;
             for (PreMergeBranch preMergeBranch : parentBranches) {
@@ -574,8 +574,17 @@ class FunctionsInBranch {
 
     private FunctionInBranch createFunctionBecauseItIsInAllFunctionsRows(JointFunctionAbSmellRow jointFunctionAbSmellRow) {
         final FunctionId functionId = jointFunctionAbSmellRow.functionId;
+        final Commit commit = jointFunctionAbSmellRow.commit;
         LOG.warn("Function exists in all functions and/or AB smells but does not exist in branch tracker: " + functionId);
-        FunctionInBranch f = functionFactory.create(functionId);
+
+        FunctionInBranch f = undeleteFunction(functionId, commit);
+        if (f == null) {
+            f = findFunctionInParentBranches(functionId);
+            if (f == null) {
+                f = functionFactory.create(functionId);
+            }
+        }
+
         this.functionsById.put(functionId, f);
         return f;
     }
