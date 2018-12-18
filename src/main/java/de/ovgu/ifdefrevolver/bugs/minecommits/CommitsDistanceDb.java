@@ -1,7 +1,7 @@
 package de.ovgu.ifdefrevolver.bugs.minecommits;
 
 import de.ovgu.ifdefrevolver.util.ProgressMonitor;
-import de.ovgu.skunk.util.GroupingHashSetMap;
+import de.ovgu.skunk.util.LinkedGroupingLinkedHashSetMap;
 import org.apache.log4j.Logger;
 
 import java.util.*;
@@ -18,7 +18,7 @@ public class CommitsDistanceDb {
 
     public Set<Commit> getRoots() {
         ensurePreprocessed();
-        Set<Commit> roots = new HashSet<>();
+        Set<Commit> roots = new LinkedHashSet<>();
         for (Commit c : commitsFromHashes.values()) {
             if (c.parents().length == 0) {
                 roots.add(c);
@@ -115,17 +115,17 @@ public class CommitsDistanceDb {
     /**
      * Map from commit to the (possibly empty) set of parent commits
      */
-    private GroupingHashSetMap<Commit, Commit> parents = new GroupingHashSetMap<>();
+    private LinkedGroupingLinkedHashSetMap<Commit, Commit> parents = new LinkedGroupingLinkedHashSetMap<>();
 
     /**
      * Map from commit to the (possibly empty) set of child commits
      */
-    private GroupingHashSetMap<Commit, Commit> children = new GroupingHashSetMap<>();
+    private LinkedGroupingLinkedHashSetMap<Commit, Commit> children = new LinkedGroupingLinkedHashSetMap<>();
 
     /**
      * Map of the commit objects that have been assigned to each hash.
      */
-    private Map<String, Commit> commitsFromHashes = new HashMap<>();
+    private Map<String, Commit> commitsFromHashes = new LinkedHashMap<>();
 
     /**
      * Same as {@link #parents}, but the hashes have been encoded as integers.
@@ -298,7 +298,7 @@ public class CommitsDistanceDb {
 
     private void populateIntParents() {
         intParents = new int[parents.getMap().size()][];
-        for (Map.Entry<Commit, HashSet<Commit>> e : parents.getMap().entrySet()) {
+        for (Map.Entry<Commit, Set<Commit>> e : parents.getMap().entrySet()) {
             final int childKey = e.getKey().key;
             int[] existingParentsArray = new int[e.getValue().size()];
             int ixInsert = 0;
@@ -316,7 +316,7 @@ public class CommitsDistanceDb {
     }
 
     private void populateCommitParents() {
-        for (Map.Entry<Commit, HashSet<Commit>> e : parents.getMap().entrySet()) {
+        for (Map.Entry<Commit, Set<Commit>> e : parents.getMap().entrySet()) {
             Commit[] parents = new Commit[e.getValue().size()];
             int ixInsert = 0;
             for (Commit parent : e.getValue()) {
@@ -328,7 +328,7 @@ public class CommitsDistanceDb {
     }
 
     private void populateCommitChildren() {
-        for (Map.Entry<Commit, HashSet<Commit>> e : children.getMap().entrySet()) {
+        for (Map.Entry<Commit, Set<Commit>> e : children.getMap().entrySet()) {
             Set<Commit> childrenSet = e.getValue();
             if (childrenSet == null) childrenSet = Collections.emptySet();
             Commit[] children = new Commit[childrenSet.size()];

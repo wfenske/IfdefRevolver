@@ -8,7 +8,7 @@ import org.apache.log4j.Logger;
 import java.io.File;
 import java.io.FileReader;
 import java.io.IOException;
-import java.util.Arrays;
+import java.util.*;
 
 /**
  * Created by wfenske on 2018-02-08
@@ -28,9 +28,11 @@ public class CommitsDistanceDbCsvReader {
     }
 
     protected CommitsDistanceDb dbFromCsv(File csvFile) {
-        CommitsDistanceDb db = new CommitsDistanceDb();
         CSVReader reader = null;
         FileReader fileReader = null;
+
+        List<String[]> pairs = new ArrayList<>();
+
         try {
             fileReader = new FileReader(csvFile);
             reader = new CSVReader(fileReader);
@@ -38,6 +40,7 @@ public class CommitsDistanceDbCsvReader {
 
             int ixCommitCol = -1;
             int ixParentCol = -1;
+            int ixTimestampCol = -1;
 
             for (int pos = 0; pos < header.length; pos++) {
                 if ((ixCommitCol < 0) && header[pos].equalsIgnoreCase(CommitParentsColumns.COMMIT.name())) {
@@ -45,6 +48,9 @@ public class CommitsDistanceDbCsvReader {
                 }
                 if ((ixParentCol < 0) && header[pos].equalsIgnoreCase(CommitParentsColumns.PARENT.name())) {
                     ixParentCol = pos;
+                }
+                if ((ixTimestampCol < 0) && header[pos].equalsIgnoreCase(CommitParentsColumns.TIMESTAMP.name())) {
+                    ixTimestampCol = pos;
                 }
             }
 
@@ -54,19 +60,24 @@ public class CommitsDistanceDbCsvReader {
             if (ixParentCol < 0) {
                 LOG.error("Column " + CommitParentsColumns.PARENT.name() + " not found.");
             }
-            if ((ixCommitCol < 0) || (ixParentCol < 0)) {
+            if (ixTimestampCol < 0) {
+                LOG.error("Column " + CommitParentsColumns.TIMESTAMP.name() + " not found.");
+            }
+            if ((ixCommitCol < 0) || (ixParentCol < 0) || (ixTimestampCol < 0)) {
                 throw new RuntimeException("CVS file has the wrong format. Some columns could not be found (see previous log messages for details). CSV header was: " + Arrays.toString(header));
             }
 
             String[] nextLine;
             while ((nextLine = reader.readNext()) != null) {
+                String timestamp = nextLine[ixTimestampCol];
                 String commitHash = nextLine[ixCommitCol];
                 String parentHash = nextLine[ixParentCol];
-                if ((parentHash == null) || parentHash.isEmpty()) {
-                    db.put(commitHash);
-                } else {
-                    db.put(commitHash, parentHash);
-                }
+                if (parentHash == null) parentHash = "";
+                String[] pair = new String[3];
+                pair[0] = timestamp;
+                pair[1] = commitHash;
+                pair[2] = parentHash;
+                pairs.add(pair);
             }
         } catch (IOException e1) {
             throw new RuntimeException(
@@ -75,6 +86,38 @@ public class CommitsDistanceDbCsvReader {
             CSVHelper.silentlyCloseReaders(reader, fileReader);
         }
 
+        CommitsDistanceDb db = createDbFromPairs(pairs);
         return db;
+    }
+
+    private CommitsDistanceDb createDbFromPairs(List<String[]> pairs) {
+        List<String[]> sortedPairs = sortPairs(pairs);
+        CommitsDistanceDb db = new CommitsDistanceDb();
+        for (String[] pair : sortedPairs) {
+            String commitHash = pair[1];
+            String parentHash = pair[2];
+            if (parentHash.isEmpty()) {
+                db.put(commitHash);
+            } else {
+                db.put(commitHash, parentHash);
+            }
+        }
+        return db;
+    }
+
+    private static List<String[]> sortPairs(List<String[]> pairs) {
+        List<String[]> result = new ArrayList<>(pairs);
+        Collections.sort(result, new Comparator<String[]>() {
+            @Override
+            public int compare(String[] o1, String[] o2) {
+                int r;
+                r = o1[0].compareTo(o2[0]);
+                if (r != 0) return r;
+                r = o1[1].compareTo(o2[1]);
+                if (r != 0) return r;
+                return o1[2].compareTo(o2[2]);
+            }
+        });
+        return result;
     }
 }
