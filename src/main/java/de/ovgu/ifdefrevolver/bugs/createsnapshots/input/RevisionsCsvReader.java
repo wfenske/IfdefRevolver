@@ -158,7 +158,9 @@ public class RevisionsCsvReader {
         snapshots = new ArrayList<>();
         final int snapshotSize = conf.getSnapshotSize();
 
-        final Consumer<List<Snapshot>> snapshotConsumer = new WriteSnapshotsToCsvFilesStrategy<>(this.commitsDb, conf).andThen(computedSnapshots -> snapshots.addAll(computedSnapshots));
+        final Consumer<List<Snapshot>> snapshotConsumer =
+                new WriteSnapshotsToCsvFilesStrategy<>(this.commitsDb, conf)
+                        .andThen(computedSnapshots -> snapshots.addAll(computedSnapshots));
 
         SnapshotCreatingCommitWalker<CreateSnapshotsConfig> snapshotsCreator =
                 new SnapshotCreatingCommitWalker<>(commitsDb, conf, snapshotSize,

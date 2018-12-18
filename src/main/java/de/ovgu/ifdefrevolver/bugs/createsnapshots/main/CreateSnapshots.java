@@ -385,14 +385,14 @@ public class CreateSnapshots {
     /**
      * Size of a commit window, requires positive integer argument
      */
-    private static final String OPT_COMMIT_WINDOW_SIZE_L = "windowsize";
-    private static final char OPT_COMMIT_WINDOW_SIZE = 'w';
+    private static final String OPT_SNAPSHOT_SIZE_L = "windowsize";
+    private static final char OPT_SNAPSHOT_SIZE = 'w';
 
     /**
      * How the size of a commit window is counted.  Requires an arg, as determined by the values in {@link
      * SnapshotSizeMode}
      */
-    private static final String OPT_COMMIT_WINDOW_SIZE_MODE_L = "sizemode";
+    private static final String OPT_SNAPSHOT_SIZE_MODE_L = "sizemode";
 
     /**
      * --reposdir=, e.g. /home/me/Repositories/
@@ -463,8 +463,8 @@ public class CreateSnapshots {
                     "Either `--" + OPT_CHECKOUT_L + "', `--" + OPT_PREPROCESS_L + "' or `--" + OPT_DETECT_L + "' must be specified!");
         }
 
-        parseCommitWindowSizeModeFromCommandLine(res, line);
-        parseCommitWindowSizeFromCommandLine(res, line, res.commitWindowSizeMode().defaultSize());
+        parseSnapshotSizeModeFromCommandLine(res, line);
+        parseSnapshotSizeFromCommandLine(res, line, res.commitWindowSizeMode().defaultSize());
 
         ProjectInformationConfig.parseProjectNameFromCommandLine(line, res);
         ProjectInformationConfig.parseSnapshotsDirFromCommandLine(line, res, res.skunkMode().snapshotDirMissingStrategy());
@@ -504,31 +504,31 @@ public class CreateSnapshots {
         return res;
     }
 
-    private void parseCommitWindowSizeModeFromCommandLine(CreateSnapshotsConfig res, CommandLine line) {
-        if (line.hasOption(OPT_COMMIT_WINDOW_SIZE_MODE_L)) {
+    private void parseSnapshotSizeModeFromCommandLine(CreateSnapshotsConfig res, CommandLine line) {
+        if (line.hasOption(OPT_SNAPSHOT_SIZE_MODE_L)) {
             if (res.skunkMode() != SnapshotProcessingMode.CHECKOUT) {
-                LOG.warn("Ignoring commit window size mode because `--" + OPT_CHECKOUT_L + "' was not specified.");
+                LOG.warn("Ignoring snapshot size mode because `--" + OPT_CHECKOUT_L + "' was not specified.");
             } else {
-                SnapshotSizeMode mode = parseCommitWindowSizeModeValueOrDie(line);
+                SnapshotSizeMode mode = parseSnapshotSizeModeValueOrDie(line);
                 res.setSnapshotSizeMode(mode);
             }
         }
     }
 
-    private SnapshotSizeMode parseCommitWindowSizeModeValueOrDie(CommandLine line) {
-        String modeName = line.getOptionValue(OPT_COMMIT_WINDOW_SIZE_MODE_L);
+    private SnapshotSizeMode parseSnapshotSizeModeValueOrDie(CommandLine line) {
+        String modeName = line.getOptionValue(OPT_SNAPSHOT_SIZE_MODE_L);
         try {
             return SnapshotSizeMode.valueOf(modeName.toUpperCase());
         } catch (IllegalArgumentException iae) {
-            throw new RuntimeException("Invalid value for option `--" + OPT_COMMIT_WINDOW_SIZE_MODE_L
+            throw new RuntimeException("Invalid value for option `--" + OPT_SNAPSHOT_SIZE_MODE_L
                     + "': Expected: " + getCommitWindowSizeModeArgs() + " got: " + modeName);
         }
     }
 
-    private void parseCommitWindowSizeFromCommandLine(CreateSnapshotsConfig res, CommandLine line, int defaultValue) {
-        if (line.hasOption(OPT_COMMIT_WINDOW_SIZE)) {
+    private void parseSnapshotSizeFromCommandLine(CreateSnapshotsConfig res, CommandLine line, int defaultValue) {
+        if (line.hasOption(OPT_SNAPSHOT_SIZE)) {
             if (res.skunkMode() != SnapshotProcessingMode.CHECKOUT) {
-                LOG.warn("Ignoring custom commit window size because `--" + OPT_CHECKOUT_L + "' was not specified.");
+                LOG.warn("Ignoring custom snapshot size because `--" + OPT_CHECKOUT_L + "' was not specified.");
             } else {
                 int windowSizeNum = parseCommitWindowSizeValueOrDie(line);
                 res.setSnapshotSize(windowSizeNum);
@@ -539,17 +539,17 @@ public class CreateSnapshots {
     }
 
     private int parseCommitWindowSizeValueOrDie(CommandLine line) {
-        final String windowSizeString = line.getOptionValue(OPT_COMMIT_WINDOW_SIZE);
+        final String windowSizeString = line.getOptionValue(OPT_SNAPSHOT_SIZE);
         int windowSizeNum;
         try {
             windowSizeNum = Integer.valueOf(windowSizeString);
         } catch (NumberFormatException e) {
-            throw new RuntimeException("Invalid value for option `--" + OPT_COMMIT_WINDOW_SIZE_L
+            throw new RuntimeException("Invalid value for option `--" + OPT_SNAPSHOT_SIZE_L
                     + "': Not a valid integer: " + windowSizeString);
         }
         if (windowSizeNum < 1) {
-            throw new RuntimeException("Invalid value for option `--" + OPT_COMMIT_WINDOW_SIZE_L
-                    + "': Commit window size must be an integer >= 1.");
+            throw new RuntimeException("Invalid value for option `--" + OPT_SNAPSHOT_SIZE_L
+                    + "': Snapshot size must be an integer >= 1.");
         }
         return windowSizeNum;
     }
@@ -632,18 +632,18 @@ public class CreateSnapshots {
                 .build());
 
 
-        options.addOption(Option.builder().longOpt(OPT_COMMIT_WINDOW_SIZE_MODE_L)
+        options.addOption(Option.builder().longOpt(OPT_SNAPSHOT_SIZE_MODE_L)
                 .desc("How the size of the commit windows is determined. This option is only relevant during" +
                         " snapshot creation, i.e., when running in `--" + OPT_CHECKOUT_L
                         + "' mode." + " [Default=" + CreateSnapshotsConfig.DEFAULT_COMMIT_WINDOW_SIZE_MODE.name().toLowerCase() + "]")
                 .hasArg().argName(getCommitWindowSizeModeArgs()).build());
 
 
-        options.addOption(Option.builder(String.valueOf(OPT_COMMIT_WINDOW_SIZE)).longOpt(OPT_COMMIT_WINDOW_SIZE_L)
+        options.addOption(Option.builder(String.valueOf(OPT_SNAPSHOT_SIZE)).longOpt(OPT_SNAPSHOT_SIZE_L)
                 .desc("Size of a commit window, specified as a positive integer. This option is only relevant during" +
                         " snapshot creation, i.e., when running in `--" + OPT_CHECKOUT_L
                         + "' mode." + " [Default value depends on the mode specified via `--" +
-                        OPT_COMMIT_WINDOW_SIZE_MODE_L + "': " + getCommitWindowSizeDefaults() + "]")
+                        OPT_SNAPSHOT_SIZE_MODE_L + "': " + getCommitWindowSizeDefaults() + "]")
                 .hasArg().argName("NUM").build());
 
         // --checkout, --preprocess and --detect options

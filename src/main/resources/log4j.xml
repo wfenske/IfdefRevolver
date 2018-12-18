@@ -86,6 +86,10 @@
         <level value="info"/>
     </logger>
 
+    <logger name="de.ovgu.ifdefrevolver.commitanalysis.branchtraversal.GenealogyTracker">
+        <level value="debug"/>
+    </logger>
+
     <!--logger name="de.ovgu.ifdefrevolver.commitanalysis.FunctionLocationProvider">
         <level value="debug"/>
     </logger-->
