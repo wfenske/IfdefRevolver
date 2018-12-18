@@ -63,10 +63,12 @@ public class CommitsDistanceDb {
 //        }
 
         /**
-         * Determine whether the <code>this</code> is a descendant of the given commit, <code>possibleAncestor</code>. Note that every commit is its own descendant.
+         * Determine whether the <code>this</code> is a descendant of the given commit, <code>possibleAncestor</code>.
+         * Note that every commit is its own descendant.
          *
          * @param possibleAncestor A commit that might be an ancestor of <code>this</code> commit
-         * @return <code>true</code> if and only if <code>this</code> is a descendant of (or the same as) the given commit
+         * @return <code>true</code> if and only if <code>this</code> is a descendant of (or the same as) the given
+         * commit
          */
         public boolean isDescendant(Commit possibleAncestor) {
             return db.isDescendant(this, possibleAncestor);
@@ -74,8 +76,8 @@ public class CommitsDistanceDb {
 
         /**
          * @param descendant A commit that is supposed to be an descendant of <code>this</code>
-         * @return distance from this commit to the descendant commit; or {@link Optional#empty()} if there is no possible
-         * path
+         * @return distance from this commit to the descendant commit; or {@link Optional#empty()} if there is no
+         * possible path
          */
         public Optional<Integer> minDistance(Commit descendant) {
             return db.minDistance(descendant, this);
@@ -273,7 +275,7 @@ public class CommitsDistanceDb {
         return result;
     }
 
-    public synchronized Commit internCommit(String commitHash) {
+    private synchronized Commit internCommit(String commitHash) {
         //ensurePreprocessed();
 
         Commit result = commitsFromHashes.get(commitHash);

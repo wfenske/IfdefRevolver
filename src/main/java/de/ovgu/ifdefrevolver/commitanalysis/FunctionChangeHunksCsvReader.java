@@ -42,7 +42,7 @@ public class FunctionChangeHunksCsvReader extends SimpleCsvFileReader<List<Funct
         result.functionId = functionId;
 
         String commitId = line[FunctionChangeHunksColumns.COMMIT_ID.ordinal()];
-        Commit commit = commitsDistanceDb.internCommit(commitId);
+        Commit commit = commitsDistanceDb.findCommitOrDie(commitId);
 
         result.previousRevision = parsePreviousRevisionId(line[FunctionChangeHunksColumns.PREVIOUS_REVISION_ID.ordinal()]);
 
@@ -70,7 +70,7 @@ public class FunctionChangeHunksCsvReader extends SimpleCsvFileReader<List<Funct
         if ((previousRevisionId == null) || previousRevisionId.isEmpty()) {
             previousRevision = Optional.empty();
         } else {
-            previousRevision = Optional.of(commitsDistanceDb.internCommit(previousRevisionId));
+            previousRevision = Optional.of(commitsDistanceDb.findCommitOrDie(previousRevisionId));
         }
         return previousRevision;
     }

@@ -49,7 +49,7 @@ public class SnapshotReader {
         @Override
         protected void processContentLine(String[] line) {
             String commitHash = line[SnapshotCommitsColumns.COMMIT_HASH.ordinal()];
-            Commit commit = commitsDistanceDb.internCommit(commitHash);
+            Commit commit = commitsDistanceDb.findCommitOrDie(commitHash);
             result.add(commit);
         }
 

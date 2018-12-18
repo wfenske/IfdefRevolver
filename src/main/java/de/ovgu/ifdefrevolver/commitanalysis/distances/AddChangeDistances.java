@@ -918,7 +918,7 @@ public class AddChangeDistances {
             final FunctionId functionId = function.functionId;
 
             String startHashOfFirstContainingSnapshot = function.getFirstSnapshotCommit();
-            Commit startCommitOfFirstContainingSnaphsot = commitsDistanceDb.internCommit(startHashOfFirstContainingSnapshot);
+            Commit startCommitOfFirstContainingSnaphsot = commitsDistanceDb.findCommitOrDie(startHashOfFirstContainingSnapshot);
 
             AgeAndDistance distanceStrings = getAgeAndDistance(functionId, startCommitOfFirstContainingSnaphsot);
 
