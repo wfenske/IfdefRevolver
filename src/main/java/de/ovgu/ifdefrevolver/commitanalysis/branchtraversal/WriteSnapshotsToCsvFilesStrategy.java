@@ -26,6 +26,7 @@ public class WriteSnapshotsToCsvFilesStrategy<TConfig extends IHasResultsDir & I
         this.config = config;
     }
 
+    @Override
     public void accept(List<Snapshot> snapshots) {
         this.snapshots = snapshots;
 
@@ -37,8 +38,7 @@ public class WriteSnapshotsToCsvFilesStrategy<TConfig extends IHasResultsDir & I
 
     private void writeSnapshotOverviewFile() {
         LOG.debug("Writing snapshot overview CSV for " + snapshots.size() + " snapshot(s).");
-        File outputDir = config.projectResultsDir();
-        File outputFile = new File(outputDir, SnapshotsColumns.FILE_BASENAME);
+        File outputFile = config.snapshotsCsvFile();
         LOG.info("Writing snapshot overview file to " + outputFile);
         CsvRowProvider<Snapshot, Void, SnapshotsColumns> rowProvider = new CsvRowProvider<>(SnapshotsColumns.class, null);
 

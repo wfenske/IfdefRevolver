@@ -14,7 +14,7 @@ import java.util.Collection;
 public class CommitParentsVisitor implements ICommitVisitorWithOutputFileHeader {
     private static Logger LOG = Logger.getLogger(CommitParentsVisitor.class);
 
-    private final DateFormat dateFormat = new SimpleDateFormat(OrderedRevisionsColumns.TIMESTAMP_FORMAT);
+    private final DateFormat dateFormat = new SimpleDateFormat(CommitParentsColumns.TIMESTAMP_FORMAT);
 
     public CommitParentsVisitor() {
     }

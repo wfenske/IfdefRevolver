@@ -1,5 +1,7 @@
 package de.ovgu.ifdefrevolver.bugs.correlate.main;
 
+import de.ovgu.ifdefrevolver.commitanalysis.branchtraversal.SnapshotsColumns;
+
 import java.io.File;
 import java.util.Date;
 
@@ -20,4 +22,8 @@ public interface IHasResultsDir {
      * Directory in which computed information related to the snapshot with the given commit hash resides.
      */
     File snapshotResultsDirForCommit(String commitHash);
+
+    default File snapshotsCsvFile() {
+        return new File(projectResultsDir(), SnapshotsColumns.FILE_BASENAME);
+    }
 }

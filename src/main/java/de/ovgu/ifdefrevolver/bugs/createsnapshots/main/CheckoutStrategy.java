@@ -11,10 +11,8 @@ import org.apache.log4j.Logger;
 import java.io.*;
 import java.nio.file.Files;
 import java.nio.file.StandardCopyOption;
-import java.util.ArrayList;
-import java.util.Collection;
-import java.util.Date;
-import java.util.List;
+import java.util.*;
+import java.util.regex.Pattern;
 
 /**
  * <p>Checks out a project from GIT and creates the commit windows in the project's <code>snapshots</code>
@@ -27,6 +25,15 @@ import java.util.List;
 class CheckoutStrategy implements ISnapshotProcessingModeStrategy {
     private static final String CPPSTATS_INPUT_TXT = "cppstats_input.txt";
     private static Logger LOG = Logger.getLogger(CheckoutStrategy.class);
+
+    private static final FilenameFilter SNAPSHOT_DIR_NAME_FILTER = new FilenameFilter() {
+        private final Pattern SNAPSHOT_DIR_NAME_PATTERN = Pattern.compile("\\d{4}-\\d{2}-\\d{2}");
+
+        @Override
+        public boolean accept(File dir, String name) {
+            return SNAPSHOT_DIR_NAME_PATTERN.matcher(name).matches();
+        }
+    };
 
     private final CommitsDistanceDb commitsDb;
     private final CreateSnapshotsConfig conf;
@@ -42,7 +49,14 @@ class CheckoutStrategy implements ISnapshotProcessingModeStrategy {
     public void readAllRevisionsAndComputeSnapshots() {
         this.revisionsCsvReader = new RevisionsCsvReader(commitsDb, conf.revisionCsvFile());
         this.revisionsCsvReader.readCommitsThatModifyCFiles();
+        this.removeOutputFiles();
         this.revisionsCsvReader.computeAndPersistSnapshots(conf);
+    }
+
+    private void removeOutputFiles() {
+        removeSnapshotCsv();
+        removeCheckouts();
+        removeSnapshotResults();
     }
 
     @Override
@@ -64,20 +78,83 @@ class CheckoutStrategy implements ISnapshotProcessingModeStrategy {
                 FileUtils.isNonEmptyRegularFile(cppstatsFeatureLocationsCsv));
     }
 
-    @Override
-    public void removeOutputFiles() {
-        File projInfoCsv = conf.projectInfoCsv();
-        if (projInfoCsv.exists()) {
-            LOG.warn("Running in CHECKOUT mode, but project info CSV already exists. It will be overwritten: "
-                    + projInfoCsv.getAbsolutePath());
-            projInfoCsv.delete();
+    private void removeSnapshotCsv() {
+        File snapshotCsv = conf.snapshotsCsvFile();
+        if (!snapshotCsv.exists()) return;
+
+        LOG.info("Deleting obsolete snapshot file " + snapshotCsv);
+        if (!conf.isForce()) {
+            throw new RuntimeException("Cowardly refusing to delete snapshots file " + snapshotCsv
+                    + ". Use " + CreateSnapshotsConfig.OPT_FORCE_L + " to override.");
         }
-        File projAnalysisCsv = conf.projectAnalysisCsv();
-        if (projAnalysisCsv.exists()) {
-            LOG.warn("Running in CHECKOUT mode, but project analysis CSV already exists. It will be overwritten: "
-                    + projAnalysisCsv.getAbsolutePath());
-            projAnalysisCsv.delete();
+
+        if (!snapshotCsv.delete()) {
+            throw new RuntimeException("Failed to delete snapshots file " + snapshotCsv);
         }
+    }
+
+    private void removeCheckouts() {
+        File snapshotsDir = conf.projectSnapshotsDir();
+        if (!snapshotsDir.exists()) return;
+
+        Set<String> snapshotDirNames = toSet(snapshotsDir.list(SNAPSHOT_DIR_NAME_FILTER));
+
+        if (snapshotDirNames.isEmpty()) return;
+
+        if (!conf.isForce()) {
+            throw new RuntimeException("Cowardly refusing to delete snapshot directories "
+                    + snapshotDirNames
+                    + ". Use " + CreateSnapshotsConfig.OPT_FORCE_L + " to override.");
+        }
+
+        List<File> dirsThatCouldNotBeDeleted = deleteDirs(snapshotsDir, snapshotDirNames);
+
+        if (!dirsThatCouldNotBeDeleted.isEmpty()) {
+            throw new RuntimeException("Some snapshot directories could not be deleted: " + dirsThatCouldNotBeDeleted);
+        }
+    }
+
+    private static Set<String> toSet(String[] snapshotDirNames) {
+        return new TreeSet<>(Arrays.asList(snapshotDirNames));
+    }
+
+    private void removeSnapshotResults() {
+        File resultsDir = conf.projectResultsDir();
+        if (!resultsDir.exists()) return;
+
+        Set<String> snapshotDirNames = toSet(resultsDir.list(SNAPSHOT_DIR_NAME_FILTER));
+
+        if (snapshotDirNames.isEmpty()) return;
+
+        if (!conf.isForce()) {
+            throw new RuntimeException("Cowardly refusing to delete snapshot result directories "
+                    + snapshotDirNames
+                    + ". Use " + CreateSnapshotsConfig.OPT_FORCE_L + " to override.");
+        }
+
+        List<File> dirsThatCouldNotBeDeleted = deleteDirs(resultsDir, snapshotDirNames);
+
+        if (!dirsThatCouldNotBeDeleted.isEmpty()) {
+            throw new RuntimeException("Some snapshot result directories could not be deleted: " + dirsThatCouldNotBeDeleted);
+        }
+    }
+
+    private List<File> deleteDirs(File baseDir, Collection<String> snapshotDirNames) {
+        List<File> dirsThatCouldNotBeDeleted = new ArrayList<>();
+
+        for (String snapshotDirName : snapshotDirNames) {
+            File snapshotDir = new File(baseDir, snapshotDirName);
+
+            try {
+                LOG.info("Deleting obsolete output dir " + snapshotDir);
+                org.apache.commons.io.FileUtils.deleteDirectory(snapshotDir);
+            } catch (IOException e) {
+                LOG.error("Failed to delete output directory " + snapshotDir, e);
+                dirsThatCouldNotBeDeleted.add(snapshotDir);
+            }
+        }
+
+        return dirsThatCouldNotBeDeleted;
     }
 
     @Override

@@ -49,7 +49,7 @@ public class GenealogyTracker {
         }
 
         this.moveConflictStats = new MoveConflictStats();
-        this.branchesByCommitKey = new Branch[projectInfo.commitsDb().getCommits().size()];
+        this.branchesByCommitKey = new Branch[projectInfo.commitsDb().getNumCommits()];
         this.functionFactory = new FunctionInBranchFactory();
         this.changesProcessed = 0;
 

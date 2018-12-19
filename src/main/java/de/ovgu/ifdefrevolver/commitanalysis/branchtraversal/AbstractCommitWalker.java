@@ -5,7 +5,7 @@ import de.ovgu.ifdefrevolver.bugs.minecommits.CommitsDistanceDb.Commit;
 import org.apache.log4j.Logger;
 
 import java.util.BitSet;
-import java.util.LinkedList;
+import java.util.PriorityQueue;
 import java.util.Queue;
 
 
@@ -23,7 +23,8 @@ public abstract class AbstractCommitWalker {
     public void processCommits() {
         final int numAllCommits = getNumAllCommits();
         done = new BitSet(numAllCommits);
-        next = new LinkedList<>(commitsDistanceDb.getRoots());
+        next = new PriorityQueue<>(commitsDistanceDb.getRoots().size(), Commit.BY_TIMESTAMP_FIRST);
+        next.addAll(commitsDistanceDb.getRoots());
 
         while (!next.isEmpty()) {
             this.currentCommit = getNextProcessableCommit();

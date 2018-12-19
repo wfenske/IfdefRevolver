@@ -10,11 +10,6 @@ import java.util.Collection;
  */
 interface ISnapshotProcessingModeStrategy {
     /**
-     * Delete output files, such as the projectInfo.csv, if they are recreated anyway
-     */
-    void removeOutputFiles();
-
-    /**
      * Create the Snapshot, if it does not already exist. Snapshots are stored on disk in the folder {@link
      * CreateSnapshotsConfig#projectSnapshotsDir()} /&lt;date&gt;, where &lt;date&gt; has the format
      * &quot;YYYY-MM-DD&quot;.

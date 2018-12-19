@@ -4,6 +4,9 @@ import de.ovgu.ifdefrevolver.util.ProgressMonitor;
 import de.ovgu.skunk.util.LinkedGroupingLinkedHashSetMap;
 import org.apache.log4j.Logger;
 
+import java.text.DateFormat;
+import java.text.ParseException;
+import java.text.SimpleDateFormat;
 import java.util.*;
 
 /**
@@ -16,32 +19,26 @@ public class CommitsDistanceDb {
 
     private boolean preprocessed = false;
 
-    public Set<Commit> getRoots() {
-        ensurePreprocessed();
-        Set<Commit> roots = new LinkedHashSet<>();
-        for (Commit c : commitsFromHashes.values()) {
-            if (c.parents().length == 0) {
-                roots.add(c);
-            }
-        }
-        return roots;
-    }
-
-    public static final class Commit {
+    public static final class Commit implements Comparable<Commit> {
         private static final Commit[] EMPTY_COMMITS_ARRAY = new Commit[0];
+
+        public static Comparator<Commit> BY_TIMESTAMP_FIRST = new Comparator<Commit>() {
+            @Override
+            public int compare(Commit a, Commit b) {
+                int r;
+                r = a.timestamp.compareTo(b.timestamp);
+                if (r != 0) return r;
+                r = a.compareTo(b);
+                return r;
+            }
+        };
 
         private final CommitsDistanceDb db;
         public final String commitHash;
         public final int key;
+        private String timestamp;
         private Commit[] parents = EMPTY_COMMITS_ARRAY;
         private Commit[] children = EMPTY_COMMITS_ARRAY;
-
-        public static final Comparator<Commit> BY_HASH = new Comparator<Commit>() {
-            @Override
-            public int compare(Commit o1, Commit o2) {
-                return o1.commitHash.compareTo(o2.commitHash);
-            }
-        };
 
         private Commit(String commitHash, int key, CommitsDistanceDb db) {
             this.db = db;
@@ -49,11 +46,27 @@ public class CommitsDistanceDb {
             this.key = key;
         }
 
+        private void setTimestamp(String timestamp) {
+            this.timestamp = timestamp;
+        }
+
+        public Date getTimestamp() {
+            DateFormat df = new SimpleDateFormat(OrderedRevisionsColumns.TIMESTAMP_FORMAT);
+            Date parsedTimestamp;
+            try {
+                parsedTimestamp = df.parse(timestamp);
+            } catch (ParseException e) {
+                throw new RuntimeException("Invalid timestamp format: " + timestamp, e);
+            }
+            return parsedTimestamp;
+        }
+
         @Override
         public String toString() {
             final StringBuilder sb = new StringBuilder("Commit{");
-            sb.append("commitHash='").append(commitHash).append('\'');
-            //sb.append(", key=").append(key);
+            sb.append('\'').append(commitHash).append('\'');
+            sb.append(", key=").append(key);
+            sb.append(", timestamp='").append(timestamp).append('\'');
             sb.append('}');
             return sb.toString();
         }
@@ -110,27 +123,12 @@ public class CommitsDistanceDb {
         public boolean isBugfix() {
             return false;
         }
+
+        @Override
+        public int compareTo(Commit o) {
+            return this.key - o.key;
+        }
     }
-
-    /**
-     * Map from commit to the (possibly empty) set of parent commits
-     */
-    private LinkedGroupingLinkedHashSetMap<Commit, Commit> parents = new LinkedGroupingLinkedHashSetMap<>();
-
-    /**
-     * Map from commit to the (possibly empty) set of child commits
-     */
-    private LinkedGroupingLinkedHashSetMap<Commit, Commit> children = new LinkedGroupingLinkedHashSetMap<>();
-
-    /**
-     * Map of the commit objects that have been assigned to each hash.
-     */
-    private Map<String, Commit> commitsFromHashes = new LinkedHashMap<>();
-
-    /**
-     * Same as {@link #parents}, but the hashes have been encoded as integers.
-     */
-    int[][] intParents;
 
     private static class CacheKey {
         final int child;
@@ -154,6 +152,26 @@ public class CommitsDistanceDb {
             return (other.ancestor == this.ancestor) && (other.child == this.child);
         }
     }
+
+    /**
+     * Map from commit to the (possibly empty) set of parent commits
+     */
+    private LinkedGroupingLinkedHashSetMap<Commit, Commit> parents = new LinkedGroupingLinkedHashSetMap<>();
+
+    /**
+     * Map from commit to the (possibly empty) set of child commits
+     */
+    private LinkedGroupingLinkedHashSetMap<Commit, Commit> children = new LinkedGroupingLinkedHashSetMap<>();
+
+    /**
+     * Map of the commit objects that have been assigned to each hash.
+     */
+    private Map<String, Commit> commitsFromHashes = new LinkedHashMap<>();
+
+    /**
+     * Same as {@link #parents}, but the hashes have been encoded as integers.
+     */
+    int[][] intParents;
 
     Map<CacheKey, Integer> knownDistances = new HashMap<>();
 
@@ -183,7 +201,7 @@ public class CommitsDistanceDb {
     }
 
     private BitSet newReachablesColumn() {
-        int sz = commitsFromHashes.size();
+        int sz = getNumCommits();
         return new BitSet(sz);
     }
 
@@ -255,12 +273,8 @@ public class CommitsDistanceDb {
         return result;
     }
 
-    public Set<String> getCommitHashes() {
-        return new HashSet<>(commitsFromHashes.keySet());
-    }
-
     public Set<Commit> getCommits() {
-        return new HashSet<>(commitsFromHashes.values());
+        return new LinkedHashSet<>(commitsFromHashes.values());
     }
 
     public int getNumCommits() {
@@ -275,24 +289,34 @@ public class CommitsDistanceDb {
         return result;
     }
 
+    private CommitsDistanceDb() {
+
+    }
+
+    public static CommitsDistanceDb fromProtoCommits(Collection<ProtoCommit> protoCommits) {
+        List<ProtoCommit> sorted = new ArrayList<>(protoCommits);
+        Collections.sort(sorted);
+        CommitsDistanceDb db = new CommitsDistanceDb();
+        for (ProtoCommit c : sorted) {
+            db.put(c);
+        }
+        return db;
+    }
+
     private synchronized Commit internCommit(String commitHash) {
         //ensurePreprocessed();
 
         Commit result = commitsFromHashes.get(commitHash);
-        if (result == null) {
-            if (commitHash == null) {
-                throw new NullPointerException("Commit must not be null");
-            }
+        if (result != null) return result;
 
-//            Integer key = intsFromHashes.get(commitHash);
-//            if (key == null) {
-//                throw new IllegalArgumentException("Unknown commit: " + commitHash);
-//            }
-            int key = commitsFromHashes.size();
-
-            result = new Commit(commitHash, key, this);
-            commitsFromHashes.put(commitHash, result);
+        if (commitHash == null) {
+            throw new NullPointerException("Commit hash must not be null");
         }
+
+        int key = commitsFromHashes.size();
+        result = new Commit(commitHash, key, this);
+        commitsFromHashes.put(commitHash, result);
+
         return result;
     }
 
@@ -300,12 +324,13 @@ public class CommitsDistanceDb {
         intParents = new int[parents.getMap().size()][];
         for (Map.Entry<Commit, Set<Commit>> e : parents.getMap().entrySet()) {
             final int childKey = e.getKey().key;
-            int[] existingParentsArray = new int[e.getValue().size()];
+            final Commit[] parentsArray = toSortedCommitArray(e.getValue());
+            int[] parentKeys = new int[parentsArray.length];
             int ixInsert = 0;
-            for (Commit parent : e.getValue()) {
-                existingParentsArray[ixInsert++] = parent.key;
+            for (Commit parent : parentsArray) {
+                parentKeys[ixInsert++] = parent.key;
             }
-            intParents[childKey] = existingParentsArray;
+            intParents[childKey] = parentKeys;
         }
 //        LOG.warn("Remove the following code!");
 //        for (int i = 0; i < intParents.length; i++) {
@@ -317,33 +342,32 @@ public class CommitsDistanceDb {
 
     private void populateCommitParents() {
         for (Map.Entry<Commit, Set<Commit>> e : parents.getMap().entrySet()) {
-            Commit[] parents = new Commit[e.getValue().size()];
-            int ixInsert = 0;
-            for (Commit parent : e.getValue()) {
-                parents[ixInsert++] = parent;
-            }
             Commit c = e.getKey();
-            c.parents = parents;
+            c.parents = toSortedCommitArray(e.getValue());
         }
     }
 
     private void populateCommitChildren() {
         for (Map.Entry<Commit, Set<Commit>> e : children.getMap().entrySet()) {
-            Set<Commit> childrenSet = e.getValue();
-            if (childrenSet == null) childrenSet = Collections.emptySet();
-            Commit[] children = new Commit[childrenSet.size()];
-            int ixInsert = 0;
-            for (Commit child : childrenSet) {
-                children[ixInsert++] = child;
-            }
             Commit c = e.getKey();
-            c.children = children;
+            c.children = toSortedCommitArray(e.getValue());
         }
+    }
+
+    private static Commit[] toSortedCommitArray(Set<Commit> commits) {
+        if (commits == null) commits = Collections.emptySet();
+        Commit[] children = new Commit[commits.size()];
+        int ixInsert = 0;
+        for (Commit c : commits) {
+            children[ixInsert++] = c;
+        }
+        Arrays.sort(children);
+        return children;
     }
 
     private void populateReachables() {
         LOG.debug("Computing reachable commits");
-        final int numCommits = commitsFromHashes.size();
+        final int numCommits = getNumCommits();
 
         ProgressMonitor pm = new ProgressMonitor(numCommits) {
             @Override
@@ -548,23 +572,28 @@ public class CommitsDistanceDb {
         }
     }
 
-    public synchronized void put(String commitHash, String... parents) {
-        assertNotPreprocessed();
-        Commit commit = internCommit(commitHash);
-        this.parents.ensureMapping(commit);
-        for (String parentHash : parents) {
-            Commit parent = internCommit(parentHash);
-            this.parents.put(commit, parent);
-            this.children.put(parent, commit);
+    private void put(String commitHash, String... parentHashes) {
+        DateFormat format = new SimpleDateFormat(OrderedRevisionsColumns.TIMESTAMP_FORMAT);
+        String timestamp = format.format(new Date());
+        if (parentHashes.length == 0) {
+            put(new ProtoCommit(commitHash, timestamp, Optional.empty()));
+        } else {
+            for (String parentHash : parentHashes) {
+                put(new ProtoCommit(commitHash, timestamp, Optional.of(parentHash)));
+            }
         }
     }
 
-    public synchronized void put(String commitHash, Set<String> parents) {
+    public synchronized void put(ProtoCommit protoCommit) {
         assertNotPreprocessed();
-        Commit commit = internCommit(commitHash);
+        Commit commit = internCommit(protoCommit.commitHash);
+        if (commit.timestamp == null) {
+            commit.setTimestamp(protoCommit.timestamp);
+        }
         this.parents.ensureMapping(commit);
-        for (String parentHash : parents) {
-            Commit parent = internCommit(parentHash);
+
+        if (protoCommit.parentHash.isPresent()) {
+            Commit parent = internCommit(protoCommit.parentHash.get());
             this.parents.put(commit, parent);
             this.children.put(parent, commit);
         }
@@ -629,6 +658,17 @@ public class CommitsDistanceDb {
         validateCommit(c1);
         validateCommit(c2);
         return isReachable(c1.key, c2.key) || isReachable(c2.key, c1.key);
+    }
+
+    public Set<Commit> getRoots() {
+        ensurePreprocessed();
+        Set<Commit> roots = new LinkedHashSet<>();
+        for (Commit c : commitsFromHashes.values()) {
+            if (c.parents().length == 0) {
+                roots.add(c);
+            }
+        }
+        return roots;
     }
 
     private static void main(String[] args) {

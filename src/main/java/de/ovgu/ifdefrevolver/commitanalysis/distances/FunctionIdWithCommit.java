@@ -11,12 +11,12 @@ public class FunctionIdWithCommit {
     public final Commit commit;
     public final boolean move;
 
-    public static final Comparator<FunctionIdWithCommit> BY_FUNCTION_ID_AND_COMMIT_HASH = new Comparator<FunctionIdWithCommit>() {
+    public static final Comparator<FunctionIdWithCommit> BY_FUNCTION_ID_AND_COMMIT = new Comparator<FunctionIdWithCommit>() {
         @Override
         public int compare(FunctionIdWithCommit o1, FunctionIdWithCommit o2) {
             int r = FunctionId.BY_FILE_AND_SIGNATURE_ID.compare(o1.functionId, o2.functionId);
             if (r != 0) return r;
-            return Commit.BY_HASH.compare(o1.commit, o2.commit);
+            return o1.commit.compareTo(o2.commit);
         }
     };
 

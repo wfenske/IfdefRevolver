@@ -5,21 +5,21 @@ import de.ovgu.ifdefrevolver.bugs.correlate.main.IHasResultsDir;
 import de.ovgu.ifdefrevolver.bugs.correlate.main.IHasSnapshotsDir;
 import de.ovgu.ifdefrevolver.bugs.minecommits.CommitsDistanceDb;
 import de.ovgu.ifdefrevolver.bugs.minecommits.CommitsDistanceDb.Commit;
-import de.ovgu.ifdefrevolver.commitanalysis.GitUtil;
-import de.ovgu.ifdefrevolver.commitanalysis.IHasRepoDir;
 import de.ovgu.ifdefrevolver.util.DateUtils;
 import org.apache.log4j.Logger;
 
+import java.io.File;
+import java.text.DateFormat;
+import java.text.SimpleDateFormat;
 import java.util.*;
 import java.util.function.Consumer;
 
-public class SnapshotCreatingCommitWalker<TConfig extends IHasResultsDir & IHasSnapshotsDir & IHasRepoDir> extends AbstractCommitWalker {
+public class SnapshotCreatingCommitWalker<TConfig extends IHasResultsDir & IHasSnapshotsDir> extends AbstractCommitWalker {
     private static Logger LOG = Logger.getLogger(SnapshotCreatingCommitWalker.class);
 
     private final int snapshotSize;
     private List<Snapshot> snapshots;
     private List<Commit> commitsInCurrentSnapshot;
-    private Calendar lastSnapshotCal = null;
     private final TConfig config;
     private int numberOfRelevantCommitsInCurrentSnapshot;
     private final Set<Commit> commitsThatModifyCFiles;
@@ -52,7 +52,7 @@ public class SnapshotCreatingCommitWalker<TConfig extends IHasResultsDir & IHasS
         outputStrategy.accept(snapshots);
 
         final int numSnapshots = snapshots.size();
-        final int commitsInSnapshots = snapshots.stream().map(s -> s.getCommits().size()).reduce(0, Integer::sum);
+        final int commitsInSnapshots = snapshots.stream().mapToInt(s -> s.getCommits().size()).sum();
         final int discardedCommits = commitsInCurrentSnapshot.size();
         LOG.info("Collected " + commitsInSnapshots + " commit(s) in " + numSnapshots + " snapshot(s). " +
                 "Discarded " + discardedCommits + " commit(s) since it/they did not fill up a whole snapshot.");
@@ -81,26 +81,42 @@ public class SnapshotCreatingCommitWalker<TConfig extends IHasResultsDir & IHasS
 
     private void createSnapshotFromCurrentCommits() {
         final Commit startCommit = this.commitsInCurrentSnapshot.get(0);
-        Calendar snapshotDateCal = GitUtil.getAuthorDateOfCommit(config.getRepoDir(), startCommit.commitHash);
-        snapshotDateCal = ensureSnapshotDatesAreUnique(snapshotDateCal);
-        Date snapshotDate = snapshotDateCal.getTime();
+        Calendar snapshotCal = DateUtils.toCalendar(startCommit.getTimestamp());
+        snapshotCal = ensureSnapshotDatesAreUnique(snapshotCal);
+        Date snapshotDate = snapshotCal.getTime();
+        File snapshotDir = config.snapshotDirForDate(snapshotDate);
         Snapshot s = new Snapshot(this.snapshots.size(), snapshotDate,
-                new LinkedHashSet<>(this.commitsInCurrentSnapshot), config.snapshotDirForDate(snapshotDate));
+                new LinkedHashSet<>(this.commitsInCurrentSnapshot), snapshotDir);
         this.snapshots.add(s);
     }
 
-    private Calendar ensureSnapshotDatesAreUnique(Calendar snapshotDateCal) {
-        if (lastSnapshotCal == null) return snapshotDateCal;
-        int advances = 0;
-        while (!DateUtils.isAtLeastOneDayBefore(lastSnapshotCal, snapshotDateCal)) {
-            snapshotDateCal.add(Calendar.DAY_OF_YEAR, 1);
-            advances++;
-        }
-        if (advances > 0) {
-            LOG.info("Advanced snapshot date by " + advances + " day(s) to ensure it is unique. New snapshot date is " + snapshotDateCal);
+    private Calendar ensureSnapshotDatesAreUnique(Calendar snapshotCal) {
+        if (snapshots.isEmpty()) return snapshotCal;
+        String originalStartDate = "";
+        if (LOG.isInfoEnabled()) {
+            originalStartDate = formatSnapshotDate(snapshotCal);
         }
 
-        return snapshotDateCal;
+        final Snapshot previousSnapshot = snapshots.get(snapshots.size() - 1);
+        Date previousSnapshotStartDate = previousSnapshot.getStartDate();
+        Calendar lastSnapshotCal = DateUtils.toCalendar(previousSnapshotStartDate);
+        int advances = 0;
+        while (!DateUtils.isAtLeastOneDayBefore(lastSnapshotCal, snapshotCal)) {
+            snapshotCal.add(Calendar.DAY_OF_YEAR, 1);
+            advances++;
+        }
+
+        if (LOG.isInfoEnabled() && (advances > 0)) {
+            LOG.info("Advanced snapshot date by " + advances + " day(s) to ensure it is unique. Old date: " +
+                    originalStartDate + " New date: " + formatSnapshotDate(snapshotCal));
+        }
+
+        return snapshotCal;
+    }
+
+    private static String formatSnapshotDate(Calendar cal) {
+        DateFormat df = new SimpleDateFormat("yyyy-MM-dd");
+        return df.format(cal.getTime());
     }
 
 //    private void writeCurrentSnapshotToFile() {

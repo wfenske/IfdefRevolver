@@ -31,7 +31,7 @@ public class CommitsDistanceDbCsvReader {
         CSVReader reader = null;
         FileReader fileReader = null;
 
-        List<String[]> pairs = new ArrayList<>();
+        List<ProtoCommit> protoCommits = new ArrayList<>();
 
         try {
             fileReader = new FileReader(csvFile);
@@ -72,12 +72,11 @@ public class CommitsDistanceDbCsvReader {
                 String timestamp = nextLine[ixTimestampCol];
                 String commitHash = nextLine[ixCommitCol];
                 String parentHash = nextLine[ixParentCol];
-                if (parentHash == null) parentHash = "";
-                String[] pair = new String[3];
-                pair[0] = timestamp;
-                pair[1] = commitHash;
-                pair[2] = parentHash;
-                pairs.add(pair);
+                final Optional<String> optParentHash;
+                if ((parentHash == null) || parentHash.isEmpty()) optParentHash = Optional.empty();
+                else optParentHash = Optional.of(parentHash);
+                ProtoCommit c = new ProtoCommit(commitHash, timestamp, optParentHash);
+                protoCommits.add(c);
             }
         } catch (IOException e1) {
             throw new RuntimeException(
@@ -86,22 +85,7 @@ public class CommitsDistanceDbCsvReader {
             CSVHelper.silentlyCloseReaders(reader, fileReader);
         }
 
-        CommitsDistanceDb db = createDbFromPairs(pairs);
-        return db;
-    }
-
-    private CommitsDistanceDb createDbFromPairs(List<String[]> pairs) {
-        List<String[]> sortedPairs = sortPairs(pairs);
-        CommitsDistanceDb db = new CommitsDistanceDb();
-        for (String[] pair : sortedPairs) {
-            String commitHash = pair[1];
-            String parentHash = pair[2];
-            if (parentHash.isEmpty()) {
-                db.put(commitHash);
-            } else {
-                db.put(commitHash, parentHash);
-            }
-        }
+        CommitsDistanceDb db = CommitsDistanceDb.fromProtoCommits(protoCommits);
         return db;
     }
 

@@ -44,11 +44,6 @@ class DetectSmellsStrategy implements ISnapshotProcessingModeStrategy {
     }
 
     @Override
-    public void removeOutputFiles() {
-        // Nothing to do.
-    }
-
-    @Override
     public boolean isCurrentSnapshotDependentOnPreviousSnapshot() {
         return false;
     }

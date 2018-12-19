@@ -379,7 +379,7 @@ public class FunctionMoveResolver {
 
     public List<List<FunctionIdWithCommit>> computeFunctionGenealogies(Collection<FunctionIdWithCommit> unsortedIds) {
         List<FunctionIdWithCommit> ids = new ArrayList<>(unsortedIds);
-        Collections.sort(ids, FunctionIdWithCommit.BY_FUNCTION_ID_AND_COMMIT_HASH);
+        Collections.sort(ids, FunctionIdWithCommit.BY_FUNCTION_ID_AND_COMMIT);
         GenealogySet result = new GenealogySet();
 
 //        for (Iterator<FunctionIdWithCommit> it = ids.iterator(); it.hasNext(); ) {
@@ -498,7 +498,7 @@ public class FunctionMoveResolver {
                 for (int i = 0; i < len; i++) {
                     FunctionIdWithCommit f1 = o1.get(i);
                     FunctionIdWithCommit f2 = o2.get(i);
-                    int r = FunctionIdWithCommit.BY_FUNCTION_ID_AND_COMMIT_HASH.compare(f1, f2);
+                    int r = FunctionIdWithCommit.BY_FUNCTION_ID_AND_COMMIT.compare(f1, f2);
                     if (r != 0) return r;
                 }
                 return o2.size() - o1.size();
@@ -512,7 +512,7 @@ public class FunctionMoveResolver {
 
     private List<FunctionIdWithCommit> sortGenealogy(Set<FunctionIdWithCommit> unsortedGenealogy) {
         LinkedList<FunctionIdWithCommit> in = new LinkedList<>(unsortedGenealogy);
-        Collections.sort(in, FunctionIdWithCommit.BY_FUNCTION_ID_AND_COMMIT_HASH);
+        Collections.sort(in, FunctionIdWithCommit.BY_FUNCTION_ID_AND_COMMIT);
 
         class SortableFunctionIdWithCommit implements Comparable<SortableFunctionIdWithCommit> {
             final FunctionIdWithCommit id;
@@ -524,7 +524,7 @@ public class FunctionMoveResolver {
 
             @Override
             public int compareTo(SortableFunctionIdWithCommit other) {
-                int r = FunctionIdWithCommit.BY_FUNCTION_ID_AND_COMMIT_HASH.compare(this.id, other.id);
+                int r = FunctionIdWithCommit.BY_FUNCTION_ID_AND_COMMIT.compare(this.id, other.id);
                 if (r != 0) return r;
                 return this.numberOfAncestors - other.numberOfAncestors;
             }

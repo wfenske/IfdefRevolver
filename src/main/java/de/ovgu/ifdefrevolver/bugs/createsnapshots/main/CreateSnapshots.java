@@ -68,7 +68,6 @@ public class CreateSnapshots {
     private void applyStrategyToSnapshots(ISnapshotProcessingModeStrategy skunkStrategy) {
         this.erroneousSnapshots = 0;
         skunkStrategy.readAllRevisionsAndComputeSnapshots();
-        skunkStrategy.removeOutputFiles();
         if (skunkStrategy.isCurrentSnapshotDependentOnPreviousSnapshot()) {
             processSnapshotsSequentially(skunkStrategy);
         } else {
@@ -385,14 +384,14 @@ public class CreateSnapshots {
     /**
      * Size of a commit window, requires positive integer argument
      */
-    private static final String OPT_SNAPSHOT_SIZE_L = "windowsize";
-    private static final char OPT_SNAPSHOT_SIZE = 'w';
+    private static final String OPT_SNAPSHOT_SIZE_L = "snapshotsize";
+    private static final char OPT_SNAPSHOT_SIZE = 's';
 
-    /**
-     * How the size of a commit window is counted.  Requires an arg, as determined by the values in {@link
-     * SnapshotSizeMode}
-     */
-    private static final String OPT_SNAPSHOT_SIZE_MODE_L = "sizemode";
+//    /**
+//     * How the size of a commit window is counted.  Requires an arg, as determined by the values in {@link
+//     * SnapshotSizeMode}
+//     */
+//    private static final String OPT_SNAPSHOT_SIZE_MODE_L = "sizemode";
 
     /**
      * --reposdir=, e.g. /home/me/Repositories/
@@ -463,12 +462,13 @@ public class CreateSnapshots {
                     "Either `--" + OPT_CHECKOUT_L + "', `--" + OPT_PREPROCESS_L + "' or `--" + OPT_DETECT_L + "' must be specified!");
         }
 
-        parseSnapshotSizeModeFromCommandLine(res, line);
+        //parseSnapshotSizeModeFromCommandLine(res, line);
         parseSnapshotSizeFromCommandLine(res, line, res.commitWindowSizeMode().defaultSize());
 
         ProjectInformationConfig.parseProjectNameFromCommandLine(line, res);
         ProjectInformationConfig.parseSnapshotsDirFromCommandLine(line, res, res.skunkMode().snapshotDirMissingStrategy());
         ProjectInformationConfig.parseProjectResultsDirFromCommandLine(line, res);
+        CreateSnapshotsConfig.parseForceFromCommandLine(line, res);
 
 //        final String reposDirName;
 //        if (line.hasOption(OPT_REPOS_DIR_L)) {
@@ -504,26 +504,26 @@ public class CreateSnapshots {
         return res;
     }
 
-    private void parseSnapshotSizeModeFromCommandLine(CreateSnapshotsConfig res, CommandLine line) {
-        if (line.hasOption(OPT_SNAPSHOT_SIZE_MODE_L)) {
-            if (res.skunkMode() != SnapshotProcessingMode.CHECKOUT) {
-                LOG.warn("Ignoring snapshot size mode because `--" + OPT_CHECKOUT_L + "' was not specified.");
-            } else {
-                SnapshotSizeMode mode = parseSnapshotSizeModeValueOrDie(line);
-                res.setSnapshotSizeMode(mode);
-            }
-        }
-    }
-
-    private SnapshotSizeMode parseSnapshotSizeModeValueOrDie(CommandLine line) {
-        String modeName = line.getOptionValue(OPT_SNAPSHOT_SIZE_MODE_L);
-        try {
-            return SnapshotSizeMode.valueOf(modeName.toUpperCase());
-        } catch (IllegalArgumentException iae) {
-            throw new RuntimeException("Invalid value for option `--" + OPT_SNAPSHOT_SIZE_MODE_L
-                    + "': Expected: " + getCommitWindowSizeModeArgs() + " got: " + modeName);
-        }
-    }
+//    private void parseSnapshotSizeModeFromCommandLine(CreateSnapshotsConfig res, CommandLine line) {
+//        if (line.hasOption(OPT_SNAPSHOT_SIZE_MODE_L)) {
+//            if (res.skunkMode() != SnapshotProcessingMode.CHECKOUT) {
+//                LOG.warn("Ignoring snapshot size mode because `--" + OPT_CHECKOUT_L + "' was not specified.");
+//            } else {
+//                SnapshotSizeMode mode = parseSnapshotSizeModeValueOrDie(line);
+//                res.setSnapshotSizeMode(mode);
+//            }
+//        }
+//    }
+//
+//    private SnapshotSizeMode parseSnapshotSizeModeValueOrDie(CommandLine line) {
+//        String modeName = line.getOptionValue(OPT_SNAPSHOT_SIZE_MODE_L);
+//        try {
+//            return SnapshotSizeMode.valueOf(modeName.toUpperCase());
+//        } catch (IllegalArgumentException iae) {
+//            throw new RuntimeException("Invalid value for option `--" + OPT_SNAPSHOT_SIZE_MODE_L
+//                    + "': Expected: " + getCommitWindowSizeModeArgs() + " got: " + modeName);
+//        }
+//    }
 
     private void parseSnapshotSizeFromCommandLine(CreateSnapshotsConfig res, CommandLine line, int defaultValue) {
         if (line.hasOption(OPT_SNAPSHOT_SIZE)) {
@@ -612,6 +612,7 @@ public class CreateSnapshots {
         options.addOption(ProjectInformationConfig.projectNameCommandLineOption(required));
         options.addOption(ProjectInformationConfig.snapshotsDirCommandLineOption());
         options.addOption(ProjectInformationConfig.resultsDirCommandLineOption());
+        options.addOption(CreateSnapshotsConfig.forceCommandLineOption());
 
         options.addOption(
                 Option.builder().longOpt(OPT_SMELL_CONFIGS_DIR_L)
@@ -626,25 +627,25 @@ public class CreateSnapshots {
         options.addOption(Option.builder(String.valueOf(ListChangedFunctionsConfig.OPT_REPO))
                 .longOpt(ListChangedFunctionsConfig.OPT_REPO_L)
                 .desc("Directory containing the git repository to analyze." + " [Default="
-                        + ListChangedFunctionsConfig.DEFAULT_REPOS_DIR_NAME + "/<project>/.git]")
+                        + ListChangedFunctionsConfig.DEFAULT_REPOS_DIR_NAME + "/<project>]")
                 .hasArg().argName("DIR")
                 //.required(required)
                 .build());
 
 
-        options.addOption(Option.builder().longOpt(OPT_SNAPSHOT_SIZE_MODE_L)
-                .desc("How the size of the commit windows is determined. This option is only relevant during" +
-                        " snapshot creation, i.e., when running in `--" + OPT_CHECKOUT_L
-                        + "' mode." + " [Default=" + CreateSnapshotsConfig.DEFAULT_COMMIT_WINDOW_SIZE_MODE.name().toLowerCase() + "]")
-                .hasArg().argName(getCommitWindowSizeModeArgs()).build());
+//        options.addOption(Option.builder().longOpt(OPT_SNAPSHOT_SIZE_MODE_L)
+//                .desc("How the size of the commit windows is determined. This option is only relevant during" +
+//                        " snapshot creation, i.e., when running in `--" + OPT_CHECKOUT_L
+//                        + "' mode." + " [Default=" + CreateSnapshotsConfig.DEFAULT_COMMIT_WINDOW_SIZE_MODE.name().toLowerCase() + "]")
+//                .hasArg().argName(getCommitWindowSizeModeArgs()).build());
 
 
         options.addOption(Option.builder(String.valueOf(OPT_SNAPSHOT_SIZE)).longOpt(OPT_SNAPSHOT_SIZE_L)
                 .desc("Size of a commit window, specified as a positive integer. This option is only relevant during" +
                         " snapshot creation, i.e., when running in `--" + OPT_CHECKOUT_L
-                        + "' mode." + " [Default value depends on the mode specified via `--" +
-                        OPT_SNAPSHOT_SIZE_MODE_L + "': " + getCommitWindowSizeDefaults() + "]")
-                .hasArg().argName("NUM").build());
+                        + "' mode." + " [Default=" + CreateSnapshotsConfig.DEFAULT_COMMIT_WINDOW_SIZE_MODE.defaultSize() + "]")
+                .hasArg().argName("NUM")
+                .build());
 
         // --checkout, --preprocess and --detect options
         OptionGroup skunkModeOptions = new OptionGroup();
@@ -669,17 +670,17 @@ public class CreateSnapshots {
         return options;
     }
 
-    private String getCommitWindowSizeDefaults() {
-        StringBuilder result = new StringBuilder();
-        for (SnapshotSizeMode m : SnapshotSizeMode.values()) {
-            if (result.length() > 0) {
-                result.append(", ");
-            }
-            String name = m.name().toLowerCase();
-            result.append(m.defaultSize()).append(" for `").append(name).append("'");
-        }
-        return result.toString();
-    }
+//    private String getCommitWindowSizeDefaults() {
+//        StringBuilder result = new StringBuilder();
+//        for (SnapshotSizeMode m : SnapshotSizeMode.values()) {
+//            if (result.length() > 0) {
+//                result.append(", ");
+//            }
+//            String name = m.name().toLowerCase();
+//            result.append(m.defaultSize()).append(" for `").append(name).append("'");
+//        }
+//        return result.toString();
+//    }
 
     private static String getValidSmellArgs() {
         StringBuilder validSmellArgs = new StringBuilder();

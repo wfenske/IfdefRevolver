@@ -3,6 +3,8 @@ package de.ovgu.ifdefrevolver.bugs.createsnapshots.main;
 import de.ovgu.ifdefrevolver.bugs.correlate.main.ProjectInformationConfig;
 import de.ovgu.ifdefrevolver.bugs.createsnapshots.data.Smell;
 import de.ovgu.ifdefrevolver.commitanalysis.IHasRepoDir;
+import org.apache.commons.cli.CommandLine;
+import org.apache.commons.cli.Option;
 
 import java.io.File;
 import java.util.Optional;
@@ -16,19 +18,23 @@ public class CreateSnapshotsConfig extends ProjectInformationConfig implements I
     public static final String SKUNK_PROG = "skunk.sh";
     private String repoDir;
 
-//    public void setReposDir(String reposDir) {
-//        this.reposDir = reposDir;
-//    }
+    /**
+     * Name of the project to analyze
+     */
+    public static final char OPT_FORCE = 'f';
 
-//    private String reposDir = null;
-
-//    public static final String DEFAULT_REPOS_DIR_NAME = "repos";
+    /**
+     * Long name of the {@link #OPT_FORCE} option.
+     */
+    public static final String OPT_FORCE_L = "force";
 
     private String smellConfig = null;
     public static final String DEFAULT_SMELL_CONFIGS_DIR_NAME = "smellconfigs";
 
     private SnapshotProcessingMode snapshotProcessingMode = null;
     private Smell smell = null;
+
+    private boolean force = false;
 
     private int snapshotSize = -1;
     public static final SnapshotSizeMode DEFAULT_COMMIT_WINDOW_SIZE_MODE = SnapshotSizeMode.COMMITS;
@@ -79,6 +85,18 @@ public class CreateSnapshotsConfig extends ProjectInformationConfig implements I
         }
     }
 
+    public static Option forceCommandLineOption() {
+        return Option.builder(String.valueOf(OPT_FORCE)).longOpt(OPT_FORCE_L)
+                .desc("Overwrite and/or delete files created by a previous run of the tool before recreating them.")
+                .build();
+    }
+
+    public static void parseForceFromCommandLine(CommandLine line, CreateSnapshotsConfig config) {
+        if (line.hasOption(OPT_FORCE)) {
+            config.setForce(true);
+        }
+    }
+
     public Smell getSmell() {
         return smell;
     }
@@ -112,5 +130,13 @@ public class CreateSnapshotsConfig extends ProjectInformationConfig implements I
     @Override
     public void setRepoDir(String repoDir) {
         this.repoDir = repoDir;
+    }
+
+    public void setForce(boolean force) {
+        this.force = force;
+    }
+
+    public boolean isForce() {
+        return force;
     }
 }
