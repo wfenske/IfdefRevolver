@@ -419,7 +419,7 @@ class FunctionsInBranch {
                 //this.markNotDeleted(id, function, this.branch.firstCommit);
                 this.deleted.put(id, winningDeletionRecord);
             } else if (summary.isAlwaysDeleted()) {
-                LOG.info("Function is deleted in all parent branches: " + id + " branch=" + this.branch);
+                LOG.debug("Function is deleted in all parent branches: " + id + " branch=" + this.branch);
 //                    for (DeletionRecord r : withoutSupersededRecords) {
 //                        this.deleted.put(id, r);
 //                    }
@@ -469,7 +469,7 @@ class FunctionsInBranch {
                         } else {
                             final List<FunctionChangeRow> dels = delsByFunctionId.get(functionId);
                             if ((dels != null) && dels.stream().anyMatch(del -> del.isSamePreviousRevisionAndCommit(change))) {
-                                LOG.info("Ignoring MOD to function that is deleted by another hunk in the same commit: " + change);
+                                LOG.debug("Ignoring MOD to function that is deleted by another hunk in the same commit: " + change);
                                 merged = true;
                             } else {
                                 LOG.warn("Ignoring MOD to non-existing function: " + change);
@@ -498,7 +498,7 @@ class FunctionsInBranch {
         if (isSameAlready) {
             LOG.debug("Parent branch adds different function for same ID " + id + " during merge of " + this.branch);
         } else {
-            LOG.info("Parent branch adds different function for same ID " + id + " during merge of " + this.branch);
+            LOG.debug("Parent branch adds different function for same ID " + id + " during merge of " + this.branch);
         }
     }
 

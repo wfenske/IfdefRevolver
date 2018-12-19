@@ -1078,6 +1078,7 @@ public class AddChangeDistances {
 
         AddChangeDistancesConfig.parseWindowSizeFromCommandLine(line, config);
         AddChangeDistancesConfig.parseWindowSlideFromCommandLine(line, config);
+        AddChangeDistancesConfig.parseValidateAfterMergeFromCommandLine(line, config);
 
 //        if (line.hasOption(AddChangeDistancesConfig.OPT_THREADS)) {
 //            String threadsString = line.getOptionValue(ListChangedFunctionsConfig.OPT_THREADS);
@@ -1134,6 +1135,11 @@ public class AddChangeDistances {
                 .longOpt(AddChangeDistancesConfig.OPT_COMMIT_WINDOW_SLIDE_L)
                 .desc("Number of snapshots to slide over when creating the next commit window, specified as a positive integer. [Default=" + AddChangeDistancesConfig.DEFAULT_WINDOW_SLIDE + "]")
                 .hasArg().argName("NUM").build());
+
+        options.addOption(Option.builder()
+                .longOpt(AddChangeDistancesConfig.OPT_VALIDATE_AFTER_MERGE_L)
+                .desc("Validate computed against actual functions after each merge. [Default=" + AddChangeDistancesConfig.DEFAULT_VALIDATE_AFTER_MERGE + "]")
+                .build());
 
 //        // --threads=1 options
 //        options.addOption(Option.builder(String.valueOf(ListChangedFunctionsConfig.OPT_THREADS))

@@ -53,6 +53,10 @@ public class FunctionChangeRow {
         return this.modType == FunctionChangeHunk.ModificationType.MOVE;
     }
 
+    public static boolean isModOrMove(FunctionChangeRow r) {
+        return r.modType.isModOrMove();
+    }
+
     public boolean isMoveOfIdenticalFunctionIds(FunctionChangeRow other) {
         if (!this.isMove() || !other.isMove()) return false;
         if (!functionId.equals(other.functionId)) return false;

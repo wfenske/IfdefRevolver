@@ -3,7 +3,11 @@ package de.ovgu.ifdefrevolver.commitanalysis.branchtraversal;
 import de.ovgu.ifdefrevolver.bugs.correlate.data.Snapshot;
 import de.ovgu.ifdefrevolver.bugs.correlate.input.ProjectInformationReader;
 import de.ovgu.ifdefrevolver.bugs.minecommits.CommitsDistanceDb.Commit;
-import de.ovgu.ifdefrevolver.commitanalysis.*;
+import de.ovgu.ifdefrevolver.commitanalysis.AbResRow;
+import de.ovgu.ifdefrevolver.commitanalysis.AllFunctionsRow;
+import de.ovgu.ifdefrevolver.commitanalysis.FunctionChangeRow;
+import de.ovgu.ifdefrevolver.commitanalysis.FunctionId;
+import de.ovgu.ifdefrevolver.commitanalysis.distances.AddChangeDistancesConfig;
 import de.ovgu.skunk.util.GroupingListMap;
 import de.ovgu.skunk.util.LinkedGroupingListMap;
 import org.apache.log4j.Logger;
@@ -15,7 +19,7 @@ public class GenealogyTracker {
     private static Logger LOG = Logger.getLogger(GenealogyTracker.class);
 
     private final List<FunctionChangeRow>[] changesByCommitKey;
-    private final IHasRepoAndResultsDir config;
+    private final AddChangeDistancesConfig config;
     private final ProjectInformationReader projectInfo;
     private final Map<Date, List<AllFunctionsRow>> allFunctionsInSnapshots;
     private final Map<Date, List<AbResRow>> annotationDataInSnapshots;
@@ -30,7 +34,7 @@ public class GenealogyTracker {
     private int changesProcessed;
     private Map<Commit, Snapshot> snapshotsByStartCommit;
 
-    public GenealogyTracker(ProjectInformationReader projectInfo, IHasRepoAndResultsDir config, List<FunctionChangeRow>[] changesByCommitKey, Map<Date, List<AllFunctionsRow>> allFunctionsInSnapshots, Map<Date, List<AbResRow>> annotationDataInSnapshots) {
+    public GenealogyTracker(ProjectInformationReader projectInfo, AddChangeDistancesConfig config, List<FunctionChangeRow>[] changesByCommitKey, Map<Date, List<AllFunctionsRow>> allFunctionsInSnapshots, Map<Date, List<AbResRow>> annotationDataInSnapshots) {
         this.changesByCommitKey = changesByCommitKey;
         this.config = config;
         this.projectInfo = projectInfo;
@@ -173,7 +177,7 @@ public class GenealogyTracker {
             assignJointFunctionAbSmellRowsForCurrentCommit();
         }
 
-        if ((currentBranch.getFirstCommit() == currentCommit) && (currentCommit.isMerge())) {
+        if (config.isValidateAfterMerge() && (currentBranch.getFirstCommit() == currentCommit) && (currentCommit.isMerge())) {
             validateComputedFunctionsAfterMerge();
         }
 

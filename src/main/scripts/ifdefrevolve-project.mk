@@ -13,22 +13,28 @@ endif
 ###
 
 REVISIONS_FILE = results/$(PROJECT)/revisionsFull.csv
+COMMIT_PARENTS_FILE = results/$(PROJECT)/commitParents.csv
 CHECKOUT_MARKER = results/$(PROJECT)/.checkout_successful
 ANALYSIS_MARKER = results/$(PROJECT)/.analysis_successful
 ANALYZE_MAKEFILE = results/$(PROJECT)/analyze.mk
 
 all: $(REVISIONS_FILE) $(CHECKOUT_MARKER) $(ANALYSIS_MARKER)
 
-findrevisions: $(REVISIONS_FILE)
+findrevisions: $(REVISIONS_FILE) $(COMMIT_PARENTS_FILE)
 
 $(REVISIONS_FILE):
 	@mkdir -p logs/$(PROJECT)
 	@mkdir -p results/$(PROJECT)
 	lscommits.sh -r repos/$(PROJECT) -o $(REVISIONS_FILE) >> logs/$(PROJECT)/lscommits.log 2>&1
 
+$(COMMIT_PARENTS_FILE):
+	@mkdir -p logs/$(PROJECT)
+	@mkdir -p results/$(PROJECT)
+	lsparentcommits.sh -r repos/$(PROJECT) -o $(COMMIT_PARENTS_FILE) >> logs/$(PROJECT)/lsparentcommits.log 2>&1
+
 checkout: $(CHECKOUT_MARKER)
 
-$(CHECKOUT_MARKER): $(REVISIONS_FILE)
+$(CHECKOUT_MARKER): $(REVISIONS_FILE) $(COMMIT_PARENTS_FILE)
 	@mkdir -p logs/$(PROJECT)
 	@mkdir -p snapshots/$(PROJECT)
 	rm -f $@

@@ -13,7 +13,7 @@ SMELL_CONFIGS_DIR="smellconfigs"
 
 PROJECT_RESULTS_DIR="results/${PROJECT:?}"
 
-TOP_LEVEL_SNAPSHOT_RESULT_FILE=joint_function_ab_smell_snapshot.csv
+TOP_LEVEL_SNAPSHOT_RESULT_FILE=joint_function_ab_smell_age_snapshot.csv
 
 if [ ! -d "$PROJECT_RESULTS_DIR" ]
 then
@@ -25,15 +25,19 @@ all_snapshot_rules=""
 all_deps=""
 
 have_snapshot_results_dir=false
-for snapshot_results_dir in "${PROJECT_RESULTS_DIR:?}"/[0-9][0-9][0-9][0-9]-[0-9][0-9]-[0-9][0-9]
+snapshot_dates=$(cut -f 2 -d',' snapshots.csv) || exit $?
+snapshot_dates=$(printf '%s\n' "$snapshot_dates"|tail -n +2) || exit $?
+for snapshot_date in $snapshot_dates
 do
+    snapshot_results_dir="${PROJECT_RESULTS_DIR:?}"/$snapshot_date
+    
     if [ ! -d "$snapshot_results_dir" ]
     then
 	echo "Not a directory: $snapshot_results_dir" >&2
 	continue
     fi
     have_snapshot_results_dir=true
-    snapshot_date=$(basename -- "$snapshot_results_dir") || exit $?
+    ##snapshot_date=$(basename -- "$snapshot_results_dir") || exit $?
     snapshot_rules=$(sed \
 			 -e "s|%%SNAPSHOT_RESULTS_DIR%%|$snapshot_results_dir|g" \
 			 -e "s|%%SNAPSHOT_DATE%%|$snapshot_date|g" \

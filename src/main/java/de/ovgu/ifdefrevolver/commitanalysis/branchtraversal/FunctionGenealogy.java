@@ -59,7 +59,10 @@ public class FunctionGenealogy {
 
     protected LinkedHashSet<Commit> getChangingCommitsInSnapshot(Snapshot s) {
         final List<FunctionChangeRow> changes = changesBySnapshot.get(s);
-        return changes.stream().map(c -> c.commit).collect(Collectors.toCollection(LinkedHashSet::new));
+        return changes.stream()
+                .filter(FunctionChangeRow::isModOrMove)
+                .map(c -> c.commit)
+                .collect(Collectors.toCollection(LinkedHashSet::new));
     }
 
     public int countLinesAddedInSnapshot(Snapshot s) {
@@ -79,9 +82,10 @@ public class FunctionGenealogy {
 
         final List<FunctionChangeRow> changes = changesBySnapshot.get(s);
         int result = changes.stream()
-                .filter(c -> c.modType != FunctionChangeHunk.ModificationType.ADD && c.modType != FunctionChangeHunk.ModificationType.DEL)
+                .filter(FunctionChangeRow::isModOrMove)
                 .mapToInt(functionChangeRowToIntFunction)
                 .sum();
+
         return result;
     }
 

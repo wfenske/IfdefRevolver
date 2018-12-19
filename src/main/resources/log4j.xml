@@ -86,13 +86,13 @@
         <level value="info"/>
     </logger>
 
-    <logger name="de.ovgu.ifdefrevolver.commitanalysis.branchtraversal.GenealogyTracker">
+    <!--logger name="de.ovgu.ifdefrevolver.commitanalysis.branchtraversal.GenealogyTracker">
         <level value="debug"/>
-    </logger>
+    </logger-->
 
-    <logger name="de.ovgu.ifdefrevolver.commitanalysis.branchtraversal.WriteSnapshotsToCsvFilesStrategy">
+    <!--logger name="de.ovgu.ifdefrevolver.commitanalysis.branchtraversal.WriteSnapshotsToCsvFilesStrategy">
         <level value="debug"/>
-    </logger>
+    </logger-->
 
     <!--logger name="de.ovgu.ifdefrevolver.commitanalysis.FunctionLocationProvider">
         <level value="debug"/>

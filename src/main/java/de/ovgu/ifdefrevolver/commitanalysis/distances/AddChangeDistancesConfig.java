@@ -19,6 +19,11 @@ public class AddChangeDistancesConfig extends ListChangedFunctionsConfig {
     public static int DEFAULT_WINDOW_SIZE = 5;
     public static int DEFAULT_WINDOW_SLIDE = 2;
 
+    public static final boolean DEFAULT_VALIDATE_AFTER_MERGE = false;
+
+    private boolean validateAfterMerge = DEFAULT_VALIDATE_AFTER_MERGE;
+
+    public static final String OPT_VALIDATE_AFTER_MERGE_L = "validate-after-merge";
 
     private int windowSize = DEFAULT_WINDOW_SIZE;
     private int windowSlide = DEFAULT_WINDOW_SLIDE;
@@ -39,6 +44,14 @@ public class AddChangeDistancesConfig extends ListChangedFunctionsConfig {
         this.windowSlide = windowSlide;
     }
 
+    public boolean isValidateAfterMerge() {
+        return validateAfterMerge;
+    }
+
+    public void setValidateAfterMerge(boolean validateAfterMerge) {
+        this.validateAfterMerge = validateAfterMerge;
+    }
+
     public static void parseWindowSizeFromCommandLine(CommandLine line, AddChangeDistancesConfig res) {
         if (line.hasOption(OPT_COMMIT_WINDOW_SIZE)) {
             int v = parsePositiveIntOrDie(line, OPT_COMMIT_WINDOW_SIZE, OPT_COMMIT_WINDOW_SIZE_L);
@@ -50,6 +63,12 @@ public class AddChangeDistancesConfig extends ListChangedFunctionsConfig {
         if (line.hasOption(OPT_COMMIT_WINDOW_SLIDE)) {
             int v = parsePositiveIntOrDie(line, OPT_COMMIT_WINDOW_SLIDE, OPT_COMMIT_WINDOW_SLIDE_L);
             res.setWindowSlide(v);
+        }
+    }
+
+    public static void parseValidateAfterMergeFromCommandLine(CommandLine line, AddChangeDistancesConfig res) {
+        if (line.hasOption(OPT_VALIDATE_AFTER_MERGE_L)) {
+            res.setValidateAfterMerge(true);
         }
     }
 

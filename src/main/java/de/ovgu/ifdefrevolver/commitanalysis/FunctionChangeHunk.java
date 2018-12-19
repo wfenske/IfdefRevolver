@@ -34,16 +34,30 @@ public class FunctionChangeHunk {
         /**
          * if this change moved a function to another place
          */
-        MOVE,
+        MOVE {
+            @Override
+            public boolean isModOrMove() {
+                return true;
+            }
+        },
         /**
          * if this change neither adds nor deletes the entire function but simply modifies parts of it
          */
-        MOD,
+        MOD {
+            @Override
+            public boolean isModOrMove() {
+                return true;
+            }
+        },
         /**
          * if this change deletes the entire function (happens sometimes if a function is moved to another file or
          * within the same file)
          */
-        DEL
+        DEL;
+
+        public boolean isModOrMove() {
+            return false;
+        }
     }
 
     private ModificationType modType;
