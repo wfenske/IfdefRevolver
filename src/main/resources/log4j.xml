@@ -90,6 +90,10 @@
         <level value="debug"/>
     </logger>
 
+    <logger name="de.ovgu.ifdefrevolver.commitanalysis.branchtraversal.WriteSnapshotsToCsvFilesStrategy">
+        <level value="debug"/>
+    </logger>
+
     <!--logger name="de.ovgu.ifdefrevolver.commitanalysis.FunctionLocationProvider">
         <level value="debug"/>
     </logger-->

@@ -54,24 +54,29 @@ public class SnapshotCreatingCommitWalker<TConfig extends IHasResultsDir & IHasS
         final int numSnapshots = snapshots.size();
         final int commitsInSnapshots = snapshots.stream().mapToInt(s -> s.getCommits().size()).sum();
         final int discardedCommits = commitsInCurrentSnapshot.size();
+        final long discardedCommitsThatModifyCFiles = commitsInCurrentSnapshot.stream().filter(this::isCommitRelevant).count();
+
         LOG.info("Collected " + commitsInSnapshots + " commit(s) in " + numSnapshots + " snapshot(s). " +
-                "Discarded " + discardedCommits + " commit(s) since it/they did not fill up a whole snapshot.");
+                "Discarded " + discardedCommits + " commit(s) (" +
+                discardedCommitsThatModifyCFiles + " of which modify .c files) " +
+                "since it/they did not fill up a whole snapshot.");
     }
 
     @Override
     protected void processCurrentCommit() {
         this.commitsInCurrentSnapshot.add(this.currentCommit);
-        if (isCurrentCommitRelevant()) {
+        if (isCommitRelevant(this.currentCommit)) {
             this.numberOfRelevantCommitsInCurrentSnapshot++;
         }
-        if ((this.numberOfRelevantCommitsInCurrentSnapshot % snapshotSize) == 0) {
+
+        if (this.numberOfRelevantCommitsInCurrentSnapshot == snapshotSize) {
             createSnapshotFromCurrentCommits();
             startNewSnapshot();
         }
     }
 
-    private boolean isCurrentCommitRelevant() {
-        return this.commitsThatModifyCFiles.contains(this.currentCommit);
+    private boolean isCommitRelevant(Commit c) {
+        return this.commitsThatModifyCFiles.contains(c);
     }
 
     private void startNewSnapshot() {

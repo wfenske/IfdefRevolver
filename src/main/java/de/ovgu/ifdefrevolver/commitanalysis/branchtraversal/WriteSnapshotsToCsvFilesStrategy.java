@@ -66,7 +66,7 @@ public class WriteSnapshotsToCsvFilesStrategy<TConfig extends IHasResultsDir & I
     }
 
     private void writeSnapshotFile(Snapshot s) {
-        LOG.debug("Writing snapshot CSV for " + s);
+        LOG.debug("Writing snapshot CSV for " + s + " (" + s.getCommits().size() + " commits)");
         File outputDir = config.snapshotResultsDirForDate(s.getStartDate());
         if (!outputDir.exists()) {
             if (!outputDir.mkdirs()) {
