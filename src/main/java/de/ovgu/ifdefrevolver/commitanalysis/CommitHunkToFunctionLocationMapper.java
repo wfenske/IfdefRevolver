@@ -280,13 +280,13 @@ class CommitHunkToFunctionLocationMapper implements Consumer<Edit> {
 
     public void handleUntreatedAddedAndDeletedFunctions() {
         for (Method f : appearedAndDisappearedFunctionHandler.getUntreatedDisappearedFunctions()) {
-            LOG.info("Commit " + changeId + " deletes function: " + f + " but change has not been published. Publishing now.");
+            LOG.debug("Commit " + changeId + " deletes function: " + f + " but change has not been published. Publishing now.");
             FunctionChangeHunk hunk = FunctionChangeHunk.makePseudoDel(changeId, oldPath, newPath, f);
             changedFunctionConsumer.accept(hunk);
         }
 
         for (Method f : appearedAndDisappearedFunctionHandler.getUntreatedAppearedFunctions()) {
-            LOG.info("Commit " + changeId + "    adds function: " + f + " but change has not been published. Publishing now.");
+            LOG.debug("Commit " + changeId + "    adds function: " + f + " but change has not been published. Publishing now.");
             int aSideStartLocation = appearedAndDisappearedFunctionHandler.getASideStartLocationOfAppearedFunction(f);
             FunctionChangeHunk hunk = FunctionChangeHunk.makePseudoAdd(changeId, oldPath, newPath, f, Optional.of(aSideStartLocation));
             changedFunctionConsumer.accept(hunk);
@@ -383,10 +383,14 @@ class CommitHunkToFunctionLocationMapper implements Consumer<Edit> {
         }
     }
 
-    private boolean isPlausibleRename(FunctionChangeHunk del, FunctionChangeHunk add) {
+    private static boolean isPlausibleRename(FunctionChangeHunk del, FunctionChangeHunk add) {
         Method delFunction = del.getFunction();
         Method addFunction = add.getFunction();
 
+        return isPlausibleRename(delFunction, addFunction);
+    }
+
+    private static boolean isPlausibleRename(Method delFunction, Method addFunction) {
         if (delFunction.hasSameOriginalSignature(addFunction)) {
             return true;
         }
@@ -395,19 +399,22 @@ class CommitHunkToFunctionLocationMapper implements Consumer<Edit> {
             return true;
         }
 
-        final String delName = delFunction.functionName;
-        final String addName = addFunction.functionName;
+        return isPlausibleRename(delFunction.functionName, addFunction.functionName);
+    }
 
-        int threshold = (Math.min(delName.length(), addName.length()) * 3) / 4;
+    private static boolean isPlausibleRename(String oldFunctionName, String newFunctionName) {
+        int threshold = (Math.min(oldFunctionName.length(), newFunctionName.length()) * 3) / 4;
         threshold = Math.max(threshold, 1);
         LevenshteinDistance distMeasure = new LevenshteinDistance();
         // If initialized with a threshold, apply will return -1 if the threshold is exceeded.
-        int dist = distMeasure.apply(delName, addName);
+        int dist = distMeasure.apply(oldFunctionName, newFunctionName);
         if (dist < threshold) {
-            LOG.debug("Function names are similar enough for a rename: " + delName + " -> " + addName);
+            LOG.info("Function names are similar enough for a rename: " + oldFunctionName + " -> " + newFunctionName +
+                    " threshold=" + threshold + " actual distance=" + dist);
             return true;
         } else {
-            LOG.debug("Function names are too dissimilar for a rename: " + delName + " -> " + addName);
+            LOG.info("Function names are too dissimilar for a rename: " + oldFunctionName + " -> " + newFunctionName +
+                    " threshold=" + threshold + " actual distance=" + dist);
         }
 
 //        String delSignature = delFunction.functionSignatureXml;
