@@ -215,7 +215,7 @@ class Branch {
         return this.functions.getCurrentlyActiveFunctionIds();
     }
 
-    public void assignJointFunctionAbSmellRows(Commit commit, List<AbResRow> jointFunctionAbSmellRows) {
-        this.functions.assignJointFunctionAbSmellRows(commit, jointFunctionAbSmellRows);
+    public TrackingErrorStats assignJointFunctionAbSmellRows(Commit commit, List<AbResRow> jointFunctionAbSmellRows) {
+        return this.functions.assignJointFunctionAbSmellRows(commit, jointFunctionAbSmellRows);
     }
 }

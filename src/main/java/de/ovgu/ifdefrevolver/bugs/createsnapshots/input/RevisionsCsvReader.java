@@ -200,8 +200,7 @@ public class RevisionsCsvReader {
 
         Map<String, Snapshot> snapshotsByDate = new HashMap<>();
         for (Snapshot s : allSnapshots) {
-            String dateString = df.format(s.getStartDate());
-            snapshotsByDate.put(dateString, s);
+            snapshotsByDate.put(s.getStartDateString(), s);
         }
 
         List<Snapshot> result = new ArrayList<>();

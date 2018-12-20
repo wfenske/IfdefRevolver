@@ -89,8 +89,9 @@ public class SnapshotCreatingCommitWalker<TConfig extends IHasResultsDir & IHasS
         Calendar snapshotCal = DateUtils.toCalendar(startCommit.getTimestamp());
         snapshotCal = ensureSnapshotDatesAreUnique(snapshotCal);
         Date snapshotDate = snapshotCal.getTime();
+        String snapshotDateString = formatSnapshotDate(snapshotDate);
         File snapshotDir = config.snapshotDirForDate(snapshotDate);
-        Snapshot s = new Snapshot(this.snapshots.size(), snapshotDate,
+        Snapshot s = new Snapshot(this.snapshots.size(), snapshotDateString, snapshotDate,
                 new LinkedHashSet<>(this.commitsInCurrentSnapshot), snapshotDir);
         this.snapshots.add(s);
     }
@@ -99,7 +100,7 @@ public class SnapshotCreatingCommitWalker<TConfig extends IHasResultsDir & IHasS
         if (snapshots.isEmpty()) return snapshotCal;
         String originalStartDate = "";
         if (LOG.isInfoEnabled()) {
-            originalStartDate = formatSnapshotDate(snapshotCal);
+            originalStartDate = formatSnapshotDate(snapshotCal.getTime());
         }
 
         final Snapshot previousSnapshot = snapshots.get(snapshots.size() - 1);
@@ -113,15 +114,15 @@ public class SnapshotCreatingCommitWalker<TConfig extends IHasResultsDir & IHasS
 
         if (LOG.isInfoEnabled() && (advances > 0)) {
             LOG.info("Advanced snapshot date by " + advances + " day(s) to ensure it is unique. Old date: " +
-                    originalStartDate + " New date: " + formatSnapshotDate(snapshotCal));
+                    originalStartDate + " New date: " + formatSnapshotDate(snapshotCal.getTime()));
         }
 
         return snapshotCal;
     }
 
-    private static String formatSnapshotDate(Calendar cal) {
+    private static String formatSnapshotDate(Date d) {
         DateFormat df = new SimpleDateFormat("yyyy-MM-dd");
-        return df.format(cal.getTime());
+        return df.format(d);
     }
 
 //    private void writeCurrentSnapshotToFile() {

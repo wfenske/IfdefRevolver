@@ -9,6 +9,7 @@ import de.ovgu.skunk.util.GroupingListMap;
 import org.apache.log4j.Logger;
 
 import java.util.*;
+import java.util.stream.Collectors;
 
 class FunctionsInBranch {
     private static Logger LOG = Logger.getLogger(FunctionsInBranch.class);
@@ -557,25 +558,50 @@ class FunctionsInBranch {
         return new HashSet<>(this.functionsById.keySet());
     }
 
-    public void assignJointFunctionAbSmellRows(Commit commit, List<AbResRow> jointFunctionAbSmellRows) {
-        for (AbResRow jointFunctionAbSmellRow : jointFunctionAbSmellRows) {
-            assignJointFunctionAbSmellRow(commit, jointFunctionAbSmellRow);
+    public TrackingErrorStats assignJointFunctionAbSmellRows(Commit commit, List<AbResRow> jointFunctionAbSmellRows) {
+        TrackingErrorStats errorStats = new TrackingErrorStats(
+                extractActualFunctionIds(jointFunctionAbSmellRows),
+                new HashSet<>(this.functionsById.keySet()));
+
+        for (AbResRow row : jointFunctionAbSmellRows) {
+            if (errorStats.isMissing(row.getFunctionId())) {
+                createFunctionBecauseItExistsAtSnapshotStart(commit, row);
+            }
+            assignJointFunctionAbSmellRow(commit, row);
         }
+
+        for (FunctionId superfluousId : errorStats.getSuperfluousFunctions()) {
+            removeFunctionBecauseItDoesNotExistAtSnapshotStart(commit, superfluousId);
+        }
+
+        return errorStats;
+    }
+
+    private void removeFunctionBecauseItDoesNotExistAtSnapshotStart(Commit commit, FunctionId functionId) {
+        LOG.warn("Function does not exist in all functions and/or AB smells exists in branch tracker. Removing it now. " +
+                "function=" + functionId + " commit=" + commit);
+        FunctionInBranch oldFunction = functionsById.remove(functionId);
+        if (oldFunction == null) {
+            throw new RuntimeException("Internal error: Trying to remove a superfluous function that does not exist. functionId=" + functionId + " commit=" + commit);
+        }
+        deleteFunction(functionId, oldFunction, commit);
+    }
+
+    private Set<FunctionId> extractActualFunctionIds(Collection<AbResRow> jointFunctionAbSmellRows) {
+        return jointFunctionAbSmellRows.stream().map(r -> r.getFunctionId()).collect(Collectors.toCollection(HashSet::new));
     }
 
     private void assignJointFunctionAbSmellRow(Commit commit, AbResRow jointFunctionAbSmellRow) {
         final FunctionId functionId = jointFunctionAbSmellRow.getFunctionId();
         LOG.debug("Assigning joint function with AB smell " + functionId);
         FunctionInBranch function = this.functionsById.get(functionId);
-        if (function == null) {
-            function = createFunctionBecauseItIsInAllFunctionsRows(commit, jointFunctionAbSmellRow);
-        }
         function.addJointFunctionAbSmellRow(commit, jointFunctionAbSmellRow);
     }
 
-    private FunctionInBranch createFunctionBecauseItIsInAllFunctionsRows(final Commit commit, AbResRow jointFunctionAbSmellRow) {
+    private FunctionInBranch createFunctionBecauseItExistsAtSnapshotStart(final Commit commit, AbResRow jointFunctionAbSmellRow) {
         final FunctionId functionId = jointFunctionAbSmellRow.getFunctionId();
-        LOG.warn("Function exists in all functions and/or AB smells but does not exist in branch tracker: " + functionId);
+        LOG.warn("Function exists in all functions and/or AB smells but does not exist in branch tracker. Creating it now. " +
+                "function=" + functionId + " commit=" + commit);
 
         FunctionInBranch function = undeleteFunction(functionId, commit);
         if (function == null) {
@@ -585,7 +611,10 @@ class FunctionsInBranch {
             }
         }
 
-        this.functionsById.put(functionId, function);
+        FunctionInBranch oldFunction = this.functionsById.put(functionId, function);
+        if (oldFunction != null) {
+            throw new RuntimeException("Internal error: Function was newly created although it existed. oldFunction=" + oldFunction + " commit=" + commit);
+        }
         return function;
     }
 }

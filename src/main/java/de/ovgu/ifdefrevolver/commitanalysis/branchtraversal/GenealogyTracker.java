@@ -33,6 +33,7 @@ public class GenealogyTracker {
     private MoveConflictStats moveConflictStats;
     private int changesProcessed;
     private Map<Commit, Snapshot> snapshotsByStartCommit;
+    private List<TrackingErrorStats> trackingStats;
 
     public GenealogyTracker(ProjectInformationReader projectInfo, AddChangeDistancesConfig config, List<FunctionChangeRow>[] changesByCommitKey, Map<Date, List<AllFunctionsRow>> allFunctionsInSnapshots, Map<Date, List<AbResRow>> annotationDataInSnapshots) {
         this.changesByCommitKey = changesByCommitKey;
@@ -44,6 +45,7 @@ public class GenealogyTracker {
 
     public LinkedGroupingListMap<Snapshot, FunctionGenealogy> processCommits() {
         this.snapshots = projectInfo.getAllSnapshots();
+        this.trackingStats = new ArrayList<>();
 
         this.snapshotsByStartCommit = new LinkedHashMap<>();
         this.commitsInSnapshots = new ArrayList<>();
@@ -194,7 +196,9 @@ public class GenealogyTracker {
 
     private void assignJointFunctionAbSmellRowsForCurrentCommit() {
         List<AbResRow> jointFunctionAbSmellRows = joinAllFunctionWithAbSmellRows(this.currentCommit);
-        this.currentBranch.assignJointFunctionAbSmellRows(this.currentCommit, jointFunctionAbSmellRows);
+        TrackingErrorStats stats = this.currentBranch.assignJointFunctionAbSmellRows(this.currentCommit, jointFunctionAbSmellRows);
+        LOG.info(stats);
+        this.trackingStats.add(stats);
     }
 
     private List<AbResRow> joinAllFunctionWithAbSmellRows(final Commit currentCommit) {
@@ -218,19 +222,26 @@ public class GenealogyTracker {
     }
 
     protected void onAllCommitsProcessed() {
-        LOG.debug("Successfully processed " + commitsInSnapshots.size() + " commits and " + changesProcessed + " changes.");
+        LOG.info("Successfully processed " + commitsInSnapshots.size() + " commits and " + changesProcessed + " changes.");
         maybeReportBranchStats();
         reportMoveConflicts();
+        reportTrackingStats();
+    }
+
+    private void reportTrackingStats() {
+        if (!LOG.isInfoEnabled()) return;
+        TrackingErrorStats totalStats = TrackingErrorStats.aggregate(this.trackingStats);
+        LOG.info("Aggregated tracking accuracy over all snapshots: " + totalStats);
     }
 
     private void reportMoveConflicts() {
         if (moveConflictStats.allMoveConflicts > 0) {
             int perentage = (int) Math.round((100.0 * moveConflictStats.moveConflictsThatProbablyResolveMergeConflicts) / moveConflictStats.allMoveConflicts);
-            LOG.debug("Encountered " + moveConflictStats.allMoveConflicts + " MOVE conflicts of which " +
+            LOG.info("Encountered " + moveConflictStats.allMoveConflicts + " MOVE conflicts of which " +
                     moveConflictStats.moveConflictsThatProbablyResolveMergeConflicts +
                     " (" + perentage + "%) probably resolved a merge conflict.");
         } else {
-            LOG.debug("Encountered no MOVE conflicts.");
+            LOG.info("Encountered no MOVE conflicts.");
         }
     }
 

@@ -5,7 +5,6 @@ import de.ovgu.ifdefrevolver.bugs.createsnapshots.input.FileFinder;
 import de.ovgu.ifdefrevolver.bugs.minecommits.CommitsDistanceDb.Commit;
 
 import java.io.File;
-import java.text.SimpleDateFormat;
 import java.util.Date;
 import java.util.List;
 import java.util.Set;
@@ -16,27 +15,27 @@ import java.util.Set;
  * @author wfenske
  */
 public class Snapshot implements Comparable<Snapshot>, IMinimalSnapshot, ISnapshot {
-    private static final SimpleDateFormat dateFormatter = new SimpleDateFormat("yyyy-MM-dd");
-
     private final int snapshotIndex;
     //    private final int branch;
     private final Date startDate;
+    private final String startDateString;
     private final Set<Commit> commits;
     private final Commit startCommit;
     private final File snapshotDir;
     //private Set<String> bugfixCommits = new HashSet<>();
 
-    public Snapshot(int snapshotIndex, Date startDate, Set<Commit> commits, File snapshotDir) {
+    public Snapshot(int snapshotIndex, String startDateString, Date startDate, Set<Commit> commits, File snapshotDir) {
         this.snapshotIndex = snapshotIndex;
-//        this.branch = branch;
+        this.startDateString = startDateString;
         this.startDate = startDate;
         this.commits = commits;
         this.startCommit = commits.iterator().next();
         this.snapshotDir = snapshotDir;
     }
 
-    public synchronized String getStartDateString() {
-        return dateFormatter.format(startDate);
+    @Override
+    public String getStartDateString() {
+        return startDateString;
     }
 
     /**
@@ -61,6 +60,7 @@ public class Snapshot implements Comparable<Snapshot>, IMinimalSnapshot, ISnapsh
         return commits;
     }
 
+    @Override
     public Commit getStartCommit() {
         return startCommit;
     }

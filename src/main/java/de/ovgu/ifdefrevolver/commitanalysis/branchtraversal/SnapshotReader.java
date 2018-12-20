@@ -98,20 +98,24 @@ public class SnapshotReader {
 
         @Override
         protected void processContentLine(String[] line) {
-            Date snapshotDate = parseSnapshotDate(line);
+            String snapshotDateString = parseSnapshotDateString(line);
+            Date snapshotDate = parseSnapshotDate(snapshotDateString);
             int snapshotIndex = parseSnapshotIndex(line);
             SnapshotCommitsCsvReader commitsReader = new SnapshotCommitsCsvReader(commitsDistanceDb, config);
             Set<Commit> commits = commitsReader.readFile(snapshotDate);
-            Snapshot snapshot = new Snapshot(snapshotIndex, snapshotDate, commits, config.snapshotDirForDate(snapshotDate));
+            Snapshot snapshot = new Snapshot(snapshotIndex, snapshotDateString, snapshotDate, commits, config.snapshotDirForDate(snapshotDate));
             result.add(snapshot);
         }
 
-        private Date parseSnapshotDate(String[] line) {
-            String dateString = line[SnapshotsColumns.SNAPSHOT_DATE.ordinal()];
+        private String parseSnapshotDateString(String[] line) {
+            return line[SnapshotsColumns.SNAPSHOT_DATE.ordinal()];
+        }
+
+        private Date parseSnapshotDate(String snapshotDateString) {
             try {
-                return dateFormatter.parse(dateString);
+                return dateFormatter.parse(snapshotDateString);
             } catch (ParseException e) {
-                throw new RuntimeException("Error parsing snapshot date " + dateString + " in file " + this.file, e);
+                throw new RuntimeException("Error parsing snapshot date " + snapshotDateString + " in file " + this.file, e);
             }
         }
 
