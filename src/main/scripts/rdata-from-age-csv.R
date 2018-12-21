@@ -25,37 +25,30 @@ opts <- args$options
 
 outFile <- "allDataAge.rdata"
 
-getInputFilenames <- function(commandLineArgs) {
+getInputFilename <- function(commandLineArgs) {
     result <- commandLineArgs$args
     if ( length(result) > 0 ) {
-        return (result)
+        return (result[1])
     }
 
     opts <- commandLineArgs$options
     if ( is.null(opts$project) ) {
-            stop("Missing input files.  Either specify explicit input files or specify the name of the project the `--project' option (`-p' for short).")
+            stop("Missing input files.  Either specify an explicit input file or specify the name of the project the `--project' option (`-p' for short).")
     }
 
-    baseDir <-  file.path("results", opts$project)
-    snapshotResultDirs <- list.files(baseDir, pattern="[0-9][0-9][0-9][0-9]-[0-9][0-9]-[0-9][0-9]")
-    if (length(snapshotResultDirs) == 0) {
-        stop(paste("No snapshot directories found in `", baseDir, "'", sep=""))
-    }
-
+    baseDir <- file.path("results", opts$project)
+    inputFn <-  file.path(baseDir, "joint_function_ab_smell_age_snapshot.csv")
     outFile <<- file.path(baseDir, "allDataAge.rdata")
     
-    allPotentialInputFns <- lapply(snapshotResultDirs, function(snapshotDir) { file.path(baseDir, snapshotDir, "joint_function_ab_smell_age_snapshot.csv") })
-    allExistingInputFns <- allPotentialInputFns[sapply(allPotentialInputFns, file.exists)]
-    return (allExistingInputFns)
+    return (inputFn)
 }
-
-snapshotIx <- 1
 
 iround <- function(x) {
     return (as.integer(round(x)))
 }
 
 readSnapshotFile <- function(inputFn) {
+    eprintf("INFO: Reading data from %s\n", inputFn)
     snapshotData <- read.csv(inputFn, header=TRUE, sep=",",
                              colClasses=c(
                                  "SNAPSHOT_DATE"="character"
@@ -78,8 +71,7 @@ readSnapshotFile <- function(inputFn) {
                                , "CND"="numeric"
                                , "NEG"="numeric"))
     snapshotDate <- snapshotData$SNAPSHOT_DATE[1]
-    eprintf("INFO: Reading snapshot %s\n", snapshotDate)
-    snapshotData["SNAPSHOT"] <- snapshotIx
+    ##eprintf("INFO: Read snapshot %s\n", snapshotDate)
     ##snapshotData[is.na(snapshotData)] = 0
 
     changedFuncs <- subset(snapshotData, COMMITS > 0)
@@ -106,24 +98,12 @@ readSnapshotFile <- function(inputFn) {
     eprintf("DEBUG: median lines changed ratio of changed functions: %.3f\n", medianChangedFuncsLchRatio)
     snapshotData["MEDIAN_SNAPSHOT_CH_LCHratio"] <- medianChangedFuncsLchRatio
     
-    ##meanChangedFuncsCommitsRatio <- mean(changedFuncs$COMMITSratio)
-    ##totalMeanChangedFuncsCommitsRatio <- sum(changedFuncs$COMMITS) / sum(changedFuncs$LOC)
-    ##eprintf("DEBUG: mean commit ratio of changed functions: %.3f\n", meanChangedFuncsCommitsRatio)
-    ##eprintf("DEBUG: total mean of commit ratio (all commits / all LOC) of changed functions: %.3f\n",
-    ##        totalMeanChangedFuncsCommitsRatio)
-    ##snapshotData["MEAN_SNAPSHOT_CH_COMMITSratio"] <- meanChangedFuncsCommitsRatio
-    ##snapshotData["TOTAL_MEAN_SNAPSHOT_CH_COMMITSratio"] <- totalMeanChangedFuncsCommitsRatio
-    
-    ##cat(str(max(as.numeric(snapshotData$LOC), na.rm=T)))
-    ##cat(str(max(snapshotData$LOC), na.rm=T))
-    ## Change the value of the global variable using <<-
-    snapshotIx <<- snapshotIx + 1
     return (snapshotData)
 }
 
-inputFns <- getInputFilenames(args)
+inputFn <- getInputFilename(args)
 
-allData <- do.call("rbind", lapply(inputFns, readSnapshotFile))
+allData <- readSnapshotFile(inputFn)
 
 allData$LOC <- iround(allData$LOC)
 allData$LOAC <- iround(allData$LOAC)
@@ -154,12 +134,41 @@ if (numMissingEdit > 0) {
     ##allData$LAST_EDIT[is.na(allData$LAST_EDIT)] <- naSubstVal
 }
 
+dataWithAge  <- subset(allData, !is.na(AGE))
+dataWithEdit <- subset(allData, !is.na(LAST_EDIT))
+
+changedDataWithAge  <- subset(dataWithAge,  COMMITS > 0)
+changedDataWithEdit <- subset(dataWithEdit, COMMITS > 0)
+
+unchangedDataWithAge  <- subset(dataWithAge,  COMMITS == 0)
+unchangedDataWithEdit <- subset(dataWithEdit, COMMITS == 0)
+
+eprintf("Median AGE/LAST_EDIT of all functions:\n%.0f,%.0f\n"
+      , median(dataWithAge$AGE)
+      , median(dataWithEdit$LAST_EDIT))
+
+eprintf("Median AGE/LAST_EDIT of changed functions:\n%.0f,%.0f\n"
+      , median(changedDataWithAge$AGE)
+      , median(changedDataWithEdit$LAST_EDIT))
+
+eprintf("Median AGE/LAST_EDIT of unchanged functions:\n%.0f,%.0f\n"
+      , median(unchangedDataWithAge$AGE)
+      , median(unchangedDataWithEdit$LAST_EDIT))
+
+eprintf("Mean AGE/LAST_EDIT of all functions:\n%.0f,%.0f\n"
+      , mean(dataWithAge$AGE)
+      , mean(dataWithEdit$LAST_EDIT))
+
+eprintf("Mean AGE/LAST_EDIT of changed functions:\n%.0f,%.0f\n"
+      , mean(changedDataWithAge$AGE)
+      , mean(changedDataWithEdit$LAST_EDIT))
+
+eprintf("Mean AGE/LAST_EDIT of unchanged functions:\n%.0f,%.0f\n"
+      , mean(unchangedDataWithAge$AGE)
+      , mean(unchangedDataWithEdit$LAST_EDIT))
+
 
 ### Independent variables for taking smell presence into account
-
-## Independent variables for taking file size into account
-##topSLOCValue <- quantile(data$SLOC, 1.0 - opts$large / 100.0)
-##data$binLARGE <- data$SLOC > topSLOCValue
 
 ### Independent variables
 ## LOC,LOAC,LOFC,NOFL,NOFC_Dup,NOFC_NonDup,NONEST

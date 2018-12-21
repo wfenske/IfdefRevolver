@@ -568,20 +568,11 @@ allData$LCHratio <- allData$LCH / allData$LOC
 changedData0 <- subset(allData, COMMITS > 0)
 medianLCHratio <- median(changedData0$LCHratio)
 
-##cat("Median changed lines/LOC for all changed functions: ", medianLCHratio, "\n", sep="")
-
 eprintf("Median COMMITS/LCHG of changed functions:\n%.2g,%.2g\n"
       , median(changedData0$COMMITS)
-      ##, median(changedData0$HUNKS)
       , median(changedData0$LCH))
 
-eprintf("Median AGE/LAST_EDIT of all functions:\n%.0f,%.0f\n"
-      , median(subset(allData, !is.na(AGE))$AGE)
-      , median(subset(allData, !is.na(LAST_EDIT))$LAST_EDIT))
-
-eprintf("Mean AGE/LAST_EDIT of all functions:\n%.0f,%.0f\n"
-      , mean(subset(allData, !is.na(AGE))$AGE)
-      , mean(subset(allData, !is.na(LAST_EDIT))$LAST_EDIT))
+##cat("Median changed lines/LOC for all changed functions: ", medianLCHratio, "\n", sep="")
 
 allData$CHURN_PRONE <- allData$LCHratio > medianLCHratio
 

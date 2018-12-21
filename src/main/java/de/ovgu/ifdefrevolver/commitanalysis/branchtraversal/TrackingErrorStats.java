@@ -5,6 +5,7 @@ import de.ovgu.ifdefrevolver.commitanalysis.FunctionId;
 import java.util.Collection;
 import java.util.HashSet;
 import java.util.Set;
+import java.util.stream.Collectors;
 
 public class TrackingErrorStats {
     private final Set<FunctionId> actualFunctions;
@@ -32,9 +33,20 @@ public class TrackingErrorStats {
         Set<FunctionId> allActualFunctions = new HashSet<>();
         Set<FunctionId> allComputedFunctions = new HashSet<>();
         for (TrackingErrorStats s : stats) {
-            // TODO
+            String prefix = String.format("#%03d ", ixTrackerId);
+            allActualFunctions.addAll(addPrefix(prefix, s.actualFunctions));
+            allComputedFunctions.addAll(addPrefix(prefix, s.computedFunctions));
+            ixTrackerId++;
         }
         return new TrackingErrorStats(allActualFunctions, allComputedFunctions);
+    }
+
+    private static Collection<? extends FunctionId> addPrefix(String prefix, Set<FunctionId> functionIds) {
+        return functionIds.stream().map(f -> addPrefix(prefix, f)).collect(Collectors.toSet());
+    }
+
+    private static FunctionId addPrefix(String prefix, FunctionId id) {
+        return new FunctionId(prefix + id.signature, prefix + id.file);
     }
 
     public boolean isMissing(FunctionId id) {
