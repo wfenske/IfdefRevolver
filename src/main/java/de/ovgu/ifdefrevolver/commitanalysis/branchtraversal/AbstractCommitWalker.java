@@ -4,9 +4,7 @@ import de.ovgu.ifdefrevolver.bugs.minecommits.CommitsDistanceDb;
 import de.ovgu.ifdefrevolver.bugs.minecommits.CommitsDistanceDb.Commit;
 import org.apache.log4j.Logger;
 
-import java.util.BitSet;
-import java.util.PriorityQueue;
-import java.util.Queue;
+import java.util.*;
 
 
 public abstract class AbstractCommitWalker {
@@ -50,12 +48,14 @@ public abstract class AbstractCommitWalker {
 
     protected Commit getNextProcessableCommit() {
         int sz = next.size();
+        List<Commit> unprocessableCommits = new ArrayList<>();
         for (int i = 0; i < sz; i++) {
             Commit nextCommit = next.poll(); // cannot be null due to preconditions of this method
             if (isProcessable(nextCommit)) {
+                unprocessableCommits.stream().forEach(c -> next.offer(c));
                 return nextCommit;
             } else {
-                next.offer(nextCommit);
+                unprocessableCommits.add(nextCommit);
             }
         }
         throw new RuntimeException("None of the next commits is processable");
