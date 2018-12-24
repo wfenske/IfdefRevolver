@@ -36,7 +36,7 @@ do
     ## Files 2010-03-03/source/os/bs2000/ebcdic.c and 2010-06-08/source/os/bs2000/ebcdic.c are identical
     relName=${srcFile#$srcPath/source/} || exit $?
     relDir=$(dirname "$relName") || exit $?
-    for mode in _cppstats _cppstats_featurelocations
+    for mode in source _cppstats _cppstats_featurelocations
     do
 	$SIM mkdir -p "$dstPath/$mode/$relDir/" || exit $?
 	for fn in "${relName}" "${relName}".xml
