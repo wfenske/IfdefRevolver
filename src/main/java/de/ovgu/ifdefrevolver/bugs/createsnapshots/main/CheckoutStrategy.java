@@ -256,6 +256,11 @@ class CheckoutStrategy implements ISnapshotProcessingModeStrategy {
 
     private void copyCheckoutToTmpSnapshotDir(List<File> filesInCurrentCheckout, Snapshot currentSnapshot) {
         final File cppstatsDir = new File(snapshotDir(currentSnapshot), "source");
+        if (cppstatsDir.exists()) {
+            if (!cppstatsDir.mkdirs()) {
+                throw new RuntimeException("Failed to create target directory for checkout: " + cppstatsDir.getPath());
+            }
+        }
         copyAllFiles(filesInCurrentCheckout, cppstatsDir);
     }
 
