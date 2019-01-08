@@ -1,5 +1,6 @@
 package de.ovgu.ifdefrevolver.commitanalysis;
 
+import de.ovgu.ifdefrevolver.bugs.minecommits.OrderingCommitVisitor;
 import de.ovgu.skunk.detection.data.Method;
 import de.ovgu.skunk.detection.input.PositionalXmlReader;
 import org.apache.log4j.Logger;
@@ -89,7 +90,7 @@ public class CommitChangedFunctionLister {
 
                         logFilesAndFunctions("A-side", aSideCFilePaths, allASideFunctions);
                         logFilesAndFunctions("B-side", bSideCFilePaths, allBSideFunctions);
-                        mapEditsFunctionLocations(diffs);
+                        mapEditsToFunctionLocations(diffs);
                         changedFunctionConsumer.mergeAndPublishRemainingHunks();
                     } catch (RuntimeException re) {
                         LOG.warn("Error analyzing diffs for parent " + iParent + " of commit " + commitId, re);
@@ -131,14 +132,14 @@ public class CommitChangedFunctionLister {
     }
 
     private void logFilesAndFunctions(String side, Set<String> cFiles, Map<String, List<Method>> functionsByFile) {
-        if (LOG.isTraceEnabled()) {
-            for (String fn : cFiles) {
-                LOG.trace(side + " modified file: " + fn);
-            }
-            for (List<Method> methods : functionsByFile.values()) {
-                for (Method m : methods) {
-                    LOG.trace(side + " function: " + m);
-                }
+        if (!LOG.isTraceEnabled()) return;
+
+        for (String fn : cFiles) {
+            LOG.trace(side + " modified file: " + fn);
+        }
+        for (List<Method> methods : functionsByFile.values()) {
+            for (Method m : methods) {
+                LOG.trace(side + " function: " + m);
             }
         }
     }
@@ -159,7 +160,7 @@ public class CommitChangedFunctionLister {
         }
     }
 
-    private void mapEditsFunctionLocations(List<DiffEntry> diffs) throws IOException {
+    private void mapEditsToFunctionLocations(List<DiffEntry> diffs) throws IOException {
         LOG.debug("Mapping edits to function locations");
         for (DiffEntry diff : diffs) {
             listFunctionChanges(diff);
@@ -170,7 +171,7 @@ public class CommitChangedFunctionLister {
         Set<String> filePaths = new HashSet<>();
         for (DiffEntry diff : diffs) {
             String path = diff.getPath(side);
-            if (path.endsWith(".c") || path.endsWith(".C")) {
+            if (OrderingCommitVisitor.isCFileName(path)) {
                 filePaths.add(path);
             }
         }
@@ -255,27 +256,6 @@ public class CommitChangedFunctionLister {
 
         List<Method> oldFunctions = allASideFunctions.get(oldPath);
         List<Method> newFunctions = allBSideFunctions.get(newPath);
-
-//        if ((diffType == DiffType.RENAME) && oldPath.endsWith(".c")) {
-//            synchronized (CommitChangedFunctionLister.class) {
-//                if (!printedHeader) {
-//                    System.out.println("COMMIT_ID,FOLD,FNEW,EDITS,SIGNATURE,OLDP");
-//                    printedHeader = true;
-//                }
-//            }
-//
-//            EditList edits = formatter.toFileHeader(diff).toEditList();
-//            int numEdits = edits.size();
-//
-//            if (oldFunctions != null)
-//                for (Method m : oldFunctions) {
-//                    System.out.println(commitId + "," + oldPath + "," + newPath + "," + numEdits + ",\"" + m.functionSignatureXml + "\",0");
-//                }
-//            if (newFunctions != null)
-//                for (Method m : newFunctions) {
-//                    System.out.println(commitId + "," + oldPath + "," + newPath + "," + numEdits + ",\"" + m.functionSignatureXml + "\",1");
-//                }
-//        }
 
         if (oldFunctions == null) {
             if (newFunctions == null) {

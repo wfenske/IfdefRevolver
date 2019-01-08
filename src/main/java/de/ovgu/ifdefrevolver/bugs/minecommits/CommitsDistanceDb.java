@@ -386,6 +386,20 @@ public class CommitsDistanceDb {
             setReachables(childCommit, computeReachables(childCommit));
             pm.increaseDone();
         }
+
+        maybeLogReachableStats(numCommits);
+    }
+
+    private void maybeLogReachableStats(int numCommits) {
+        if (LOG.isDebugEnabled()) {
+            long setBits = 0;
+            for (int childCommit = 0; childCommit < numCommits; childCommit++) {
+                BitSet r = getReachables(childCommit);
+                setBits += r.cardinality();
+            }
+            float percentageSet = (100.f * setBits) / numCommits / numCommits;
+            LOG.debug(String.format("%.1f%%", percentageSet) + " of all reachables are set.");
+        }
     }
 
     private BitSet computeReachables(int childCommit) {
@@ -416,10 +430,10 @@ public class CommitsDistanceDb {
                 parentReachables = computeReachables(parent);
             }
 
-            for (int i = 0; i < parentReachables.length(); i++) {
-                if (isReachable(parentReachables, i)) {
-                    setReachable(reachableFromHere, i);
-                }
+            int i = 0;
+            while ((i = parentReachables.nextSetBit(i)) >= 0) {
+                setReachable(reachableFromHere, i);
+                i++;
             }
         }
 

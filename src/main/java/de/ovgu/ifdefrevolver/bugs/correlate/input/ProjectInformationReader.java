@@ -8,6 +8,7 @@ import de.ovgu.ifdefrevolver.bugs.correlate.main.IHasRevisionCsvFile;
 import de.ovgu.ifdefrevolver.bugs.correlate.main.IHasSnapshotsDir;
 import de.ovgu.ifdefrevolver.bugs.createsnapshots.input.RevisionsCsvReader;
 import de.ovgu.ifdefrevolver.bugs.minecommits.CommitsDistanceDb;
+import de.ovgu.ifdefrevolver.bugs.minecommits.CommitsDistanceDb.Commit;
 import de.ovgu.ifdefrevolver.commitanalysis.IHasSnapshotFilter;
 import org.apache.log4j.Logger;
 
@@ -132,6 +133,10 @@ public class ProjectInformationReader<TConfig extends IHasProjectInfoFile & IHas
         }
 
         return snapshotsToProcess;
+    }
+
+    public Set<Commit> getCommitsThatModifyCFiles() {
+        return this.revisionsReader.getCommitsThatModifyCFiles();
     }
 
 //    protected Map<Commit, Snapshot> mapSnapshotsToCommits() {

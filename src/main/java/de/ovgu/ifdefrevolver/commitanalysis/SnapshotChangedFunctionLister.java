@@ -1,6 +1,7 @@
 package de.ovgu.ifdefrevolver.commitanalysis;
 
 import de.ovgu.ifdefrevolver.bugs.correlate.data.IMinimalSnapshot;
+import de.ovgu.ifdefrevolver.bugs.minecommits.CommitsDistanceDb.Commit;
 import de.ovgu.ifdefrevolver.util.TerminableThread;
 import de.ovgu.ifdefrevolver.util.UncaughtWorkerThreadException;
 import de.ovgu.skunk.detection.input.PositionalXmlReader;
@@ -13,24 +14,23 @@ import org.eclipse.jgit.lib.Repository;
 
 import java.io.File;
 import java.io.IOException;
-import java.util.ArrayList;
-import java.util.Collection;
-import java.util.Iterator;
-import java.util.List;
+import java.util.*;
 import java.util.function.Consumer;
 import java.util.stream.Collectors;
 
 public class SnapshotChangedFunctionLister {
     private static final Logger LOG = Logger.getLogger(SnapshotChangedFunctionLister.class);
+    private final Set<Commit> commitsThatModifyCFiles;
     private ListChangedFunctionsConfig config;
     private IMinimalSnapshot snapshot;
     private int errors = 0;
     private Git git = null;
     private Repository repo = null;
 
-    public SnapshotChangedFunctionLister(ListChangedFunctionsConfig config, IMinimalSnapshot snapshot) {
+    public SnapshotChangedFunctionLister(ListChangedFunctionsConfig config, IMinimalSnapshot snapshot, Set<Commit> commitsThatModifyCFiles) {
         this.config = config;
         this.snapshot = snapshot;
+        this.commitsThatModifyCFiles = commitsThatModifyCFiles;
     }
 
     /**
@@ -83,7 +83,10 @@ public class SnapshotChangedFunctionLister {
             protected void actuallyDoStuff(CSVPrinter csv) throws IOException {
                 csv.printRecord(csvRowProvider.headerRow());
                 Consumer<FunctionChangeHunk> csvRowFromFunction = newThreadSafeFunctionToCsvWriter(csv, csvRowProvider);
-                List<String> commitIds = snapshot.getCommits().stream().map(c -> c.commitHash).collect(Collectors.toList());
+                List<String> commitIds = snapshot.getCommits()
+                        .stream()
+                        .filter(c -> commitsThatModifyCFiles.contains(c))
+                        .map(c -> c.commitHash).collect(Collectors.toList());
 
                 try {
                     listChangedFunctions(commitIds, csvRowFromFunction);

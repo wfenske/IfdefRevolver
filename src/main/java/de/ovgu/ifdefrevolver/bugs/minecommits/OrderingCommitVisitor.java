@@ -269,12 +269,15 @@ public class OrderingCommitVisitor implements ICommitVisitorWithOutputFileHeader
 
     private boolean commitModifiesCFile(Commit commit) {
         for (Modification m : commit.getModifications()) {
-            String fileName = m.getFileName();
-            if (fileName.endsWith(".c") || fileName.endsWith(".C")) {
+            if (isCFileName(m.getOldPath()) || isCFileName(m.getNewPath())) {
                 return true;
             }
         }
         return false;
+    }
+
+    public static boolean isCFileName(String fileName) {
+        return fileName.endsWith(".c") || fileName.endsWith(".C");
     }
 
     private boolean finalized = false;

@@ -145,9 +145,10 @@ public class ListChangedFunctions {
         }
     }
 
-    private File listChangedFunctionsInSnapshot(IMinimalSnapshot IMinimalSnapshot) {
-        LOG.debug("Listing functions changed in " + IMinimalSnapshot);
-        SnapshotChangedFunctionLister lister = new SnapshotChangedFunctionLister(config, IMinimalSnapshot);
+    private File listChangedFunctionsInSnapshot(IMinimalSnapshot snapshot) {
+        LOG.debug("Listing functions changed in " + snapshot);
+        final Set<Commit> commitsThatModifyCFiles = this.projectInfo.getCommitsThatModifyCFiles();
+        SnapshotChangedFunctionLister lister = new SnapshotChangedFunctionLister(config, snapshot, commitsThatModifyCFiles);
         File resultCsv = lister.listChangedFunctions();
         if (lister.errorsOccurred()) {
             errors++;
