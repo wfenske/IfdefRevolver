@@ -16,6 +16,9 @@ import java.io.File;
 import java.io.IOException;
 import java.util.*;
 import java.util.function.Consumer;
+import java.util.stream.Collectors;
+
+import static de.ovgu.ifdefrevolver.bugs.minecommits.OrderingCommitVisitor.isCFileName;
 
 /**
  * Created by wfenske on 14.04.17.
@@ -56,7 +59,7 @@ public class CommitChangedFunctionLister {
         LOG.debug("Analyzing commit " + commitId);
         RevWalk rw = null;
         try {
-            List<DiffEntry> diffs;
+            List<DiffEntry> diffEntries;
             try {
                 rw = new RevWalk(repo);
                 RevCommit commit = rw.parseCommit(repo.resolve(commitId));
@@ -79,18 +82,18 @@ public class CommitChangedFunctionLister {
                         RevCommit parent = rw.parseCommit(parentCommitId);
                         currentChangeId = new ChangeId(parentCommitId.getName(), commitId);
                         formatter = getDiffFormatterInstance();
-                        diffs = formatter.scan(parent.getTree(), commit.getTree());
+                        diffEntries = getDiffEntriesThatModifyCFiles(commit, parent);
                         LOG.debug(parentCommitId.name() + " ... " + commitId);
 
-                        Set<String> aSideCFilePaths = getFilenamesOfCFilesModifiedByDiffs(diffs, DiffEntry.Side.OLD);
+                        Set<String> aSideCFilePaths = getFilenamesOfCFilesModifiedByDiffs(diffEntries, DiffEntry.Side.OLD);
                         allASideFunctions = listAllFunctionsInModifiedFiles(parent, aSideCFilePaths);
 
-                        Set<String> bSideCFilePaths = getFilenamesOfCFilesModifiedByDiffs(diffs, DiffEntry.Side.NEW);
+                        Set<String> bSideCFilePaths = getFilenamesOfCFilesModifiedByDiffs(diffEntries, DiffEntry.Side.NEW);
                         allBSideFunctions = listAllFunctionsInModifiedFiles(commit, bSideCFilePaths);
 
                         logFilesAndFunctions("A-side", aSideCFilePaths, allASideFunctions);
                         logFilesAndFunctions("B-side", bSideCFilePaths, allBSideFunctions);
-                        mapEditsToFunctionLocations(diffs);
+                        mapEditsToFunctionLocations(diffEntries);
                         changedFunctionConsumer.mergeAndPublishRemainingHunks();
                     } catch (RuntimeException re) {
                         LOG.warn("Error analyzing diffs for parent " + iParent + " of commit " + commitId, re);
@@ -108,6 +111,13 @@ public class CommitChangedFunctionLister {
         } finally {
             releaseRevisionWalker(rw);
         }
+    }
+
+    private List<DiffEntry> getDiffEntriesThatModifyCFiles(RevCommit commit, RevCommit parent) throws IOException {
+        return formatter.scan(parent.getTree(), commit.getTree())
+                .stream()
+                .filter(e -> isCFileName(e.getOldPath()) || isCFileName(e.getNewPath()))
+                .collect(Collectors.toList());
     }
 
     private void addFunctionsOfParentLessCommit(RevCommit commit) throws IOException {
@@ -160,17 +170,17 @@ public class CommitChangedFunctionLister {
         }
     }
 
-    private void mapEditsToFunctionLocations(List<DiffEntry> diffs) throws IOException {
+    private void mapEditsToFunctionLocations(List<DiffEntry> diffEntries) throws IOException {
         LOG.debug("Mapping edits to function locations");
-        for (DiffEntry diff : diffs) {
-            listFunctionChanges(diff);
+        for (DiffEntry diffEntry : diffEntries) {
+            listFunctionChanges(diffEntry);
         }
     }
 
-    private static Set<String> getFilenamesOfCFilesModifiedByDiffs(List<DiffEntry> diffs, DiffEntry.Side side) {
+    private static Set<String> getFilenamesOfCFilesModifiedByDiffs(List<DiffEntry> diffEntries, DiffEntry.Side side) {
         Set<String> filePaths = new HashSet<>();
-        for (DiffEntry diff : diffs) {
-            String path = diff.getPath(side);
+        for (DiffEntry diffEntry : diffEntries) {
+            String path = diffEntry.getPath(side);
             if (OrderingCommitVisitor.isCFileName(path)) {
                 filePaths.add(path);
             }
@@ -197,26 +207,42 @@ public class CommitChangedFunctionLister {
     private enum DiffType {
         EDIT {
             @Override
-            public void handleZeroEdits(CommitChangedFunctionLister self, String oldPath, String newPath, List<Method> oldFunctions, List<Method> newFunctions) {
+            public void handleZeroEdits(CommitChangedFunctionLister self, String oldPath, String newPath,
+                                        List<Method> oldFunctions, List<Method> newFunctions) {
                 // Nothing to do: old and new file are the same, but there are no edits
                 return;
             }
         },
         ADD {
             @Override
-            public void handleZeroEdits(CommitChangedFunctionLister self, String oldPath, String newPath, List<Method> oldFunctions, List<Method> newFunctions) {
-                throw new RuntimeException("Didn't really expect a file addition with zero edits. Commit: " + self.commitId + " old path: " + oldPath + " new path: " + newPath + " old functions: " + oldFunctions + " new functions: " + newFunctions);
+            public void handleZeroEdits(CommitChangedFunctionLister self, String oldPath, String newPath,
+                                        List<Method> oldFunctions, List<Method> newFunctions) {
+                for (Method f : newFunctions) {
+                    LOG.debug("Publishing pseudo add for a file addition with zero edits. Commit: " + self.commitId + " old path: " + oldPath + " new path: " + newPath + " added function: " + f);
+                    self.publishPseudoAdd(oldPath, newPath, f);
+                }
+                if (!oldFunctions.isEmpty()) {
+                    LOG.warn("Didn't expect old functions in a file addition with zero edits. Commit: " + self.commitId + " old path: " + oldPath + " new path: " + newPath + " old functions: " + oldFunctions);
+                }
             }
         },
         DEL {
             @Override
-            public void handleZeroEdits(CommitChangedFunctionLister self, String oldPath, String newPath, List<Method> oldFunctions, List<Method> newFunctions) {
-                throw new RuntimeException("Didn't really expect a file deletion with zero edits. Commit: " + self.commitId + " old path: " + oldPath + " new path: " + newPath + " old functions: " + oldFunctions + " new functions: " + newFunctions);
+            public void handleZeroEdits(CommitChangedFunctionLister self, String oldPath, String newPath,
+                                        List<Method> oldFunctions, List<Method> newFunctions) {
+                for (Method f : oldFunctions) {
+                    LOG.debug("Publishing pseudo del for a file deletion with zero edits. Commit: " + self.commitId + " old path: " + oldPath + " new path: " + newPath + " deleted function: " + f);
+                    self.publishPseudoDel(oldPath, newPath, f);
+                }
+                if (!newFunctions.isEmpty()) {
+                    LOG.warn("Didn't expect new functions in a file deletion with zero edits. Commit: " + self.commitId + " old path: " + oldPath + " new path: " + newPath + " new functions: " + newFunctions);
+                }
             }
         },
         RENAME {
             @Override
-            public void handleZeroEdits(CommitChangedFunctionLister self, String oldPath, String newPath, List<Method> oldFunctions, List<Method> newFunctions) {
+            public void handleZeroEdits(CommitChangedFunctionLister self, String oldPath, String newPath,
+                                        List<Method> oldFunctions, List<Method> newFunctions) {
                 self.publishMoveEvents(oldPath, newPath, oldFunctions, newFunctions);
             }
         };
@@ -248,9 +274,9 @@ public class CommitChangedFunctionLister {
         }
     }
 
-    private void listFunctionChanges(final DiffEntry diff) throws IOException {
-        final String oldPath = diff.getOldPath();
-        final String newPath = diff.getNewPath();
+    private void listFunctionChanges(final DiffEntry diffEntry) throws IOException {
+        final String oldPath = diffEntry.getOldPath();
+        final String newPath = diffEntry.getNewPath();
 
         final DiffType diffType = getFileDiffType(oldPath, newPath);
 
@@ -279,7 +305,7 @@ public class CommitChangedFunctionLister {
         }
 
         int iEdit = 0;
-        EditList edits = formatter.toFileHeader(diff).toEditList();
+        EditList edits = formatter.toFileHeader(diffEntry).toEditList();
 
         if (edits.isEmpty()) {
             diffType.handleZeroEdits(this, oldPath, newPath, oldFunctions, newFunctions);
@@ -339,15 +365,23 @@ public class CommitChangedFunctionLister {
 
         for (String signature : deletedSignatures) {
             Method func = oldFunctionsBySignature.get(signature);
-            FunctionChangeHunk fh = FunctionChangeHunk.makePseudoDel(currentChangeId, oldPath, newPath, func);
-            changedFunctionConsumer.accept(fh);
+            publishPseudoDel(oldPath, newPath, func);
         }
 
         for (String signature : createdSignatures) {
             Method func = newFunctionsBySignature.get(signature);
-            FunctionChangeHunk fh = FunctionChangeHunk.makePseudoAdd(currentChangeId, oldPath, newPath, func, Optional.empty());
-            changedFunctionConsumer.accept(fh);
+            publishPseudoAdd(oldPath, newPath, func);
         }
+    }
+
+    private void publishPseudoAdd(String oldPath, String newPath, Method func) {
+        FunctionChangeHunk fh = FunctionChangeHunk.makePseudoAdd(currentChangeId, oldPath, newPath, func, Optional.empty());
+        changedFunctionConsumer.accept(fh);
+    }
+
+    private void publishPseudoDel(String oldPath, String newPath, Method func) {
+        FunctionChangeHunk fh = FunctionChangeHunk.makePseudoDel(currentChangeId, oldPath, newPath, func);
+        changedFunctionConsumer.accept(fh);
     }
 
     private DiffType getFileDiffType(String oldPath, String newPath) {
@@ -355,9 +389,17 @@ public class CommitChangedFunctionLister {
         if (!oldPath.equals(newPath)) {
             if (oldPath.equals("/dev/null"))
                 diffType = DiffType.ADD;
-            else if (newPath.equals("/dev/null"))
+            else if (!isCFileName(oldPath)) {
+                LOG.info("A non-.c file is being renamed to a .c file: "
+                        + oldPath + " -> " + newPath + " Treating it as an ADD.");
+                diffType = DiffType.ADD;
+            } else if (newPath.equals("/dev/null"))
                 diffType = DiffType.DEL;
-            else
+            else if (!isCFileName(newPath)) {
+                LOG.info("A .c file is being renamed to a non-.c file: "
+                        + oldPath + " -> " + newPath + " Treating it as a DEL.");
+                diffType = DiffType.DEL;
+            } else
                 diffType = DiffType.RENAME;
         }
         return diffType;
