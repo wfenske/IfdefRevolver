@@ -15,9 +15,9 @@ class Branch {
     protected Commit mostRecentCommit;
     protected final MoveConflictStats moveConflictStats;
     protected final FunctionsInBranch functions;
-    protected final Set<Commit> directCommits = new LinkedHashSet<>();
+    protected final List<Commit> directCommits = new ArrayList<>();
     protected final FunctionInBranchFactory functionFactory;
-    private Map<Commit, PreMergeBranch> preMergeBranches = new HashMap<>();
+    private Map<Commit, PreMergeBranch> preMergeBranches = null;
 
     protected Branch(Branch[] parentBranches, Commit firstCommit, MoveConflictStats moveConflictStats, FunctionsInBranch functionsInBranch, FunctionInBranchFactory functionFactory) {
         this.parentBranches = parentBranches;
@@ -30,7 +30,7 @@ class Branch {
         this.directCommits.add(firstCommit);
     }
 
-    public Branch(Branch[] parentBranches, Commit firstCommit, MoveConflictStats moveConflictStats, FunctionInBranchFactory functionFactory) {
+    protected Branch(Branch[] parentBranches, Commit firstCommit, MoveConflictStats moveConflictStats, FunctionInBranchFactory functionFactory) {
         this(parentBranches, firstCommit, moveConflictStats, new FunctionsInBranch(moveConflictStats, functionFactory), functionFactory);
     }
 
@@ -189,7 +189,7 @@ class Branch {
     }
 
     public PreMergeBranch createPreMergeBranch(final Commit mergeCommit) {
-        PreMergeBranch preMergeBranch = preMergeBranches.get(mergeCommit);
+        PreMergeBranch preMergeBranch = getPreMergeBranchOrNull(mergeCommit);
         if (preMergeBranch == null) {
             final Commit lastCommitBeforeMerge = this.getMostRecentCommit();
             preMergeBranch = new PreMergeBranch(this,
@@ -204,11 +204,16 @@ class Branch {
     }
 
     public PreMergeBranch getPreMergeBranchOrDie(final Commit mergeCommit) {
-        PreMergeBranch preMergeBranch = preMergeBranches.get(mergeCommit);
+        PreMergeBranch preMergeBranch = getPreMergeBranchOrNull(mergeCommit);
         if (preMergeBranch != null) {
             return preMergeBranch;
         }
         throw new NullPointerException("Pre-merge branch for merge -> " + mergeCommit.commitHash + " does not exist.");
+    }
+
+    private PreMergeBranch getPreMergeBranchOrNull(Commit mergeCommit) {
+        if (this.preMergeBranches == null) this.preMergeBranches = new HashMap<>();
+        return this.preMergeBranches.get(mergeCommit);
     }
 
     public Set<FunctionId> getCurrentlyActiveFunctionIds() {

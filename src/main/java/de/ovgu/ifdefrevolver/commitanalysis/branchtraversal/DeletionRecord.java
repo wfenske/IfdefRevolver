@@ -1,6 +1,6 @@
 package de.ovgu.ifdefrevolver.commitanalysis.branchtraversal;
 
-import de.ovgu.ifdefrevolver.bugs.minecommits.CommitsDistanceDb;
+import de.ovgu.ifdefrevolver.bugs.minecommits.CommitsDistanceDb.Commit;
 import org.apache.log4j.Logger;
 
 import java.util.ArrayList;
@@ -13,7 +13,7 @@ class DeletionRecord {
     private static Logger LOG = Logger.getLogger(DeletionRecord.class);
 
     public final FunctionInBranch function;
-    public final CommitsDistanceDb.Commit deletingCommit;
+    public final Commit deletingCommit;
     public final Branch branch;
     private boolean active = true;
 
@@ -21,10 +21,10 @@ class DeletionRecord {
         final boolean logDebug = LOG.isDebugEnabled();
 
         List<DeletionRecord> result = new ArrayList<>();
-        Set<CommitsDistanceDb.Commit> allCommits = records.stream().map(r -> r.deletingCommit).collect(Collectors.toSet());
+        Set<Commit> allCommits = records.stream().map(r -> r.deletingCommit).collect(Collectors.toSet());
 
         for (DeletionRecord r : records) {
-            final CommitsDistanceDb.Commit deletingCommit = r.deletingCommit;
+            final Commit deletingCommit = r.deletingCommit;
             if (allCommits.stream().noneMatch(otherCommit -> (otherCommit != deletingCommit) && otherCommit.isDescendant(deletingCommit))) {
                 result.add(r);
             } else {
@@ -73,7 +73,7 @@ class DeletionRecord {
         return new DeletionRecordSummary(numActive, numInactive);
     }
 
-    DeletionRecord(FunctionInBranch function, CommitsDistanceDb.Commit deletingCommit, Branch branch) {
+    DeletionRecord(FunctionInBranch function, Commit deletingCommit, Branch branch) {
         this.function = function;
         this.deletingCommit = deletingCommit;
         this.branch = branch;

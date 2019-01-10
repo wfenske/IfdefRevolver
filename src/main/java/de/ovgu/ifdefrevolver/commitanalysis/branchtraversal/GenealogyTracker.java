@@ -120,8 +120,12 @@ public class GenealogyTracker {
 
     private LinkedGroupingListMap<Commit, FunctionChangeRow> mergeFunctionChangeRows(Set<FunctionInBranch> equivalentFunctions) {
         GroupingListMap<Commit, FunctionChangeRow> unorderedChanges = new GroupingListMap<>();
+
         for (FunctionInBranch equivalentFunction : equivalentFunctions) {
-            for (Map.Entry<Commit, List<FunctionChangeRow>> e : equivalentFunction.getChanges().getMap().entrySet()) {
+            Optional<LinkedGroupingListMap<Commit, FunctionChangeRow>> optChangesToEquivalentFunction = equivalentFunction.getChanges();
+            if (!optChangesToEquivalentFunction.isPresent()) continue;
+
+            for (Map.Entry<Commit, List<FunctionChangeRow>> e : optChangesToEquivalentFunction.get().getMap().entrySet()) {
                 final Commit commit = e.getKey();
                 for (FunctionChangeRow changeRow : e.getValue()) {
                     unorderedChanges.put(commit, changeRow);
@@ -161,11 +165,13 @@ public class GenealogyTracker {
     private LinkedHashMap<Commit, AbResRow> mergeJointFunctionAbSmellRows(Set<FunctionInBranch> equivalentFunctions) {
         Map<Commit, AbResRow> rawResult = new HashMap<>();
         for (FunctionInBranch equivalentFunction : equivalentFunctions) {
-            rawResult.putAll(equivalentFunction.getJointFunctionAbSmellRows());
+            Optional<Map<Commit, AbResRow>> jointFunctionAbSmellRows = equivalentFunction.getJointFunctionAbSmellRows();
+            if (jointFunctionAbSmellRows.isPresent()) {
+                rawResult.putAll(jointFunctionAbSmellRows.get());
+            }
         }
         return orderByCommitTraversalOrder(rawResult);
     }
-
 
     protected void processCommit(Commit c) {
         LOG.debug("Processing " + c);
@@ -362,6 +368,8 @@ public class GenealogyTracker {
     }
 
     private Branch assignBranch(Commit commit) {
+        final boolean isLogDebug = LOG.isDebugEnabled();
+
         final Branch existingBranch = branchesByCommitKey[commit.key];
         if (existingBranch != null) {
             throw new IllegalArgumentException("Commit " +
@@ -371,22 +379,30 @@ public class GenealogyTracker {
         final Branch branch;
         Commit[] parents = commit.parents();
         if (parents.length == 0) { // a root commit
-            LOG.debug("Creating new root branch for commit " + commit);
+            if (isLogDebug) {
+                LOG.debug("Creating new root branch for commit " + commit);
+            }
             branch = Branch.createRootBranch(commit, moveConflictStats, functionFactory);
         } else if (parents.length == 1) {
             Commit parent = parents[0];
             if (parent.children().length == 1) {
-                LOG.debug("Inheriting branch for " + commit + " from parent " + parent);
+                if (isLogDebug) {
+                    LOG.debug("Inheriting branch for " + commit + " from parent " + parent);
+                }
                 branch = getBranchForCommitOrDie(parent);
                 branch.addDirectCommit(currentCommit);
             } else {
                 // Parent splits into multiple branches
-                LOG.debug("Creating new branch after branch split of " + parent + " to " + commit);
+                if (isLogDebug) {
+                    LOG.debug("Creating new branch after branch split of " + parent + " to " + commit);
+                }
                 Branch parentBranch = getBranchForCommitOrDie(parent);
                 branch = parentBranch.createSplitBranch(commit);
             }
         } else { // a merge commit
-            LOG.debug("Creating new branch after merge of " + Arrays.toString(parents) + " into " + commit);
+            if (isLogDebug) {
+                LOG.debug("Creating new branch after merge of " + Arrays.toString(parents) + " into " + commit);
+            }
             Branch[] parentBranches = new Branch[parents.length];
             for (int i = 0; i < parents.length; i++) {
                 parentBranches[i] = getBranchForCommitOrDie(parents[i]);

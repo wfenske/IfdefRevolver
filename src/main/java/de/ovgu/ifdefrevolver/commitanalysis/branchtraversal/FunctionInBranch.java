@@ -10,37 +10,45 @@ import org.apache.log4j.Logger;
 
 import java.util.LinkedHashMap;
 import java.util.Map;
+import java.util.Optional;
 
 class FunctionInBranch {
     private static Logger LOG = Logger.getLogger(FunctionInBranch.class);
     private final FunctionInBranchFactory factory;
     int uid;
     public final FunctionId firstId;
-    private Map<Commit, AbResRow> jointFunctionAbSmellRows = new LinkedHashMap<>();
-    private LinkedGroupingListMap<Commit, FunctionChangeRow> changes = new LinkedGroupingListMap<>();
+    private Map<Commit, AbResRow> jointFunctionAbSmellRows = null;
+    private LinkedGroupingListMap<Commit, FunctionChangeRow> changes = null;
+    private final boolean isLogDebug;
 
     protected FunctionInBranch(FunctionId firstId, int uid, FunctionInBranchFactory factory) {
         this.firstId = firstId;
         this.uid = uid;
         this.factory = factory;
+        this.isLogDebug = LOG.isDebugEnabled();
     }
 
     public void addChange(FunctionChangeRow change) {
+        if (changes == null) {
+            this.changes = new LinkedGroupingListMap<>();
+        }
         changes.put(change.commit, change);
     }
 
-    public LinkedGroupingListMap<Commit, FunctionChangeRow> getChanges() {
-        return changes;
+    public Optional<LinkedGroupingListMap<Commit, FunctionChangeRow>> getChanges() {
+        return Optional.ofNullable(changes);
     }
 
     public void markSameAs(FunctionInBranch function) {
-        if (function == this) return;
-        LOG.debug("Marking as the same function: " + function + " and " + this);
+        if (isSameAs(function)) return;
+        if (isLogDebug) {
+            LOG.debug("Marking as the same function: " + function + " and " + this);
+        }
         factory.markAsSame(this, function);
     }
 
     public boolean isSameAs(FunctionInBranch other) {
-        return this.uid == other.uid;
+        return ((this == other) || (this.uid == other.uid));
     }
 
     @Override
@@ -50,11 +58,14 @@ class FunctionInBranch {
                 '}';
     }
 
-    public Map<Commit, AbResRow> getJointFunctionAbSmellRows() {
-        return this.jointFunctionAbSmellRows;
+    public Optional<Map<Commit, AbResRow>> getJointFunctionAbSmellRows() {
+        return Optional.ofNullable(this.jointFunctionAbSmellRows);
     }
 
     public void addJointFunctionAbSmellRow(Commit commit, AbResRow jointFunctionAbSmellRow) {
+        if (this.jointFunctionAbSmellRows == null) {
+            this.jointFunctionAbSmellRows = new LinkedHashMap<>();
+        }
         this.jointFunctionAbSmellRows.put(commit, jointFunctionAbSmellRow);
     }
 }

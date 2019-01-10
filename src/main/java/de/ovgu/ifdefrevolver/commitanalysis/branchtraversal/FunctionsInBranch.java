@@ -17,28 +17,34 @@ class FunctionsInBranch {
     protected Branch branch;
     protected final MoveConflictStats moveConflictStats;
     protected final FunctionInBranchFactory functionFactory;
+    private final boolean isLogDebug;
 
     private Map<FunctionId, FunctionInBranch> functionsById = new HashMap<>();
     private Map<FunctionId, DeletionRecord> deleted = new HashMap<>();
-    private GroupingListMap<FunctionId, FunctionChangeRow> movedInCurrentBranch = new GroupingListMap<>();
+    private GroupingListMap<FunctionId, FunctionChangeRow> movedInCurrentBranch = new GroupingListMap<>(1);
 
     public FunctionsInBranch(MoveConflictStats moveConflictStats, FunctionInBranchFactory functionFactory) {
         this.moveConflictStats = moveConflictStats;
         this.functionFactory = functionFactory;
+        this.isLogDebug = LOG.isDebugEnabled();
     }
 
     public void putAdd(FunctionChangeRow change) {
         final FunctionId functionId = change.functionId;
-        LOG.debug("ADD " + functionId + " by " + change.commit.commitHash + " in " + this.branch);
+        if (isLogDebug) {
+            LOG.debug("ADD " + functionId + " by " + change.commit.commitHash + " in " + this.branch);
+        }
 
         FunctionInBranch oldFunction = functionsById.get(functionId);
         if (oldFunction != null) {
-            LOG.debug("Added function already exists: " + functionId);
+            if (isLogDebug) {
+                LOG.debug("Added function already exists: " + functionId);
 //                FunctionInBranch replacedAdd = added.put(functionId, oldFunction);
 //                if ((replacedAdd != null) && (replacedAdd != oldFunction)) {
 //                    LOG.warn("Overwriting a previous add for ID " + functionId);
 //                    overwritten.add(replacedAdd);
 //                }
+            }
             markNotDeleted(functionId, oldFunction, change.commit);
             oldFunction.addChange(change);
         } else {
@@ -62,12 +68,14 @@ class FunctionsInBranch {
         if (lastRecord == null) return null;
 
         if (!lastRecord.isActive()) {
-            LOG.debug("Function was previously deleted but currently is not: " + functionId);
+            if (isLogDebug) LOG.debug("Function was previously deleted but currently is not: " + functionId);
         } else {
             if (isRecordInCurrentBranch(lastRecord)) {
-                LOG.debug("Function was deleted in current branch but is resurrected by " + commit.commitHash + " : " + functionId);
+                if (isLogDebug)
+                    LOG.debug("Function was deleted in current branch but is resurrected by " + commit.commitHash + " : " + functionId);
             } else {
-                LOG.debug("Function was deleted in a previous branch but is resurrected by " + commit.commitHash + " : " + functionId);
+                if (isLogDebug)
+                    LOG.debug("Function was deleted in a previous branch but is resurrected by " + commit.commitHash + " : " + functionId);
             }
             DeletionRecord newRecord = deleteFunction(functionId, lastRecord.function, commit);
             newRecord.deactivate();
@@ -122,7 +130,9 @@ class FunctionsInBranch {
     public void putMod(FunctionChangeRow change) {
         final FunctionId id = change.functionId;
 
-        LOG.debug("MOD " + id + " by " + change.commit.commitHash + " in " + this.branch);
+        if (isLogDebug) {
+            LOG.debug("MOD " + id + " by " + change.commit.commitHash + " in " + this.branch);
+        }
 
         FunctionInBranch function = functionsById.get(id);
         if (function == null) {
@@ -204,12 +214,16 @@ class FunctionsInBranch {
         final FunctionId newFunctionId = change.newFunctionId.get();
 
         if (oldFunctionId.equals(newFunctionId)) {
-            LOG.debug("MOVE is actually a MOD (both ids are the same): " + change);
+            if (isLogDebug) {
+                LOG.debug("MOVE is actually a MOD (both ids are the same): " + change);
+            }
             putMod(change);
             return;
         }
 
-        LOG.debug("MOVE " + oldFunctionId + " -> " + newFunctionId + " by " + change.commit.commitHash + " in " + this.branch);
+        if (isLogDebug) {
+            LOG.debug("MOVE " + oldFunctionId + " -> " + newFunctionId + " by " + change.commit.commitHash + " in " + this.branch);
+        }
 
         FunctionInBranch existingFunction = functionsById.remove(oldFunctionId);
         FunctionInBranch conflictingFunction = functionsById.get(newFunctionId);
@@ -289,11 +303,11 @@ class FunctionsInBranch {
     }
 
     private void logMovesInParentBranches(FunctionId oldFunctionId, FunctionId newFunctionId) {
-        if (LOG.isDebugEnabled()) {
-            for (Branch parent : this.branch.getParentBranches()) {
-                if (parent.functions.moveAlreadyHappenedInCurrentBranch(oldFunctionId, newFunctionId)) {
-                    LOG.debug("An identical MOVE already happened in parent branch " + parent);
-                }
+        if (!isLogDebug) return;
+
+        for (Branch parent : this.branch.getParentBranches()) {
+            if (parent.functions.moveAlreadyHappenedInCurrentBranch(oldFunctionId, newFunctionId)) {
+                LOG.debug("An identical MOVE already happened in parent branch " + parent);
             }
         }
     }
@@ -323,7 +337,9 @@ class FunctionsInBranch {
 
     public void putDel(FunctionChangeRow change) {
         final FunctionId functionId = change.functionId;
-        LOG.debug("DEL " + functionId + " by " + change.commit.commitHash + " in " + this.branch);
+        if (isLogDebug) {
+            LOG.debug("DEL " + functionId + " by " + change.commit.commitHash + " in " + this.branch);
+        }
 
         FunctionInBranch oldFunction = functionsById.remove(functionId);
         if ((oldFunction == null) && isFunctionDeleted(functionId)) {
@@ -389,8 +405,6 @@ class FunctionsInBranch {
             }
         }
 
-        final boolean logDebug = LOG.isDebugEnabled();
-
         final Set<FunctionId> allActiveDeletes = new HashSet<>();
 
         for (Map.Entry<FunctionId, List<DeletionRecord>> deletionEntry : lastDeletionRecordsById.getMap().entrySet()) {
@@ -400,27 +414,23 @@ class FunctionsInBranch {
             final List<DeletionRecord> withoutSupersededRecords = DeletionRecord.excludeSuperseded(allRecords);
             final DeletionRecord.DeletionRecordSummary summary = DeletionRecord.summarizeRecords(withoutSupersededRecords);
 
-            if (logDebug) {
-                final DeletionRecord.DeletionRecordSummary allRecordsSummary = DeletionRecord.summarizeRecords(allRecords);
-                if (allRecordsSummary.isAmbiguous() && !summary.isAmbiguous()) {
-                    Set<DeletionRecord> supersededRecords = new LinkedHashSet<>(allRecords);
-                    supersededRecords.removeAll(withoutSupersededRecords);
-                    LOG.debug("Summary of all records is ambiguous but summary of non-superseded records is not. allRecords=" +
-                            allRecords + " withoutSupersededRecords=" + withoutSupersededRecords + " supersededRecords=" + supersededRecords);
-                }
-            }
+            logMergeDeletedSummary(allRecords, withoutSupersededRecords, summary);
 
             final DeletionRecord winningDeletionRecord = withoutSupersededRecords.get(withoutSupersededRecords.size() - 1);
 //                final FunctionInBranch function = winningDeletionRecord.function;
             if (summary.isNeverDeleted()) {
-                LOG.debug("Function is not deleted in any parent branch: " + id + " branch=" + this.branch);
+                if (isLogDebug) {
+                    LOG.debug("Function is not deleted in any parent branch: " + id + " branch=" + this.branch);
+                }
 //                    for (DeletionRecord r : withoutSupersededRecords) {
 //                        this.deleted.put(id, r);
 //                    }
                 //this.markNotDeleted(id, function, this.branch.firstCommit);
                 this.deleted.put(id, winningDeletionRecord);
             } else if (summary.isAlwaysDeleted()) {
-                LOG.debug("Function is deleted in all parent branches: " + id + " branch=" + this.branch);
+                if (isLogDebug) {
+                    LOG.debug("Function is deleted in all parent branches: " + id + " branch=" + this.branch);
+                }
 //                    for (DeletionRecord r : withoutSupersededRecords) {
 //                        this.deleted.put(id, r);
 //                    }
@@ -435,6 +445,18 @@ class FunctionsInBranch {
         }
 
         return allActiveDeletes;
+    }
+
+    private void logMergeDeletedSummary(List<DeletionRecord> allRecords, List<DeletionRecord> withoutSupersededRecords, DeletionRecord.DeletionRecordSummary summary) {
+        if (isLogDebug) {
+            final DeletionRecord.DeletionRecordSummary allRecordsSummary = DeletionRecord.summarizeRecords(allRecords);
+            if (allRecordsSummary.isAmbiguous() && !summary.isAmbiguous()) {
+                Set<DeletionRecord> supersededRecords = new LinkedHashSet<>(allRecords);
+                supersededRecords.removeAll(withoutSupersededRecords);
+                LOG.debug("Summary of all records is ambiguous but summary of non-superseded records is not. allRecords=" +
+                        allRecords + " withoutSupersededRecords=" + withoutSupersededRecords + " supersededRecords=" + supersededRecords);
+            }
+        }
     }
 
     private void mergeChangesOfMergeCommits(PreMergeBranch[] parentBranches, List<FunctionChangeRow> changesOfMergeCommit) {
@@ -470,7 +492,9 @@ class FunctionsInBranch {
                         } else {
                             final List<FunctionChangeRow> dels = delsByFunctionId.get(functionId);
                             if ((dels != null) && dels.stream().anyMatch(del -> del.isSamePreviousRevisionAndCommit(change))) {
-                                LOG.debug("Ignoring MOD to function that is deleted by another hunk in the same commit: " + change);
+                                if (isLogDebug) {
+                                    LOG.debug("Ignoring MOD to function that is deleted by another hunk in the same commit: " + change);
+                                }
                                 merged = true;
                             } else {
                                 LOG.warn("Ignoring MOD to non-existing function: " + change);
@@ -492,14 +516,14 @@ class FunctionsInBranch {
 
     private void handleDisplacedFunctionDuringBranchMerge(FunctionId id, FunctionInBranch function, FunctionInBranch displaced) {
         boolean isSameAlready = function.isSameAs(displaced);
-        if (!isSameAlready) {
-            function.markSameAs(displaced);
-        }
+        function.markSameAs(displaced);
 
-        if (isSameAlready) {
-            LOG.debug("Parent branch adds different function for same ID " + id + " during merge of " + this.branch);
-        } else {
-            LOG.debug("Parent branch adds different function for same ID " + id + " during merge of " + this.branch);
+        if (isLogDebug) {
+            if (isSameAlready) {
+                LOG.debug("Parent branch adds different function for same ID " + id + " during merge of " + this.branch);
+            } else {
+                LOG.debug("Parent branch adds different function for same ID " + id + " during merge of " + this.branch);
+            }
         }
     }
 
@@ -578,7 +602,7 @@ class FunctionsInBranch {
     }
 
     private void removeFunctionBecauseItDoesNotExistAtSnapshotStart(Commit commit, FunctionId functionId) {
-        LOG.warn("Function does not exist in all functions and/or AB smells exists in branch tracker. Removing it now. " +
+        LOG.warn("Function does not exist in all functions and/or AB smells but exists in branch tracker. Removing it now. " +
                 "function=" + functionId + " commit=" + commit);
         FunctionInBranch oldFunction = functionsById.remove(functionId);
         if (oldFunction == null) {
@@ -593,7 +617,9 @@ class FunctionsInBranch {
 
     private void assignJointFunctionAbSmellRow(Commit commit, AbResRow jointFunctionAbSmellRow) {
         final FunctionId functionId = jointFunctionAbSmellRow.getFunctionId();
-        LOG.debug("Assigning joint function with AB smell " + functionId);
+        if (isLogDebug) {
+            LOG.debug("Assigning joint function with AB smell " + functionId);
+        }
         FunctionInBranch function = this.functionsById.get(functionId);
         function.addJointFunctionAbSmellRow(commit, jointFunctionAbSmellRow);
     }
