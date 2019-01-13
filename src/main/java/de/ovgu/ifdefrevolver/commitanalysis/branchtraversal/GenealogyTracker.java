@@ -277,17 +277,7 @@ public class GenealogyTracker {
             }
         }
 
-        logActiveBranches();
-    }
-
-    private void logActiveBranches() {
-        final int len = branchesByCommitKey.length;
-        int numActiveBranches = 0;
-        for (int i = 0; i < len; i++) {
-            if (branchesByCommitKey[i] != null) {
-                numActiveBranches++;
-            }
-        }
+        final int numActiveBranches = allBranches.size() - branchesToDiscard.size();
         LOG.info(numActiveBranches + " active branches remain.");
     }
 
