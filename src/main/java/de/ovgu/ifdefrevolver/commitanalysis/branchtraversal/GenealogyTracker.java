@@ -68,7 +68,8 @@ public class GenealogyTracker {
     }
 
     public LinkedGroupingListMap<Snapshot, FunctionGenealogy> processCommits() {
-        this.processedCommits = new BitSet();
+        final int numCommits = projectInfo.commitsDb().getNumCommits();
+        this.processedCommits = new BitSet(numCommits);
         this.numBranchesCreated = 0;
         this.lastTimeBranchesWereClosed = 0;
         this.snapshots = projectInfo.getAllSnapshots();
@@ -82,7 +83,6 @@ public class GenealogyTracker {
         }
 
         this.moveConflictStats = new MoveConflictStats();
-        final int numCommits = projectInfo.commitsDb().getNumCommits();
         this.branchesByCommitKey = new Branch[numCommits];
         this.functionFactory = new FunctionInBranchFactory();
         this.changesProcessed = 0;

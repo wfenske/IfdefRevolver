@@ -14,12 +14,13 @@ import java.util.Optional;
 
 class FunctionInBranch {
     private static Logger LOG = Logger.getLogger(FunctionInBranch.class);
+
     private final FunctionInBranchFactory factory;
+    private final boolean isLogDebug;
     int uid;
     public final FunctionId firstId;
     private Map<Commit, AbResRow> jointFunctionAbSmellRows = null;
     private LinkedGroupingListMap<Commit, FunctionChangeRow> changes = null;
-    private final boolean isLogDebug;
 
     protected FunctionInBranch(FunctionId firstId, int uid, FunctionInBranchFactory factory) {
         this.firstId = firstId;
