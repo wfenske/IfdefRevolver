@@ -30,6 +30,7 @@ class FunctionsInBranch {
     }
 
     public void close() {
+        this.branch = null;
         this.functionsById = Collections.emptyMap();
         this.deleted = Collections.emptyMap();
         this.movedInCurrentBranch = GroupingListMap.emptyMap();

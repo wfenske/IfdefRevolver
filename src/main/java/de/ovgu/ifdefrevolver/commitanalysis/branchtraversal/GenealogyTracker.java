@@ -276,6 +276,19 @@ public class GenealogyTracker {
                 branchesByCommitKey[i] = null;
             }
         }
+
+        logActiveBranches();
+    }
+
+    private void logActiveBranches() {
+        final int len = branchesByCommitKey.length;
+        int numActiveBranches = 0;
+        for (int i = 0; i < len; i++) {
+            if (branchesByCommitKey[i] != null) {
+                numActiveBranches++;
+            }
+        }
+        LOG.info(numActiveBranches + " active branches remain.");
     }
 
     private boolean isBranchActive(Branch b) {

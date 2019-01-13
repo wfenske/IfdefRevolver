@@ -4,18 +4,19 @@ import de.ovgu.ifdefrevolver.bugs.minecommits.CommitsDistanceDb.Commit;
 import de.ovgu.ifdefrevolver.commitanalysis.AbResRow;
 import de.ovgu.ifdefrevolver.commitanalysis.FunctionChangeRow;
 import de.ovgu.ifdefrevolver.commitanalysis.FunctionId;
+import org.apache.log4j.Logger;
 
 import java.util.*;
 
 class Branch {
-    //private static Logger LOG = Logger.getLogger(Branch.class);
+    private static Logger LOG = Logger.getLogger(Branch.class);
     private static final Branch[] EMPTY_PARENT_BRANCHES = new Branch[0];
 
     protected Branch[] parentBranches;
     protected final Commit firstCommit;
     protected Commit mostRecentCommit;
     protected final MoveConflictStats moveConflictStats;
-    protected final FunctionsInBranch functions;
+    protected FunctionsInBranch functions;
     protected List<Commit> directCommits = new ArrayList<>();
     protected final FunctionInBranchFactory functionFactory;
     private Map<Commit, PreMergeBranch> preMergeBranches = null;
@@ -33,7 +34,8 @@ class Branch {
 
     public void close() {
         this.parentBranches = EMPTY_PARENT_BRANCHES;
-        this.functions.close();
+        //this.functions.close();
+        this.functions = null;
         this.directCommits = Collections.emptyList();
         this.preMergeBranches = null;
     }
@@ -155,7 +157,9 @@ class Branch {
     }
 
     public void logOccurrenceOfFunction(FunctionId id) {
-        this.functions.logOccurrenceOfFunction(id);
+        if (this.functions != null) {
+            this.functions.logOccurrenceOfFunction(id);
+        }
     }
 
 
@@ -225,6 +229,10 @@ class Branch {
     }
 
     public Set<FunctionId> getCurrentlyActiveFunctionIds() {
+        if (this.functions == null) {
+            LOG.warn("getCurrentlyActiveFunctionIds called for obsolete branch");
+            return Collections.emptySet();
+        }
         return this.functions.getCurrentlyActiveFunctionIds();
     }
 
