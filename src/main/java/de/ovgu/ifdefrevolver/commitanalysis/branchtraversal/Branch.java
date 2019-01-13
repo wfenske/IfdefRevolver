@@ -34,8 +34,7 @@ class Branch {
 
     public void close() {
         this.parentBranches = EMPTY_PARENT_BRANCHES;
-        //this.functions.close();
-        this.functions = null;
+        this.functions.close();
         this.directCommits = Collections.emptyList();
         this.preMergeBranches = null;
     }
