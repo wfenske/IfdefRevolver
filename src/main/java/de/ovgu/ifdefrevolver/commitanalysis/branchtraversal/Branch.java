@@ -12,13 +12,14 @@ class Branch {
     private static Logger LOG = Logger.getLogger(Branch.class);
     private static final Branch[] EMPTY_PARENT_BRANCHES = new Branch[0];
 
-    protected Branch[] parentBranches;
     protected final Commit firstCommit;
-    protected Commit mostRecentCommit;
     protected final MoveConflictStats moveConflictStats;
+    protected final FunctionInBranchFactory functionFactory;
+    
+    protected Branch[] parentBranches;
+    protected Commit mostRecentCommit;
     protected FunctionsInBranch functions;
     protected List<Commit> directCommits = new ArrayList<>();
-    protected final FunctionInBranchFactory functionFactory;
     private Map<Commit, PreMergeBranch> preMergeBranches = null;
 
     protected Branch(Branch[] parentBranches, Commit firstCommit, MoveConflictStats moveConflictStats, FunctionsInBranch functionsInBranch, FunctionInBranchFactory functionFactory) {
@@ -32,15 +33,15 @@ class Branch {
         this.directCommits.add(firstCommit);
     }
 
+    protected Branch(Branch[] parentBranches, Commit firstCommit, MoveConflictStats moveConflictStats, FunctionInBranchFactory functionFactory) {
+        this(parentBranches, firstCommit, moveConflictStats, new FunctionsInBranch(moveConflictStats, functionFactory), functionFactory);
+    }
+
     public void close() {
         this.parentBranches = EMPTY_PARENT_BRANCHES;
         this.functions.close();
         this.directCommits = Collections.emptyList();
         this.preMergeBranches = null;
-    }
-
-    protected Branch(Branch[] parentBranches, Commit firstCommit, MoveConflictStats moveConflictStats, FunctionInBranchFactory functionFactory) {
-        this(parentBranches, firstCommit, moveConflictStats, new FunctionsInBranch(moveConflictStats, functionFactory), functionFactory);
     }
 
     public static Branch createRootBranch(Commit commit, MoveConflictStats moveConflictStats, FunctionInBranchFactory functionFactory) {

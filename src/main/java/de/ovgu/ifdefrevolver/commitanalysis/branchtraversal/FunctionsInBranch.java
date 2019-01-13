@@ -14,11 +14,11 @@ import java.util.stream.Collectors;
 class FunctionsInBranch {
     private static Logger LOG = Logger.getLogger(FunctionsInBranch.class);
 
-    protected Branch branch;
     protected final MoveConflictStats moveConflictStats;
     protected final FunctionInBranchFactory functionFactory;
     private final boolean isLogDebug;
 
+    protected Branch branch;
     private Map<FunctionId, FunctionInBranch> functionsById = new HashMap<>();
     private Map<FunctionId, DeletionRecord> deleted = new HashMap<>();
     private GroupingListMap<FunctionId, FunctionChangeRow> movedInCurrentBranch = new GroupingListMap<>(1);
