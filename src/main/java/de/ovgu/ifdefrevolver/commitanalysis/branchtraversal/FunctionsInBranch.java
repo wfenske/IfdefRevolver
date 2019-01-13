@@ -585,18 +585,26 @@ class FunctionsInBranch {
     }
 
     public TrackingErrorStats assignJointFunctionAbSmellRows(Commit commit, List<AbResRow> jointFunctionAbSmellRows) {
-        TrackingErrorStats errorStats = new TrackingErrorStats(
-                extractActualFunctionIds(jointFunctionAbSmellRows),
-                new HashSet<>(this.functionsById.keySet()));
+        final Set<FunctionId> actualFunctions = extractActualFunctionIds(jointFunctionAbSmellRows);
+        final Set<FunctionId> computedFunctions = new HashSet<>(this.functionsById.keySet());
+
+        Set<FunctionId> missingFunctionIds = new HashSet<>(actualFunctions);
+        missingFunctionIds.removeAll(computedFunctions);
+        missingFunctionIds = new HashSet<>(missingFunctionIds);
+
+        TrackingErrorStats errorStats = new TrackingErrorStats(actualFunctions, computedFunctions);
 
         for (AbResRow row : jointFunctionAbSmellRows) {
-            if (errorStats.isMissing(row.getFunctionId())) {
+            if (missingFunctionIds.contains(row.getFunctionId())) {
                 createFunctionBecauseItExistsAtSnapshotStart(commit, row);
             }
             assignJointFunctionAbSmellRow(commit, row);
         }
 
-        for (FunctionId superfluousId : errorStats.getSuperfluousFunctions()) {
+        Set<FunctionId> superfluousFunctionIds = new HashSet<>(computedFunctions);
+        superfluousFunctionIds.removeAll(actualFunctions);
+
+        for (FunctionId superfluousId : superfluousFunctionIds) {
             removeFunctionBecauseItDoesNotExistAtSnapshotStart(commit, superfluousId);
         }
 

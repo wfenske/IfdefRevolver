@@ -317,7 +317,7 @@ public class GenealogyTracker {
 
     private void reportTrackingStats() {
         if (!LOG.isInfoEnabled()) return;
-        TrackingErrorStats totalStats = TrackingErrorStats.aggregate(this.trackingStats);
+        TrackingErrorStats totalStats = new TrackingErrorStats(this.trackingStats);
         LOG.info("Aggregated tracking accuracy over all snapshots: " + totalStats);
     }
 

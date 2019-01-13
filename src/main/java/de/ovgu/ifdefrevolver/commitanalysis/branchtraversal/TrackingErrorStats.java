@@ -5,79 +5,50 @@ import de.ovgu.ifdefrevolver.commitanalysis.FunctionId;
 import java.util.Collection;
 import java.util.HashSet;
 import java.util.Set;
-import java.util.stream.Collectors;
 
 public class TrackingErrorStats {
-    private final Set<FunctionId> actualFunctions;
-    private final Set<FunctionId> computedFunctions;
-    private Set<FunctionId> matchingFunctions;
-    private Set<FunctionId> missingFunctions;
-    private Set<FunctionId> superfluousFunctions;
+    private int numActualFunctions;
+    private int numMatchingFunctions;
+    private int numMissingFunctions;
+    private int numSuperfluousFunctions;
 
     public TrackingErrorStats(Set<FunctionId> actualFunctions, Set<FunctionId> computedFunctions) {
-        this.actualFunctions = actualFunctions;
-        this.computedFunctions = computedFunctions;
+        numActualFunctions = actualFunctions.size();
 
-        this.matchingFunctions = new HashSet<>(actualFunctions);
+        Set<FunctionId> matchingFunctions = new HashSet<>(actualFunctions);
         matchingFunctions.retainAll(computedFunctions);
-        matchingFunctions = new HashSet<>(matchingFunctions);
+        numMatchingFunctions = matchingFunctions.size();
 
-        this.missingFunctions = new HashSet<>(actualFunctions);
+        Set<FunctionId> missingFunctions = new HashSet<>(actualFunctions);
         missingFunctions.removeAll(computedFunctions);
-        missingFunctions = new HashSet<>(missingFunctions);
+        numMissingFunctions = missingFunctions.size();
 
-        this.superfluousFunctions = new HashSet<>(computedFunctions);
+        Set<FunctionId> superfluousFunctions = new HashSet<>(computedFunctions);
         superfluousFunctions.removeAll(actualFunctions);
-        superfluousFunctions = new HashSet<>(superfluousFunctions);
+        numSuperfluousFunctions = superfluousFunctions.size();
     }
 
-    public static TrackingErrorStats aggregate(Collection<TrackingErrorStats> stats) {
-        int ixTrackerId = 0;
-        Set<FunctionId> allActualFunctions = new HashSet<>();
-        Set<FunctionId> allComputedFunctions = new HashSet<>();
-        for (TrackingErrorStats s : stats) {
-            String prefix = String.format("#%03d ", ixTrackerId);
-            allActualFunctions.addAll(addPrefix(prefix, s.actualFunctions));
-            allComputedFunctions.addAll(addPrefix(prefix, s.computedFunctions));
-            ixTrackerId++;
-        }
-        return new TrackingErrorStats(allActualFunctions, allComputedFunctions);
-    }
-
-    private static Collection<? extends FunctionId> addPrefix(String prefix, Set<FunctionId> functionIds) {
-        return functionIds.stream().map(f -> addPrefix(prefix, f)).collect(Collectors.toSet());
-    }
-
-    private static FunctionId addPrefix(String prefix, FunctionId id) {
-        return new FunctionId(prefix + id.signature, prefix + id.file);
-    }
-
-    public boolean isMissing(FunctionId id) {
-        return this.missingFunctions.contains(id);
-    }
-
-    public Set<FunctionId> getMissingFunctions() {
-        return missingFunctions;
-    }
-
-    public Set<FunctionId> getSuperfluousFunctions() {
-        return superfluousFunctions;
+    public TrackingErrorStats(Collection<TrackingErrorStats> stats) {
+        this.numActualFunctions = stats.stream().mapToInt(s -> s.numActualFunctions).sum();
+        this.numMatchingFunctions = stats.stream().mapToInt(s -> s.numMatchingFunctions).sum();
+        this.numMissingFunctions = stats.stream().mapToInt(s -> s.numMissingFunctions).sum();
+        this.numSuperfluousFunctions = stats.stream().mapToInt(s -> s.numSuperfluousFunctions).sum();
     }
 
     public int getNumActualFunctions() {
-        return actualFunctions.size();
+        return numActualFunctions;
     }
 
     public int getNumMissingFunctions() {
-        return missingFunctions.size();
+        return numMissingFunctions;
     }
 
     public int getNumSuperfluousFunctions() {
-        return superfluousFunctions.size();
+        return numSuperfluousFunctions;
     }
 
     public int getNumMatchingFunctions() {
-        return matchingFunctions.size();
+        return numMatchingFunctions;
     }
 
     public int getNumErroneousFunctions() {
