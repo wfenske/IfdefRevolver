@@ -20,12 +20,15 @@ public class TrackingErrorStats {
 
         this.matchingFunctions = new HashSet<>(actualFunctions);
         matchingFunctions.retainAll(computedFunctions);
+        matchingFunctions = new HashSet<>(matchingFunctions);
 
         this.missingFunctions = new HashSet<>(actualFunctions);
         missingFunctions.removeAll(computedFunctions);
+        missingFunctions = new HashSet<>(missingFunctions);
 
         this.superfluousFunctions = new HashSet<>(computedFunctions);
         superfluousFunctions.removeAll(actualFunctions);
+        superfluousFunctions = new HashSet<>(superfluousFunctions);
     }
 
     public static TrackingErrorStats aggregate(Collection<TrackingErrorStats> stats) {

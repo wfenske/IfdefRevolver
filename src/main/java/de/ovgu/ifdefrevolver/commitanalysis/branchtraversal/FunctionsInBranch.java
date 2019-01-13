@@ -29,6 +29,12 @@ class FunctionsInBranch {
         this.isLogDebug = LOG.isDebugEnabled();
     }
 
+    public void close() {
+        this.functionsById = Collections.emptyMap();
+        this.deleted = Collections.emptyMap();
+        this.movedInCurrentBranch = GroupingListMap.emptyMap();
+    }
+
     public void putAdd(FunctionChangeRow change) {
         final FunctionId functionId = change.functionId;
         if (isLogDebug) {
@@ -390,9 +396,9 @@ class FunctionsInBranch {
             }
         }
 
-        for (PreMergeBranch parentBranch : parentBranches) {
-            inheritDeletedRecords(parentBranch.functions);
-        }
+//        for (PreMergeBranch parentBranch : parentBranches) {
+//            inheritDeletedRecords(parentBranch.functions);
+//        }
     }
 
     private Set<FunctionId> mergeDeleted(PreMergeBranch[] parentBranches) {
@@ -529,11 +535,7 @@ class FunctionsInBranch {
 
     public void inherit(FunctionsInBranch parentFunctions) {
         this.functionsById.putAll(parentFunctions.functionsById);
-        inheritDeletedRecords(parentFunctions);
-    }
-
-    private void inheritDeletedRecords(FunctionsInBranch parentFunctions) {
-        deleted.putAll(parentFunctions.deleted);
+        this.deleted.putAll(parentFunctions.deleted);
     }
 
     public void logOccurrenceOfFunction(FunctionId id) {

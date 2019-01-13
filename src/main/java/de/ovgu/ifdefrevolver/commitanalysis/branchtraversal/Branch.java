@@ -9,13 +9,14 @@ import java.util.*;
 
 class Branch {
     //private static Logger LOG = Logger.getLogger(Branch.class);
+    private static final Branch[] EMPTY_PARENT_BRANCHES = new Branch[0];
 
-    protected final Branch[] parentBranches;
+    protected Branch[] parentBranches;
     protected final Commit firstCommit;
     protected Commit mostRecentCommit;
     protected final MoveConflictStats moveConflictStats;
     protected final FunctionsInBranch functions;
-    protected final List<Commit> directCommits = new ArrayList<>();
+    protected List<Commit> directCommits = new ArrayList<>();
     protected final FunctionInBranchFactory functionFactory;
     private Map<Commit, PreMergeBranch> preMergeBranches = null;
 
@@ -28,6 +29,13 @@ class Branch {
         this.functions.setBranch(this);
         this.functionFactory = functionFactory;
         this.directCommits.add(firstCommit);
+    }
+
+    public void close() {
+        this.parentBranches = EMPTY_PARENT_BRANCHES;
+        this.functions.close();
+        this.directCommits = Collections.emptyList();
+        this.preMergeBranches = null;
     }
 
     protected Branch(Branch[] parentBranches, Commit firstCommit, MoveConflictStats moveConflictStats, FunctionInBranchFactory functionFactory) {

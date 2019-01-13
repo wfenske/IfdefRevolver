@@ -18,7 +18,9 @@ import java.util.stream.Collectors;
 public class GenealogyTracker {
     private static Logger LOG = Logger.getLogger(GenealogyTracker.class);
 
-    private final List<FunctionChangeRow>[] changesByCommitKey;
+    private static final FunctionChangeRow[] NO_CHANGES = new FunctionChangeRow[0];
+
+    private final FunctionChangeRow[][] changesByCommitKey;
     private final AddChangeDistancesConfig config;
     private final ProjectInformationReader projectInfo;
     private final Map<Date, List<AllFunctionsRow>> allFunctionsInSnapshots;
@@ -34,16 +36,38 @@ public class GenealogyTracker {
     private int changesProcessed;
     private Map<Commit, Snapshot> snapshotsByStartCommit;
     private List<TrackingErrorStats> trackingStats;
+    private BitSet processedCommits;
+    private final boolean isLogDebug;
+    private int numBranchesCreated;
 
     public GenealogyTracker(ProjectInformationReader projectInfo, AddChangeDistancesConfig config, List<FunctionChangeRow>[] changesByCommitKey, Map<Date, List<AllFunctionsRow>> allFunctionsInSnapshots, Map<Date, List<AbResRow>> annotationDataInSnapshots) {
-        this.changesByCommitKey = changesByCommitKey;
+        this.changesByCommitKey = transformChangesByCommitKey(changesByCommitKey);
         this.config = config;
         this.projectInfo = projectInfo;
         this.allFunctionsInSnapshots = allFunctionsInSnapshots;
         this.annotationDataInSnapshots = annotationDataInSnapshots;
+        this.isLogDebug = LOG.isDebugEnabled();
+    }
+
+    private static FunctionChangeRow[][] transformChangesByCommitKey(List<FunctionChangeRow>[] changesByCommitKey) {
+        final int numCommits = changesByCommitKey.length;
+        FunctionChangeRow[][] result = new FunctionChangeRow[numCommits][];
+        for (int iCommit = 0; iCommit < numCommits; iCommit++) {
+            result[iCommit] = toArray(changesByCommitKey[iCommit]);
+        }
+        return result;
+    }
+
+    private static FunctionChangeRow[] toArray(List<FunctionChangeRow> rows) {
+        if (rows.isEmpty()) return NO_CHANGES;
+        else {
+            return rows.toArray(new FunctionChangeRow[rows.size()]);
+        }
     }
 
     public LinkedGroupingListMap<Snapshot, FunctionGenealogy> processCommits() {
+        this.processedCommits = new BitSet();
+        this.numBranchesCreated = 0;
         this.snapshots = projectInfo.getAllSnapshots();
         this.trackingStats = new ArrayList<>();
 
@@ -174,10 +198,12 @@ public class GenealogyTracker {
     }
 
     protected void processCommit(Commit c) {
-        LOG.debug("Processing " + c);
+        if (isLogDebug) LOG.debug("Processing " + c);
         this.currentCommit = c;
         this.currentBranch = assignBranch(currentCommit);
-        LOG.debug("Current branch of " + currentCommit + " is " + this.currentBranch);
+        if (isLogDebug) {
+            LOG.debug("Current branch of " + currentCommit + " is " + this.currentBranch);
+        }
 
         processChangesOfCurrentCommit();
 
@@ -194,6 +220,61 @@ public class GenealogyTracker {
                 this.currentBranch.createPreMergeBranch(child);
             }
         }
+
+        this.processedCommits.set(c.key);
+        if (this.numBranchesCreated % 100 == 0) {
+            this.closeObsoleteBranches();
+        }
+    }
+
+    private void closeObsoleteBranches() {
+        Set<Branch> allBranches = new HashSet<>();
+        Set<Branch> activeBranches = new HashSet<>();
+        for (Branch b : branchesByCommitKey) {
+            if (b == null) continue;
+            boolean isNew = allBranches.add(b);
+            if (isNew) {
+                if (isBranchActive(b)) {
+                    activeBranches.add(b);
+                }
+            }
+        }
+
+        Set<Branch> branchesToDiscard = new HashSet<>(allBranches);
+        for (Branch activeBranch : activeBranches) {
+            branchesToDiscard.remove(activeBranch);
+            for (Branch parent : activeBranch.parentBranches) {
+                branchesToDiscard.remove(parent);
+            }
+        }
+
+        LOG.info("Closing " + branchesToDiscard.size() + " obsolete branch(es).");
+        for (Branch b : branchesToDiscard) {
+            b.close();
+        }
+
+        final int len = branchesByCommitKey.length;
+        for (int i = 0; i < len; i++) {
+            Branch b = branchesByCommitKey[i];
+            if (b == null) return;
+            if (branchesToDiscard.contains(b)) {
+                branchesByCommitKey[i] = null;
+            }
+        }
+    }
+
+    private boolean isBranchActive(Branch b) {
+        Commit c = b.getMostRecentCommit();
+        for (Commit child : c.children()) {
+            if (!isProcessedCommit(child)) {
+                return true;
+            }
+        }
+        return false;
+    }
+
+    private boolean isProcessedCommit(Commit commit) {
+        return processedCommits.get(commit.key);
     }
 
     private boolean isCurrentCommitSnapshotStart() {
@@ -368,8 +449,6 @@ public class GenealogyTracker {
     }
 
     private Branch assignBranch(Commit commit) {
-        final boolean isLogDebug = LOG.isDebugEnabled();
-
         final Branch existingBranch = branchesByCommitKey[commit.key];
         if (existingBranch != null) {
             throw new IllegalArgumentException("Commit " +
@@ -383,6 +462,7 @@ public class GenealogyTracker {
                 LOG.debug("Creating new root branch for commit " + commit);
             }
             branch = Branch.createRootBranch(commit, moveConflictStats, functionFactory);
+            this.numBranchesCreated++;
         } else if (parents.length == 1) {
             Commit parent = parents[0];
             if (parent.children().length == 1) {
@@ -398,6 +478,7 @@ public class GenealogyTracker {
                 }
                 Branch parentBranch = getBranchForCommitOrDie(parent);
                 branch = parentBranch.createSplitBranch(commit);
+                this.numBranchesCreated++;
             }
         } else { // a merge commit
             if (isLogDebug) {
@@ -407,7 +488,12 @@ public class GenealogyTracker {
             for (int i = 0; i < parents.length; i++) {
                 parentBranches[i] = getBranchForCommitOrDie(parents[i]);
             }
-            branch = Branch.createMergeBranch(commit, parentBranches, getChangesOfCurrentCommit());
+
+            final List<FunctionChangeRow> changesOfCurrentCommit = Arrays.asList(getChangesOfCurrentCommit());
+            branch = Branch.createMergeBranch(commit, parentBranches, changesOfCurrentCommit);
+            changesByCommitKey[currentCommit.key] = changesOfCurrentCommit.toArray(
+                    new FunctionChangeRow[changesOfCurrentCommit.size()]);
+            this.numBranchesCreated++;
         }
 
         branchesByCommitKey[commit.key] = branch;
@@ -421,15 +507,15 @@ public class GenealogyTracker {
     }
 
     private void processChangesOfCurrentCommit() {
-        List<FunctionChangeRow> changes = getChangesOfCurrentCommit();
+        FunctionChangeRow[] changes = getChangesOfCurrentCommit();
         assignChangesToFunctions(changes);
     }
 
-    private List<FunctionChangeRow> getChangesOfCurrentCommit() {
+    private FunctionChangeRow[] getChangesOfCurrentCommit() {
         return changesByCommitKey[currentCommit.key];
     }
 
-    private void assignChangesToFunctions(Collection<FunctionChangeRow> changes) {
+    private void assignChangesToFunctions(FunctionChangeRow[] changes) {
         GroupingListMap<FunctionId, FunctionChangeRow> deletions = new GroupingListMap<>();
         for (FunctionChangeRow r : changes) {
             switch (r.modType) {
@@ -443,7 +529,9 @@ public class GenealogyTracker {
             boolean isModOfDeletedFunction = isModOfDeletedFunction(deletions, r);
 
             if (isModOfDeletedFunction) {
-                LOG.debug("Skipping MOD/MOVE of function that was deleted by a previous hunk in the same commit: " + r);
+                if (isLogDebug) {
+                    LOG.debug("Skipping MOD/MOVE of function that was deleted by a previous hunk in the same commit: " + r);
+                }
             } else {
                 assignChangeToFunctionsInBranch(r);
             }
