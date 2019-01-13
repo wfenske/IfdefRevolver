@@ -271,7 +271,9 @@ public class GenealogyTracker {
             }
         }
 
-        LOG.info("Closing " + branchesToDiscard.size() + " obsolete branch(es).");
+        final int numActiveBranches = allBranches.size() - branchesToDiscard.size();
+        LOG.info("Closing " + branchesToDiscard.size() + " obsolete branch(es). " +
+                numActiveBranches + " active branches will remain.");
         for (Branch b : branchesToDiscard) {
             b.close();
         }
@@ -279,14 +281,13 @@ public class GenealogyTracker {
         final int len = branchesByCommitKey.length;
         for (int i = 0; i < len; i++) {
             Branch b = branchesByCommitKey[i];
-            if (b == null) return;
+            if (b == null) continue;
             if (branchesToDiscard.contains(b)) {
                 branchesByCommitKey[i] = null;
             }
         }
 
-        final int numActiveBranches = allBranches.size() - branchesToDiscard.size();
-        LOG.info(numActiveBranches + " active branches remain.");
+        LOG.info("Done closing obsolete branches.");
     }
 
     private boolean isBranchActive(Branch b) {
