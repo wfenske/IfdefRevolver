@@ -8,6 +8,7 @@ import de.ovgu.ifdefrevolver.commitanalysis.AllFunctionsRow;
 import de.ovgu.ifdefrevolver.commitanalysis.FunctionChangeRow;
 import de.ovgu.ifdefrevolver.commitanalysis.FunctionId;
 import de.ovgu.ifdefrevolver.commitanalysis.distances.AddChangeDistancesConfig;
+import de.ovgu.ifdefrevolver.util.ProgressMonitor;
 import de.ovgu.skunk.util.GroupingListMap;
 import de.ovgu.skunk.util.LinkedGroupingListMap;
 import org.apache.log4j.Logger;
@@ -79,12 +80,26 @@ public class GenealogyTracker {
         }
 
         this.moveConflictStats = new MoveConflictStats();
-        this.branchesByCommitKey = new Branch[projectInfo.commitsDb().getNumCommits()];
+        final int numCommits = projectInfo.commitsDb().getNumCommits();
+        this.branchesByCommitKey = new Branch[numCommits];
         this.functionFactory = new FunctionInBranchFactory();
         this.changesProcessed = 0;
 
+        ProgressMonitor pm = new ProgressMonitor(numCommits) {
+            @Override
+            protected void reportIntermediateProgress() {
+                LOG.info("Processed " + this.ticksDone + " commits (" + this.percentage() + "%).");
+            }
+
+            @Override
+            protected void reportFinished() {
+                LOG.info("Processed all " + this.ticksDone + " commits (" + this.percentage() + "%).");
+            }
+        };
+
         for (Commit c : commitsInSnapshots) {
             processCommit(c);
+            pm.increaseDone();
         }
 
         onAllCommitsProcessed();
