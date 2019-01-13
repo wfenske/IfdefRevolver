@@ -40,6 +40,7 @@ public class GenealogyTracker {
     private BitSet processedCommits;
     private final boolean isLogDebug;
     private int numBranchesCreated;
+    private int lastTimeBranchesWereClosed;
 
     public GenealogyTracker(ProjectInformationReader projectInfo, AddChangeDistancesConfig config, List<FunctionChangeRow>[] changesByCommitKey, Map<Date, List<AllFunctionsRow>> allFunctionsInSnapshots, Map<Date, List<AbResRow>> annotationDataInSnapshots) {
         this.changesByCommitKey = transformChangesByCommitKey(changesByCommitKey);
@@ -69,6 +70,7 @@ public class GenealogyTracker {
     public LinkedGroupingListMap<Snapshot, FunctionGenealogy> processCommits() {
         this.processedCommits = new BitSet();
         this.numBranchesCreated = 0;
+        this.lastTimeBranchesWereClosed = 0;
         this.snapshots = projectInfo.getAllSnapshots();
         this.trackingStats = new ArrayList<>();
 
@@ -237,8 +239,14 @@ public class GenealogyTracker {
         }
 
         this.processedCommits.set(c.key);
-        if (this.numBranchesCreated % 100 == 0) {
+        maybeCloseObsoleteBranches();
+    }
+
+    private void maybeCloseObsoleteBranches() {
+        if (((this.numBranchesCreated % 100) == 0) &&
+                (this.lastTimeBranchesWereClosed != this.numBranchesCreated)) {
             this.closeObsoleteBranches();
+            this.lastTimeBranchesWereClosed = this.numBranchesCreated;
         }
     }
 
