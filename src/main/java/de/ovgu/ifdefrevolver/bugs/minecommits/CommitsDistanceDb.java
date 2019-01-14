@@ -173,8 +173,6 @@ public class CommitsDistanceDb {
      */
     int[][] intParents;
 
-    Map<CacheKey, Integer> knownDistances = new HashMap<>();
-
     /**
      * Map from child commit (first dimension index) to ancestor commits (second dimension index)
      */
@@ -203,74 +201,6 @@ public class CommitsDistanceDb {
     private BitSet newReachablesColumn() {
         int sz = getNumCommits();
         return new BitSet(sz);
-    }
-
-    /**
-     * Calculate the length of the shortest path from a child commit to its ancestor
-     *
-     * @param child    the child commit
-     * @param ancestor a preceding commit
-     * @return Minimum distance in terms of commits from child to ancestor; {@link #INFINITE_DISTANCE} if no path can be
-     * found
-     */
-    int minDistance1(int child, int ancestor, CacheKey cacheKey) {
-        // Test for end of recursion
-        if (child == ancestor) {
-            return 0;
-        }
-
-        int[] currentParents = intParents[child];
-
-        // Optimization for the common case that a commit has exactly one parent
-        int distanceLocallyTraveled = 1;
-        while (currentParents.length == 1) {
-            int parent = currentParents[0];
-            if (parent == ancestor) {
-                return distanceLocallyTraveled;
-            }
-            currentParents = intParents[parent];
-            // Update iteration
-            distanceLocallyTraveled++;
-        }
-
-        // Recurse
-        int winningDist = INFINITE_DISTANCE;
-        for (int i = 0; i < currentParents.length; i++) {
-            int currentParent = currentParents[i];
-            if (!isReachable(currentParent, ancestor)) continue;
-
-            CacheKey localCacheKey = new CacheKey(currentParent, ancestor);
-            Integer cachedDist;
-            synchronized (knownDistances) {
-                cachedDist = knownDistances.get(localCacheKey);
-            }
-
-            int nextDist;
-            if (cachedDist != null) {
-                nextDist = cachedDist;
-            } else {
-                nextDist = minDistance1(currentParent, ancestor, localCacheKey);
-            }
-            if (nextDist < winningDist) {
-                winningDist = nextDist;
-            }
-        }
-
-        // Return result
-        int result;
-        if (winningDist < INFINITE_DISTANCE) {
-            result = winningDist + distanceLocallyTraveled;
-        } else {
-            result = INFINITE_DISTANCE;
-        }
-
-        if (cacheKey != null) {
-            synchronized (knownDistances) {
-                knownDistances.put(cacheKey, result);
-            }
-        }
-
-        return result;
     }
 
     public Set<Commit> getCommits() {
