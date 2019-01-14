@@ -337,7 +337,7 @@ public class GenealogyTracker {
 
     protected void onAllCommitsProcessed() {
         LOG.info("Successfully processed " + commitsInSnapshots.size() + " commits and " + changesProcessed + " changes.");
-        maybeReportBranchStats();
+        //maybeReportBranchStats();
         reportMoveConflicts();
         reportTrackingStats();
     }
@@ -361,6 +361,8 @@ public class GenealogyTracker {
 
     protected void maybeReportBranchStats() {
         if (!LOG.isInfoEnabled()) return;
+
+        // FIXME, 2019-01-14, wf: These figures are inaccurate if cleaning of obsolete branches is active.
 
         Set<Branch> branches = new HashSet<>();
         int merges = 0;

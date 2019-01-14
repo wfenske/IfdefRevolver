@@ -215,7 +215,8 @@ public class AddChangeDistances {
         final int WINDOW_SIZE = config.getWindowSize();
         final int SLIDE = config.getWindowSlide();
 
-//        final int numWindows = Math.max(snapshots.size() - WINDOW_SIZE, 0) / SLIDE + 1;
+        List<Snapshot> allSnapshots = this.projectInfo.getAllSnapshots();
+        final int numWindows = Math.max(allSnapshots.size() - WINDOW_SIZE, 0) / SLIDE + 1;
 //        ProgressMonitor pm = new ProgressMonitor(numWindows) {
 //            @Override
 //            protected void reportIntermediateProgress() {
@@ -229,10 +230,10 @@ public class AddChangeDistances {
 //        };
 
         List<CommitWindow> windows = new ArrayList<>();
-        List<Snapshot> allSnapshots = this.projectInfo.getAllSnapshots();
         final int lastStartIndex = allSnapshots.size() - WINDOW_SIZE;
 
         for (int startIndex = 0; startIndex <= lastStartIndex; startIndex += SLIDE) {
+            LOG.info("Computing window " + windows.size() + "/" + numWindows);
             final List<Snapshot> snapshotsInWindow = allSnapshots.subList(startIndex, startIndex + WINDOW_SIZE);
             final Snapshot firstSnapshot = allSnapshots.get(startIndex);
             final List<FunctionGenealogy> functionsInFirstSnapshot = functionGenealogiesBySnapshot.get(firstSnapshot);
@@ -241,6 +242,7 @@ public class AddChangeDistances {
             windows.add(window);
             //pm.increaseDone();
         }
+        LOG.info("Done computing windows. " + windows.size() + " windows have been created.");
 
         writeAbSmellAgeSnapshotCsv(windows);
     }
