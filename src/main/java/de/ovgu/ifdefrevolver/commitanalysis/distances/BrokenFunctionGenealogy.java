@@ -43,7 +43,7 @@ public class BrokenFunctionGenealogy {
         while ((i1 < len1) && (i2 < len2)) {
             FunctionIdWithCommit c1 = l1.get(i1);
             FunctionIdWithCommit c2 = l2.get(i2);
-            if (c1.commit.isDescendant(c2.commit)) { // c1 comes after c2 --> take c2
+            if (c1.commit.isDescendantOf(c2.commit)) { // c1 comes after c2 --> take c2
                 result.add(c2);
                 i2++;
             } else {
@@ -67,7 +67,7 @@ public class BrokenFunctionGenealogy {
 
     public int isSuccessor(BrokenFunctionGenealogy earlierGenealogy) {
         if (this.firstId.commit == earlierGenealogy.firstId.commit) return -1;
-        if (!this.firstId.commit.isDescendant(earlierGenealogy.firstId.commit)) return -1;
+        if (!this.firstId.commit.isDescendantOf(earlierGenealogy.firstId.commit)) return -1;
 //        if (!earlierGenealogy.commitsByFunctionId.containsKey(firstId.functionId)) return -1;
 //        if (functionsIdsWithCommitsIntersect(earlierGenealogy)) return 0;
         return earlierGenealogy.mergePosition(this.firstId);
@@ -79,7 +79,7 @@ public class BrokenFunctionGenealogy {
         for (int i = 0; i < len; i++) {
             FunctionIdWithCommit myId = functionIdsWithCommitsList.get(i);
             if (!myId.functionId.equals(id.functionId)) continue;
-            if (!id.commit.isDescendant(myId.commit)) continue;
+            if (!id.commit.isDescendantOf(myId.commit)) continue;
 
             final int nextI = i + 1;
             if (nextI >= len) {
@@ -89,7 +89,7 @@ public class BrokenFunctionGenealogy {
             }
 
             Commit nextCommit = functionIdsWithCommitsList.get(nextI).commit;
-            if (nextCommit.isDescendant(id.commit)) {
+            if (nextCommit.isDescendantOf(id.commit)) {
                 return 0;
             }
         }

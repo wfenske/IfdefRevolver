@@ -25,11 +25,11 @@ class DeletionRecord {
 
         for (DeletionRecord r : records) {
             final Commit deletingCommit = r.deletingCommit;
-            if (allCommits.stream().noneMatch(otherCommit -> (otherCommit != deletingCommit) && otherCommit.isDescendant(deletingCommit))) {
+            if (allCommits.stream().noneMatch(otherCommit -> (otherCommit != deletingCommit) && otherCommit.isDescendantOf(deletingCommit))) {
                 result.add(r);
             } else {
                 if (logDebug) {
-                    Set<String> supersedingCommits = allCommits.stream().filter(otherCommit -> (otherCommit != deletingCommit) && otherCommit.isDescendant(deletingCommit)).map(c -> c.commitHash).collect(Collectors.toSet());
+                    Set<String> supersedingCommits = allCommits.stream().filter(otherCommit -> (otherCommit != deletingCommit) && otherCommit.isDescendantOf(deletingCommit)).map(c -> c.commitHash).collect(Collectors.toSet());
                     LOG.debug("Deletion record " + r + " is superseded by at least one other deletion record in " + records);
                     LOG.debug("Current deleting commit: " + deletingCommit.commitHash + " superseding commits=" + supersedingCommits);
                 }

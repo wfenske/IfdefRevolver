@@ -93,10 +93,12 @@ public class FunctionGenealogy {
         assertExistsAtStartOfSnapshot(s);
 
         Commit startCommit = s.getStartCommit();
-        Set<Commit> newestChangingCommits = getNewestChangingCommitsBefore(startCommit);
+        Set<Commit> newestChangingCommitsBeforeStartCommit = getNewestChangingCommitsBefore(startCommit);
 
-        if (!newestChangingCommits.isEmpty()) {
-            return newestChangingCommits.stream().mapToInt(c -> c.minDistance(startCommit).get()).min();
+        if (!newestChangingCommitsBeforeStartCommit.isEmpty()) {
+            return newestChangingCommitsBeforeStartCommit.stream()
+                    .mapToInt(c -> startCommit.distanceAmongCModifyingCommits(c).get())
+                    .min();
         }
 
         if (haveChangesForOlderSnapshotThan(s)) {
@@ -135,7 +137,7 @@ public class FunctionGenealogy {
 
         Set<Commit> result = new HashSet<>();
         for (Commit c : allChaningCommitsBefore) {
-            if (allChaningCommitsBefore.stream().noneMatch(descendant -> (descendant != c) && descendant.isDescendant(c))) {
+            if (allChaningCommitsBefore.stream().noneMatch(descendant -> (descendant != c) && descendant.isDescendantOf(c))) {
                 result.add(c);
             }
         }
@@ -148,7 +150,7 @@ public class FunctionGenealogy {
 
         Set<Commit> result = new HashSet<>();
         for (Commit c : allChaningCommitsBefore) {
-            if (allChaningCommitsBefore.stream().noneMatch(ancestor -> (ancestor != c) && c.isDescendant(ancestor))) {
+            if (allChaningCommitsBefore.stream().noneMatch(ancestor -> (ancestor != c) && c.isDescendantOf(ancestor))) {
                 result.add(c);
             }
         }
@@ -157,20 +159,21 @@ public class FunctionGenealogy {
     }
 
     private Set<Commit> getAllChangingCommitsBefore(Commit point) {
-        Set<Commit> allOlderCommits = new HashSet<>();
+        Set<Commit> allChangingCommits = changesBySnapshot.getMap().values().stream()
+                .flatMap(changeRows -> changeRows.stream())
+                .map(change -> change.commit)
+                .collect(Collectors.toCollection(HashSet::new));
 
-        for (Map.Entry<Snapshot, List<FunctionChangeRow>> e : changesBySnapshot.getMap().entrySet()) {
-            e.getValue().forEach(change -> allOlderCommits.add(change.commit));
-        }
-        allOlderCommits.remove(point);
+        allChangingCommits.remove(point);
 
-        for (Iterator<Commit> olderCommitIter = allOlderCommits.iterator(); olderCommitIter.hasNext(); ) {
-            if (!point.isDescendant(olderCommitIter.next())) {
-                olderCommitIter.remove();
+        for (Iterator<Commit> it = allChangingCommits.iterator(); it.hasNext(); ) {
+            final Commit ancestor = it.next();
+            if (!point.isDescendantOf(ancestor)) {
+                it.remove();
             }
         }
 
-        return allOlderCommits;
+        return allChangingCommits;
     }
 
     @Override

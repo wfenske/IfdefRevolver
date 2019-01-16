@@ -36,6 +36,8 @@ public class CommitsDistanceDb {
         private final CommitsDistanceDb db;
         public final String commitHash;
         public final int key;
+        private int ixInTraversalOrder = -1;
+        private int ixAsCModifyingCommitInTraversalOrder = -1;
         private String timestamp;
         private Commit[] parents = EMPTY_COMMITS_ARRAY;
         private Commit[] children = EMPTY_COMMITS_ARRAY;
@@ -83,17 +85,48 @@ public class CommitsDistanceDb {
          * @return <code>true</code> if and only if <code>this</code> is a descendant of (or the same as) the given
          * commit
          */
-        public boolean isDescendant(Commit possibleAncestor) {
+        public boolean isDescendantOf(Commit possibleAncestor) {
             return db.isDescendant(this, possibleAncestor);
         }
 
+        private void dieUnlessTraversalIndexInitialized() {
+            if (ixInTraversalOrder < 0) {
+                throw new IllegalStateException("Traversal index of commit not initialized. " + this);
+            }
+        }
+
         /**
-         * @param descendant A commit that is supposed to be an descendant of <code>this</code>
-         * @return distance from this commit to the descendant commit; or {@link Optional#empty()} if there is no
+         * @param ancestor A commit that is supposed to be an ancestor of <code>this</code>
+         * @return distance from this commit to the given ancestor commit; or {@link Optional#empty()} if there is no
          * possible path
          */
-        public Optional<Integer> minDistance(Commit descendant) {
-            return db.minDistance(descendant, this);
+        public Optional<Integer> distanceAmongAllCommits(Commit ancestor) {
+            this.dieUnlessTraversalIndexInitialized();
+            ancestor.dieUnlessTraversalIndexInitialized();
+
+            if (isDescendantOf(ancestor)) {
+                int distance = this.ixInTraversalOrder - ancestor.ixInTraversalOrder;
+                return Optional.of(distance);
+            } else {
+                return Optional.empty();
+            }
+        }
+
+        /**
+         * @param ancestor A commit that is supposed to be an ancestor of <code>this</code>
+         * @return distance from this commit to the given ancestor commit, but only considering commits that modify C
+         * files; or {@link Optional#empty()} if there is no possible path
+         */
+        public Optional<Integer> distanceAmongCModifyingCommits(Commit ancestor) {
+            this.dieUnlessTraversalIndexInitialized();
+            ancestor.dieUnlessTraversalIndexInitialized();
+
+            if (this.isDescendantOf(ancestor)) {
+                int distance = this.ixAsCModifyingCommitInTraversalOrder - ancestor.ixAsCModifyingCommitInTraversalOrder;
+                return Optional.of(distance);
+            } else {
+                return Optional.empty();
+            }
         }
 
         public Commit[] parents() {
@@ -124,32 +157,17 @@ public class CommitsDistanceDb {
             return false;
         }
 
+        public void setIxInTraversalOrder(int ixInTraversalOrder) {
+            this.ixInTraversalOrder = ixInTraversalOrder;
+        }
+
+        public void setIxAsCModifyingCommitInTraversalOrder(int ixAsCModifyingCommitInTraversalOrder) {
+            this.ixAsCModifyingCommitInTraversalOrder = ixAsCModifyingCommitInTraversalOrder;
+        }
+
         @Override
         public int compareTo(Commit o) {
             return this.key - o.key;
-        }
-    }
-
-    private static class CacheKey {
-        final int child;
-        final int ancestor;
-
-        public CacheKey(int child, int ancestor) {
-            this.child = child;
-            this.ancestor = ancestor;
-        }
-
-        @Override
-        public int hashCode() {
-            return child ^ ancestor;
-        }
-
-        @Override
-        public boolean equals(Object obj) {
-            if (obj == null) return false;
-            if (!(obj instanceof CacheKey)) return false;
-            CacheKey other = (CacheKey) obj;
-            return (other.ancestor == this.ancestor) && (other.child == this.child);
         }
     }
 
@@ -381,80 +399,23 @@ public class CommitsDistanceDb {
         }
     }
 
-    int requests = 0;
-    long firstRequestMillis;
-
-    /**
-     * Calculate the length of the shortest path from a child commit to its ancestor
-     *
-     * @param child    the child commit
-     * @param ancestor a preceding commit
-     * @return Minimum distance in terms of commits from child to ancestor if there is a path; {@link Optional#empty()}
-     * otherwise
-     */
-    public Optional<Integer> minDistance(String child, String ancestor) {
-        ensurePreprocessed();
-
-        if (child == null) {
-            throw new NullPointerException("Child commit must not be null");
+    public void initializeDistanceInformation(Collection<Commit> commitsInTraversalOrder, Set<Commit> cModifyingCommits) {
+        int ixInTraversalOrder = 0;
+        int ixAsCModifyingCommit = 0;
+        for (Commit c : commitsInTraversalOrder) {
+            c.setIxInTraversalOrder(ixInTraversalOrder);
+            c.setIxAsCModifyingCommitInTraversalOrder(ixAsCModifyingCommit);
+            ixInTraversalOrder++;
+            if (cModifyingCommits.contains(c)) {
+                ixAsCModifyingCommit++;
+            }
         }
-        if (ancestor == null) {
-            throw new NullPointerException("Ancestor commit must not be null");
-        }
-
-        final int childKey = findCommitOrDie(child).key;
-        final int ancestorKey = findCommitOrDie(ancestor).key;
-
-        return minDistance(childKey, ancestorKey);
-    }
-
-    /**
-     * Calculate the length of the shortest path from a child commit to its ancestor
-     *
-     * @param child    the child commit
-     * @param ancestor a preceding commit
-     * @return Minimum distance in terms of commits from child to ancestor if there is a path; {@link Optional#empty()}
-     * otherwise
-     */
-    public Optional<Integer> minDistance(Commit child, Commit ancestor) {
-        ensurePreprocessed();
-        validateCommit(child);
-        validateCommit(ancestor);
-        return minDistance(child.key, ancestor.key);
     }
 
     private void validateCommit(Commit commit) {
         if (commit.db != this) {
             throw new IllegalArgumentException("Unknown commit: " + commit);
         }
-    }
-
-    private Optional<Integer> minDistance(int iChildKey, int iAncestorKey) {
-        if (iChildKey == iAncestorKey) {
-            return DIST_ZERO;
-        }
-
-        if (!isReachable(iChildKey, iAncestorKey)) {
-            return Optional.empty();
-        }
-
-        CacheKey cacheKey = new CacheKey(iChildKey, iAncestorKey);
-        synchronized (knownDistances) {
-            Integer cachedDist = knownDistances.get(cacheKey);
-            if (cachedDist != null) {
-                return optionalizeDistance(cachedDist);
-            }
-        }
-
-        final int dist;
-        if (isReachable(iChildKey, iAncestorKey)) {
-            maybeStatPerformance();
-            dist = minDistance1(iChildKey, iAncestorKey, cacheKey);
-        } else {
-            dist = INFINITE_DISTANCE;
-        }
-
-        return optionalizeDistance(dist);
     }
 
     /**
@@ -486,34 +447,6 @@ public class CommitsDistanceDb {
         }
 
         return numAncestors;
-    }
-
-    private void maybeStatPerformance() {
-        if (!LOG.isDebugEnabled()) return;
-
-        if (requests == 0) {
-            LOG.debug("First request.");
-//                System.out.flush();
-//                System.err.flush();
-            firstRequestMillis = System.currentTimeMillis();
-        } else if ((requests % 40000) == 0) {
-            long timeInMillis = System.currentTimeMillis() - firstRequestMillis;
-            long timeInSeconds = timeInMillis / 1000;
-            LOG.debug("Computation request: " + requests + ". Total time: " + timeInSeconds
-                    + " seconds (" + ((timeInMillis * 1000) / requests) + "ns/request). "
-                    + "Cache size: " + knownDistances.size() + " entries.");
-//                System.out.flush();
-//                System.err.flush();
-        }
-        requests++;
-    }
-
-    private static Optional<Integer> optionalizeDistance(int dist) {
-        if (dist == INFINITE_DISTANCE) {
-            return Optional.empty();
-        } else {
-            return Optional.of(dist);
-        }
     }
 
     private void put(String commitHash, String... parentHashes) {
@@ -579,24 +512,6 @@ public class CommitsDistanceDb {
         return commitsWithoutAncestors;
     }
 
-    public boolean areCommitsRelated(String c1, String c2) {
-        ensurePreprocessed();
-        if (c1 == null) {
-            throw new NullPointerException("Descendant commit must not be null");
-        }
-        if (c2 == null) {
-            throw new NullPointerException("Ancestor commit must not be null");
-        }
-
-        int c1Key = findCommitOrDie(c1).key;
-        int c2Key = findCommitOrDie(c2).key;
-
-        int i1 = c1Key;
-        int i2 = c2Key;
-
-        return isReachable(i1, i2) || isReachable(i2, i1);
-    }
-
     public boolean areCommitsRelated(Commit c1, Commit c2) {
         ensurePreprocessed();
         validateCommit(c1);
@@ -615,54 +530,54 @@ public class CommitsDistanceDb {
         return roots;
     }
 
-    private static void main(String[] args) {
-        CommitsDistanceDb db = new CommitsDistanceDb();
-//        db.put("D", "C");
-//        db.put("C", "B");
-//        db.put("B", "A");
-//        db.put("A", "(root)");
+//    private static void main(String[] args) {
+//        CommitsDistanceDb db = new CommitsDistanceDb();
+////        db.put("D", "C");
+////        db.put("C", "B");
+////        db.put("B", "A");
+////        db.put("A", "(root)");
+////        db.put("(root)");
 //        db.put("(root)");
-        db.put("(root)");
-        db.put("A", "(root)");
-        db.put("B", "A");
-        db.put("C", "B");
-        db.put("D", "C");
-        db.put("E", "D", "M");
-        db.put("F", "E");
-        db.put("G", "I", "F");
-        db.put("H", "G");
-        db.put("I", "J");
-        db.put("J", "K");
-        db.put("K", "A");
-        db.put("L", "A");
-        db.put("M", "L");
-
-        LOG.info("beginning tests");
-        test(db, "<unknown-child>", "(root)");
-        test(db, "A", "<unknown-ancestor>");
-        test(db, "J", "C");
-        test(db, "A", "A");
-        test(db, "B", "A");
-        test(db, "H", "G");
-        test(db, "H", "I");
-        test(db, "H", "E");
-        test(db, "H", "D");
-        test(db, "H", "L");
-        test(db, "H", "A");
-        test(db, "H", "(root)");
-        LOG.info("ending tests");
-    }
-
-    private static void test(CommitsDistanceDb db, String child, String ancestor) {
-        System.out.flush();
-        System.err.flush();
-        Optional<Integer> dist = db.minDistance(child, ancestor);
-        if (dist.isPresent()) {
-            System.out.println(child + "->" + ancestor + ": " + dist.get());
-        } else {
-            System.out.println(child + "->" + ancestor + ": n/a");
-        }
-        System.out.flush();
-        System.err.flush();
-    }
+//        db.put("A", "(root)");
+//        db.put("B", "A");
+//        db.put("C", "B");
+//        db.put("D", "C");
+//        db.put("E", "D", "M");
+//        db.put("F", "E");
+//        db.put("G", "I", "F");
+//        db.put("H", "G");
+//        db.put("I", "J");
+//        db.put("J", "K");
+//        db.put("K", "A");
+//        db.put("L", "A");
+//        db.put("M", "L");
+//
+//        LOG.info("beginning tests");
+//        test(db, "<unknown-child>", "(root)");
+//        test(db, "A", "<unknown-ancestor>");
+//        test(db, "J", "C");
+//        test(db, "A", "A");
+//        test(db, "B", "A");
+//        test(db, "H", "G");
+//        test(db, "H", "I");
+//        test(db, "H", "E");
+//        test(db, "H", "D");
+//        test(db, "H", "L");
+//        test(db, "H", "A");
+//        test(db, "H", "(root)");
+//        LOG.info("ending tests");
+//    }
+//
+//    private static void test(CommitsDistanceDb db, String child, String ancestor) {
+//        System.out.flush();
+//        System.err.flush();
+//        Optional<Integer> dist = db.minDistance(child, ancestor);
+//        if (dist.isPresent()) {
+//            System.out.println(child + "->" + ancestor + ": " + dist.get());
+//        } else {
+//            System.out.println(child + "->" + ancestor + ": n/a");
+//        }
+//        System.out.flush();
+//        System.err.flush();
+//    }
 }

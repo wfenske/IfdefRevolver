@@ -24,6 +24,7 @@ import java.io.IOException;
 import java.io.PrintWriter;
 import java.nio.file.Paths;
 import java.util.*;
+import java.util.stream.Collectors;
 
 public class AddChangeDistances {
     private static final Logger LOG = Logger.getLogger(AddChangeDistances.class);
@@ -109,6 +110,8 @@ public class AddChangeDistances {
         projectInfo.readSnapshotsAndRevisionsFile();
         LOG.debug("Done reading project information");
 
+        initializeDistanceInformation();
+
         Collection<Date> realSnapshotDates = projectInfo.getSnapshotDatesFiltered(config);
         Optional<Date> leftOverSnapshotDate = config.getDummySnapshotDateToCoverRemainingChanges();
         Collection<Date> allChangesSnapshotDates = new LinkedHashSet<>(realSnapshotDates);
@@ -154,6 +157,14 @@ public class AddChangeDistances {
 //        }
 //
 //        LOG.info(ageRequestStats);
+    }
+
+    private void initializeDistanceInformation() {
+        final List<Commit> commitsInTraversalOrder = this.projectInfo.getAllSnapshots().stream()
+                .flatMap(s -> s.getCommits().stream())
+                .collect(Collectors.toList());
+        this.commitsDistanceDb.initializeDistanceInformation(commitsInTraversalOrder,
+                this.projectInfo.getCommitsThatModifyCFiles());
     }
 
     private void trackGenealogies() {

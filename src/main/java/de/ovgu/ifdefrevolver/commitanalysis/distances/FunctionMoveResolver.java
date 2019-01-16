@@ -49,7 +49,7 @@ public class FunctionMoveResolver {
             List<FunctionChangeRow> aliasChanges = changesByFunction.get(alias.functionId);
             if (aliasChanges == null) continue;
             for (FunctionChangeRow change : aliasChanges) {
-                if (predicate.test(change) && alias.commit.isDescendant(change.commit)) {
+                if (predicate.test(change) && alias.commit.isDescendantOf(change.commit)) {
                     result.add(change);
                 }
             }
@@ -64,7 +64,7 @@ public class FunctionMoveResolver {
             List<FunctionChangeRow> aliasChanges = changesByFunction.get(alias.functionId);
             if (aliasChanges == null) continue;
             for (FunctionChangeRow change : aliasChanges) {
-                if (predicate.test(change) && change.commit.isDescendant(alias.commit)) {
+                if (predicate.test(change) && change.commit.isDescendantOf(alias.commit)) {
                     result.add(change);
                 }
             }
@@ -140,7 +140,7 @@ public class FunctionMoveResolver {
             for (FunctionChangeRow r : moves) {
                 final FunctionIdWithCommit move = new FunctionIdWithCommit(r.functionId, r.commit, true);
                 if (todo.contains(move) || done.contains(move)) continue;
-                if (needle.commit.isDescendant(move.commit)) {
+                if (needle.commit.isDescendantOf(move.commit)) {
                     todo.add(move);
                 } else {
 //                        LOG.debug("Rejecting move " + r + ": not an ancestor of " + commit);
@@ -175,7 +175,7 @@ public class FunctionMoveResolver {
             for (FunctionChangeRow r : moves) {
                 final FunctionIdWithCommit move = new FunctionIdWithCommit(r.newFunctionId.get(), r.commit, true);
                 if (todo.contains(move) || done.contains(move)) continue;
-                if (move.commit.isDescendant(needle.commit)) {
+                if (move.commit.isDescendantOf(needle.commit)) {
                     todo.add(move);
                 } else {
 //                        LOG.debug("Rejecting move " + r + ": not a descendant of " + ancestorCommit);
@@ -756,7 +756,7 @@ public class FunctionMoveResolver {
             Set<Commit> commits = commitsWhereFunctionIsKnownToExitsByFunctionId.get(alias.functionId);
             if (commits != null) {
                 for (Commit c : commits) {
-                    if (alias.commit.isDescendant(c)) {
+                    if (alias.commit.isDescendantOf(c)) {
                         result.add(c);
                     }
                 }
