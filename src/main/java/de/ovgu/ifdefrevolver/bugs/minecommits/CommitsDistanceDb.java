@@ -78,6 +78,18 @@ public class CommitsDistanceDb {
 //        }
 
         /**
+         * Determine whether the <code>this</code> is an ancestor of the given commit, <code>possibleDescendant</code>.
+         * Note that every commit is its own ancestor.
+         *
+         * @param possibleDescendant A commit that might be an ancestor of <code>this</code> commit
+         * @return <code>true</code> if and only if <code>this</code> is an ancestor of (or the same as) the given
+         * commit
+         */
+        public boolean isAncestorOf(Commit possibleDescendant) {
+            return db.isDescendant(possibleDescendant, this);
+        }
+
+        /**
          * Determine whether the <code>this</code> is a descendant of the given commit, <code>possibleAncestor</code>.
          * Note that every commit is its own descendant.
          *

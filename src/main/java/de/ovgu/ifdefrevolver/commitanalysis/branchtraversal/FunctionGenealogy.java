@@ -116,7 +116,7 @@ public class FunctionGenealogy {
         Commit startCommit = s.getStartCommit();
         Set<Commit> oldestChangingCommits = getOldestChangingCommitsBefore(startCommit);
         if (!oldestChangingCommits.isEmpty()) {
-            return oldestChangingCommits.stream().mapToInt(c -> c.minDistance(startCommit).get()).max();
+            return oldestChangingCommits.stream().mapToInt(c -> c.distanceAmongCModifyingCommits(startCommit).get()).max();
         }
 
         if (haveChangesForOlderSnapshotThan(s)) {
@@ -133,11 +133,11 @@ public class FunctionGenealogy {
     }
 
     private Set<Commit> getNewestChangingCommitsBefore(final Commit point) {
-        Set<Commit> allChaningCommitsBefore = getAllChangingCommitsBefore(point);
+        Set<Commit> allChangingCommitsBefore = getAllChangingCommitsBefore(point);
 
         Set<Commit> result = new HashSet<>();
-        for (Commit c : allChaningCommitsBefore) {
-            if (allChaningCommitsBefore.stream().noneMatch(descendant -> (descendant != c) && descendant.isDescendantOf(c))) {
+        for (Commit c : allChangingCommitsBefore) {
+            if (allChangingCommitsBefore.stream().noneMatch(descendant -> (descendant != c) && descendant.isDescendantOf(c))) {
                 result.add(c);
             }
         }
@@ -146,11 +146,11 @@ public class FunctionGenealogy {
     }
 
     private Set<Commit> getOldestChangingCommitsBefore(final Commit point) {
-        Set<Commit> allChaningCommitsBefore = getAllChangingCommitsBefore(point);
+        Set<Commit> allChangingCommitsBefore = getAllChangingCommitsBefore(point);
 
         Set<Commit> result = new HashSet<>();
-        for (Commit c : allChaningCommitsBefore) {
-            if (allChaningCommitsBefore.stream().noneMatch(ancestor -> (ancestor != c) && c.isDescendantOf(ancestor))) {
+        for (Commit c : allChangingCommitsBefore) {
+            if (allChangingCommitsBefore.stream().noneMatch(ancestor -> (ancestor != c) && ancestor.isAncestorOf(c))) {
                 result.add(c);
             }
         }
