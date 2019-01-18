@@ -100,40 +100,11 @@ public class AddChangeDistances {
         this.changesInSnapshots = readChangesInSnapshots(allChangesSnapshotDates);
 
         LOG.debug("Building move resolver.");
-//        this.moveResolver = buildMoveResolver(changesInSnapshots);
-
-//        final Set<Map.Entry<FunctionId, List<FunctionChangeRow>>> functionChangeEntries =
-//                moveResolver.getChangesByFunction().entrySet();
-//        LOG.debug("Done reading all function changes. Number of distinct changed functions: " + functionChangeEntries.size());
 
         allFunctionsInSnapshots = readAllFunctionsInSnapshots(realSnapshotDates);
         annotationDataInSnapshots = readAllAbResInSnapshots(realSnapshotDates);
 
-//        Set<FunctionIdWithCommit> allFunctionsEver = getFunctionIdsWithCommitFromRegularSnapshots();
-//        Set<FunctionIdWithCommit> leftOverFunctionIdsWithCommits = getFunctionIdsWithCommitFromLeftOverSnapshot(leftOverSnapshotDate);
-//        Set<FunctionIdWithCommit> functionsAddedInBetween = getFunctionIdsWithCommitsAddedInBetween();
-
         trackGenealogies();
-        System.exit(0);
-
-//        functionGenealogies = computeFunctionGenealogies(allFunctionsEver, leftOverFunctionIdsWithCommits, functionsAddedInBetween);
-//        List<SnapshotWithFunctions> snapshotsWithFunctions = mergeGenealogiesWithSnapshotData();
-//        List<SnapshotWithFunctions> commitWindowsWithFunctions = formCommitWindows(snapshotsWithFunctions);
-//        writeAbSmellAgeSnapshotCsv(commitWindowsWithFunctions);
-//        System.exit(0);
-
-//        List<CommitWindow> allWindows = groupSnapshots();
-//
-//        try {
-//            //processingStats = new ProcessingStats(functionChangeEntries.size());
-//            //(new ChangeEntryProcessor()).processItems(functionChangeEntries.iterator(), config.getNumThreads());
-//            processingStats = new ProcessingStats(allWindows.size());
-//            (new AllFunctionsProcessor()).processItems(allWindows.iterator(), config.getNumThreads());
-//        } catch (UncaughtWorkerThreadException e) {
-//            throw new RuntimeException(e);
-//        }
-//
-//        LOG.info(ageRequestStats);
     }
 
     private void initializeDistanceInformation() {
@@ -146,21 +117,10 @@ public class AddChangeDistances {
 
     private void trackGenealogies() {
         List<FunctionChangeRow>[] changesByCommitKey = groupChangesByCommitKey();
-//        Map<Commit, List<AllFunctionsRow>> allFunctionsBySnapshotStartCommit = groupAllFunctionsBySnapshotStartCommit();
         GenealogyTracker gt = new GenealogyTracker(projectInfo, config, changesByCommitKey,
                 allFunctionsInSnapshots, annotationDataInSnapshots);
         final LinkedGroupingListMap<Snapshot, FunctionGenealogy> functionGenealogiesBySnapshot = gt.processCommits();
         writeAbSmellAgeSnapshotCsv(functionGenealogiesBySnapshot);
-    }
-
-    private Map<Commit, List<AllFunctionsRow>> groupAllFunctionsBySnapshotStartCommit() {
-        Map<Commit, List<AllFunctionsRow>> result = new HashMap<>();
-        for (Snapshot s : projectInfo.getSnapshots().values()) {
-            Commit startCommit = s.getStartCommit();
-            List<AllFunctionsRow> funcs = allFunctionsInSnapshots.get(s.getStartDate());
-            result.put(startCommit, funcs);
-        }
-        return result;
     }
 
     private List<FunctionChangeRow>[] groupChangesByCommitKey() {
@@ -338,7 +298,6 @@ public class AddChangeDistances {
 
         ProjectInformationConfig.parseProjectNameFromCommandLine(line, this.config);
         ProjectInformationConfig.parseProjectResultsDirFromCommandLine(line, this.config);
-        ProjectInformationConfig.parseSnapshotsDirFromCommandLine(line, this.config);
 
         if (line.hasOption(ListChangedFunctionsConfig.OPT_REPO)) {
             config.setRepoDir(line.getOptionValue(ListChangedFunctionsConfig.OPT_REPO));
@@ -384,7 +343,6 @@ public class AddChangeDistances {
         // Options for describing project locations
         options.addOption(ProjectInformationConfig.projectNameCommandLineOption(required));
         options.addOption(ProjectInformationConfig.resultsDirCommandLineOption());
-        options.addOption(ProjectInformationConfig.snapshotsDirCommandLineOption());
 
         // --repo=foo/bar/.git GIT repository location
         options.addOption(Option.builder(String.valueOf(ListChangedFunctionsConfig.OPT_REPO))
@@ -411,15 +369,6 @@ public class AddChangeDistances {
                 .longOpt(AddChangeDistancesConfig.OPT_VALIDATE_AFTER_MERGE_L)
                 .desc("Validate computed against actual functions after each merge. [Default=" + AddChangeDistancesConfig.DEFAULT_VALIDATE_AFTER_MERGE + "]")
                 .build());
-
-//        // --threads=1 options
-//        options.addOption(Option.builder(String.valueOf(ListChangedFunctionsConfig.OPT_THREADS))
-//                .longOpt(ListChangedFunctionsConfig.OPT_THREADS_L)
-//                .desc("Number of parallel analysis threads. Must be at least 1." + " [Default="
-//                        + ListChangedFunctionsConfig.DEFAULT_NUM_THREADS + "]")
-//                .hasArg().argName("NUM")
-//                .type(Integer.class)
-//                .build());
 
         // @formatter:on
         return options;

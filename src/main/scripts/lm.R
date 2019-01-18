@@ -39,6 +39,10 @@ printf  <- function(...) cat(sprintf(...), sep='', file=stdout())
 eprintf <- function(...) cat(sprintf(...), sep='', file=stderr())
 
 sysname <- "<unknown>"
+if ( ! is.null(opts$project) ) {
+    sysname <<- opts$project
+}
+
 readData <- function(commandLineArgs) {
     fns <- commandLineArgs$args
     if ( length(fns) == 1 ) {
@@ -49,7 +53,6 @@ readData <- function(commandLineArgs) {
             stop("Missing input files.  Either specify explicit input files or specify the name of the project the `--project' option (`-p' for short).")
         }
         dataFn <-  file.path("results", opts$project, "allDataAge.rdata")
-        sysname <<- opts$project
     }
     eprintf("DEBUG: Reading data from %s\n", dataFn)
     result <- readRDS(dataFn)

@@ -1,6 +1,7 @@
 package de.ovgu.ifdefrevolver.bugs.minecommits.main;
 
 import de.ovgu.ifdefrevolver.bugs.minecommits.CommitsDistanceDb;
+import de.ovgu.ifdefrevolver.bugs.minecommits.CommitsDistanceDb.Commit;
 import de.ovgu.ifdefrevolver.bugs.minecommits.CommitsDistanceDbCsvReader;
 import org.apache.commons.cli.*;
 import org.apache.log4j.Logger;
@@ -44,7 +45,12 @@ public class CommitDistance {
 //            for (int i = 0; i < 1000; i++) {
 //                Optional<Integer> dist = db.minDistance(conf.childCommit, conf.ancestorCommit);
 //            }
-            Optional<Integer> dist = db.minDistance(conf.childCommit, conf.ancestorCommit);
+
+            Commit ancestorCommit = db.findCommitOrDie(conf.ancestorCommit);
+            Commit childCommit = db.findCommitOrDie(conf.childCommit);
+
+
+            Optional<Integer> dist = childCommit.distanceAmongCModifyingCommits(ancestorCommit);
             long after = System.nanoTime();
             LOG.debug("Done querying DB (" + (after - before) + "ns)");
             if (dist.isPresent()) {

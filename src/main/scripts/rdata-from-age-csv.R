@@ -11,19 +11,22 @@ eprintf <- function(...) cat(sprintf(...), sep='', file=stderr())
 
 options <- list(
     make_option(c("-p", "--project")
-              , help="Name of the project whose data to load.  We expect a directory named `results/<projec-name>' to exist below the current working directory, and this directory is expected to contain directories named, e.g., `1996-07-01', which, in turn, contain CSV files named `joint_function_ab_smell_age_snapshot.csv'."
+              , help="Name of the project whose data to load.  We expect a directory named `results/<projec-name>' to exist below the current working directory, and this directory is expected to contain a CSV file named `joint_function_ab_smell_age_snapshot.csv'."
+              , default = NULL
+                )
+    , make_option(c("-o", "--output")
+              , help="Name of the output file.  If omitted, the project name must be specified using the `-p' option, and the output file will be saved under `results/<projec-name>/allDataAge.rdata'."
               , default = NULL
                 )
 )
 
-args <- parse_args(OptionParser(
-    description = "Read a project's data (as CSV files) and create R data from it. If no input files are named, the project name must be specified via the `--project' (`-p') option."
-  , usage = "%prog [options] [file ...]"
+optionsParser <- OptionParser(
+    description = "Read a project's data (as a CSV file) and create R data from it. If no input files are named, the project name must be specified via the `--project' (`-p') option."
+  , usage = "%prog [options] [file]"
   , option_list=options)
-  , positional_arguments = c(0, Inf))
-opts <- args$options
 
-outFile <- "allDataAge.rdata"
+args <- parse_args(optionsParser, positional_arguments = c(0, 1))
+opts <- args$options
 
 getInputFilename <- function(commandLineArgs) {
     result <- commandLineArgs$args
@@ -38,9 +41,24 @@ getInputFilename <- function(commandLineArgs) {
 
     baseDir <- file.path("results", opts$project)
     inputFn <-  file.path(baseDir, "joint_function_ab_smell_age_snapshot.csv")
-    outFile <<- file.path(baseDir, "allDataAge.rdata")
     
     return (inputFn)
+}
+
+getOutputFilename <- function(commandLineArgs) {
+    opts <- commandLineArgs$options
+    if ( ! is.null(opts$output) ) {
+        return (opts$output)
+    }
+    
+    if ( is.null(opts$project) ) {
+            stop("Missing input files.  Either specify an explicit input file or specify the name of the project the `--project' option (`-p' for short).")
+    }
+
+    baseDir <- file.path("results", opts$project)
+    outputFn <- file.path(baseDir, "allDataAge.rdata")
+
+    return (outputFn)
 }
 
 iround <- function(x) {
@@ -102,6 +120,7 @@ readSnapshotFile <- function(inputFn) {
 }
 
 inputFn <- getInputFilename(args)
+outputFile <- getOutputFilename(args)
 
 allData <- readSnapshotFile(inputFn)
 
@@ -203,5 +222,5 @@ allData$LCHratio <- allData$LINES_CHANGED / allData$LOC
 ### Compute some more independent variables from the data
 ##data$CHANGE_PRONE <- data$COMMITS >= opts$changes
 
-saveRDS(allData, file=outFile)
-cat("INFO: Successfully wrote ", outFile, "\n", sep="")
+saveRDS(allData, file=outputFile)
+cat("INFO: Successfully wrote ", outputFile, "\n", sep="")

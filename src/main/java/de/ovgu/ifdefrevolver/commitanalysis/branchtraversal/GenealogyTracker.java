@@ -518,7 +518,7 @@ public class GenealogyTracker {
                 parentBranches[i] = getBranchForCommitOrDie(parents[i]);
             }
 
-            final List<FunctionChangeRow> changesOfCurrentCommit = Arrays.asList(getChangesOfCurrentCommit());
+            final List<FunctionChangeRow> changesOfCurrentCommit = listify(getChangesOfCurrentCommit());
             branch = Branch.createMergeBranch(commit, parentBranches, changesOfCurrentCommit);
             changesByCommitKey[currentCommit.key] = changesOfCurrentCommit.toArray(
                     new FunctionChangeRow[changesOfCurrentCommit.size()]);
@@ -527,6 +527,14 @@ public class GenealogyTracker {
 
         branchesByCommitKey[commit.key] = branch;
         return branch;
+    }
+
+    private static <T> List<T> listify(T... elements) {
+        List<T> result = new ArrayList<>(elements.length);
+        for (T e : elements) {
+            result.add(e);
+        }
+        return result;
     }
 
     private Branch getBranchForCommitOrDie(Commit commit) {

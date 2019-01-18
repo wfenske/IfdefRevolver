@@ -116,7 +116,9 @@ public class FunctionGenealogy {
         Commit startCommit = s.getStartCommit();
         Set<Commit> oldestChangingCommits = getOldestChangingCommitsBefore(startCommit);
         if (!oldestChangingCommits.isEmpty()) {
-            return oldestChangingCommits.stream().mapToInt(c -> c.distanceAmongCModifyingCommits(startCommit).get()).max();
+            return oldestChangingCommits.stream()
+                    .mapToInt(c -> startCommit.distanceAmongCModifyingCommits(c).get())
+                    .max();
         }
 
         if (haveChangesForOlderSnapshotThan(s)) {
