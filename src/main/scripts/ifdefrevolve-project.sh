@@ -12,7 +12,7 @@ echo_as_me()
 usage()
 {
     echo "Usage:"
-    echo " $me -p PROJECT_NAME [-s WINDOW_SIZE] [-n]"
+    echo " $me -p PROJECT_NAME [-w WINDOW_SIZE] [-n]"
     echo " $me -h"
 }
 
@@ -142,4 +142,4 @@ fi
 
 PATH=$PATH:${real_me_dir}
 
-make -f "${real_me_dir}/ifdefrevolve-project.mk" $DRY_RUN
+make -f "${real_me_dir}/ifdefrevolve-project.mk" -j 4 $DRY_RUN

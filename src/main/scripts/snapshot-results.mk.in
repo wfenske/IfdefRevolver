@@ -1,26 +1,23 @@
 ## Template variables:
 ##
-## %%SNAPSHOT_RESULTS_DIR%% -- s.th. like result/apache/2000-04-08
+## %%PROJECT_RESULTS_DIR%% -- s.th. like result/apache/
 ##
-## %%SNAPSHOT_DATE%% -- the date part of %%SNAPSHOT_RESULTS_DIR%%, e.g., 2000-04-08
+## %%SNAPSHOT_DATE%% -- the date of the snapshot, e.g., 2000-04-08
 
-## Variables that mus be set by the surrounding Makefile:
+## Variables that must be set by the surrounding Makefile:
 ##
 ## SMELL_CONFIGS_DIR -- e.g., to $(HOME)/src/skunk/trialrun/smellconfigs
 ##
 ## PROJECT -- e.g., apache
 
-##%%SNAPSHOT_RESULTS_DIR%%/joint_function_ab_smell_age_snapshot.csv: %%SNAPSHOT_RESULTS_DIR%%/ABRes.csv %%SNAPSHOT_RESULTS_DIR%%/all_functions.csv %%SNAPSHOT_RESULTS_DIR%%/function_change_hunks.csv
-##	join_functions_to_ab_smells_snapshot.sh %%SNAPSHOT_RESULTS_DIR%%
-
-%%SNAPSHOT_RESULTS_DIR%%/all_functions.csv: %%SNAPSHOT_RESULTS_DIR%%/../revisionsFull.csv
+%%PROJECT_RESULTS_DIR%%/%%SNAPSHOT_DATE%%/all_functions.csv: %%PROJECT_RESULTS_DIR%%/revisionsFull.csv %%PROJECT_RESULTS_DIR%%/commitParents.csv
 	lsallfuncs.sh -p $(PROJECT) %%SNAPSHOT_DATE%%
 
-%%SNAPSHOT_RESULTS_DIR%%/function_change_hunks.csv: %%SNAPSHOT_RESULTS_DIR%%/../revisionsFull.csv
+%%PROJECT_RESULTS_DIR%%/%%SNAPSHOT_DATE%%/function_change_hunks.csv: %%PROJECT_RESULTS_DIR%%/revisionsFull.csv %%PROJECT_RESULTS_DIR%%/commitParents.csv
 	lschfuncs.sh -p $(PROJECT) %%SNAPSHOT_DATE%%
 
-%%SNAPSHOT_RESULTS_DIR%%/ABRes.csv: %%SNAPSHOT_RESULTS_DIR%%/skunk_intermediate_functions.xml $(SMELL_CONFIGS_DIR)/AnnotationBundle.csm
+%%PROJECT_RESULTS_DIR%%/%%SNAPSHOT_DATE%%/ABRes.csv: %%PROJECT_RESULTS_DIR%%/%%SNAPSHOT_DATE%%/skunk_intermediate_functions.xml $(SMELL_CONFIGS_DIR)/AnnotationBundle.csm
 	createsnapshots.sh -p $(PROJECT) --smellconfigsdir=$(SMELL_CONFIGS_DIR) --detect=AB %%SNAPSHOT_DATE%%
 
-%%SNAPSHOT_RESULTS_DIR%%/skunk_intermediate_functions.xml:
+%%PROJECT_RESULTS_DIR%%/%%SNAPSHOT_DATE%%/skunk_intermediate_functions.xml:
 	createsnapshots.sh -p $(PROJECT) --preprocess %%SNAPSHOT_DATE%%

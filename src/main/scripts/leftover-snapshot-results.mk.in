@@ -1,0 +1,10 @@
+## Template variables:
+##
+## %%PROJECT_RESULTS_DIR%% -- s.th. like result/apache/
+
+## Variables that must be set by the surrounding Makefile:
+##
+## PROJECT -- e.g., apache
+
+%%PROJECT_RESULTS_DIR%%/1970-01-01/function_change_hunks.csv: %%PROJECT_RESULTS_DIR%%/revisionsFull.csv %%PROJECT_RESULTS_DIR%%/commitParents.csv
+	lschfuncs.sh -p $(PROJECT) -l
