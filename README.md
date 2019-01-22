@@ -26,9 +26,6 @@ some third-party tools, used as is.
   cleaner output in CSV files.  Function signature parsing was also
   improved.
 
-  Be sure to check out the `skunk` branch!  This branch contains
-  changed and new functionality that IfdefRevolver depends on.
-
 * repodriller: https://github.com/wfenske/repodriller
 
   Enhanced to improve performance on large repositories with many
@@ -126,8 +123,6 @@ Other Unix-like systems will probably work. Windows has not been tested.
    `csvsql --help`
 
 1. Install Skunk
-
-   Be sure to checkout out the correct fork and branch (see above).
 
    Installation works via Maven, i.e., go to the checkout, then change
    to the `Skunk` subdirectory (`cd Skunk`), then do
