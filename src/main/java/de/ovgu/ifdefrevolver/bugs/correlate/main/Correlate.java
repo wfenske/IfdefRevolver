@@ -571,9 +571,9 @@ public class Correlate {
 
         ProjectInformationConfig.parseProjectNameFromCommandLine(line, result);
 
-        ProjectInformationConfig.parseProjectResultsDirFromCommandLine(line, result);
-
-        ProjectInformationConfig.parseSnapshotsDirFromCommandLine(line, result);
+//        ProjectInformationConfig.parseProjectResultsDirFromCommandLine(line, result);
+//
+//        ProjectInformationConfig.parseSnapshotsDirFromCommandLine(line, result);
 
         // Large file percentage
         Optional<Double> largeFileSizePercentage = getPercentOptionValue(line,
@@ -634,8 +634,8 @@ public class Correlate {
 
         // Options for describing project locations
         options.addOption(ProjectInformationConfig.projectNameCommandLineOption(required));
-        options.addOption(ProjectInformationConfig.resultsDirCommandLineOption());
-        options.addOption(ProjectInformationConfig.snapshotsDirCommandLineOption());
+//        options.addOption(ProjectInformationConfig.resultsDirCommandLineOption());
+//        options.addOption(ProjectInformationConfig.snapshotsDirCommandLineOption());
 
         // Option for large file evaluation
         options.addOption(Option.builder().longOpt(OPT_LARGE_FILE_PERCENT_PERCENT_L)

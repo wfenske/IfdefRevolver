@@ -5,9 +5,9 @@ dir_me=$(dirname -- "$0")
 
 # Enter results directory for project.
 dir_old="$PWD"
-if [ -d results/"$p" ]
+if [ -d "$p"/results ]
 then
-    cd -- "results/$p" || exit $?
+    cd -- "$p/results" || exit $?
     if askyesno -y "Delete results in \`$PWD'?"
     then
         for f in *
@@ -26,11 +26,11 @@ else
     echo "No results to delete for \`$p'"
 fi
 
-if [ -e snapshots/"$p" ]
+if [ -e "$p"/snapshots ]
 then
-    if askyesno -y "Delete snapshots in \`$PWD/snapshots/$p'?"
+    if askyesno -y "Delete snapshots in \`$PWD/$p/snapshots'?"
     then
-	rm -rf snapshots/"$p" && \
+	rm -rf "$p"/snapshots && \
 	echo "Snapshots deleted"
     else
 	echo "Keeping snapshots"

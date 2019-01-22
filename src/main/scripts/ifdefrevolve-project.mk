@@ -12,42 +12,48 @@ WINDOW_SIZE_OPT	= -s $(WINDOW_SIZE)
 endif
 ###
 
-REVISIONS_FILE = results/$(PROJECT)/revisionsFull.csv
-COMMIT_PARENTS_FILE = results/$(PROJECT)/commitParents.csv
-CHECKOUT_MARKER = results/$(PROJECT)/.checkout_successful
-ANALYSIS_MARKER = results/$(PROJECT)/.analysis_successful
-ANALYZE_MAKEFILE = results/$(PROJECT)/analyze.mk
+RESULTS_DIR         = $(PROJECT)/results
+SNAPSHOTS_DIR       = $(PROJECT)/snapshots
+LOGS_DIR            = $(PROJECT)/logs
 
-all: $(REVISIONS_FILE) $(CHECKOUT_MARKER) $(ANALYSIS_MARKER)
+REVISIONS_FILE      = $(RESULTS_DIR)/revisionsFull.csv
+COMMIT_PARENTS_FILE = $(RESULTS_DIR)/commitParents.csv
+CHECKOUT_MARKER     = $(RESULTS_DIR)/.checkout_successful
+ANALYSIS_MARKER     = $(RESULTS_DIR)/.analysis_successful
+ANALYZE_MAKEFILE    = $(RESULTS_DIR)/analyze.mk
+
+
+
+all: $(REVISIONS_FILE)  $(COMMIT_PARENTS_FILE) $(CHECKOUT_MARKER) $(ANALYSIS_MARKER)
 
 findrevisions: $(REVISIONS_FILE) $(COMMIT_PARENTS_FILE)
 
 $(REVISIONS_FILE):
-	@mkdir -p logs/$(PROJECT)
-	@mkdir -p results/$(PROJECT)
-	lscommits.sh -r repos/$(PROJECT) -o $(REVISIONS_FILE) >> logs/$(PROJECT)/lscommits.log 2>&1
+	@mkdir -p $(LOGS_DIR)
+	@mkdir -p $(RESULTS_DIR)
+	lscommits.sh -r repos/$(PROJECT) -o $(REVISIONS_FILE) >> $(LOGS_DIR)/lscommits.log 2>&1
 
 $(COMMIT_PARENTS_FILE):
-	@mkdir -p logs/$(PROJECT)
-	@mkdir -p results/$(PROJECT)
-	lsparentcommits.sh -r repos/$(PROJECT) -o $(COMMIT_PARENTS_FILE) >> logs/$(PROJECT)/lsparentcommits.log 2>&1
+	@mkdir -p $(LOGS_DIR)
+	@mkdir -p $(RESULTS_DIR)
+	lsparentcommits.sh -r repos/$(PROJECT) -o $(COMMIT_PARENTS_FILE) >> $(LOGS_DIR)/lsparentcommits.log 2>&1
 
 checkout: $(CHECKOUT_MARKER)
 
 $(CHECKOUT_MARKER): $(REVISIONS_FILE) $(COMMIT_PARENTS_FILE)
-	@mkdir -p logs/$(PROJECT)
-	@mkdir -p snapshots/$(PROJECT)
+	@mkdir -p $(LOGS_DIR)
+	@mkdir -p $(SNAPSHOTS_DIR)
 	rm -f $@
-	createsnapshots.sh -p $(PROJECT) --checkout $(WINDOW_SIZE_OPT) >> logs/$(PROJECT)/checkout.log 2>&1 && \
+	createsnapshots.sh -p $(PROJECT) --checkout $(WINDOW_SIZE_OPT) >> $(LOGS_DIR)/checkout.log 2>&1 && \
 	touch $@
 
 analyze: $(ANALYSIS_MARKER)
 
 $(ANALYSIS_MARKER): $(ANALYZE_MAKEFILE) $(CHECKOUT_MARKER)
-	@mkdir -p logs/$(PROJECT)
-	@mkdir -p snapshots/$(PROJECT)
+	@mkdir -p $(LOGS_DIR)
+	@mkdir -p $(SNAPSHOTS_DIR)
 	rm -f $(ANALYSIS_MARKER)
-	make -f $< >> logs/$(PROJECT)/analyze.log 2>&1 && \
+	make -f $< >> $(LOGS_DIR)/analyze.log 2>&1 && \
 	touch $(ANALYSIS_MARKER)
 
 $(ANALYZE_MAKEFILE): $(CHECKOUT_MARKER)

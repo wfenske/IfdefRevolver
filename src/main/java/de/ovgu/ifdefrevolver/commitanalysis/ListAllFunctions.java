@@ -344,9 +344,9 @@ public class ListAllFunctions {
 
         ProjectInformationConfig.parseProjectNameFromCommandLine(line, this.config);
 
-        ProjectInformationConfig.parseProjectResultsDirFromCommandLine(line, this.config);
+//        ProjectInformationConfig.parseProjectResultsDirFromCommandLine(line, this.config);
 
-        ProjectInformationConfig.parseSnapshotsDirFromCommandLine(line, this.config);
+//        ProjectInformationConfig.parseSnapshotsDirFromCommandLine(line, this.config);
 
         List<String> snapshotDateNames = line.getArgList();
         if (!snapshotDateNames.isEmpty()) {
@@ -364,8 +364,8 @@ public class ListAllFunctions {
 
         // Options for describing project locations
         options.addOption(ProjectInformationConfig.projectNameCommandLineOption(required));
-        options.addOption(ProjectInformationConfig.resultsDirCommandLineOption());
-        options.addOption(ProjectInformationConfig.snapshotsDirCommandLineOption());
+//        options.addOption(ProjectInformationConfig.resultsDirCommandLineOption());
+//        options.addOption(ProjectInformationConfig.snapshotsDirCommandLineOption());
 
         // @formatter:on
         return options;

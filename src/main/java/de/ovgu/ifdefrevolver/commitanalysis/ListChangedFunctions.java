@@ -243,8 +243,8 @@ public class ListChangedFunctions {
         this.config = new ListChangedFunctionsConfig();
 
         ProjectInformationConfig.parseProjectNameFromCommandLine(line, this.config);
-        ProjectInformationConfig.parseProjectResultsDirFromCommandLine(line, this.config);
-        ProjectInformationConfig.parseSnapshotsDirFromCommandLine(line, this.config);
+//        ProjectInformationConfig.parseProjectResultsDirFromCommandLine(line, this.config);
+//        ProjectInformationConfig.parseSnapshotsDirFromCommandLine(line, this.config);
 
         if (line.hasOption(ListChangedFunctionsConfig.OPT_REPO)) {
             config.setRepoDir(line.getOptionValue(ListChangedFunctionsConfig.OPT_REPO));
@@ -289,8 +289,8 @@ public class ListChangedFunctions {
 
         // Options for describing project locations
         options.addOption(ProjectInformationConfig.projectNameCommandLineOption(required));
-        options.addOption(ProjectInformationConfig.resultsDirCommandLineOption());
-        options.addOption(ProjectInformationConfig.snapshotsDirCommandLineOption());
+//        options.addOption(ProjectInformationConfig.resultsDirCommandLineOption());
+//        options.addOption(ProjectInformationConfig.snapshotsDirCommandLineOption());
 
         // --repo=foo/bar/.git GIT repository location
         options.addOption(Option.builder(String.valueOf(ListChangedFunctionsConfig.OPT_REPO))

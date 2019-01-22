@@ -18,7 +18,7 @@ PROJECT=${1:?project name missing}
 
 SMELL_CONFIGS_DIR="smellconfigs"
 
-PROJECT_RESULTS_DIR="results/${PROJECT:?}"
+PROJECT_RESULTS_DIR="${PROJECT:?}/results"
 
 TOP_LEVEL_SNAPSHOT_RESULT_FILE="${PROJECT_RESULTS_DIR:?}/joint_function_ab_smell_age_snapshot.csv"
 

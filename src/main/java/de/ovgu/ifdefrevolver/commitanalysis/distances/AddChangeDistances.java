@@ -297,7 +297,7 @@ public class AddChangeDistances {
         this.config = new AddChangeDistancesConfig();
 
         ProjectInformationConfig.parseProjectNameFromCommandLine(line, this.config);
-        ProjectInformationConfig.parseProjectResultsDirFromCommandLine(line, this.config);
+//        ProjectInformationConfig.parseProjectResultsDirFromCommandLine(line, this.config);
 
         if (line.hasOption(ListChangedFunctionsConfig.OPT_REPO)) {
             config.setRepoDir(line.getOptionValue(ListChangedFunctionsConfig.OPT_REPO));
@@ -342,7 +342,7 @@ public class AddChangeDistances {
 
         // Options for describing project locations
         options.addOption(ProjectInformationConfig.projectNameCommandLineOption(required));
-        options.addOption(ProjectInformationConfig.resultsDirCommandLineOption());
+//        options.addOption(ProjectInformationConfig.resultsDirCommandLineOption());
 
         // --repo=foo/bar/.git GIT repository location
         options.addOption(Option.builder(String.valueOf(ListChangedFunctionsConfig.OPT_REPO))

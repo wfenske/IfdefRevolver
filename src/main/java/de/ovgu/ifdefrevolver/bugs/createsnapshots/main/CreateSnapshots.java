@@ -466,8 +466,8 @@ public class CreateSnapshots {
         parseSnapshotSizeFromCommandLine(res, line, res.commitWindowSizeMode().defaultSize());
 
         ProjectInformationConfig.parseProjectNameFromCommandLine(line, res);
-        ProjectInformationConfig.parseSnapshotsDirFromCommandLine(line, res, res.skunkMode().snapshotDirMissingStrategy());
-        ProjectInformationConfig.parseProjectResultsDirFromCommandLine(line, res);
+        //ProjectInformationConfig.parseSnapshotsDirFromCommandLine(line, res, res.skunkMode().snapshotDirMissingStrategy());
+        //ProjectInformationConfig.parseProjectResultsDirFromCommandLine(line, res);
         CreateSnapshotsConfig.parseForceFromCommandLine(line, res);
 
 //        final String reposDirName;
@@ -610,8 +610,8 @@ public class CreateSnapshots {
         options.addOption(ProjectInformationConfig.helpCommandLineOption());
 
         options.addOption(ProjectInformationConfig.projectNameCommandLineOption(required));
-        options.addOption(ProjectInformationConfig.snapshotsDirCommandLineOption());
-        options.addOption(ProjectInformationConfig.resultsDirCommandLineOption());
+        //options.addOption(ProjectInformationConfig.snapshotsDirCommandLineOption());
+        //options.addOption(ProjectInformationConfig.resultsDirCommandLineOption());
         options.addOption(CreateSnapshotsConfig.forceCommandLineOption());
 
         options.addOption(
@@ -693,16 +693,16 @@ public class CreateSnapshots {
         return validSmellArgs.toString();
     }
 
-    private static String getCommitWindowSizeModeArgs() {
-        StringBuilder result = new StringBuilder();
-        for (SnapshotSizeMode m : SnapshotSizeMode.values()) {
-            if (result.length() > 0) {
-                result.append("|");
-            }
-            result.append(m.name().toLowerCase());
-        }
-        return result.toString();
-    }
+//    private static String getCommitWindowSizeModeArgs() {
+//        StringBuilder result = new StringBuilder();
+//        for (SnapshotSizeMode m : SnapshotSizeMode.values()) {
+//            if (result.length() > 0) {
+//                result.append("|");
+//            }
+//            result.append(m.name().toLowerCase());
+//        }
+//        return result.toString();
+//    }
 
     private String progName() {
         return this.getClass().getSimpleName();

@@ -19,7 +19,7 @@ real_me=$(realpath -- "$0")
 me_dir=$(dirname -- "${real_me}")
 
 ifdefrevolver_dir=${me_dir}/../../..
-skunk_dir=${ifdefrevolver_dir}/../Skunk/Skunk
+skunk_dir=${ifdefrevolver_dir}/../Skunk
 reprodriller_dir=${ifdefrevolver_dir}/../repodriller
 maven_repo=$HOME/.m2/repository
 

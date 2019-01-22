@@ -9,7 +9,7 @@ import java.util.Date;
 public interface IHasSnapshotsDir {
     File projectSnapshotsDir();
 
-    void setSnapshotsDir(String snapshotsDir);
+    //void setSnapshotsDir(String snapshotsDir);
 
     File snapshotDirForDate(Date date);
 }

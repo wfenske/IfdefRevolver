@@ -2,7 +2,6 @@ package de.ovgu.ifdefrevolver.bugs.correlate.input;
 
 import de.ovgu.ifdefrevolver.bugs.correlate.data.IMinimalSnapshot;
 import de.ovgu.ifdefrevolver.bugs.correlate.data.Snapshot;
-import de.ovgu.ifdefrevolver.bugs.correlate.main.IHasProjectInfoFile;
 import de.ovgu.ifdefrevolver.bugs.correlate.main.IHasResultsDir;
 import de.ovgu.ifdefrevolver.bugs.correlate.main.IHasRevisionCsvFile;
 import de.ovgu.ifdefrevolver.bugs.correlate.main.IHasSnapshotsDir;
@@ -17,7 +16,7 @@ import java.util.*;
 /**
  * Created by wfenske on 09.02.17.
  */
-public class ProjectInformationReader<TConfig extends IHasProjectInfoFile & IHasResultsDir & IHasSnapshotsDir & IHasRevisionCsvFile> {
+public class ProjectInformationReader<TConfig extends IHasResultsDir & IHasSnapshotsDir & IHasRevisionCsvFile> {
     private static Logger LOG = Logger.getLogger(ProjectInformationReader.class);
 
     protected final TConfig conf;

@@ -11,7 +11,7 @@ import java.util.Date;
 public interface IHasResultsDir {
     File projectResultsDir();
 
-    void setResultsDir(String resultsDir);
+//    void setResultsDir(String resultsDir);
 
     /**
      * Directory in which computed information related to the snapshot with the given date resides.
