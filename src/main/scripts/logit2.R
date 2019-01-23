@@ -8,17 +8,13 @@ suppressMessages(library(aod))
 
 options <- list(
     make_option(c("-p", "--project")
-              , help="Name of the project whose data to load.  We expect the input R data to reside in `results/<projec-name>/allData.rdata' below the current working directory."
+              , help="Name of the project whose data to load.  We expect the input R data to reside in `<projec-name>/results/allDataAge.rdata' below the current working directory."
               , default = NULL
                 )
   , make_option(c("-a", "--annotated"),
                 default=FALSE,
                 action="store_true",
                 help="Restrict data to only annotated functions. [default: %default]")
-  , make_option(c("-c", "--changed"),
-                default=FALSE,
-                action="store_true",
-                help="Restrict data to only changed functions functions. [default: %default]")
   , make_option(c("-T", "--no-test-code"),
                 default=FALSE,
                 action="store_true",
@@ -27,7 +23,7 @@ options <- list(
 )
 
 args <- parse_args(OptionParser(
-    description = "Build a negative binomial regression model to determine which independent variables have a significant effect on functions being (or not) change-prone. If no input R data set is given, the project must be specified via the `--project' (`-p') option."
+    description = "Build a logistic binomial regression model to determine which independent variables have a significant effect on functions being (or not) change-prone. If no input R data set is given, the project must be specified via the `--project' (`-p') option."
   , usage = "%prog [options] [file]"
   , option_list=options)
   , positional_arguments = c(0, 1))
@@ -575,6 +571,8 @@ eprintf("Median COMMITS/LCHG of changed functions:\n%.2g,%.2g\n"
 
 ##cat("Median changed lines/LOC for all changed functions: ", medianLCHratio, "\n", sep="")
 
+allData$CHANGE_PRONE <- allData$COMMITS > 0
+
 allData$CHURN_PRONE <- allData$LCHratio > medianLCHratio
 
 changedData <- subset(allData, COMMITS > 0)
@@ -600,32 +598,22 @@ changedPercent <- nrow(changedData0) * 100 / allNRow
 
 ##sampleChangedSize <- 10000
 ##negBinData <- sampleDf(changedData, sampleChangedSize)
-negBinData <- allData
-
-negBinData <- subset(negBinData, !is.na(AGE))
-negBinData <- subset(negBinData, is.finite(AGE))
-
-negBinData <- subset(negBinData, !is.na(LAST_EDIT))
-negBinData <- subset(negBinData, is.finite(LAST_EDIT))
+modelData <- subset(allData, !is.na(AGE) && is.finite(AGE) && !is.na(LAST_EDIT) && is.finite(LAST_EDIT))
 
 if (opts$annotated) {
     eprintf("DEBUG: Creating models for just the annotated functions.\n")
-    negBinData <- subset(negBinData, FL > 0)
-}
-if (opts$changed) {
-    eprintf("DEBUG: Creating models for just the changed functions.\n")
-    negBinData <- subset(negBinData, COMMITS > 0)
+    modelData <- subset(modelData, FL > 0)
 }
 
 if (opts$noTestCode) {
-    negBinTestData <- subset(negBinData, (grepl(" test", FUNCTION_SIGNATURE) | grepl("Test", FUNCTION_SIGNATURE) | grepl("^test", FILE)))
+    modelDataTests <- subset(modelData, (grepl(" test", FUNCTION_SIGNATURE) | grepl("Test", FUNCTION_SIGNATURE) | grepl("^test", FILE)))
     
-    negBinData <- subset(negBinData, ! (grepl(" test", FUNCTION_SIGNATURE) | grepl("Test", FUNCTION_SIGNATURE) | grepl("^test", FILE)))
+    modelData <- subset(modelData, ! (grepl(" test", FUNCTION_SIGNATURE) | grepl("Test", FUNCTION_SIGNATURE) | grepl("^test", FILE)))
 
     library(effsize)
     
-    tGroup <- negBinTestData # only test code
-    cGroup <- negBinData     # no test code
+    tGroup <- modelDataTests # only test code
+    cGroup <- modelData # no test code
 
     for (v in c("COMMITS", "LCH", "FL", "FC", "CND", "NEG", "LOACratio")) {
         mwuResult <- wilcox.test(tGroup[,v], cGroup[,v])
@@ -646,7 +634,7 @@ header <- function() {
 }
 
 negbinCsvModel <- function(dep, indeps) {
-    model <- tryNbModel(indeps=indeps, dep=dep, data=logitData, csvOut=TRUE, csvHeader=header())
+    model <- tryLogitModel(indeps=indeps, dep=dep, data=modelData, csvOut=TRUE, csvHeader=header())
     return (model)
 }
 
@@ -658,80 +646,7 @@ for (dep in c("COMMITS"
             , "LCH"
               )) { 
     dummy <- csvModel(dep, c("log2LOC"))
-##    dummy <- csvModel(dep, c("log2LOC", "AGE"))
-##    dummy <- csvModel(dep, c("log2LOC", "log2LAST_EDIT"))
     dummy <- csvModel(dep, c("log2LOC", "AGE", "log2LAST_EDIT"))
     dummy <- csvModel(dep, c("FL", "FC", "CND", "NEG", "LOACratio", "log2LOC"))
     dummy <- csvModel(dep, c("FL", "FC", "CND", "NEG", "LOACratio", "log2LOC", "AGE", "log2LAST_EDIT"))
 }
-
-##haveHeader <<- FALSE
-##csvModel <- zeroinflNegbinCsvModel
-##for (dep in c("COMMITS"
-##              ##, "HUNKS"
-##              ##, "LCH"
-##              )) {
-##    dummy <- csvModel(dep, c("log2LOC"))
-##    print(summary(dummy))
-##    dummy <- csvModel(dep, c("FL", "FC", "CND", "NEG", "LOACratio", "log2LOC"))
-##    print(summary(dummy))
-##}
-
-##model.zip.COMMITS <- tryZeroInflModel(indeps=ziIndeps, dep="COMMITS", data=ziData)
-
-##model.zip.HUNKS   <- tryZeroInflModel(indeps=ziIndeps, dep="HUNKS",   data=ziData)
-
-##model.nb.LCHG <- tryNbModel(indeps=c(#"FL", "FC",
-##                                "CND"
-##                                        #, "LOFC", "LOC"
-##                            ), dep="LINES_CHANGED", data=negBinData)
-##model.nb.LCHGratio <- tryNbModel(indeps=c("FL", "FC", "CND", "LOC"), dep="LCHratio", data=negBinData)
-##model.nb.orig <- tryNbModel(indeps=c("LOC"), dep="LINES_CHANGED", data=negBinData)
-
-
-##model.zip.LCH = tryZeroInflModel(indeps=c(
-##                                     ##"FL", "FC",
-##                                     "CND"
-##                                        #, "LOC"
-##                                 ), dep="LINES_CHANGED", data=ziSampleData)
-
-##nd <- sampleDf(changedData, 100)
-##ndMeanSE <- cbind(nd,
-##                  Mean = predict(model.nb.orig, newdata = nd, type = "response"), 
-##                  SE = predict(model.nb.orig, newdata = nd, type="response", se.fit = T)$se.fit
-##                  )
-
-##anova(modelOnSample # complex model
-##    , locLinesChangedModelOnSample # simple model
-##    , test ="Chisq")
-
-##cat(paste("*** LR test of model ***\n", sep=""))
-##suppressMessages(library(lmtest))
-##lrtest(locLinesChangedModelOnSample, modelOnSample)
-
-### Begin plot creation
-
-
-## A linear model in which all independent variables are tranformed by
-## a logarithm and the depent variable is, too (i.e.,
-## log(LINES_CHANGED) ~ log(FL) + ... + log(LOC)), leads to a QQ plot
-## where the lower and the upper part is bent upwards.  This indicates
-## a chi-square distribution.
-##
-## Reference: http://data.library.virginia.edu/understanding-q-q-plots/
-
-##outputFn <- paste("Residuals_", "Sample_", opts$project, ".pdf", sep="")
-##pdf(file=outputFn)
-##dummy <- plotResiduals(modelOnSample)
-
-##dev.off()
-##cat(outputFn,"\n",sep="")
-
-##suppressMessages(library(lmtest))
-##lrtest(reducedModel, slocModel)
-
-##cat("\n")
-##cat("*** Step model ***\n")
-##reducedModel <- step(allDataModel, trace=0)
-##summary(reducedModel)
-
