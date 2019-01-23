@@ -142,4 +142,4 @@ fi
 
 PATH=$PATH:${real_me_dir}
 
-make -f "${real_me_dir}/ifdefrevolve-project.mk" -j 4 $DRY_RUN
+make -f "${real_me_dir}/ifdefrevolve-project.mk" -j4 $DRY_RUN

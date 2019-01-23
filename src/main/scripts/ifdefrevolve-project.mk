@@ -53,7 +53,7 @@ $(ANALYSIS_MARKER): $(ANALYZE_MAKEFILE) $(CHECKOUT_MARKER)
 	@mkdir -p $(LOGS_DIR)
 	@mkdir -p $(SNAPSHOTS_DIR)
 	rm -f $(ANALYSIS_MARKER)
-	make -f $< >> $(LOGS_DIR)/analyze.log 2>&1 && \
+	$(MAKE) -f $< >> $(LOGS_DIR)/analyze.log 2>&1 && \
 	touch $(ANALYSIS_MARKER)
 
 $(ANALYZE_MAKEFILE): $(CHECKOUT_MARKER)
