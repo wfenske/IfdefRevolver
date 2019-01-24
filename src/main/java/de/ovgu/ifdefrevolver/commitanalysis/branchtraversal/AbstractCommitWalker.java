@@ -12,7 +12,7 @@ public abstract class AbstractCommitWalker {
     protected CommitsDistanceDb commitsDistanceDb;
     protected Commit currentCommit;
     protected Queue<Commit> next;
-    protected BitSet done;
+    protected BitSet processed;
 
     public AbstractCommitWalker(CommitsDistanceDb commitsDistanceDb) {
         this.commitsDistanceDb = commitsDistanceDb;
@@ -20,21 +20,21 @@ public abstract class AbstractCommitWalker {
 
     public void processCommits() {
         final int numAllCommits = getNumAllCommits();
-        done = new BitSet(numAllCommits);
+        processed = new BitSet(numAllCommits);
         next = new PriorityQueue<>(commitsDistanceDb.getRoots().size(), Commit.BY_TIMESTAMP_FIRST);
         next.addAll(commitsDistanceDb.getRoots());
 
         while (!next.isEmpty()) {
             this.currentCommit = getNextProcessableCommit();
             processCurrentCommit();
-            markCurrentCommitAsDone();
+            markCurrentCommitAsProcessed();
 
             for (Commit child : currentCommit.children()) {
                 offerIfNew(child);
             }
         }
 
-        final int numUnprocessed = numAllCommits - done.cardinality();
+        final int numUnprocessed = numAllCommits - processed.cardinality();
         if (numUnprocessed != 0) {
             onUnprocessedCommitsRemain(numUnprocessed);
         } else {
@@ -61,16 +61,12 @@ public abstract class AbstractCommitWalker {
         throw new RuntimeException("None of the next commits is processable");
     }
 
-    protected void markCurrentCommitAsDone() {
-        done.set(currentCommit.key);
-    }
-
     protected void onUnprocessedCommitsRemain(int numUnprocessed) {
         throw new RuntimeException(numUnprocessed + " unprocessed commit(s) remain(s)");
     }
 
     protected void onAllCommitsProcessed() {
-        LOG.info("Successfully processed all " + done.cardinality() + " commits.");
+        LOG.info("Successfully processed all " + processed.cardinality() + " commits.");
     }
 
     protected boolean isProcessable(Commit commit) {
@@ -89,7 +85,11 @@ public abstract class AbstractCommitWalker {
     }
 
     protected boolean isCommitProcessed(Commit commit) {
-        return done.get(commit.key);
+        return processed.get(commit.key);
+    }
+
+    protected void markCurrentCommitAsProcessed() {
+        processed.set(currentCommit.key);
     }
 
     protected abstract void processCurrentCommit();

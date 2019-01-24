@@ -65,6 +65,7 @@ public class SnapshotCreatingCommitWalker<TConfig extends IHasResultsDir & IHasS
     @Override
     protected void processCurrentCommit() {
         this.commitsInCurrentSnapshot.add(this.currentCommit);
+        
         if (isCommitRelevant(this.currentCommit)) {
             this.numberOfRelevantCommitsInCurrentSnapshot++;
         }
@@ -124,17 +125,4 @@ public class SnapshotCreatingCommitWalker<TConfig extends IHasResultsDir & IHasS
         DateFormat df = new SimpleDateFormat("yyyy-MM-dd");
         return df.format(d);
     }
-
-//    private void writeCurrentSnapshotToFile() {
-//        CsvRowProvider<String, CommitWalkerContext, CommitWalkerSnapshotColumns> rowProvider;
-//        CsvFileWriterHelper writer = new CsvFileWriterHelper() {
-//            @Override
-//            protected void actuallyDoStuff(CSVPrinter csv) throws IOException {
-//
-//            }
-//        };
-//        File outputFile = new File(config)
-//
-//        writer.write(outputFile);
-//    }
 }

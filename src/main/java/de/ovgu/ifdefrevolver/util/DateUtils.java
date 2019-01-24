@@ -45,10 +45,12 @@ public class DateUtils {
 
         if (thisYear < otherYear) return true;
 
-        int thisDayOfYear = thisCal.get(Calendar.DAY_OF_YEAR);
-        int otherDayOfYear = otherCal.get(Calendar.DAY_OF_YEAR);
+        if (thisYear == otherYear) {
+            int thisDayOfYear = thisCal.get(Calendar.DAY_OF_YEAR);
+            int otherDayOfYear = otherCal.get(Calendar.DAY_OF_YEAR);
 
-        if (thisDayOfYear < otherDayOfYear) return true;
+            if (thisDayOfYear < otherDayOfYear) return true;
+        }
 
         return false;
     }
