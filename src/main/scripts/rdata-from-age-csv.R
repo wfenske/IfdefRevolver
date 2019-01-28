@@ -39,7 +39,7 @@ getInputFilename <- function(commandLineArgs) {
             stop("Missing input files.  Either specify an explicit input file or specify the name of the project the `--project' option (`-p' for short).")
     }
 
-    baseDir <- file.path("results", opts$project)
+    baseDir <- file.path(opts$project, "results")
     inputFn <-  file.path(baseDir, "joint_function_ab_smell_age_snapshot.csv")
     
     return (inputFn)
@@ -55,7 +55,7 @@ getOutputFilename <- function(commandLineArgs) {
             stop("Missing input files.  Either specify an explicit input file or specify the name of the project the `--project' option (`-p' for short).")
     }
 
-    baseDir <- file.path("results", opts$project)
+    baseDir <- file.path(opts$project, "results")
     outputFn <- file.path(baseDir, "allDataAge.rdata")
 
     return (outputFn)
