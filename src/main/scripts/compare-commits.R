@@ -1,16 +1,10 @@
 #!/usr/bin/env Rscript
 
-### Performs linear regression the totals over all snapshots of a system
-###
-### Input files are the snapshot files under Correlated/
-
-## Example by Fisher:
-
 library(optparse)
 
 options <- list(
     make_option(c("-p", "--project")
-              , help="Name of the project whose data to load.  We expect the input R data to reside in `<projec-name>/results/allDataAge.rdata' below the current working directory."
+              , help="Name of the project whose data to load.  The input R data is expected to reside in `<projec-name>/results/allDataAge.rdata' below the current working directory."
               , default = NULL
                 )
     
@@ -21,7 +15,7 @@ options <- list(
     
   , make_option(c("-d", "--divisions")
               , help="Number of divisions to make."
-              , default = 3
+              , default = 2
                 )
   , make_option(c("-o", "--output")
               , help="Output filename."
@@ -51,7 +45,7 @@ options <- list(
 )
 
 args <- parse_args(OptionParser(
-    description = "Compare SLOC of non-annotated and annotated functions in a project. The project must be specified via the `--project' (`-p') option."
+    description = "Compare COMMITS of non-annotated and annotated functions in a project. If no input R data set is given, the project must be specified via the `--project' (`-p') option."
   , usage = "%prog [options] [file]"
   , option_list=options)
   , positional_arguments = c(0, 1))
@@ -79,7 +73,6 @@ if (is.null(opts$name)) {
 }
 
 allData <- readData(args)
-allData$CND <- allData$ND
 
 threshold <- opts$divisions - 1
 aboveThreshold <- paste((threshold), "+", sep="")
@@ -96,14 +89,14 @@ valGroup <- function(v) {
 allData$grouped <- mapply(valGroup, eval(parse(text=paste("allData", opts$independent, sep="$"))))
 
 if (is.null(opts$output)) {
-    outputFn <- paste("LOC_", opts$name, ".pdf", sep="")
+    outputFn <- paste("COMMITS_", opts$name, ".pdf", sep="")
 } else {
     outputFn <- opts$output
 }
 
 ### Begin plot creation
 
-pdf(file=outputFn,width=7.5,height=3.6)
+pdf(file=outputFn)
 
 ##x <- allData$FLgrouped
 ##y <- allData$LOC
@@ -117,7 +110,7 @@ pdf(file=outputFn,width=7.5,height=3.6)
 ##} else {
 ##    stop(paste("Invalid independent variable name: ", opts$independent))
 ##}
-yLab <- opts$independent
+xLab <- opts$independent
 
 if (is.null(opts$ymax)) {
     yLims <- c()
@@ -126,40 +119,40 @@ if (is.null(opts$ymax)) {
 }
 
 # Decrease `horizontalScale' to move boxes in boxplot closer together
-horizontalScale <- 0.75
+horizontalScale <- 1 #0.75
 xAxisPositions <- seq(1,by=horizontalScale,length.out=opts$divisions)
 ##xLims <- c(xAxisPositions[1]-0.5,xAxisPositions[opts$divisions] + 0.3 * horizontalScale)
 
 if (opts$noXLabels) {
-    xLab <- ""
-    xAxt <- "n"
+    yLab <- ""
+    yAxt <- "n"
 } else {
-    xLab <- "LOC"
-    xAxt <- NULL # default value
+    yLab <- "COMMITS"
+    yAxt <- NULL # default value
 }
 
 colors <- topo.colors(opts$divisions)
 
-txtScale <- 1.2
+##txtScale <- 1.2
 
-bp <- invisible(boxplot(LOC ~ grouped
+bp <- invisible(boxplot(COMMITS ~ grouped
             , data=allData
-            , cex=txtScale
-            , cex.lab=txtScale
-            , cex.axis=txtScale # size of value labels on x & y axis
+#            , cex=txtScale
+#            , cex.lab=txtScale
+#            , cex.axis=txtScale # size of value labels on x & y axis
             #, cex.main=1
             #, cex.sub=1
-            , xaxt=xAxt
+#            , xaxt=xAxt
             , xlab=xLab
             #, yaxt=yAxt
             , ylab=yLab
             , main=(if (opts$noTitle) NULL else opts$name)
-            , outline=FALSE
-            , varwidth=T
+#            , outline=FALSE
+#            , varwidth=T
             , at=xAxisPositions
             ##, xlim=xLims
             , ylim=yLims
-            , horizontal = TRUE
+#            , horizontal = TRUE
             , col = colors
               ))
 ##text(1:5,rep(min(y),5),paste("n=",tapply(y,x,length)) )
@@ -171,10 +164,10 @@ bp <- invisible(boxplot(LOC ~ grouped
 ##    , cex = 0.8 # scale text size
 ##      )
 
-legend("bottomright", ##inset=.02
-     , title="Number of functions"
-     , c(paste("", bp$n, sep = ""))
-     , fill=colors, horiz=TRUE, cex=txtScale)
+#legend("bottomright", ##inset=.02
+#     , title="Number of functions"
+#     , c(paste("", bp$n, sep = ""))
+#     , fill=colors, horiz=TRUE, cex=txtScale)
 
 invisible(dev.off())
 
