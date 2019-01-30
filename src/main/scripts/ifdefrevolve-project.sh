@@ -12,7 +12,7 @@ echo_as_me()
 usage()
 {
     echo "Usage:"
-    echo " $me -p PROJECT_NAME [-w WINDOW_SIZE] [-n]"
+    echo " $me -p PROJECT_NAME [-b] [-n]"
     echo " $me -h"
 }
 
@@ -37,15 +37,17 @@ esac
 help()
 {
     lo_project=
-    lo_windowsize=
+    ##lo_windowsize=
     lo_dry_run=
+    lo_background=
     indent=
 
     if $have_long_opt
     then
 	   lo_project=', --project   '
-	lo_windowsize=', --windowsize'
+	##lo_windowsize=', --windowsize'
 	   lo_dry_run=', --dry-run   '
+	   lo_background=', --background'
 	       indent='              '
     fi
     
@@ -53,19 +55,20 @@ help()
     echo
     echo "Options:"
     echo " -p${lo_project} PROJECT_NAME Name of the project to analyze"
-    echo " -s${lo_windowsize} WINDOW_SIZE  Number of commits for a commit window."
-    echo "   ${indent}              See createsnapshots.sh(1) to see what the default"
-    echo "   ${indent}              value is."
-    echo " -n${lo_dry_run}              Print the commands that would be executed, but do"
-    echo "   ${indent}              not execute them."
+    ##echo " -s${lo_windowsize} WINDOW_SIZE  Number of commits for a commit window."
+    ##echo "   ${indent}              See createsnapshots.sh(1) to see what the default"
+    ##echo "   ${indent}              value is."
+    echo " -b${lo_background} Run the anaylsis in the in background."
+    echo " -n${lo_dry_run} Print the commands that would be executed, but do"
+    echo "   ${indent} not execute them."
     echo
     echo "Example:"
     echo " $me -p openldap"
 }
 
-short_opts="p:s:hn"
+short_opts="p:bhn"
 case $getop_flavor in
-    gnu) ARGS=`getopt -o "$short_opts" -l "project:,windowsize:,help,dry-run" -n "$me" -- "$@"`
+    gnu) ARGS=`getopt -o "$short_opts" -l "project:,background:,help,dry-run" -n "$me" -- "$@"`
 	 err=$?
 	 break
 	 ;;
@@ -86,22 +89,27 @@ WINDOW_SIZE=
 PROJECT=
 DRY_RUN=
 have_project=false
+background_mode=false
 
 eval set -- "$ARGS"
 
 while true
 do
     case $1 in
-	-s|--windowsize)
-	    shift
-	    WINDOW_SIZE=$1
-	    shift
-	    ;;
+#	-s|--windowsize)
+#	    shift
+#	    WINDOW_SIZE=$1
+#	    shift
+#	    ;;
 	-p|--project)
 	    shift
 	    PROJECT=$1
 	    have_project=true
 	    shift
+	    ;;
+	-b|--background)
+	    shift
+	    background_mode=true
 	    ;;
 	-n|--dry-run)
 	    shift
@@ -142,4 +150,19 @@ fi
 
 PATH=$PATH:${real_me_dir}
 
-make -f "${real_me_dir}/ifdefrevolve-project.mk" -j4 $DRY_RUN
+DAEMONIZE_CMD=daemonize
+if $background_mode && ! $(command -v $DAEMONIZE_CMD >/dev/null 2>&1)
+then
+    echo_as_me "Cannot run in background mode.  Command \`$DAEMONIZE_CMD' not found.  Running in foreground mode instead."
+    background_mode=false
+fi
+
+if $background_mode && [ -z "$DRY_RUN" ]
+then
+    LOG_FILE="${PROJECT}/logs/ifdefrevolve-project.log"
+    mkdir -p "${PROJECT}/logs" || exit $?
+    $DAEMONIZE_CMD bash -c "time nice make -f '${real_me_dir}/ifdefrevolve-project.mk' -j4 $DRY_RUN >> '${LOG_FILE}' 2>&1"
+    echo_as_me "Started analysis of \`$PROJECT'. Log output is written to $LOG_FILE" 2>&1
+else
+    echo make -f "${real_me_dir}/ifdefrevolve-project.mk" -j4 $DRY_RUN
+fi
