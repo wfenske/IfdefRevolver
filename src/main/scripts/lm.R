@@ -10,7 +10,7 @@ suppressMessages(library(pscl)) # for Zero-inflated Poisson models
 
 options <- list(
     make_option(c("-p", "--project")
-              , help="Name of the project whose data to load.  We expect the input R data to reside in `results/<projec-name>/allData.rdata' below the current working directory."
+              , help="Name of the project whose data to load.  We expect the input R data to reside in `<projec-name>/results/allData.rdata' below the current working directory."
               , default = NULL
                 )
   , make_option(c("-a", "--annotated"),
@@ -52,7 +52,7 @@ readData <- function(commandLineArgs) {
         if ( is.null(opts$project) ) {
             stop("Missing input files.  Either specify explicit input files or specify the name of the project the `--project' option (`-p' for short).")
         }
-        dataFn <-  file.path("results", opts$project, "allDataAge.rdata")
+        dataFn <-  file.path(opts$project, "results", "allDataAge.rdata")
     }
     eprintf("DEBUG: Reading data from %s\n", dataFn)
     result <- readRDS(dataFn)
