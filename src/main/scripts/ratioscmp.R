@@ -23,7 +23,7 @@ options <- list(
               , default = NULL
                 )
   , make_option(c("-p", "--project")
-              , help="Name of the project whose data to load.  We expect the input R data to reside in `results/<projec-name>/allData.rdata' below the current working directory."
+              , help="Name of the project whose data to load.  We expect the input R data to reside in `<projec-name>/results/allDataAge.rdata' below the current working directory."
               , default = NULL
                 )
   , make_option(c("-i", "--independent")
@@ -73,7 +73,7 @@ readData <- function(commandLineArgs) {
     if ( is.null(opts$project) ) {
         stop("Specify the name of the project the `--project' option (`-p' for short).")
     }
-    dataFn <-  file.path("results", opts$project, "allData.rdata")
+    dataFn <-  file.path(opts$project, "results", "allDataAge.rdata")
     if (opts$debug) {
         write(sprintf(dataFn, fmt="DEBUG: Reading data from %s"), stderr())
     }
@@ -109,7 +109,7 @@ parseScaleOptValue <- function(value) {
             } else {
                 dfSubset <- subset(df, INDEPV == indepValue)
             }
-            return (sum(dfSubset$FUNCTION_LOC))
+            return (sum(dfSubset$LOC))
         }
 
         yAxisScaleSuffix <<- "/LOC"
@@ -185,7 +185,7 @@ computeIndepValue <- function(df, valIndep, includeBiggerP=FALSE) {
 }
 
 processSnapshot <- function(df) {
-    snapshotNo <- df$SNAPSHOT[1]
+    snapshotNo <- df$SNAPSHOT_INDEX[1]
     snapshotDate <- df$SNAPSHOT_DATE[1]
     
     ## Replace all missing values with zeroes
@@ -224,9 +224,19 @@ processSnapshot <- function(df) {
 ##warnings()
 
 allData <- readData(args)
+##AGE_GROUP <- cut(allData$AGE, 3, include.lowest=TRUE,
+##                 ##labels=c("Low", "Med", "High")
+##                 labels=c(0, 1, 2)
+##                 )
+##FL_GROUP <- cut(allData$FL, 3, include.lowest=TRUE,
+##                 ##labels=c("Low", "Med", "High")
+##                 labels=c(0, 1, 2)
+##                 )
+##cutData <- cbind(allData, AGE_GROUP, FL_GROUP)
+cutData <- allData
 
 ## returns a list of cleanRatio, dirtyRatio pairs
-listOfValueFrames <- lapply(split(allData, factor(allData$SNAPSHOT)),
+listOfValueFrames <- lapply(split(cutData, factor(cutData$SNAPSHOT_INDEX)),
                             processSnapshot)
 combinedValueFrame <- Reduce(rbind, listOfValueFrames)
 
@@ -250,7 +260,7 @@ p <- ggplot(data=combinedValueFrame, aes(x=CommitWindow, y=Value,
         se=FALSE
       , size=0.85 # line thickness
       , method="loess" # loess is the default for datasets with n<1000 anyway
-      , span = 0.5 # amount of smoothness; defaults to 0.75; bigger = smoother
+      , span = 0.15 # amount of smoothness; defaults to 0.75; bigger = smoother
     )
 
 p <- p +
