@@ -81,6 +81,18 @@ public enum JointFunctionAbSmellAgeSnapshotColumns implements CsvColumnValueProv
             return in.countLinesDeletedInWindow(window);
         }
     },
+    PREVIOUS_COMMITS {
+        @Override
+        public Integer csvColumnValue(FunctionGenealogy in, List<Snapshot> window) {
+            return in.countCommitsInPreviousSnapshots(window);
+        }
+    },
+    PREVIOUS_LINES_CHANGED {
+        @Override
+        public Integer csvColumnValue(FunctionGenealogy in, List<Snapshot> window) {
+            return in.countLinesChangedInPreviousSnapshots(window);
+        }
+    },
     LOC {
         @Override
         public Integer csvColumnValue(FunctionGenealogy in, List<Snapshot> window) {

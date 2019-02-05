@@ -80,6 +80,8 @@ readSnapshotFile <- function(inputFn) {
                                , "LINES_CHANGED"="numeric"
                                , "LINES_ADDED"="numeric"
                                , "LINES_DELETED"="numeric"
+                               , "PREVIOUS_COMMITS"="numeric"
+                               , "PREVIOUS_LINES_CHANGED"="numeric"
                                , "LOC"="numeric"
                                , "LOAC"="numeric"
                                , "LOFC"="numeric"
@@ -194,15 +196,13 @@ eprintf("Mean AGE/LAST_EDIT of unchanged functions:\n%.0f,%.0f\n"
 
 ## Some renaming
 allData$LCH <- allData$LINES_CHANGED
-
-allData$logLOC <- log(allData$LOC)
-
+allData$PLCH <- allData$PREVIOUS_LINES_CHANGED
 
 ## LOAC and LOFC are taken as is, but also log() and ratio (to LOC)
-allData$logLOAC <- log(allData$LOAC + 1)
+##allData$logLOAC <- log(allData$LOAC + 1)
 allData$LOACratio <- allData$LOAC / allData$LOC
 
-allData$logLOFC <- log(allData$LOFC + 1)
+##allData$logLOFC <- log(allData$LOFC + 1)
 allData$LOFCratio <- allData$LOFC / allData$LOC
 
 allData$FLratio <- allData$FL / allData$LOC
@@ -213,6 +213,22 @@ allData$FCratio <- allData$FC / allData$LOC
 allData$CNDratio <- allData$CND / allData$LOC
 
 allData$NEGratio <- allData$NEG / allData$LOC
+
+
+## Calculate some log-scaled variables
+allData$log2FL  <- log2(allData$FL + 1)
+allData$log2FC  <- log2(allData$FC + 1)
+allData$log2CND  <- log2(allData$CND + 1)
+allData$log2NEG <- log2(allData$NEG + 1)
+
+allData$log2LOAC <- log2(allData$LOAC + 1)
+
+allData$log2LOC <- log2(allData$LOC)
+
+allData$log2AGE <- log2(allData$AGE + 1)
+allData$log2LAST_EDIT <- log2(allData$LAST_EDIT + 1)
+
+allData$log2PREVIOUS_COMMITS <- log2(allData$PREVIOUS_COMMITS + 1)
 
 ### Dependent variables
 ## HUNKS,COMMITS,LINES_CHANGED,LINE_DELTA,LINES_DELETED,LINES_ADDED

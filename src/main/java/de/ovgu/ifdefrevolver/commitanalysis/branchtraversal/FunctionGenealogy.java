@@ -9,6 +9,7 @@ import org.apache.log4j.Logger;
 import java.util.*;
 import java.util.function.ToIntFunction;
 import java.util.stream.Collectors;
+import java.util.stream.Stream;
 
 public class FunctionGenealogy {
     private static final OptionalInt OPTIONAL_ZERO = OptionalInt.of(0);
@@ -45,9 +46,14 @@ public class FunctionGenealogy {
         return jointFunctionAbSmellRowsBySnapshot.get(s);
     }
 
-    public int countCommitsInSnapshot(Snapshot s) {
+    private int countCommitsInSnapshot(Snapshot s) {
         assertExistsAtStartOfSnapshot(s);
-        return getChangingCommitsInSnapshot(s).size();
+        final List<FunctionChangeRow> changes = changesBySnapshot.get(s);
+        return (int) changes.stream()
+                .filter(FunctionChangeRow::isModOrMove)
+                .map(c -> c.commit)
+                .distinct()
+                .count();
     }
 
     private void assertExistsAtStartOfSnapshot(Snapshot s) {
@@ -57,36 +63,32 @@ public class FunctionGenealogy {
         }
     }
 
-    protected LinkedHashSet<Commit> getChangingCommitsInSnapshot(Snapshot s) {
-        final List<FunctionChangeRow> changes = changesBySnapshot.get(s);
-        return changes.stream()
-                .filter(FunctionChangeRow::isModOrMove)
-                .map(c -> c.commit)
-                .collect(Collectors.toCollection(LinkedHashSet::new));
-    }
-
-    public int countLinesAddedInSnapshot(Snapshot s) {
+    private int countLinesAddedInSnapshot(Snapshot s) {
         return sumChangeRowsInSnapshot(s, c -> c.linesAdded);
     }
 
-    public int countLinesDeletedInSnapshot(Snapshot s) {
+    private int countLinesDeletedInSnapshot(Snapshot s) {
         return sumChangeRowsInSnapshot(s, c -> c.linesDeleted);
     }
 
-    public int countLinesChangedInSnapshot(Snapshot s) {
-        return sumChangeRowsInSnapshot(s, c -> c.linesAdded + c.linesDeleted);
+    private int countLinesChangedInSnapshot(Snapshot s) {
+        return sumChangeRowsInSnapshot(s, FunctionChangeRow::linesChanged);
     }
 
     private int sumChangeRowsInSnapshot(Snapshot s, ToIntFunction<FunctionChangeRow> functionChangeRowToIntFunction) {
         assertExistsAtStartOfSnapshot(s);
 
         final List<FunctionChangeRow> changes = changesBySnapshot.get(s);
-        int result = changes.stream()
+        int result = sumAttrValuesOfChanges(changes, functionChangeRowToIntFunction);
+
+        return result;
+    }
+
+    private int sumAttrValuesOfChanges(List<FunctionChangeRow> changes, ToIntFunction<FunctionChangeRow> functionChangeRowToIntFunction) {
+        return changes.stream()
                 .filter(FunctionChangeRow::isModOrMove)
                 .mapToInt(functionChangeRowToIntFunction)
                 .sum();
-
-        return result;
     }
 
     public OptionalInt distanceToMostRecentEdit(Snapshot s) {
@@ -161,7 +163,9 @@ public class FunctionGenealogy {
     }
 
     private Set<Commit> getAllChangingCommitsBefore(Commit point) {
-        Set<Commit> allChangingCommits = changesBySnapshot.getMap().values().stream()
+        Set<Commit> allChangingCommits = changesBySnapshot.getMap()
+                .values()
+                .stream()
                 .flatMap(changeRows -> changeRows.stream())
                 .map(change -> change.commit)
                 .collect(Collectors.toCollection(HashSet::new));
@@ -197,30 +201,60 @@ public class FunctionGenealogy {
         return distanceToMostRecentEdit(window.get(0));
     }
 
-    private int sum(List<Snapshot> window, ToIntFunction<Snapshot> getAttr) {
+    private int sumAttrValuesInWindow(List<Snapshot> window, ToIntFunction<Snapshot> getAttr) {
         int first = getAttr.applyAsInt(window.get(0));
         if (window.size() == 1) {
             return first;
         } else {
-            int rest = window.stream().skip(1).filter(s -> existsAtStartOfSnapshot(s)).mapToInt(getAttr).sum();
+            int rest = window.stream()
+                    .skip(1)
+                    .filter(s -> existsAtStartOfSnapshot(s))
+                    .mapToInt(getAttr)
+                    .sum();
             return first + rest;
         }
     }
 
     public int countCommitsInWindow(List<Snapshot> window) {
-        return sum(window, s -> countCommitsInSnapshot(s));
+        return sumAttrValuesInWindow(window, s -> countCommitsInSnapshot(s));
+    }
+
+    public int countCommitsInPreviousSnapshots(List<Snapshot> window) {
+        Stream<FunctionChangeRow> changesInPreviousSnapshots = getModsAndMovesPreviousSnapshots(window);
+        return (int) changesInPreviousSnapshots
+                .map(c -> c.commit)
+                .distinct()
+                .count();
+    }
+
+    public int countLinesChangedInPreviousSnapshots(List<Snapshot> window) {
+        Stream<FunctionChangeRow> changesInPreviousSnapshots = getModsAndMovesPreviousSnapshots(window);
+        return changesInPreviousSnapshots
+                .mapToInt(FunctionChangeRow::linesChanged)
+                .sum();
+    }
+
+    private Stream<FunctionChangeRow> getModsAndMovesPreviousSnapshots(List<Snapshot> window) {
+        Snapshot firstSnapshotOfWindow = window.get(0);
+        assertExistsAtStartOfSnapshot(firstSnapshotOfWindow);
+        return this.changesBySnapshot.getMap()
+                .entrySet()
+                .stream()
+                .filter(entry -> entry.getKey().compareTo(firstSnapshotOfWindow) < 0)
+                .flatMap(entry -> entry.getValue().stream())
+                .filter(FunctionChangeRow::isModOrMove);
     }
 
     public int countLinesChangedInWindow(List<Snapshot> window) {
-        return sum(window, s -> countLinesChangedInSnapshot(s));
+        return sumAttrValuesInWindow(window, s -> countLinesChangedInSnapshot(s));
     }
 
     public int countLinesAddedInWindow(List<Snapshot> window) {
-        return sum(window, s -> countLinesAddedInSnapshot(s));
+        return sumAttrValuesInWindow(window, s -> countLinesAddedInSnapshot(s));
     }
 
     public int countLinesDeletedInWindow(List<Snapshot> window) {
-        return sum(window, s -> countLinesDeletedInSnapshot(s));
+        return sumAttrValuesInWindow(window, s -> countLinesDeletedInSnapshot(s));
     }
 
     public IAbResRow getStaticMetrics(List<Snapshot> window) {

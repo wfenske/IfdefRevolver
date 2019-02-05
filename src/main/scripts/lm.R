@@ -471,8 +471,6 @@ plotResiduals <- function(model) {
     fit <- fitted(model)
     res <- residuals(model)
 
-    ##cat("*** Shapiro test of normality of residuals ***\n")
-    ##print(shapiro.test(sample(res, min(2500,length(res)))))
     qqnorm(res); qqline(res, col = 2)
     ##qqplot(qnorm(ppoints(length(res))), qnorm(res))
 
@@ -521,8 +519,8 @@ sampleDf <- function(df, sz) {
 ##data$binLARGE <- data$SLOC > topSLOCValue
 
 ### Independent variables
-## LOC,logLOC,
-## LOAC,logLOAC,LOACratio,
+## LOC,log2LOC,
+## LOAC,log2LOAC,LOACratio,
 ## LOFC,logLOFC,LOFCratio,
 ## FL (NOFL), FLratio (FL per LOC)
 ## FC (from NOFC_NonDup), FCratio (FC per LOC)
@@ -547,16 +545,6 @@ allData$sqrtLOC <- sqrt(allData$LOC)
 allData$sqrtFL <- sqrt(allData$FL)
 allData$sqrtFC <- sqrt(allData$FC)
 allData$sqrtCND <- sqrt(allData$CND)
-
-allData$log2FL  <- log2(allData$FL + 1)
-allData$log2FC  <- log2(allData$FC + 1)
-allData$log2CND  <- log2(allData$CND + 1)
-allData$log2NEG <- log2(allData$NEG + 1)
-
-allData$log2LOC <- log2(allData$LOC)
-
-allData$log2AGE <- log2(allData$AGE + 1)
-allData$log2LAST_EDIT <- log2(allData$LAST_EDIT + 1)
 
 ## Some artificial dependent variables
 allData$logLINES_CHANGED <- log(allData$LINES_CHANGED + 1)
@@ -614,6 +602,7 @@ if (opts$annotated) {
     eprintf("DEBUG: Creating models for just the annotated functions.\n")
     negBinData <- subset(negBinData, FL > 0)
 }
+
 if (opts$changed) {
     eprintf("DEBUG: Creating models for just the changed functions.\n")
     negBinData <- subset(negBinData, COMMITS > 0)
@@ -713,49 +702,23 @@ for (dep in c("COMMITS"
 ##    dummy <- csvModel(dep, c("log2LOC", "AGE"))
 ##    dummy <- csvModel(dep, c("log2LOC", "log2LAST_EDIT"))
     dummy <- csvModel(dep, c("log2LOC", "AGE", "log2LAST_EDIT"))
+    dummy <- csvModel(dep, c("log2LOC", "AGE", "log2LAST_EDIT", "PREVIOUS_COMMITS"))
+    dummy <- csvModel(dep, c("log2LOC", "AGE", "log2LAST_EDIT", "log2PREVIOUS_COMMITS"))
     dummy <- csvModel(dep, c("FL", "FC", "CND", "NEG", "LOACratio", "log2LOC"))
     dummy <- csvModel(dep, c("FL", "FC", "CND", "NEG", "LOACratio", "log2LOC", "AGE", "log2LAST_EDIT"))
+    dummy <- csvModel(dep, c("FL", "FC", "CND", "NEG", "LOACratio", "log2LOC", "AGE", "log2LAST_EDIT", "PREVIOUS_COMMITS"))
+    dummy <- csvModel(dep, c("FL", "FC", "CND", "NEG", "LOACratio", "log2LOC", "AGE", "log2LAST_EDIT", "log2PREVIOUS_COMMITS"))
 }
-
-##haveHeader <<- FALSE
-##csvModel <- zeroinflNegbinCsvModel
-##for (dep in c("COMMITS"
-##              ##, "HUNKS"
-##              ##, "LCH"
-##              )) {
-##    dummy <- csvModel(dep, c("log2LOC"))
-##    print(summary(dummy))
-##    dummy <- csvModel(dep, c("FL", "FC", "CND", "NEG", "LOACratio", "log2LOC"))
-##    print(summary(dummy))
-##}
 
 ##model.zip.COMMITS <- tryZeroInflModel(indeps=ziIndeps, dep="COMMITS", data=ziData)
 
 ##model.zip.HUNKS   <- tryZeroInflModel(indeps=ziIndeps, dep="HUNKS",   data=ziData)
-
-##model.nb.LCHG <- tryNbModel(indeps=c(#"FL", "FC",
-##                                "CND"
-##                                        #, "LOFC", "LOC"
-##                            ), dep="LINES_CHANGED", data=negBinData)
-##model.nb.LCHGratio <- tryNbModel(indeps=c("FL", "FC", "CND", "LOC"), dep="LCHratio", data=negBinData)
-##model.nb.orig <- tryNbModel(indeps=c("LOC"), dep="LINES_CHANGED", data=negBinData)
-
 
 ##model.zip.LCH = tryZeroInflModel(indeps=c(
 ##                                     ##"FL", "FC",
 ##                                     "CND"
 ##                                        #, "LOC"
 ##                                 ), dep="LINES_CHANGED", data=ziSampleData)
-
-##nd <- sampleDf(changedData, 100)
-##ndMeanSE <- cbind(nd,
-##                  Mean = predict(model.nb.orig, newdata = nd, type = "response"), 
-##                  SE = predict(model.nb.orig, newdata = nd, type="response", se.fit = T)$se.fit
-##                  )
-
-##anova(modelOnSample # complex model
-##    , locLinesChangedModelOnSample # simple model
-##    , test ="Chisq")
 
 ##cat(paste("*** LR test of model ***\n", sep=""))
 ##suppressMessages(library(lmtest))

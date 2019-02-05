@@ -49,6 +49,10 @@ public class FunctionChangeRow {
         }
     }
 
+    public int linesChanged() {
+        return linesAdded + linesDeleted;
+    }
+
     private boolean isMove() {
         return this.modType == FunctionChangeHunk.ModificationType.MOVE;
     }
