@@ -180,6 +180,8 @@ public class AddChangeDistances {
         LOG.info("Done computing windows. " + windows.size() + " windows have been created.");
 
         writeAbSmellAgeSnapshotCsv(windows);
+
+        LOG.info("Successfully output aggregated change data for all " + windows.size() + " windows.");
     }
 
     private void writeAbSmellAgeSnapshotCsv(List<CommitWindow> windows) {
