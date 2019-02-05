@@ -698,15 +698,27 @@ for (dep in c("COMMITS"
               ##, "HUNKS"
             , "LCH"
               )) { 
+    ## Note, 2019-02-05, wf: We use the log2-scaled variant of
+    ## PREVIOUS_COMMITS because in OpenVPN (maybe others, too) the
+    ## model does not converge if PREVIOUS_COMMITS is included as is.
+    ## Moreover, McFadded is better with the scaled variant compared
+    ## to the unscaled variant.
+
+    ## Note, 2019-02-05, wf: If we do include AGE at all, then without
+    ## log2, i.e., unscaled.  Doing so gives better McFadden values
+    ## compared to including it in log2-scaled form.
+
     dummy <- csvModel(dep, c("log2LOC"))
-##    dummy <- csvModel(dep, c("log2LOC", "AGE"))
-##    dummy <- csvModel(dep, c("log2LOC", "log2LAST_EDIT"))
+
+    dummy <- csvModel(dep, c("log2LOC", "AGE"))
+    dummy <- csvModel(dep, c("log2LOC", "log2LAST_EDIT"))
+    dummy <- csvModel(dep, c("log2LOC", "log2PREVIOUS_COMMITS"))
+    
     dummy <- csvModel(dep, c("log2LOC", "AGE", "log2LAST_EDIT"))
-    dummy <- csvModel(dep, c("log2LOC", "AGE", "log2LAST_EDIT", "PREVIOUS_COMMITS"))
     dummy <- csvModel(dep, c("log2LOC", "AGE", "log2LAST_EDIT", "log2PREVIOUS_COMMITS"))
+    
     dummy <- csvModel(dep, c("FL", "FC", "CND", "NEG", "LOACratio", "log2LOC"))
     dummy <- csvModel(dep, c("FL", "FC", "CND", "NEG", "LOACratio", "log2LOC", "AGE", "log2LAST_EDIT"))
-    dummy <- csvModel(dep, c("FL", "FC", "CND", "NEG", "LOACratio", "log2LOC", "AGE", "log2LAST_EDIT", "PREVIOUS_COMMITS"))
     dummy <- csvModel(dep, c("FL", "FC", "CND", "NEG", "LOACratio", "log2LOC", "AGE", "log2LAST_EDIT", "log2PREVIOUS_COMMITS"))
 }
 
