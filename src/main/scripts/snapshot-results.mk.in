@@ -16,8 +16,8 @@
 %%PROJECT_RESULTS_DIR%%/%%SNAPSHOT_DATE%%/function_change_hunks.csv: %%PROJECT_RESULTS_DIR%%/revisionsFull.csv %%PROJECT_RESULTS_DIR%%/commitParents.csv
 	lschfuncs.sh -p $(PROJECT) %%SNAPSHOT_DATE%%
 
-%%PROJECT_RESULTS_DIR%%/%%SNAPSHOT_DATE%%/ABRes.csv: %%PROJECT_RESULTS_DIR%%/%%SNAPSHOT_DATE%%/skunk_intermediate_functions.xml $(SMELL_CONFIGS_DIR)/AnnotationBundle.csm
+%%PROJECT_RESULTS_DIR%%/%%SNAPSHOT_DATE%%/ABRes.csv: %%PROJECT_RESULTS_DIR%%/%%SNAPSHOT_DATE%%/skunk_intermediate_functions.xml.gz $(SMELL_CONFIGS_DIR)/AnnotationBundle.csm
 	createsnapshots.sh -p $(PROJECT) --smellconfigsdir=$(SMELL_CONFIGS_DIR) --detect=AB %%SNAPSHOT_DATE%%
 
-%%PROJECT_RESULTS_DIR%%/%%SNAPSHOT_DATE%%/skunk_intermediate_functions.xml:
+%%PROJECT_RESULTS_DIR%%/%%SNAPSHOT_DATE%%/skunk_intermediate_functions.xml.gz:
 	createsnapshots.sh -p $(PROJECT) --preprocess %%SNAPSHOT_DATE%%
