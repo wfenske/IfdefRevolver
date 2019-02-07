@@ -157,12 +157,15 @@ then
     background_mode=false
 fi
 
+NUM_JOBS=2
+export DRY_RUN
+
 if $background_mode && [ -z "$DRY_RUN" ]
 then
     LOG_FILE="${PROJECT}/logs/ifdefrevolve-project.log"
     mkdir -p "${PROJECT}/logs" || exit $?
-    $DAEMONIZE_CMD bash -c "time nice make -f '${real_me_dir}/ifdefrevolve-project.mk' -j4 $DRY_RUN >> '${LOG_FILE}' 2>&1"
+    $DAEMONIZE_CMD bash -c "time nice make -f '${real_me_dir}/ifdefrevolve-project.mk' -j${NUM_JOBS} $DRY_RUN >> '${LOG_FILE}' 2>&1"
     echo_as_me "Started analysis of \`$PROJECT'. Log output is written to $LOG_FILE" 2>&1
 else
-    make -f "${real_me_dir}/ifdefrevolve-project.mk" -j4 $DRY_RUN
+    make -f "${real_me_dir}/ifdefrevolve-project.mk" -j${NUM_JOBS} $DRY_RUN
 fi

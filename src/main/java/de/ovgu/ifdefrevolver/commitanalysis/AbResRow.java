@@ -16,12 +16,12 @@ public class AbResRow implements IAbResRow {
     private int noNest = 0;
     private int noNeg = 0;
 
-    public static AbResRow fromAbResCsvLine(String[] csvLine) {
+    public static AbResRow fromAbResCsvLine(String[] csvLine, FunctionIdFactory functionIdFactory) {
         AbResRow r = new AbResRow();
         String file = parse(csvLine, MethodMetricsColumns.FILE);
         String functionSignature = parse(csvLine, MethodMetricsColumns.FUNCTION_SIGNATURE);
 
-        r.functionId = new FunctionId(functionSignature, file);
+        r.functionId = functionIdFactory.intern(functionSignature, file);
 
         r.loc = parse(csvLine, MethodMetricsColumns.LOC);
         r.loac = parse(csvLine, MethodMetricsColumns.LOAC);

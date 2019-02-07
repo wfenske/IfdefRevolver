@@ -18,8 +18,10 @@ import java.util.Optional;
 public class FunctionChangeHunksCsvReader extends SimpleCsvFileReader<List<FunctionChangeRow>> {
     List<FunctionChangeRow> results;
     private CommitsDistanceDb commitsDistanceDb;
+    private FunctionIdFactory functionIdFactory;
 
-    public FunctionChangeHunksCsvReader(CommitsDistanceDb commitsDistanceDb) {
+    public FunctionChangeHunksCsvReader(FunctionIdFactory functionIdFactory, CommitsDistanceDb commitsDistanceDb) {
+        this.functionIdFactory = functionIdFactory;
         this.commitsDistanceDb = commitsDistanceDb;
     }
 
@@ -38,7 +40,7 @@ public class FunctionChangeHunksCsvReader extends SimpleCsvFileReader<List<Funct
         FunctionChangeRow result = new FunctionChangeRow();
         String signature = line[FunctionChangeHunksColumns.FUNCTION_SIGNATURE.ordinal()];
         String file = line[FunctionChangeHunksColumns.FILE.ordinal()];
-        FunctionId functionId = new FunctionId(signature, file);
+        FunctionId functionId = functionIdFactory.intern(signature, file);
         result.functionId = functionId;
 
         String commitId = line[FunctionChangeHunksColumns.COMMIT_ID.ordinal()];

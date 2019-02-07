@@ -38,6 +38,7 @@ public class AddChangeDistances {
     private Map<Date, List<AbResRow>> annotationDataInSnapshots;
 
     private RevisionsCsvReader revisionsReader;
+    private FunctionIdFactory functionIdFactory;
 
     public static void main(String[] args) {
         AddChangeDistances main = new AddChangeDistances();
@@ -96,14 +97,16 @@ public class AddChangeDistances {
             allChangesSnapshotDates.add(leftOverSnapshotDate.get());
         }
 
-        LOG.debug("Reading all function changes.");
-        this.changesInSnapshots = readChangesInSnapshots(allChangesSnapshotDates);
+        this.functionIdFactory = new FunctionIdFactory();
 
-        LOG.debug("Building move resolver.");
-
+        LOG.debug("Reading all function definitions, changes, and annotation data.");
+        changesInSnapshots = readChangesInSnapshots(allChangesSnapshotDates);
         allFunctionsInSnapshots = readAllFunctionsInSnapshots(realSnapshotDates);
         annotationDataInSnapshots = readAllAbResInSnapshots(realSnapshotDates);
 
+        this.functionIdFactory = null;
+
+        LOG.debug("Tracking genealogies.");
         trackGenealogies();
     }
 
@@ -208,7 +211,7 @@ public class AddChangeDistances {
     private Map<Date, List<FunctionChangeRow>> readChangesInSnapshots(Collection<Date> snapshotsToProcesses) {
         LOG.debug("Reading function changes for " + snapshotsToProcesses.size() + " snapshot(s).");
         int numChanges = 0;
-        FunctionChangeHunksCsvReader reader = new FunctionChangeHunksCsvReader(commitsDistanceDb);
+        FunctionChangeHunksCsvReader reader = new FunctionChangeHunksCsvReader(functionIdFactory, commitsDistanceDb);
         Map<Date, List<FunctionChangeRow>> result = new LinkedHashMap<>();
         for (Date snapshotDate : snapshotsToProcesses) {
             List<FunctionChangeRow> functionChanges = reader.readFile(config, snapshotDate);
@@ -222,7 +225,7 @@ public class AddChangeDistances {
     private Map<Date, List<AllFunctionsRow>> readAllFunctionsInSnapshots(Collection<Date> snapshotsToProcesses) {
         LOG.debug("Reading functions defined in " + snapshotsToProcesses.size() + " snapshot(s).");
         int numFunctionDefinitions = 0;
-        AllFunctionsCsvReader reader = new AllFunctionsCsvReader();
+        AllFunctionsCsvReader reader = new AllFunctionsCsvReader(functionIdFactory);
         Map<Date, List<AllFunctionsRow>> result = new LinkedHashMap<>();
         for (Date snapshotDate : snapshotsToProcesses) {
             List<AllFunctionsRow> functions = reader.readFile(config, snapshotDate);
@@ -236,7 +239,7 @@ public class AddChangeDistances {
     private Map<Date, List<AbResRow>> readAllAbResInSnapshots(Collection<Date> snapshotsToProcesses) {
         LOG.debug("Reading annotation data of functions defined in " + snapshotsToProcesses.size() + " snapshot(s).");
         int numFunctionDefinitions = 0;
-        AbResCsvReader reader = new AbResCsvReader();
+        AbResCsvReader reader = new AbResCsvReader(functionIdFactory);
         Map<Date, List<AbResRow>> result = new LinkedHashMap<>();
         for (Date snapshotDate : snapshotsToProcesses) {
             List<AbResRow> functions = reader.readFile(config, snapshotDate);

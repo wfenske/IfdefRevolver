@@ -14,7 +14,12 @@ import java.util.List;
  * Reads the <code>ABRes.csv</code> file for a snapshot
  */
 public class AbResCsvReader extends SimpleCsvFileReader<List<AbResRow>> {
+    private final FunctionIdFactory functionIdFactory;
     List<AbResRow> results;
+
+    public AbResCsvReader(FunctionIdFactory functionIdFactory) {
+        this.functionIdFactory = functionIdFactory;
+    }
 
     @Override
     protected boolean hasHeader() {
@@ -28,7 +33,7 @@ public class AbResCsvReader extends SimpleCsvFileReader<List<AbResRow>> {
 
     @Override
     protected void processContentLine(String[] line) {
-        AbResRow result = AbResRow.fromAbResCsvLine(line);
+        AbResRow result = AbResRow.fromAbResCsvLine(line, functionIdFactory);
         results.add(result);
     }
 

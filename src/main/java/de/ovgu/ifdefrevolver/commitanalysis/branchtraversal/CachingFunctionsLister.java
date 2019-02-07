@@ -108,7 +108,7 @@ class CachingFunctionsLister {
     }
 
     private Set<FunctionId> getFunctionIdsFromCsv(CommitsDistanceDb.Commit commit) {
-        AllFunctionsCsvReader reader = new AllFunctionsCsvReader();
+        AllFunctionsCsvReader reader = new AllFunctionsCsvReader(new FunctionIdFactory());
         final List<AllFunctionsRow> allFunctionsRows = reader.readFile(config, commit.commitHash);
         Set<FunctionId> result = new LinkedHashSet<>();
         for (AllFunctionsRow r : allFunctionsRows) {

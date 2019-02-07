@@ -14,6 +14,11 @@ import java.util.List;
  */
 public class AllFunctionsCsvReader extends SimpleCsvFileReader<List<AllFunctionsRow>> {
     List<AllFunctionsRow> results;
+    private final FunctionIdFactory functionIdFactory;
+
+    public AllFunctionsCsvReader(FunctionIdFactory functionIdFactory) {
+        this.functionIdFactory = functionIdFactory;
+    }
 
     @Override
     protected boolean hasHeader() {
@@ -30,7 +35,7 @@ public class AllFunctionsCsvReader extends SimpleCsvFileReader<List<AllFunctions
         AllFunctionsRow result = new AllFunctionsRow();
         String signature = line[AllSnapshotFunctionsColumns.FUNCTION_SIGNATURE.ordinal()];
         String file = line[AllSnapshotFunctionsColumns.FILE.ordinal()];
-        FunctionId functionId = new FunctionId(signature, file);
+        FunctionId functionId = functionIdFactory.intern(signature, file);
         result.functionId = functionId;
         result.loc = Integer.parseUnsignedInt(line[AllSnapshotFunctionsColumns.FUNCTION_LOC.ordinal()]);
         results.add(result);
