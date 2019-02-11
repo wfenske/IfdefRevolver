@@ -27,6 +27,8 @@ then
    exit 1
 fi
 
+
+
 diff -uqsr -- "$srcPath"/source "$dstPath"/source \
     | grep ' are identical$' \
     | sed 's,^Files \([^[:space:]]*\) and .*,\1,' \
@@ -42,7 +44,8 @@ do
 	for fn in "${relName}" "${relName}".xml
 	do
 	    test -e "$srcPath/$mode/$fn" || continue
-	    $SIM link_or_copy_file.py -f "$srcPath/$mode/$fn" "$dstPath/$mode/$fn" || exit $?
+	    echo "$srcPath/$mode/$fn"
+	    echo "$dstPath/$mode/$fn"
 	done
     done
-done
+done|$SIM link_or_copy_file.py -f
