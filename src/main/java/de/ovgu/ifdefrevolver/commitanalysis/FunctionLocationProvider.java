@@ -182,7 +182,7 @@ public class FunctionLocationProvider {
                 procStdout = new ByteArrayInputStream(buffer, 0, read);
                 */
 
-                doc[0] = folderReader.readAndRememberSrcmlFile(procStdout, path);
+                doc[0] = folderReader.readSrcmlFile(procStdout, path);
             }
         });
         return doc[0];

@@ -18,6 +18,7 @@ import de.ovgu.skunk.detection.output.CsvRowProvider;
 import org.apache.commons.cli.*;
 import org.apache.commons.csv.CSVPrinter;
 import org.apache.log4j.Logger;
+import org.w3c.dom.Document;
 
 import java.io.File;
 import java.io.IOException;
@@ -276,8 +277,8 @@ public class ListAllFunctions {
         Context ctx = new Context(null);
         de.ovgu.skunk.detection.data.File file = ctx.files.InternFile(filename);
         SrcMlFolderReader folderReader = new SrcMlFolderReader(ctx, xmlReader, Method::new);
-        folderReader.readAndRememberSrcmlFile(file.filePath);
-        folderReader.internAllFunctionsInFile(file);
+        Document document = folderReader.readSrcmlFile(file.filePath);
+        folderReader.internAllFunctionsInFile(file, document);
         ctx.functions.PostAction();
         int numFunctions = 0;
         for (Iterator<Method> it = ctx.functions.AllMethods().iterator(); it.hasNext(); it.next()) {
