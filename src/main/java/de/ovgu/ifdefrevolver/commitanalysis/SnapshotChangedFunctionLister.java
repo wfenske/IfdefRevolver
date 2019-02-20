@@ -75,6 +75,10 @@ public class SnapshotChangedFunctionLister {
     private CsvFileWriterHelper newCsvFileWriterForSnapshot(final File outputFile) {
         final String uncaughtExceptionErrorMessage = "Uncaught exception while listing changing functions in snapshot " + snapshot + ". Deleting output file " + outputFile.getAbsolutePath();
         final String fileDeleteFailedErrorMessage = "Failed to delete output file " + outputFile.getAbsolutePath() + ". Must be deleted manually.";
+        final List<String> commitIds = snapshot.getCommits()
+                .stream()
+                .filter(c -> commitsThatModifyCFiles.contains(c) || c.isMerge())
+                .map(c -> c.commitHash).collect(Collectors.toList());
 
         return new CsvFileWriterHelper() {
             CsvRowProvider<FunctionChangeHunk, IMinimalSnapshot, FunctionChangeHunksColumns> csvRowProvider = FunctionChangeHunksColumns.newCsvRowProviderForSnapshot(snapshot);
@@ -83,10 +87,6 @@ public class SnapshotChangedFunctionLister {
             protected void actuallyDoStuff(CSVPrinter csv) throws IOException {
                 csv.printRecord(csvRowProvider.headerRow());
                 Consumer<FunctionChangeHunk> csvRowFromFunction = newThreadSafeFunctionToCsvWriter(csv, csvRowProvider);
-                List<String> commitIds = snapshot.getCommits()
-                        .stream()
-                        .filter(c -> commitsThatModifyCFiles.contains(c))
-                        .map(c -> c.commitHash).collect(Collectors.toList());
 
                 try {
                     listChangedFunctions(commitIds, csvRowFromFunction);

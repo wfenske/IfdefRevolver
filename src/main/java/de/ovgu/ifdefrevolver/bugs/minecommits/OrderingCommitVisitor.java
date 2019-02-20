@@ -256,10 +256,10 @@ public class OrderingCommitVisitor implements ICommitVisitorWithOutputFileHeader
 
     private boolean isIncludeCommit(OrderedCommit commit) {
         boolean includeCommit = true;
-        if (commit.isMerge()) {
-            LOG.info("Ignoring commit " + commit.getHash() + ": is a merge.");
-            includeCommit = false;
-        }
+//        if (commit.isMerge()) {
+//            LOG.info("Ignoring commit " + commit.getHash() + ": is a merge.");
+//            includeCommit = false;
+//        }
         if (!commit.isModifiesCFile()) {
             LOG.info("Ignoring commit " + commit.getHash() + ": no .c files are modified.");
             includeCommit = false;
