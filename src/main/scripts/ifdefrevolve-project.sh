@@ -157,7 +157,7 @@ then
     background_mode=false
 fi
 
-NUM_JOBS=2
+NUM_JOBS=4
 export DRY_RUN
 
 if $background_mode && [ -z "$DRY_RUN" ]
