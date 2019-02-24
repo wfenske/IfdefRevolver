@@ -77,7 +77,7 @@ public class SnapshotChangedFunctionLister {
         final String fileDeleteFailedErrorMessage = "Failed to delete output file " + outputFile.getAbsolutePath() + ". Must be deleted manually.";
         final List<String> commitIds = snapshot.getCommits()
                 .stream()
-                .filter(c -> commitsThatModifyCFiles.contains(c) || c.isMerge())
+                .filter(c -> commitsThatModifyCFiles.contains(c))
                 .map(c -> c.commitHash).collect(Collectors.toList());
 
         return new CsvFileWriterHelper() {
