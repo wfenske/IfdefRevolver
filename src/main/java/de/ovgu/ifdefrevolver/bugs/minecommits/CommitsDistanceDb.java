@@ -18,6 +18,7 @@ public class CommitsDistanceDb {
     private static final Optional<Integer> DIST_ZERO = Optional.of(0);
 
     private boolean preprocessed = false;
+    private boolean parentsAndChildrenInitialized = false;
 
     public static final class Commit implements Comparable<Commit> {
         private static final Commit[] EMPTY_COMMITS_ARRAY = new Commit[0];
@@ -142,6 +143,7 @@ public class CommitsDistanceDb {
         }
 
         public Commit[] parents() {
+            this.db.ensureParentsAndChildrenInitialized();
             return this.parents;
         }
 
@@ -158,10 +160,12 @@ public class CommitsDistanceDb {
 //        }
 
         public Commit[] children() {
+            this.db.ensureParentsAndChildrenInitialized();
             return this.children;
         }
 
         public boolean isMerge() {
+            this.db.ensureParentsAndChildrenInitialized();
             return this.parents.length > 1;
         }
 
@@ -405,9 +409,16 @@ public class CommitsDistanceDb {
         if (!preprocessed) {
             populateIntParents();
             populateReachables();
+            this.ensureParentsAndChildrenInitialized();
+            preprocessed = true;
+        }
+    }
+
+    private void ensureParentsAndChildrenInitialized() {
+        if (!parentsAndChildrenInitialized) {
             populateCommitParents();
             populateCommitChildren();
-            preprocessed = true;
+            parentsAndChildrenInitialized = true;
         }
     }
 
