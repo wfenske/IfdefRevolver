@@ -71,3 +71,7 @@ add_to_cp "${maven_repo}"/org/apache/commons/commons-lang3/3.4/commons-lang3-3.4
 # Log4j
 add_to_cp "${maven_repo}"/log4j/log4j/1.2.14/log4j-1.2.14.jar
 #add_to_cp "${maven_repo}"/org/apache/logging/log4j/log4j-api/2.1/log4j-api-2.1.jar
+
+# Slf4j
+add_to_cp "${maven_repo}"/org/slf4j/slf4j-api/1.7.2/slf4j-api-1.7.2.jar
+add_to_cp "${maven_repo}"/org/slf4j/slf4j-log4j12/1.6.0/slf4j-log4j12-1.6.0.jar
