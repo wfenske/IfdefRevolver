@@ -51,7 +51,7 @@ add_to_cp "${maven_repo}"/commons-io/commons-io/2.5/commons-io-2.5.jar
 add_to_cp "${maven_repo}"/org/repodriller/repodriller/1.2.2-SNAPSHOT-no-git-branches/repodriller-1.2.2-SNAPSHOT-no-git-branches.jar
 
 # egit (required by repodriller)
-add_to_cp "${maven_repo}"/org/eclipse/jgit/org.eclipse.jgit/3.4.1.201406201815-r/org.eclipse.jgit-3.4.1.201406201815-r.jar
+add_to_cp "${maven_repo}"/org/eclipse/jgit/org.eclipse.jgit/3.7.1.201504261725-r/org.eclipse.jgit-3.7.1.201504261725-r.jar
 
 # repodriller requires google collections
 add_to_cp "${maven_repo}"/com/google/guava/guava/18.0/guava-18.0.jar
