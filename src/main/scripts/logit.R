@@ -98,31 +98,6 @@ mcfaddensPseudoRSquared <- function(model, nullmodel) {
     return (1-logLik(model)/logLik(nullmodel))
 }
 
-calculateChiSqStat <- function(modelSummary) {
-    chisqp <- TRUE
-    if (is.null(modelSummary$deviance)) {
-        eprintf("WARN: Cannot determine model fitness: modelSummary$deviance is missing.\n")
-        chisqp <- FALSE
-    }
-    if (is.null(modelSummary$df.residual)) {
-        eprintf("WARN: Cannot determine model fitness: modelSummary$df.residual is missing.\n")
-        chisqp <- FALSE
-    }
-    if (chisqp) {
-        chiSqStat <- 1 - pchisq(modelSummary$deviance, modelSummary$df.residual)
-        chiSqStatThreshold <- 0.05
-        if (chiSqStat > chiSqStatThreshold) {
-            judgement <- "fits the data"
-        } else {
-            judgement <- "does *not* fit the data"
-        }
-        eprintf("INFO: Model %s: Chi-square-test statistic: %.3f (should be > %.3f).\n", judgement, chiSqStat, chiSqStatThreshold)
-        return (chiSqStat)
-    } else {
-        return (NA)
-    }
-}
-
 reportModel <- function(model, modelName, mcfadden, csvOut=TRUE, csvHeader=TRUE, warnings=0, warningMessages="") {
     modelSummary <- summary(model)
     ##print(summary(model))
@@ -156,12 +131,10 @@ reportModel <- function(model, modelName, mcfadden, csvOut=TRUE, csvHeader=TRUE,
             printf("% 13s", significanceCode(p))
         }
         printf("\n")
-        dummy <- calculateChiSqStat(modelSummary)
     } else {
         if (csvHeader) {
-            printf("SYSTEM,D,FORMULA,AIC,MCFADDEN,CHISQ,I,COEF,OR,Z,P,PCODE,WARNINGS,WARNING_MESSAGES\n")
+            printf("SYSTEM,D,FORMULA,AIC,MCFADDEN,I,COEF,OR,Z,P,PCODE,WARNINGS,WARNING_MESSAGES\n")
         }
-        chisq <- calculateChiSqStat(modelSummary)
         msCoefs <- modelSummary$coefficients
         ## Name of dependent variable
         terms <- modelSummary$terms
@@ -176,9 +149,9 @@ reportModel <- function(model, modelName, mcfadden, csvOut=TRUE, csvHeader=TRUE,
             z <- msCoefs[i, "z value"]
             p <- msCoefs[i, "Pr(>|z|)"]
             ##printf("%s,%7s,% 27s,%7.0f,%.4f,%.2f,%11s,%- 6.4f,%3s,%.4f,%d,\"%s\"\n",
-            printf("%s,%s,%s,%.0f,%.4f,%.2f,%s,% .6f,%.3f,%.2f,%.4f,%s,%d,\"%s\"\n",
+            printf("%s,%s,%s,%.0f,%.4f,%s,% .6f,%.3f,%.2f,%.4f,%s,%d,\"%s\"\n",
 sysname, dName, iFormula
-, model$aic, mcfadden, chisq
+, model$aic, mcfadden
 , cName, c, or
 , z, p, significanceCode(p)
 , warnings, warningMessages)
@@ -383,11 +356,14 @@ csvModel <- logitCsvModel
 ##ageVar <- "log2AGE"
 ageVar <- "AGE"
 
-dummy <- csvModel(dep, c("log2LOC"))
-dummy <- csvModel(dep, c("log2LAST_EDIT"))
-dummy <- csvModel(dep, c(ageVar))
-dummy <- csvModel(dep, c("log2LOC", "log2LAST_EDIT"))
-dummy <- csvModel(dep, c("log2LOC", ageVar))
-dummy <- csvModel(dep, c("log2LOC", "log2LAST_EDIT", ageVar))
+dummy <- csvModel(dep, c("log2LAST_EDIT", ageVar, "log2PREVIOUS_COMMITS"))
+dummy <- csvModel(dep, c("log2LOC", "log2LAST_EDIT", ageVar, "log2PREVIOUS_COMMITS"))
+dummy <- csvModel(dep, c("FL", "FC", "CND", "NEG", "LOACratio"))
 dummy <- csvModel(dep, c("FL", "FC", "CND", "NEG", "LOACratio", "log2LOC"))
-dummy <- csvModel(dep, c("FL", "FC", "CND", "NEG", "LOACratio", "log2LOC", "log2LAST_EDIT", ageVar))
+dummy <- csvModel(dep, c("FL", "FC", "CND", "NEG", "LOACratio", "log2LOC", "log2LAST_EDIT", ageVar, "log2PREVIOUS_COMMITS"))
+
+dummy <- csvModel(dep, c("log2LAST_EDIT", "log2PREVIOUS_COMMITS"))
+dummy <- csvModel(dep, c("log2LOC", "log2LAST_EDIT", "log2PREVIOUS_COMMITS"))
+dummy <- csvModel(dep, c("FL", "FC", "CND", "NEG", "LOACratio"))
+dummy <- csvModel(dep, c("FL", "FC", "CND", "NEG", "LOACratio", "log2LOC"))
+dummy <- csvModel(dep, c("FL", "FC", "CND", "NEG", "LOACratio", "log2LOC", "log2LAST_EDIT", "log2PREVIOUS_COMMITS"))

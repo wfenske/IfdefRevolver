@@ -701,7 +701,7 @@ for (dep in c("COMMITS"
     ## Note, 2019-02-05, wf: We use the log2-scaled variant of
     ## PREVIOUS_COMMITS because in OpenVPN (maybe others, too) the
     ## model does not converge if PREVIOUS_COMMITS is included as is.
-    ## Moreover, McFadded is better with the scaled variant compared
+    ## Moreover, McFadden is better with the scaled variant compared
     ## to the unscaled variant.
 
     ## Note, 2019-02-05, wf: If we do include AGE at all, then without
