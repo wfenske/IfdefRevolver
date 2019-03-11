@@ -631,6 +631,7 @@ public class CreateSnapshots {
         //options.addOption(ProjectInformationConfig.snapshotsDirCommandLineOption());
         //options.addOption(ProjectInformationConfig.resultsDirCommandLineOption());
         options.addOption(CreateSnapshotsConfig.forceCommandLineOption());
+        options.addOption(CreateSnapshotsConfig.continueCommandLineOption());
 
         options.addOption(
                 Option.builder().longOpt(OPT_SMELL_CONFIGS_DIR_L)
