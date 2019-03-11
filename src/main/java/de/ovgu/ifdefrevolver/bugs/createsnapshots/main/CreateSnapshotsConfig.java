@@ -19,7 +19,7 @@ public class CreateSnapshotsConfig extends ProjectInformationConfig implements I
     private String repoDir;
 
     /**
-     * Name of the project to analyze
+     * Whether existing results should be overwritten
      */
     public static final char OPT_FORCE = 'f';
 
@@ -28,6 +28,16 @@ public class CreateSnapshotsConfig extends ProjectInformationConfig implements I
      */
     public static final String OPT_FORCE_L = "force";
 
+    /**
+     * Whether to continue an interrupted checkout
+     */
+    public static final char OPT_CONTINUE = 'c';
+
+    /**
+     * Long name of the {@link #OPT_CONTINUE} option.
+     */
+    public static final String OPT_CONTINUE_L = "continue";
+
     private String smellConfig = null;
     public static final String DEFAULT_SMELL_CONFIGS_DIR_NAME = "smellconfigs";
 
@@ -35,6 +45,7 @@ public class CreateSnapshotsConfig extends ProjectInformationConfig implements I
     private Smell smell = null;
 
     private boolean force = false;
+    private boolean continueCheckout = false;
 
     private int snapshotSize = -1;
     public static final SnapshotSizeMode DEFAULT_COMMIT_WINDOW_SIZE_MODE = SnapshotSizeMode.COMMITS;
@@ -91,9 +102,21 @@ public class CreateSnapshotsConfig extends ProjectInformationConfig implements I
                 .build();
     }
 
+    public static Option continueCommandLineOption() {
+        return Option.builder(String.valueOf(OPT_CONTINUE)).longOpt(OPT_CONTINUE_L)
+                .desc("Continue a checkout from by a previous, interrupted run of the tool. (conflicts with option `--" + OPT_FORCE_L + "'")
+                .build();
+    }
+
     public static void parseForceFromCommandLine(CommandLine line, CreateSnapshotsConfig config) {
         if (line.hasOption(OPT_FORCE)) {
             config.setForce(true);
+        }
+    }
+
+    public static void parseContinueFromCommandLine(CommandLine line, CreateSnapshotsConfig config) {
+        if (line.hasOption(OPT_CONTINUE)) {
+            config.setContinueCheckout(true);
         }
     }
 
@@ -138,5 +161,13 @@ public class CreateSnapshotsConfig extends ProjectInformationConfig implements I
 
     public boolean isForce() {
         return force;
+    }
+
+    public void setContinueCheckout(boolean continueCheckout) {
+        this.continueCheckout = continueCheckout;
+    }
+
+    public boolean isContinueCheckout() {
+        return continueCheckout;
     }
 }

@@ -49,8 +49,12 @@ class CheckoutStrategy implements ISnapshotProcessingModeStrategy {
     public void readAllRevisionsAndComputeSnapshots() {
         this.revisionsCsvReader = new RevisionsCsvReader(commitsDb, conf.revisionCsvFile());
         this.revisionsCsvReader.readCommitsThatModifyCFiles();
-        this.removeOutputFiles();
-        this.revisionsCsvReader.computeAndPersistSnapshots(conf);
+        if (conf.isContinueCheckout()) {
+            this.revisionsCsvReader.readPrecomputedSnapshots(conf);
+        } else {
+            this.removeOutputFiles();
+            this.revisionsCsvReader.computeAndPersistSnapshots(conf);
+        }
     }
 
     private void removeOutputFiles() {
@@ -73,9 +77,14 @@ class CheckoutStrategy implements ISnapshotProcessingModeStrategy {
         File snapshotDir = snapshotDir(snapshot);
         File cppstatsGeneralCsv = new File(snapshotDir, "cppstats.csv");
         File cppstatsFeatureLocationsCsv = new File(snapshotDir, "cppstats_featurelocations.csv");
-        return (FileUtils.isNonEmptyRegularFile(cppstatsConfigFile) &&
+        boolean alreadyProcessed = (FileUtils.isNonEmptyRegularFile(cppstatsConfigFile) &&
                 FileUtils.isNonEmptyRegularFile(cppstatsGeneralCsv) &&
                 FileUtils.isNonEmptyRegularFile(cppstatsFeatureLocationsCsv));
+        if (alreadyProcessed && !conf.isContinueCheckout()) {
+            throw new RuntimeException("Cowardly refusing to continue checkout: Some files of snapshot " + snapshot +
+                    " already exist, but option `--" + CreateSnapshotsConfig.OPT_CONTINUE_L + "' was not specified.");
+        }
+        return alreadyProcessed;
     }
 
     private void removeSnapshotCsv() {

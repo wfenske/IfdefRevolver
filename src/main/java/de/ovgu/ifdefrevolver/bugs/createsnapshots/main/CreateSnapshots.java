@@ -469,6 +469,24 @@ public class CreateSnapshots {
         //ProjectInformationConfig.parseSnapshotsDirFromCommandLine(line, res, res.skunkMode().snapshotDirMissingStrategy());
         //ProjectInformationConfig.parseProjectResultsDirFromCommandLine(line, res);
         CreateSnapshotsConfig.parseForceFromCommandLine(line, res);
+        CreateSnapshotsConfig.parseContinueFromCommandLine(line, res);
+
+        if (res.skunkMode() != SnapshotProcessingMode.CHECKOUT) {
+            if (res.isForce()) {
+                throw new RuntimeException(
+                        "Option `--" + CreateSnapshotsConfig.OPT_FORCE_L + "' can only be used in `--" + OPT_CHECKOUT_L + "' mode.");
+            }
+
+            if (res.isContinueCheckout()) {
+                throw new RuntimeException(
+                        "Option `--" + CreateSnapshotsConfig.OPT_CONTINUE_L + "' can only be used in `--" + OPT_CHECKOUT_L + "' mode.");
+            }
+        }
+
+        if (res.isContinueCheckout() && res.isForce()) {
+            throw new RuntimeException(
+                    "Option `--" + CreateSnapshotsConfig.OPT_CONTINUE_L + "' and  `--" + CreateSnapshotsConfig.OPT_FORCE_L + "' are mutually exclusive.");
+        }
 
 //        final String reposDirName;
 //        if (line.hasOption(OPT_REPOS_DIR_L)) {
