@@ -373,19 +373,6 @@ public class CreateSnapshots {
     }
 
     private static final char OPT_HELP = 'h';
-    // mutex groupof options controlling how Skunk is called
-    private static final String OPT_CHECKOUT_L = "checkout";
-    private static final String OPT_PREPROCESS_L = "preprocess";
-    /**
-     * --detect=AB|AF|LF
-     */
-    private static final String OPT_DETECT_L = "detect";
-
-    /**
-     * Size of a commit window, requires positive integer argument
-     */
-    private static final String OPT_SNAPSHOT_SIZE_L = "snapshotsize";
-    private static final char OPT_SNAPSHOT_SIZE = 's';
 
 //    /**
 //     * How the size of a commit window is counted.  Requires an arg, as determined by the values in {@link
@@ -423,14 +410,14 @@ public class CreateSnapshots {
                         "Create snapshots of a VCS repository and detect variability-aware smells in those snapshots using Skunk and cppstats.\n\t" +
                                 "Snapshot creation requires information about the commits to this repository, which can be obtained by running " +
                                 FindBugfixCommits.class.getSimpleName() + " on the repository.\n\t" +
-                                "The snapshots will be created and an extensive Skunk analysis performed when this program is run with the `--" + OPT_CHECKOUT_L
-                                + "' option. Subsequent runs with the `"
-                                + OPT_PREPROCESS_L + "' and `"
-                                + OPT_DETECT_L + "' options will reuse the snapshots and Skunk analysis data and proceed much faster."
+                                "The snapshots will be created and an extensive Skunk analysis performed when this program is run with the `--" + CreateSnapshotsConfig.OPT_CHECKOUT_L
+                                + "' option. Subsequent runs with the `--"
+                                + CreateSnapshotsConfig.OPT_PREPROCESS_L + "' and `--"
+                                + CreateSnapshotsConfig.OPT_DETECT_L + "' options will reuse the snapshots and Skunk analysis data and proceed much faster."
                                 + "\n\n"
                                 + "If you want to process only some snapshots of the project, you may optionally name the snapshots"
-                                + " to process by specifying multiple snapshot dates in YYYY-MM-DD format.  This is only possible if the `"
-                                + OPT_PREPROCESS_L + "' or `" + OPT_DETECT_L + "' options is present."
+                                + " to process by specifying multiple snapshot dates in YYYY-MM-DD format.  This is only possible if the `--"
+                                + CreateSnapshotsConfig.OPT_PREPROCESS_L + "' or `--" + CreateSnapshotsConfig.OPT_DETECT_L + "' options is present."
                                 + "\n\nOptions:\n",
                         actualOptions, null, false);
                 System.out.flush();
@@ -450,16 +437,16 @@ public class CreateSnapshots {
             return null;
         }
 
-        if (line.hasOption(OPT_CHECKOUT_L)) {
+        if (line.hasOption(CreateSnapshotsConfig.OPT_CHECKOUT_L)) {
             res.setSnapshotProcessingMode(SnapshotProcessingMode.CHECKOUT);
-        } else if (line.hasOption(OPT_PREPROCESS_L)) {
+        } else if (line.hasOption(CreateSnapshotsConfig.OPT_PREPROCESS_L)) {
             res.setSnapshotProcessingMode(SnapshotProcessingMode.PREPROCESS);
-        } else if (line.hasOption(OPT_DETECT_L)) {
+        } else if (line.hasOption(CreateSnapshotsConfig.OPT_DETECT_L)) {
             res.setSnapshotProcessingMode(SnapshotProcessingMode.DETECTSMELLS);
             parseSmellDetectionArgs(res, line);
         } else {
             throw new RuntimeException(
-                    "Either `--" + OPT_CHECKOUT_L + "', `--" + OPT_PREPROCESS_L + "' or `--" + OPT_DETECT_L + "' must be specified!");
+                    "Either `--" + CreateSnapshotsConfig.OPT_CHECKOUT_L + "', `--" + CreateSnapshotsConfig.OPT_PREPROCESS_L + "' or `--" + CreateSnapshotsConfig.OPT_DETECT_L + "' must be specified!");
         }
 
         //parseSnapshotSizeModeFromCommandLine(res, line);
@@ -474,12 +461,12 @@ public class CreateSnapshots {
         if (res.skunkMode() != SnapshotProcessingMode.CHECKOUT) {
             if (res.isForce()) {
                 throw new RuntimeException(
-                        "Option `--" + CreateSnapshotsConfig.OPT_FORCE_L + "' can only be used in `--" + OPT_CHECKOUT_L + "' mode.");
+                        "Option `--" + CreateSnapshotsConfig.OPT_FORCE_L + "' can only be used in `--" + CreateSnapshotsConfig.OPT_CHECKOUT_L + "' mode.");
             }
 
             if (res.isContinueCheckout()) {
                 throw new RuntimeException(
-                        "Option `--" + CreateSnapshotsConfig.OPT_CONTINUE_L + "' can only be used in `--" + OPT_CHECKOUT_L + "' mode.");
+                        "Option `--" + CreateSnapshotsConfig.OPT_CONTINUE_L + "' can only be used in `--" + CreateSnapshotsConfig.OPT_CHECKOUT_L + "' mode.");
             }
         }
 
@@ -513,7 +500,7 @@ public class CreateSnapshots {
         if (!snapshotDateNames.isEmpty()) {
             if (res.skunkMode() == SnapshotProcessingMode.CHECKOUT) {
                 throw new RuntimeException("Processing individual snapshots is not supported in"
-                        + " `--" + OPT_CHECKOUT_L + "' mode.");
+                        + " `--" + CreateSnapshotsConfig.OPT_CHECKOUT_L + "' mode.");
             }
 
             ProjectInformationConfig.parseSnapshotFilterDates(snapshotDateNames, res);
@@ -544,9 +531,9 @@ public class CreateSnapshots {
 //    }
 
     private void parseSnapshotSizeFromCommandLine(CreateSnapshotsConfig res, CommandLine line, int defaultValue) {
-        if (line.hasOption(OPT_SNAPSHOT_SIZE)) {
+        if (line.hasOption(CreateSnapshotsConfig.OPT_SNAPSHOT_SIZE)) {
             if (res.skunkMode() != SnapshotProcessingMode.CHECKOUT) {
-                LOG.warn("Ignoring custom snapshot size because `--" + OPT_CHECKOUT_L + "' was not specified.");
+                LOG.warn("Ignoring custom snapshot size because `--" + CreateSnapshotsConfig.OPT_CHECKOUT_L + "' was not specified.");
             } else {
                 int windowSizeNum = parseCommitWindowSizeValueOrDie(line);
                 res.setSnapshotSize(windowSizeNum);
@@ -557,23 +544,23 @@ public class CreateSnapshots {
     }
 
     private int parseCommitWindowSizeValueOrDie(CommandLine line) {
-        final String windowSizeString = line.getOptionValue(OPT_SNAPSHOT_SIZE);
+        final String windowSizeString = line.getOptionValue(CreateSnapshotsConfig.OPT_SNAPSHOT_SIZE);
         int windowSizeNum;
         try {
             windowSizeNum = Integer.valueOf(windowSizeString);
         } catch (NumberFormatException e) {
-            throw new RuntimeException("Invalid value for option `--" + OPT_SNAPSHOT_SIZE_L
+            throw new RuntimeException("Invalid value for option `--" + CreateSnapshotsConfig.OPT_SNAPSHOT_SIZE_L
                     + "': Not a valid integer: " + windowSizeString);
         }
         if (windowSizeNum < 1) {
-            throw new RuntimeException("Invalid value for option `--" + OPT_SNAPSHOT_SIZE_L
+            throw new RuntimeException("Invalid value for option `--" + CreateSnapshotsConfig.OPT_SNAPSHOT_SIZE_L
                     + "': Snapshot size must be an integer >= 1.");
         }
         return windowSizeNum;
     }
 
     private void parseSmellDetectionArgs(CreateSnapshotsConfig res, CommandLine line) {
-        String smellShortName = line.getOptionValue(OPT_DETECT_L);
+        String smellShortName = line.getOptionValue(CreateSnapshotsConfig.OPT_DETECT_L);
         try {
             res.setSmell(Smell.valueOf(smellShortName));
         } catch (IllegalArgumentException e) {
@@ -584,7 +571,7 @@ public class CreateSnapshots {
                 }
                 sb.append(m.name());
             }
-            throw new RuntimeException("Illegal value for option --" + OPT_DETECT_L + ": " + smellShortName
+            throw new RuntimeException("Illegal value for option --" + CreateSnapshotsConfig.OPT_DETECT_L + ": " + smellShortName
                     + ". Valid values are " + sb.toString());
         }
 
@@ -659,9 +646,9 @@ public class CreateSnapshots {
 //                .hasArg().argName(getCommitWindowSizeModeArgs()).build());
 
 
-        options.addOption(Option.builder(String.valueOf(OPT_SNAPSHOT_SIZE)).longOpt(OPT_SNAPSHOT_SIZE_L)
+        options.addOption(Option.builder(String.valueOf(CreateSnapshotsConfig.OPT_SNAPSHOT_SIZE)).longOpt(CreateSnapshotsConfig.OPT_SNAPSHOT_SIZE_L)
                 .desc("Size of a commit window, specified as a positive integer. This option is only relevant during" +
-                        " snapshot creation, i.e., when running in `--" + OPT_CHECKOUT_L
+                        " snapshot creation, i.e., when running in `--" + CreateSnapshotsConfig.OPT_CHECKOUT_L
                         + "' mode." + " [Default=" + CreateSnapshotsConfig.DEFAULT_COMMIT_WINDOW_SIZE_MODE.defaultSize() + "]")
                 .hasArg().argName("NUM")
                 .build());
@@ -670,16 +657,16 @@ public class CreateSnapshots {
         OptionGroup skunkModeOptions = new OptionGroup();
         skunkModeOptions.setRequired(required);
 
-        skunkModeOptions.addOption(Option.builder().longOpt(OPT_CHECKOUT_L)
+        skunkModeOptions.addOption(Option.builder().longOpt(CreateSnapshotsConfig.OPT_CHECKOUT_L)
                 .desc("Create snapshots from the specified repository and convert them to srcML using cppstats.")
                 .build());
-        skunkModeOptions.addOption(Option.builder().longOpt(OPT_PREPROCESS_L)
+        skunkModeOptions.addOption(Option.builder().longOpt(CreateSnapshotsConfig.OPT_PREPROCESS_L)
                 .desc("Preprocess cppstats files using Skunk.  Requires a previous run of this"
-                        + " tool with the `--" + OPT_CHECKOUT_L + "' option on.")
+                        + " tool with the `--" + CreateSnapshotsConfig.OPT_CHECKOUT_L + "' option on.")
                 .build());
-        skunkModeOptions.addOption(Option.builder().longOpt(OPT_DETECT_L)
+        skunkModeOptions.addOption(Option.builder().longOpt(CreateSnapshotsConfig.OPT_DETECT_L)
                 .desc("Detect smells using on already preprocessed data saved during a previous run of this"
-                        + " tool with the `--" + OPT_PREPROCESS_L + "' option on.")
+                        + " tool with the `--" + CreateSnapshotsConfig.OPT_PREPROCESS_L + "' option on.")
                 .hasArg()
                 .argName(getValidSmellArgs())
                 .build());

@@ -38,6 +38,21 @@ public class CreateSnapshotsConfig extends ProjectInformationConfig implements I
      */
     public static final String OPT_CONTINUE_L = "continue";
 
+
+    // mutex groupof options controlling how Skunk is called
+    public static final String OPT_CHECKOUT_L = "checkout";
+    public static final String OPT_PREPROCESS_L = "preprocess";
+    /**
+     * --detect=AB|AF|LF
+     */
+    public static final String OPT_DETECT_L = "detect";
+
+    /**
+     * Size of a commit window, requires positive integer argument
+     */
+    public static final String OPT_SNAPSHOT_SIZE_L = "snapshotsize";
+    public static final char OPT_SNAPSHOT_SIZE = 's';
+
     private String smellConfig = null;
     public static final String DEFAULT_SMELL_CONFIGS_DIR_NAME = "smellconfigs";
 
@@ -98,13 +113,15 @@ public class CreateSnapshotsConfig extends ProjectInformationConfig implements I
 
     public static Option forceCommandLineOption() {
         return Option.builder(String.valueOf(OPT_FORCE)).longOpt(OPT_FORCE_L)
-                .desc("Overwrite and/or delete files created by a previous run of the tool before recreating them.")
+                .desc("Overwrite and/or delete files created by a previous run of the tool before recreating them. (requires option `--" +
+                        OPT_CHECKOUT_L + "'; conflicts with option `--" + OPT_CONTINUE_L + "')")
                 .build();
     }
 
     public static Option continueCommandLineOption() {
         return Option.builder(String.valueOf(OPT_CONTINUE)).longOpt(OPT_CONTINUE_L)
-                .desc("Continue a checkout from by a previous, interrupted run of the tool. (conflicts with option `--" + OPT_FORCE_L + "'")
+                .desc("Continue a checkout from by a previous, interrupted run of the tool. (requires option `--" +
+                        OPT_CHECKOUT_L + "'; " + "conflicts with option `--" + OPT_FORCE_L + "')")
                 .build();
     }
 
