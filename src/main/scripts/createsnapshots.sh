@@ -4,8 +4,7 @@ real_me=$(realpath -- "$0")
 me_dir=$(dirname -- "${real_me}")
 . "${me_dir}"/setup_classpath.sh || exit $?
 
-##o_jvm="-Xmx768m"
-o_jvm="-Xms1g -Xmx4g"
+o_jvm="-Xms1g -Xmx16g"
 ##o_smellconfigs_dir="--smellconfigsdir=${me_dir}/../resources/smellconfigs"
 ##
 ##for o in "$@"; do
