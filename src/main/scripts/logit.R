@@ -20,6 +20,12 @@ options <- list(
                 action="store_true",
                 dest="noTestCode",
                 help="Exclude functions that likely constitute test code. A simple heuristic based on file name and function name is used to identify such functions. [default: %default]")
+  , make_option(c("-E", "--exclude-files")
+              , help="Exclude functions residing in files whose pathnames match the given regular expression."
+              , default = NULL
+              , metavar = "RE"
+              , dest="excludeFilesRe"
+                )
 )
 
 args <- parse_args(OptionParser(
@@ -52,6 +58,19 @@ readData <- function(commandLineArgs) {
     result <- readRDS(dataFn)
     eprintf("DEBUG: Sucessfully read data.\n")
     return (result)
+}
+
+removeFunctionsInFilesMatching <- function(df, excludeFilesRe) {
+    filteredData <- subset(df, !(grepl(excludeFilesRe, FILE)))
+    nrowBefore <- nrow(df)
+    nrowAfter <- nrow(filteredData)
+    nrowRemoved <- nrowBefore - nrowAfter
+    percentageRemoved <- (100.0 * nrowRemoved) / nrowBefore
+    eprintf("DEBUG: #rows before: %d\n", nrowBefore)
+    eprintf("DEBUG: #rows after: %d\n", nrowAfter)
+    eprintf("DEBUG: #rows removed: %d\n", nrowRemoved)
+    eprintf("DEBUG: Removed %d out of %d rows (%.1f%%)\n", nrowRemoved, nrowBefore, percentageRemoved)
+    return (filteredData)
 }
 
 allData <- readData(args)
@@ -333,6 +352,10 @@ if (opts$noTestCode) {
         eprintf("DEBUG: Comparing %s of test code and non-test code: delta=%.3f (%s), p=%.3g\n",
                 v, cliffRes$estimate, cliffRes$magnitude, mwuResult$p.value)
     }
+}
+
+if (!is.null(opts$excludeFilesRe)) {
+    modelData <- removeFunctionsInFilesMatching(modelData, opts$excludeFilesRe)
 }
 
 haveHeader <- FALSE
