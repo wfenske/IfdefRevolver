@@ -66,19 +66,6 @@ readData <- function(commandLineArgs) {
     return (result)
 }
 
-removeFunctionsInFilesMatching <- function(df, excludeFilesRe) {
-    filteredData <- subset(df, !(grepl(excludeFilesRe, FILE)))
-    nrowBefore <- nrow(df)
-    nrowAfter <- nrow(filteredData)
-    nrowRemoved <- nrowBefore - nrowAfter
-    percentageRemoved <- (100.0 * nrowRemoved) / nrowBefore
-    eprintf("DEBUG: #rows before: %d\n", nrowBefore)
-    eprintf("DEBUG: #rows after: %d\n", nrowAfter)
-    eprintf("DEBUG: #rows removed: %d\n", nrowRemoved)
-    eprintf("DEBUG: Removed %d out of %d rows (%.1f%%)\n", nrowRemoved, nrowBefore, percentageRemoved)
-    return (filteredData)
-}
-
 allData <- readData(args)
 
 ## Get the P-value of the wald test like this
@@ -627,30 +614,6 @@ if (opts$changed) {
     negBinData <- subset(negBinData, COMMITS > 0)
 }
 
-if (opts$noTestCode) {
-    negBinTestData <- subset(negBinData, (grepl(" test", FUNCTION_SIGNATURE) | grepl("Test", FUNCTION_SIGNATURE) | grepl("^test", FILE)))
-    
-    negBinData <- subset(negBinData, ! (grepl(" test", FUNCTION_SIGNATURE) | grepl("Test", FUNCTION_SIGNATURE) | grepl("^test", FILE)))
-
-##    library(effsize)
-##    
-##    tGroup <- negBinTestData # only test code
-##    cGroup <- negBinData     # no test code
-##
-##    for (v in c("COMMITS", "LCH", "FL", "FC", "CND", "NEG", "LOACratio")) {
-##        mwuResult <- wilcox.test(tGroup[,v], cGroup[,v])
-##        cliffRes <- cliff.delta(tGroup[,v], cGroup[,v])
-##        eprintf("DEBUG: Comparing %s of test code and non-test code: delta=%.3f (%s), p=%.3g\n",
-##                v, cliffRes$estimate, cliffRes$magnitude, mwuResult$p.value)
-##    }
-}
-
-if (!is.null(opts$excludeFilesRe)) {
-    negBinData <- removeFunctionsInFilesMatching(negBinData, opts$excludeFilesRe)
-}
-
-##negBinData <- changedData
-
 ##ziSampleSize <- 10000
 ##ziData <- sampleDf(allData, ziSampleSize)
 ziData <- allData
@@ -717,6 +680,9 @@ zeroinflNegbinCsvModel <- function(dep, indeps) {
 ##csvModel <- zeroinflNegbinCsvModel
 csvModel <- negbinCsvModel
 
+##ageVar <- "log2AGE"
+ageVar <- "AGE"
+
 for (dep in c("COMMITS"
               ##, "HUNKS"
             , "LCH"
@@ -732,17 +698,12 @@ for (dep in c("COMMITS"
     ## compared to including it in log2-scaled form.
 
     dummy <- csvModel(dep, c("log2LOC"))
+    dummy <- csvModel(dep, c("log2LOC", ageVar, "log2LAST_EDIT", "log2PREVIOUS_COMMITS"))
 
-    dummy <- csvModel(dep, c("log2LOC", "AGE"))
-    dummy <- csvModel(dep, c("log2LOC", "log2LAST_EDIT"))
-    dummy <- csvModel(dep, c("log2LOC", "log2PREVIOUS_COMMITS"))
-    
-    dummy <- csvModel(dep, c("log2LOC", "AGE", "log2LAST_EDIT"))
-    dummy <- csvModel(dep, c("log2LOC", "AGE", "log2LAST_EDIT", "log2PREVIOUS_COMMITS"))
+    dummy <- csvModel(dep, c("FL", "FC", "CND", "NEG", "LOACratio"))
     
     dummy <- csvModel(dep, c("FL", "FC", "CND", "NEG", "LOACratio", "log2LOC"))
-    dummy <- csvModel(dep, c("FL", "FC", "CND", "NEG", "LOACratio", "log2LOC", "AGE", "log2LAST_EDIT"))
-    dummy <- csvModel(dep, c("FL", "FC", "CND", "NEG", "LOACratio", "log2LOC", "AGE", "log2LAST_EDIT", "log2PREVIOUS_COMMITS"))
+    dummy <- csvModel(dep, c("FL", "FC", "CND", "NEG", "LOACratio", "log2LOC", ageVar, "log2LAST_EDIT", "log2PREVIOUS_COMMITS"))
 }
 
 ##model.zip.COMMITS <- tryZeroInflModel(indeps=ziIndeps, dep="COMMITS", data=ziData)

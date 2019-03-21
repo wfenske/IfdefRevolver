@@ -60,19 +60,6 @@ readData <- function(commandLineArgs) {
     return (result)
 }
 
-removeFunctionsInFilesMatching <- function(df, excludeFilesRe) {
-    filteredData <- subset(df, !(grepl(excludeFilesRe, FILE)))
-    nrowBefore <- nrow(df)
-    nrowAfter <- nrow(filteredData)
-    nrowRemoved <- nrowBefore - nrowAfter
-    percentageRemoved <- (100.0 * nrowRemoved) / nrowBefore
-    eprintf("DEBUG: #rows before: %d\n", nrowBefore)
-    eprintf("DEBUG: #rows after: %d\n", nrowAfter)
-    eprintf("DEBUG: #rows removed: %d\n", nrowRemoved)
-    eprintf("DEBUG: Removed %d out of %d rows (%.1f%%)\n", nrowRemoved, nrowBefore, percentageRemoved)
-    return (filteredData)
-}
-
 allData <- readData(args)
 
 ## Get the P-value of the wald test like this
@@ -263,11 +250,6 @@ sampleDf <- function(df, sz) {
 
 ##annotationData <- subset(allData, FL > 0)
 
-allData$FLratio  <- allData$FL  / allData$LOC
-allData$FCratio  <- allData$FC  / allData$LOC
-allData$CNDratio  <- allData$CND  / allData$LOC
-allData$NEGratio <- allData$NEG / allData$LOC
-
 allData$sqrtLOC <- sqrt(allData$LOC)
 allData$sqrtFL <- sqrt(allData$FL)
 allData$sqrtFC <- sqrt(allData$FC)
@@ -279,9 +261,6 @@ allData$log2CND  <- log2(allData$CND + 1)
 allData$log2NEG <- log2(allData$NEG + 1)
 
 allData$log2LOC <- log2(allData$LOC)
-
-allData$log2AGE <- log2(allData$AGE + 1)
-allData$log2LAST_EDIT <- log2(allData$LAST_EDIT + 1)
 
 ## Some artificial dependent variables
 allData$logLINES_CHANGED <- log(allData$LINES_CHANGED + 1)
@@ -328,34 +307,11 @@ changedPercent <- nrow(changedData0) * 100 / allNRow
 ##nrow(subset(allData, is.na(CND) || !is.finite(CND)))
 
 ##sampleChangedSize <- 10000
-##negBinData <- sampleDf(changedData, sampleChangedSize)
 modelData <- subset(allData, !is.na(AGE) && is.finite(AGE) && !is.na(LAST_EDIT) && is.finite(LAST_EDIT))
 
 if (opts$annotated) {
     eprintf("DEBUG: Creating models for just the annotated functions.\n")
     modelData <- subset(modelData, FL > 0)
-}
-
-if (opts$noTestCode) {
-    modelDataTests <- subset(modelData, (grepl(" test", FUNCTION_SIGNATURE) | grepl("Test", FUNCTION_SIGNATURE) | grepl("^test", FILE)))
-    
-    modelData <- subset(modelData, ! (grepl(" test", FUNCTION_SIGNATURE) | grepl("Test", FUNCTION_SIGNATURE) | grepl("^test", FILE)))
-
-    library(effsize)
-    
-    tGroup <- modelDataTests # only test code
-    cGroup <- modelData # no test code
-
-    for (v in c("COMMITS", "LCH", "FL", "FC", "CND", "NEG", "LOACratio")) {
-        mwuResult <- wilcox.test(tGroup[,v], cGroup[,v])
-        cliffRes <- cliff.delta(tGroup[,v], cGroup[,v])
-        eprintf("DEBUG: Comparing %s of test code and non-test code: delta=%.3f (%s), p=%.3g\n",
-                v, cliffRes$estimate, cliffRes$magnitude, mwuResult$p.value)
-    }
-}
-
-if (!is.null(opts$excludeFilesRe)) {
-    modelData <- removeFunctionsInFilesMatching(modelData, opts$excludeFilesRe)
 }
 
 haveHeader <- FALSE
@@ -379,14 +335,16 @@ csvModel <- logitCsvModel
 ##ageVar <- "log2AGE"
 ageVar <- "AGE"
 
-dummy <- csvModel(dep, c("log2LAST_EDIT", ageVar, "log2PREVIOUS_COMMITS"))
-dummy <- csvModel(dep, c("log2LOC", "log2LAST_EDIT", ageVar, "log2PREVIOUS_COMMITS"))
-dummy <- csvModel(dep, c("FL", "FC", "CND", "NEG", "LOACratio"))
-dummy <- csvModel(dep, c("FL", "FC", "CND", "NEG", "LOACratio", "log2LOC"))
-dummy <- csvModel(dep, c("FL", "FC", "CND", "NEG", "LOACratio", "log2LOC", "log2LAST_EDIT", ageVar, "log2PREVIOUS_COMMITS"))
+dummy <- csvModel(dep, c("log2LOC"))
+dummy <- csvModel(dep, c("log2LOC", ageVar, "log2LAST_EDIT", "log2PREVIOUS_COMMITS"))
 
-dummy <- csvModel(dep, c("log2LAST_EDIT", "log2PREVIOUS_COMMITS"))
-dummy <- csvModel(dep, c("log2LOC", "log2LAST_EDIT", "log2PREVIOUS_COMMITS"))
 dummy <- csvModel(dep, c("FL", "FC", "CND", "NEG", "LOACratio"))
+
 dummy <- csvModel(dep, c("FL", "FC", "CND", "NEG", "LOACratio", "log2LOC"))
-dummy <- csvModel(dep, c("FL", "FC", "CND", "NEG", "LOACratio", "log2LOC", "log2LAST_EDIT", "log2PREVIOUS_COMMITS"))
+dummy <- csvModel(dep, c("FL", "FC", "CND", "NEG", "LOACratio", "log2LOC", ageVar, "log2LAST_EDIT", "log2PREVIOUS_COMMITS"))
+
+##dummy <- csvModel(dep, c("log2LAST_EDIT", "log2PREVIOUS_COMMITS"))
+##dummy <- csvModel(dep, c("log2LOC", "log2LAST_EDIT", "log2PREVIOUS_COMMITS"))
+##dummy <- csvModel(dep, c("FL", "FC", "CND", "NEG", "LOACratio"))
+##dummy <- csvModel(dep, c("FL", "FC", "CND", "NEG", "LOACratio", "log2LOC"))
+##dummy <- csvModel(dep, c("FL", "FC", "CND", "NEG", "LOACratio", "log2LOC", "log2LAST_EDIT", "log2PREVIOUS_COMMITS"))

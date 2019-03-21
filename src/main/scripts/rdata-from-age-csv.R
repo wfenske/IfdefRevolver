@@ -14,7 +14,18 @@ options <- list(
               , help="Name of the project whose data to load.  We expect a directory named `results/<projec-name>' to exist below the current working directory, and this directory is expected to contain a CSV file named `joint_function_ab_smell_age_snapshot.csv'."
               , default = NULL
                 )
-    , make_option(c("-o", "--output")
+  , make_option(c("-T", "--no-test-code"),
+                default=FALSE,
+                action="store_true",
+                dest="noTestCode",
+                help="Exclude functions that likely constitute test code. A simple heuristic based on file name and function name is used to identify such functions. [default: %default]")
+  , make_option(c("-E", "--exclude-files")
+              , help="Exclude functions residing in files whose pathnames match the given regular expression."
+              , default = NULL
+              , metavar = "RE"
+              , dest="excludeFilesRe"
+                )
+  , make_option(c("-o", "--output")
               , help="Name of the output file.  If omitted, the project name must be specified using the `-p' option, and the output file will be saved under `results/<projec-name>/allDataAge.rdata'."
               , default = NULL
                 )
@@ -63,6 +74,34 @@ getOutputFilename <- function(commandLineArgs) {
 
 iround <- function(x) {
     return (as.integer(round(x)))
+}
+
+removeFunctionsInFilesMatching <- function(df, excludeFilesRe) {
+    eprintf("DEBUG: Removing functions in files matching `%s'\n", excludeFilesRe)
+    filteredData <- subset(df, !(grepl(excludeFilesRe, FILE)))
+    nrowBefore <- nrow(df)
+    nrowAfter <- nrow(filteredData)
+    nrowRemoved <- nrowBefore - nrowAfter
+    percentageRemoved <- (100.0 * nrowRemoved) / nrowBefore
+    eprintf("DEBUG: #rows before before: %d\n", nrowBefore)
+    eprintf("DEBUG: #rows after: %d\n", nrowAfter)
+    eprintf("DEBUG: #rows removed: %d\n", nrowRemoved)
+    eprintf("DEBUG: Removed %d out of %d rows (%.1f%%)\n", nrowRemoved, nrowBefore, percentageRemoved)
+    return (filteredData)
+}
+
+removeTestFunctions <- function(df) {
+    eprintf("DEBUG: Removing test functions\n")
+    filteredData <- subset(allData, ! (grepl(" test", FUNCTION_SIGNATURE) | grepl("Test", FUNCTION_SIGNATURE) | grepl("^test", FILE)))
+    nrowBefore <- nrow(df)
+    nrowAfter <- nrow(filteredData)
+    nrowRemoved <- nrowBefore - nrowAfter
+    percentageRemoved <- (100.0 * nrowRemoved) / nrowBefore
+    eprintf("DEBUG: #rows before: %d\n", nrowBefore)
+    eprintf("DEBUG: #rows after: %d\n", nrowAfter)
+    eprintf("DEBUG: #rows removed: %d\n", nrowRemoved)
+    eprintf("DEBUG: Removed %d out of %d rows (%.1f%%)\n", nrowRemoved, nrowBefore, percentageRemoved)
+    return (filteredData)
 }
 
 readSnapshotFile <- function(inputFn) {
@@ -125,6 +164,14 @@ inputFn <- getInputFilename(args)
 outputFile <- getOutputFilename(args)
 
 allData <- readSnapshotFile(inputFn)
+
+if (opts$noTestCode) {
+    allData <- removeTestFunctions(allData)
+}
+
+if (!is.null(opts$excludeFilesRe)) {
+    allData <- removeFunctionsInFilesMatching(allData, opts$excludeFilesRe)
+}
 
 allData$LOC <- iround(allData$LOC)
 allData$LOAC <- iround(allData$LOAC)
