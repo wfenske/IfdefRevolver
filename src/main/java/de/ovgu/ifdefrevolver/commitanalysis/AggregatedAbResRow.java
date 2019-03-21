@@ -9,13 +9,6 @@ public class AggregatedAbResRow implements IAbResRow {
     private final FunctionId functionId;
     private final Collection<AbResRow> containedRows;
 
-    public AggregatedAbResRow(IAbResRow left, IAbResRow right) {
-        this.containedRows = new ArrayList<>();
-        this.containedRows.addAll(left.getContainedRows());
-        this.containedRows.addAll(right.getContainedRows());
-        this.functionId = left.getContainedRows().iterator().next().getFunctionId();
-    }
-
     public AggregatedAbResRow(AbResRow first, List<AbResRow> rest) {
         this.containedRows = new ArrayList<>();
         this.containedRows.add(first);
@@ -70,10 +63,5 @@ public class AggregatedAbResRow implements IAbResRow {
     @Override
     public int getNoNeg() {
         return average(IAbResRow::getNoNeg);
-    }
-
-    @Override
-    public Collection<AbResRow> getContainedRows() {
-        return this.containedRows;
     }
 }

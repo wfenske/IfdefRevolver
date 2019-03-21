@@ -2,7 +2,10 @@ package de.ovgu.ifdefrevolver.commitanalysis.branchtraversal;
 
 import de.ovgu.ifdefrevolver.bugs.correlate.data.Snapshot;
 import de.ovgu.ifdefrevolver.bugs.minecommits.CommitsDistanceDb.Commit;
-import de.ovgu.ifdefrevolver.commitanalysis.*;
+import de.ovgu.ifdefrevolver.commitanalysis.AbResRow;
+import de.ovgu.ifdefrevolver.commitanalysis.FunctionChangeRow;
+import de.ovgu.ifdefrevolver.commitanalysis.FunctionId;
+import de.ovgu.ifdefrevolver.commitanalysis.IAbResRow;
 import de.ovgu.skunk.util.LinkedGroupingListMap;
 import org.apache.log4j.Logger;
 
@@ -259,14 +262,15 @@ public class FunctionGenealogy {
 
     public IAbResRow getStaticMetrics(List<Snapshot> window) {
         final AbResRow first = getStaticMetrics(window.get(0));
-        if (window.size() == 1) {
-            return first;
-        } else {
-            List<AbResRow> rest = window.stream()
-                    .skip(1)
-                    .filter(s -> existsAtStartOfSnapshot(s))
-                    .map(this::getStaticMetrics).collect(Collectors.toList());
-            return new AggregatedAbResRow(first, rest);
-        }
+//        if (window.size() == 1) {
+//            return first;
+//        } else {
+//            List<AbResRow> rest = window.stream()
+//                    .skip(1)
+//                    .filter(s -> existsAtStartOfSnapshot(s))
+//                    .map(this::getStaticMetrics).collect(Collectors.toList());
+//            return new AggregatedAbResRow(first, rest);
+//        }
+        return first;
     }
 }

@@ -16,8 +16,8 @@ public class AddChangeDistancesConfig extends ListChangedFunctionsConfig {
     public static final String OPT_COMMIT_WINDOW_SLIDE_L = "windowslide";
     public static final char OPT_COMMIT_WINDOW_SLIDE = 's';
 
-    public static int DEFAULT_WINDOW_SIZE = 5;
-    public static int DEFAULT_WINDOW_SLIDE = 2;
+    public static int DEFAULT_WINDOW_SIZE = 10;
+    public static int DEFAULT_WINDOW_SLIDE = 1;
 
     public static final boolean DEFAULT_VALIDATE_AFTER_MERGE = false;
 

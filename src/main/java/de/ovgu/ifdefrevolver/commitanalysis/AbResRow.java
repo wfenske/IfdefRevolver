@@ -2,9 +2,6 @@ package de.ovgu.ifdefrevolver.commitanalysis;
 
 import de.ovgu.skunk.detection.output.MethodMetricsColumns;
 
-import java.util.Collection;
-import java.util.Collections;
-
 public class AbResRow implements IAbResRow {
     private FunctionId functionId;
     private int loc;
@@ -90,10 +87,5 @@ public class AbResRow implements IAbResRow {
     @Override
     public int getNoNeg() {
         return noNeg;
-    }
-
-    @Override
-    public Collection<AbResRow> getContainedRows() {
-        return Collections.singleton(this);
     }
 }

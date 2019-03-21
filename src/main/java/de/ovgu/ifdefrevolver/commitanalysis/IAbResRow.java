@@ -1,7 +1,5 @@
 package de.ovgu.ifdefrevolver.commitanalysis;
 
-import java.util.Collection;
-
 public interface IAbResRow {
     FunctionId getFunctionId();
 
@@ -20,6 +18,4 @@ public interface IAbResRow {
     int getNoNest();
 
     int getNoNeg();
-
-    Collection<AbResRow> getContainedRows();
 }
