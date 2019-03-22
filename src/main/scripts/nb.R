@@ -679,8 +679,8 @@ zeroinflNegbinCsvModel <- function(dep, indeps) {
 ##csvModel <- zeroinflNegbinCsvModel
 csvModel <- negbinCsvModel
 
-ageVar <- "log2AGE"
-mrcVar <- "log2MRC"
+ageVar <- "AGE"
+mrcVar <- "MRC"
 pcVar  <- "log2PC"
 
 for (dep in c("COMMITS"
