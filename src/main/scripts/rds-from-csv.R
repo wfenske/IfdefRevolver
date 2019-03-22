@@ -11,7 +11,7 @@ eprintf <- function(...) cat(sprintf(...), sep='', file=stderr())
 
 options <- list(
     make_option(c("-p", "--project")
-              , help="Name of the project whose data to load.  We expect a directory named `results/<projec-name>' to exist below the current working directory, and this directory is expected to contain a CSV file named `joint_function_ab_smell_age_snapshot.csv'."
+              , help="Name of the project whose data to load.  We expect a directory named `results/<projec-name>' to exist below the current working directory, and this directory is expected to contain a CSV file named `all_data.csv'."
               , default = NULL
                 )
   , make_option(c("-T", "--no-test-code"),
@@ -51,7 +51,7 @@ getInputFilename <- function(commandLineArgs) {
     }
 
     baseDir <- file.path(opts$project, "results")
-    inputFn <-  file.path(baseDir, "joint_function_ab_smell_age_snapshot.csv")
+    inputFn <-  file.path(baseDir, "joint_data.csv")
     
     return (inputFn)
 }
@@ -67,7 +67,7 @@ getOutputFilename <- function(commandLineArgs) {
     }
 
     baseDir <- file.path(opts$project, "results")
-    outputFn <- file.path(baseDir, "allDataAge.rdata")
+    outputFn <- file.path(baseDir, "joint_data.rds")
 
     return (outputFn)
 }
@@ -242,8 +242,12 @@ eprintf("Mean AGE/LAST_EDIT of unchanged functions:\n%.0f,%.0f\n"
 ## LOC,LOAC,LOFC,NOFL,NOFC_Dup,NOFC_NonDup,NONEST
 
 ## Some renaming
-allData$LCH <- allData$LINES_CHANGED
-allData$PLCH <- allData$PREVIOUS_LINES_CHANGED
+allData$LCH  <- allData$LINES_CHANGED
+##allData$PLCH <- allData$PREVIOUS_LINES_CHANGED
+## PC = (Number of) previous changes
+allData$PC   <- allData$PREVIOUS_COMMITS
+## MRC = (time since) most recent change
+allData$MRC  <- allData$LAST_EDIT
 
 ## LOAC and LOFC are taken as is, but also log() and ratio (to LOC)
 ##allData$logLOAC <- log(allData$LOAC + 1)
@@ -252,35 +256,32 @@ allData$LOACratio <- allData$LOAC / allData$LOC
 ##allData$logLOFC <- log(allData$LOFC + 1)
 allData$LOFCratio <- allData$LOFC / allData$LOC
 
-allData$FLratio <- allData$FL / allData$LOC
+##allData$FLratio <- allData$FL / allData$LOC
 
-allData$FC <- allData$FC_NonDup
-allData$FCratio <- allData$FC / allData$LOC
+allData$FC        <- allData$FC_NonDup
 
-allData$CNDratio <- allData$CND / allData$LOC
-
-allData$NEGratio <- allData$NEG / allData$LOC
+##allData$FCratio  <- allData$FC / allData$LOC
+##allData$CNDratio <- allData$CND / allData$LOC
+##allData$NEGratio <- allData$NEG / allData$LOC
 
 
 ## Calculate some log-scaled variables
-allData$log2FL  <- log2(allData$FL + 1)
-allData$log2FC  <- log2(allData$FC + 1)
+allData$log2FL   <- log2(allData$FL + 1)
+allData$log2FC   <- log2(allData$FC + 1)
 allData$log2CND  <- log2(allData$CND + 1)
-allData$log2NEG <- log2(allData$NEG + 1)
-
+allData$log2NEG  <- log2(allData$NEG + 1)
 allData$log2LOAC <- log2(allData$LOAC + 1)
 
-allData$log2LOC <- log2(allData$LOC)
+allData$log2LOC  <- log2(allData$LOC)
 
-allData$log2AGE <- log2(allData$AGE + 1)
-allData$log2LAST_EDIT <- log2(allData$LAST_EDIT + 1)
-
-allData$log2PREVIOUS_COMMITS <- log2(allData$PREVIOUS_COMMITS + 1)
+allData$log2AGE  <- log2(allData$AGE + 1)
+allData$log2MRC  <- log2(allData$MRC + 1)
+allData$log2PC   <- log2(allData$PC + 1)
 
 ### Dependent variables
 ## HUNKS,COMMITS,LINES_CHANGED,LINE_DELTA,LINES_DELETED,LINES_ADDED
 allData$COMMITSratio <- allData$COMMITS / allData$LOC
-allData$LCHratio <- allData$LINES_CHANGED / allData$LOC
+allData$LCHratio     <- allData$LCH     / allData$LOC
 
 ### Compute some more independent variables from the data
 ##data$CHANGE_PRONE <- data$COMMITS >= opts$changes

@@ -3,14 +3,13 @@
 ### Performs regression over all snapshots of a system
 
 library(optparse)
-##library(methods)
 suppressMessages(library(aod))
 suppressMessages(library(MASS)) # for glm.nb
 suppressMessages(library(pscl)) # for Zero-inflated Poisson models
 
 options <- list(
     make_option(c("-p", "--project")
-              , help="Name of the project whose data to load.  We expect the input R data to reside in `<projec-name>/results/allData.rdata' below the current working directory."
+              , help="Name of the project whose data to load.  We expect the input R data to reside in `<projec-name>/results/joint_data.rds' below the current working directory."
               , default = NULL
                 )
   , make_option(c("-a", "--annotated"),
@@ -58,7 +57,7 @@ readData <- function(commandLineArgs) {
         if ( is.null(opts$project) ) {
             stop("Missing input files.  Either specify explicit input files or specify the name of the project the `--project' option (`-p' for short).")
         }
-        dataFn <-  file.path(opts$project, "results", "allDataAge.rdata")
+        dataFn <-  file.path(opts$project, "results", "joint_data.rds")
     }
     eprintf("DEBUG: Reading data from %s\n", dataFn)
     result <- readRDS(dataFn)
@@ -542,22 +541,22 @@ sampleDf <- function(df, sz) {
 
 ##annotationData <- subset(allData, FL > 0)
 
-allData$FLratio  <- allData$FL  / allData$LOC
-allData$FCratio  <- allData$FC  / allData$LOC
-allData$CNDratio  <- allData$CND  / allData$LOC
-allData$NEGratio <- allData$NEG / allData$LOC
+##allData$FLratio  <- allData$FL  / allData$LOC
+##allData$FCratio  <- allData$FC  / allData$LOC
+##allData$CNDratio  <- allData$CND  / allData$LOC
+##allData$NEGratio <- allData$NEG / allData$LOC
 
-allData$sqrtLOC <- sqrt(allData$LOC)
-allData$sqrtFL <- sqrt(allData$FL)
-allData$sqrtFC <- sqrt(allData$FC)
-allData$sqrtCND <- sqrt(allData$CND)
+##allData$sqrtLOC <- sqrt(allData$LOC)
+##allData$sqrtFL <- sqrt(allData$FL)
+##allData$sqrtFC <- sqrt(allData$FC)
+##allData$sqrtCND <- sqrt(allData$CND)
 
 ## Some artificial dependent variables
-allData$logLINES_CHANGED <- log(allData$LINES_CHANGED + 1)
-allData$sqrtLINES_CHANGED <- sqrt(allData$LINES_CHANGED)
+##allData$logLINES_CHANGED <- log(allData$LINES_CHANGED + 1)
+##allData$sqrtLINES_CHANGED <- sqrt(allData$LINES_CHANGED)
 
-allData$LCH <- allData$LINES_CHANGED
-allData$LCHratio <- allData$LCH / allData$LOC
+##allData$LCH <- allData$LINES_CHANGED
+##allData$LCHratio <- allData$LCH / allData$LOC
 
 ##allData$sqrtLogLINES_CHANGED <- sqrt(allData$logLINES_CHANGED)
 ##allData$logLogLINES_CHANGED <- log(allData$logLINES_CHANGED)
@@ -601,8 +600,8 @@ negBinData <- allData
 negBinData <- subset(negBinData, !is.na(AGE))
 negBinData <- subset(negBinData, is.finite(AGE))
 
-negBinData <- subset(negBinData, !is.na(LAST_EDIT))
-negBinData <- subset(negBinData, is.finite(LAST_EDIT))
+negBinData <- subset(negBinData, !is.na(MRC))
+negBinData <- subset(negBinData, is.finite(MRC))
 
 if (opts$annotated) {
     eprintf("DEBUG: Creating models for just the annotated functions.\n")
@@ -680,8 +679,9 @@ zeroinflNegbinCsvModel <- function(dep, indeps) {
 ##csvModel <- zeroinflNegbinCsvModel
 csvModel <- negbinCsvModel
 
-##ageVar <- "log2AGE"
 ageVar <- "AGE"
+mrcVar <- "MRC"
+pcVar  <- "PC"
 
 for (dep in c("COMMITS"
               ##, "HUNKS"
@@ -697,13 +697,11 @@ for (dep in c("COMMITS"
     ## log2, i.e., unscaled.  Doing so gives better McFadden values
     ## compared to including it in log2-scaled form.
 
-    dummy <- csvModel(dep, c("log2LOC"))
-    dummy <- csvModel(dep, c("log2LOC", ageVar, "log2LAST_EDIT", "log2PREVIOUS_COMMITS"))
-
-    dummy <- csvModel(dep, c("FL", "FC", "CND", "NEG", "LOACratio"))
-    
-    dummy <- csvModel(dep, c("FL", "FC", "CND", "NEG", "LOACratio", "log2LOC"))
-    dummy <- csvModel(dep, c("FL", "FC", "CND", "NEG", "LOACratio", "log2LOC", ageVar, "log2LAST_EDIT", "log2PREVIOUS_COMMITS"))
+    ##dummy <- csvModel(dep, c("log2LOC"))
+    dummy <- csvModel(dep, c("log2LOC", ageVar, mrcVar, pcVar))
+    ##dummy <- csvModel(dep, c("FL", "FC", "CND", "NEG", "LOACratio"))
+    ##dummy <- csvModel(dep, c("FL", "FC", "CND", "NEG", "LOACratio", "log2LOC"))
+    dummy <- csvModel(dep, c("FL", "FC", "CND", "NEG", "LOACratio", "log2LOC", ageVar, mrcVar, pcVar))
 }
 
 ##model.zip.COMMITS <- tryZeroInflModel(indeps=ziIndeps, dep="COMMITS", data=ziData)
@@ -746,3 +744,4 @@ for (dep in c("COMMITS"
 ##reducedModel <- step(allDataModel, trace=0)
 ##summary(reducedModel)
 
+eprintf("INFO: Successfully computed neg-bin regression models for `%s'.\n", sysname)

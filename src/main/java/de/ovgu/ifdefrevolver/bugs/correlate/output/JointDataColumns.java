@@ -8,7 +8,7 @@ import de.ovgu.skunk.detection.output.CsvColumnValueProvider;
 import java.util.List;
 import java.util.OptionalInt;
 
-public enum JointFunctionAbSmellAgeSnapshotColumns implements CsvColumnValueProvider<FunctionGenealogy, List<Snapshot>> {
+public enum JointDataColumns implements CsvColumnValueProvider<FunctionGenealogy, List<Snapshot>> {
     SNAPSHOT_DATE {
         @Override
         public String csvColumnValue(FunctionGenealogy in, List<Snapshot> window) {
@@ -155,5 +155,5 @@ public enum JointFunctionAbSmellAgeSnapshotColumns implements CsvColumnValueProv
      * Basename of the CSV file that will hold this information.  It will be located within the results directory, in a
      * project- and snapshot-specific directory, such as <code>results/busybox/2000-04-08</code>
      */
-    public static final String FILE_BASENAME = "joint_function_ab_smell_age_snapshot.csv";
+    public static final String FILE_BASENAME = "joint_data.csv";
 }

@@ -8,7 +8,7 @@ suppressMessages(library(aod))
 
 options <- list(
     make_option(c("-p", "--project")
-              , help="Name of the project whose data to load.  We expect the input R data to reside in `<projec-name>/results/allDataAge.rdata' below the current working directory."
+              , help="Name of the project whose data to load.  We expect the input R data to reside in `<projec-name>/results/joint_data.rds' below the current working directory."
               , default = NULL
                 )
   , make_option(c("-a", "--annotated"),
@@ -52,7 +52,7 @@ readData <- function(commandLineArgs) {
         if ( is.null(opts$project) ) {
             stop("Missing input files.  Either specify explicit input files or specify the name of the project the `--project' option (`-p' for short).")
         }
-        dataFn <-  file.path(opts$project, "results", "allDataAge.rdata")
+        dataFn <-  file.path(opts$project, "results", "joint_data.rds")
     }
     eprintf("DEBUG: Reading data from %s\n", dataFn)
     result <- readRDS(dataFn)
@@ -240,37 +240,7 @@ sampleDf <- function(df, sz) {
 ## FC (from NOFC_NonDup), FCratio (FC per LOC)
 ## CND (from NONEST), CNDratio (CND per LOC)
 
-### Dependent variables
-## HUNKS, HUNKSratio (HUNKS per LOC)
-## COMMITS, COMMITSratio (COMMITS per LOC)
-## LINES_CHANGED, LCHratio (LINES_CHANGED per LOC)
-## LINE_DELTA,
-## LINES_DELETED,
-## LINES_ADDED
-
 ##annotationData <- subset(allData, FL > 0)
-
-allData$sqrtLOC <- sqrt(allData$LOC)
-allData$sqrtFL <- sqrt(allData$FL)
-allData$sqrtFC <- sqrt(allData$FC)
-allData$sqrtCND <- sqrt(allData$CND)
-
-allData$log2FL  <- log2(allData$FL + 1)
-allData$log2FC  <- log2(allData$FC + 1)
-allData$log2CND  <- log2(allData$CND + 1)
-allData$log2NEG <- log2(allData$NEG + 1)
-
-allData$log2LOC <- log2(allData$LOC)
-
-## Some artificial dependent variables
-allData$logLINES_CHANGED <- log(allData$LINES_CHANGED + 1)
-allData$sqrtLINES_CHANGED <- sqrt(allData$LINES_CHANGED)
-
-allData$LCH <- allData$LINES_CHANGED
-allData$LCHratio <- allData$LCH / allData$LOC
-
-##allData$sqrtLogLINES_CHANGED <- sqrt(allData$logLINES_CHANGED)
-##allData$logLogLINES_CHANGED <- log(allData$logLINES_CHANGED)
 
 changedData0 <- subset(allData, COMMITS > 0)
 medianLCHratio <- median(changedData0$LCHratio)
@@ -307,7 +277,7 @@ changedPercent <- nrow(changedData0) * 100 / allNRow
 ##nrow(subset(allData, is.na(CND) || !is.finite(CND)))
 
 ##sampleChangedSize <- 10000
-modelData <- subset(allData, !is.na(AGE) && is.finite(AGE) && !is.na(LAST_EDIT) && is.finite(LAST_EDIT))
+modelData <- subset(allData, !is.na(AGE) && is.finite(AGE) && !is.na(MRC) && is.finite(MRC))
 
 if (opts$annotated) {
     eprintf("DEBUG: Creating models for just the annotated functions.\n")
@@ -329,22 +299,25 @@ logitCsvModel <- function(dep, indeps) {
     return (model)
 }
 
-dep <- "CHANGE_PRONE"
+
 csvModel <- logitCsvModel
 
-##ageVar <- "log2AGE"
 ageVar <- "AGE"
+mrcVar <- "MRC"
+pcVar  <- "PC"
 
-dummy <- csvModel(dep, c("log2LOC"))
-dummy <- csvModel(dep, c("log2LOC", ageVar, "log2LAST_EDIT", "log2PREVIOUS_COMMITS"))
+for (dep in c("CHANGE_PRONE")) { 
+    ##dummy <- csvModel(dep, c("log2LOC"))
+    dummy <- csvModel(dep, c("log2LOC", ageVar, mrcVar, pcVar))
+    ##dummy <- csvModel(dep, c("FL", "FC", "CND", "NEG", "LOACratio"))
+    ##dummy <- csvModel(dep, c("FL", "FC", "CND", "NEG", "LOACratio", "log2LOC"))
+    dummy <- csvModel(dep, c("FL", "FC", "CND", "NEG", "LOACratio", "log2LOC", ageVar, mrcVar, pcVar))
 
-dummy <- csvModel(dep, c("FL", "FC", "CND", "NEG", "LOACratio"))
+    ##dummy <- csvModel(dep, c(mrcVar, pcVar))
+    ##dummy <- csvModel(dep, c("log2LOC", mrcVar, pcVar))
+    ##dummy <- csvModel(dep, c("FL", "FC", "CND", "NEG", "LOACratio"))
+    ##dummy <- csvModel(dep, c("FL", "FC", "CND", "NEG", "LOACratio", "log2LOC"))
+    ##dummy <- csvModel(dep, c("FL", "FC", "CND", "NEG", "LOACratio", "log2LOC", mrcVar, pcVar))
+}
 
-dummy <- csvModel(dep, c("FL", "FC", "CND", "NEG", "LOACratio", "log2LOC"))
-dummy <- csvModel(dep, c("FL", "FC", "CND", "NEG", "LOACratio", "log2LOC", ageVar, "log2LAST_EDIT", "log2PREVIOUS_COMMITS"))
-
-##dummy <- csvModel(dep, c("log2LAST_EDIT", "log2PREVIOUS_COMMITS"))
-##dummy <- csvModel(dep, c("log2LOC", "log2LAST_EDIT", "log2PREVIOUS_COMMITS"))
-##dummy <- csvModel(dep, c("FL", "FC", "CND", "NEG", "LOACratio"))
-##dummy <- csvModel(dep, c("FL", "FC", "CND", "NEG", "LOACratio", "log2LOC"))
-##dummy <- csvModel(dep, c("FL", "FC", "CND", "NEG", "LOACratio", "log2LOC", "log2LAST_EDIT", "log2PREVIOUS_COMMITS"))
+eprintf("INFO: Successfully computed logistic regression models for `%s'.\n", sysname)

@@ -20,7 +20,7 @@ SMELL_CONFIGS_DIR="smellconfigs"
 
 PROJECT_RESULTS_DIR="${PROJECT:?}/results"
 
-TOP_LEVEL_SNAPSHOT_RESULT_FILE="${PROJECT_RESULTS_DIR:?}/joint_function_ab_smell_age_snapshot.csv"
+TOP_LEVEL_SNAPSHOT_RESULT_FILE="${PROJECT_RESULTS_DIR:?}/joint_data.csv"
 
 if [ ! -d "$PROJECT_RESULTS_DIR" ]
 then

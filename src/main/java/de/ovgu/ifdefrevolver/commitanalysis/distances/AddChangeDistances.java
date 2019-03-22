@@ -3,7 +3,7 @@ package de.ovgu.ifdefrevolver.commitanalysis.distances;
 import de.ovgu.ifdefrevolver.bugs.correlate.data.Snapshot;
 import de.ovgu.ifdefrevolver.bugs.correlate.input.ProjectInformationReader;
 import de.ovgu.ifdefrevolver.bugs.correlate.main.ProjectInformationConfig;
-import de.ovgu.ifdefrevolver.bugs.correlate.output.JointFunctionAbSmellAgeSnapshotColumns;
+import de.ovgu.ifdefrevolver.bugs.correlate.output.JointDataColumns;
 import de.ovgu.ifdefrevolver.bugs.createsnapshots.input.RevisionsCsvReader;
 import de.ovgu.ifdefrevolver.bugs.minecommits.CommitsDistanceDb;
 import de.ovgu.ifdefrevolver.bugs.minecommits.CommitsDistanceDb.Commit;
@@ -191,10 +191,10 @@ public class AddChangeDistances {
         CsvFileWriterHelper writerHelper = new CsvFileWriterHelper() {
             @Override
             protected void actuallyDoStuff(CSVPrinter csv) throws IOException {
-                final Object[] headerRow = CsvEnumUtils.headerRow(JointFunctionAbSmellAgeSnapshotColumns.class);
+                final Object[] headerRow = CsvEnumUtils.headerRow(JointDataColumns.class);
                 csv.printRecord(headerRow);
                 for (CommitWindow window : windows) {
-                    CsvRowProvider<FunctionGenealogy, List<Snapshot>, JointFunctionAbSmellAgeSnapshotColumns> rowProvider = new CsvRowProvider<>(JointFunctionAbSmellAgeSnapshotColumns.class, window.snapshotsInWindow);
+                    CsvRowProvider<FunctionGenealogy, List<Snapshot>, JointDataColumns> rowProvider = new CsvRowProvider<>(JointDataColumns.class, window.snapshotsInWindow);
                     for (FunctionGenealogy functionGenealogy : window.functionGenealogies) {
                         Object[] row = rowProvider.dataRow(functionGenealogy);
                         csv.printRecord(row);
@@ -204,7 +204,7 @@ public class AddChangeDistances {
         };
 
         File resultFile = new File(config.projectResultsDir(),
-                JointFunctionAbSmellAgeSnapshotColumns.FILE_BASENAME);
+                JointDataColumns.FILE_BASENAME);
         writerHelper.write(resultFile);
     }
 
