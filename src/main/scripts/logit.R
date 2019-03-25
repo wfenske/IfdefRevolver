@@ -302,8 +302,8 @@ logitCsvModel <- function(dep, indeps) {
 
 csvModel <- logitCsvModel
 
-ageVar <- "AGE"
-mrcVar <- "MRC"
+ageVar <- "sqrtAGE"
+mrcVar <- "sqrtMRC"
 pcVar  <- "log2PC"
 
 for (dep in c("CHANGE_PRONE")) { 

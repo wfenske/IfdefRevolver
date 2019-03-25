@@ -278,6 +278,9 @@ allData$log2AGE  <- log2(allData$AGE + 1)
 allData$log2MRC  <- log2(allData$MRC + 1)
 allData$log2PC   <- log2(allData$PC + 1)
 
+allData$sqrtAGE  <- sqrt(allData$AGE)
+allData$sqrtMRC  <- sqrt(allData$MRC)
+
 ### Dependent variables
 ## HUNKS,COMMITS,LINES_CHANGED,LINE_DELTA,LINES_DELETED,LINES_ADDED
 allData$COMMITSratio <- allData$COMMITS / allData$LOC
