@@ -6,6 +6,13 @@ library(optparse)
 ##library(methods)
 suppressMessages(library(aod))
 
+cmdArgs <- commandArgs(trailingOnly = FALSE)
+file.arg.name <- "--file="
+script.fullname <- sub(file.arg.name, "",
+                       cmdArgs[grep(file.arg.name, cmdArgs)])
+script.dir <- dirname(script.fullname)
+source(file.path(script.dir, "regression-common.R"))
+
 options <- list(
     make_option(c("-p", "--project")
               , help="Name of the project whose data to load.  We expect the input R data to reside in `<projec-name>/results/joint_data.rds' below the current working directory."
@@ -14,95 +21,26 @@ options <- list(
   , make_option(c("-a", "--annotated"),
                 default=FALSE,
                 action="store_true",
-                help="Restrict data to only annotated functions. [default: %default]")
-  , make_option(c("-T", "--no-test-code"),
+                help="Restrict data to only annotated functions.  Cannot be used together with option `--balance'. [default: %default]")
+  , make_option(c("-b", "--balance"),
                 default=FALSE,
                 action="store_true",
-                dest="noTestCode",
-                help="Exclude functions that likely constitute test code. A simple heuristic based on file name and function name is used to identify such functions. [default: %default]")
-  , make_option(c("-E", "--exclude-files")
-              , help="Exclude functions residing in files whose pathnames match the given regular expression."
-              , default = NULL
-              , metavar = "RE"
-              , dest="excludeFilesRe"
-                )
+                help="Balance input data (via downsampling) so that there is an equal amount of annotated and non-annotated functions.  Cannot be used together with option `--annotated'. [default: %default]")
 )
 
 args <- parse_args(OptionParser(
-    description = "Build a logistic binomial regression model to determine which independent variables have a significant effect on functions being (or not) change-prone. If no input R data set is given, the project must be specified via the `--project' (`-p') option."
+    description = "Build a logistic binomial regression model to determine which independent variables have a significant effect on functions being change-prone (or not). If no input R data set is given, the project must be specified via the `--project' (`-p') option."
   , usage = "%prog [options] [file]"
   , option_list=options)
   , positional_arguments = c(0, 1))
 opts <- args$options
-
-printf  <- function(...) cat(sprintf(...), sep='', file=stdout())
-eprintf <- function(...) cat(sprintf(...), sep='', file=stderr())
 
 sysname <- "<unknown>"
 if ( ! is.null(opts$project) ) {
     sysname <<- opts$project
 }
 
-readData <- function(commandLineArgs) {
-    fns <- commandLineArgs$args
-    if ( length(fns) == 1 ) {
-        dataFn <- fns[1]
-    } else {
-        opts <- commandLineArgs$options
-        if ( is.null(opts$project) ) {
-            stop("Missing input files.  Either specify explicit input files or specify the name of the project the `--project' option (`-p' for short).")
-        }
-        dataFn <-  file.path(opts$project, "results", "joint_data.rds")
-    }
-    eprintf("DEBUG: Reading data from %s\n", dataFn)
-    result <- readRDS(dataFn)
-    eprintf("DEBUG: Sucessfully read data.\n")
-    return (result)
-}
-
 allData <- readData(args)
-
-## Get the P-value of the wald test like this
-##
-## wald.test(b = coef(mylogit1), Sigma = vcov(mylogit1), Terms = 4:4)$result$chi2["P"]
-waldP <- function(testRes) {
-    return (testRes$result$chi2["P"])
-}
-
-significanceCode <- function(p) {
-    if (p < 0.0001) { return ("***"); }
-    else if (p < 0.001) { return ("**"); }
-    else if (p < 0.01) { return ("*"); }
-    else if (p < 0.05) { return ("."); }
-    else { return (""); }
-}
-
-catWaldP <- function(predictorName, testRes) {
-    p <- waldP(testRes)
-    pCode <- significanceCode(p)
-    printf("\n\t% 10s = %.3f %s", predictorName, p, pCode)
-}
-
-checkSignificanceOfIndividualPredictors <- function(model, modelName) {
-    cat(sprintf(modelName, fmt="P(> X2) based on Wald test for %s:"))
-    termPos <- 2
-    for (name in attr(model$terms, "term.labels")) {
-        ##print(regTermTest(reducedModel, name))
-        ##cat(sprintf(termPos, name, termPos:termPos, fmt="\n%d: %s, %s\n"))
-        catWaldP(name, wald.test(b = coef(model), Sigma = vcov(model), Terms = termPos:termPos))
-        termPos <- termPos + 1
-    }
-    cat("\n")
-    cat("Signif. codes:  < 0.0001 '***' 0.001 '**' 0.01 '*' 0.05 '.'\n")
-}
-
-mcfaddensPseudoRSquared <- function(model, nullmodel) {
-    ## NOTE: Values between 0.2 and 0.4 already indicate a
-    ## substantially better model.
-    
-    ## Value : [0,1)
-    return (1-logLik(model)/logLik(nullmodel))
-}
 
 reportModel <- function(model, modelName, mcfadden, csvOut=TRUE, csvHeader=TRUE, warnings=0, warningMessages="") {
     modelSummary <- summary(model)
@@ -217,15 +155,6 @@ tryLogitModel <- function(indeps, dep, data, csvOut=FALSE, csvHeader=FALSE) {
     return (model)
 }
 
-sampleDf <- function(df, sz) {
-    rowCount <- nrow(df)
-    if (rowCount < sz) {
-        return (df)
-    } else {
-        return (df[sample(rowCount, sz), ])
-    }
-}
-
 ### Independent variables for taking smell presence into account
 
 ## Independent variables for taking file size into account
@@ -277,11 +206,19 @@ changedPercent <- nrow(changedData0) * 100 / allNRow
 ##nrow(subset(allData, is.na(CND) || !is.finite(CND)))
 
 ##sampleChangedSize <- 10000
-modelData <- subset(allData, !is.na(AGE) && is.finite(AGE) && !is.na(MRC) && is.finite(MRC))
+modelData <- removeNaFunctions(allData)
+
+if (opts$annotated & opts$balance) {
+    stop("ERROR: Options `--annotated' and `--balance' cannot be used at the same time.")
+}
 
 if (opts$annotated) {
     eprintf("DEBUG: Creating models for just the annotated functions.\n")
     modelData <- subset(modelData, FL > 0)
+}
+
+if (opts$balance) {
+    modelData <- balanceAnnotatedAndUnannotatedFunctions(modelData)
 }
 
 haveHeader <- FALSE
@@ -302,16 +239,12 @@ logitCsvModel <- function(dep, indeps) {
 
 csvModel <- logitCsvModel
 
-ageVar <- "sqrtAGE"
-mrcVar <- "sqrtMRC"
-pcVar  <- "log2PC"
-
 for (dep in c("CHANGE_PRONE")) { 
     ##dummy <- csvModel(dep, c("log2LOC"))
-    dummy <- csvModel(dep, c("log2LOC", ageVar, mrcVar, pcVar))
+    dummy <- csvModel(dep, FORMULA_REDUCED)
     ##dummy <- csvModel(dep, c("FL", "FC", "CND", "NEG", "LOACratio"))
     ##dummy <- csvModel(dep, c("FL", "FC", "CND", "NEG", "LOACratio", "log2LOC"))
-    dummy <- csvModel(dep, c("FL", "FC", "CND", "NEG", "LOACratio", "log2LOC", ageVar, mrcVar, pcVar))
+    dummy <- csvModel(dep, FORMULA_FULL)
 
     ##dummy <- csvModel(dep, c(mrcVar, pcVar))
     ##dummy <- csvModel(dep, c("log2LOC", mrcVar, pcVar))
