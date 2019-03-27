@@ -19,6 +19,7 @@ COMPARE_LOCS_PROG = $(IFDEFREVOLVER_HOME)/compare-locs.R
 RATIOSCMP_PROG    = $(IFDEFREVOLVER_HOME)/ratioscmp.R
 FISHER_PROG       = $(IFDEFREVOLVER_HOME)/fisher.R
 SPEARMAN_PROG     = $(IFDEFREVOLVER_HOME)/spearman.R
+REG_COMMONS       = $(IFDEFREVOLVER_HOME)/regression-common.R
 NBREG_PROG        = $(IFDEFREVOLVER_HOME)/nb.R
 LOGITREG_PROG     = $(IFDEFREVOLVER_HOME)/logit.R
 RDS_FROM_CSV_PROG = $(IFDEFREVOLVER_HOME)/rds-from-csv.R
@@ -40,6 +41,9 @@ LOC_PLOTS = $(addprefix loc-plots/$(PROJECT)/LOC-,$(addsuffix .pdf,$(INDEPS)))
 NBREG_FULL_CSV                 = $(RESULTS_DIR)/nb-reg.csv
 NBREG_FULL_LOG                 = $(LOG_DIR)/nb-reg.log
 
+NBREG_BALANCED_CSV             = $(RESULTS_DIR)/nb-reg-balanced.csv
+NBREG_BALANCED_LOG             = $(LOG_DIR)/nb-reg-balanced.log
+
 ##NBREG_CHANGED_CSV              = $(RESULTS_DIR)/nb-reg-changed.csv
 ##NBREG_CHANGED_LOG              = $(LOG_DIR)/nb-reg-changed.log
 ##
@@ -52,7 +56,10 @@ NBREG_FULL_LOG                 = $(LOG_DIR)/nb-reg.log
 LOGITREG_FULL_CSV              = $(RESULTS_DIR)/logit-reg.csv
 LOGITREG_FULL_LOG              = $(LOG_DIR)/logit-reg.log
 
-REGRESSIONMODELS = $(NBREG_FULL_CSV) $(LOGITREG_FULL_CSV)
+LOGITREG_BALANCED_CSV          = $(RESULTS_DIR)/logit-reg-balanced.csv
+LOGITREG_BALANCED_LOG          = $(LOG_DIR)/logit-reg-balanced.log
+
+REGRESSIONMODELS = $(NBREG_FULL_CSV) $(LOGITREG_FULL_CSV) $(NBREG_BALANCED_CSV) $(LOGITREG_BALANCED_CSV)
 ## $(NBREG_CHANGED_CSV) $(NBREG_ANNOTATED_CSV) $(NBREG_ANNOTATED_CHANGED_CSV) 
 
 all: fisher ratiosplots locplots spearman regressionmodels
@@ -81,38 +88,31 @@ $(SPEARMAN_CSV): $(RDATA) $(SPEARMAN_PROG)
 		false; \
 	fi
 
-$(NBREG_FULL_CSV): $(RDATA) $(NBREG_PROG)
+$(NBREG_FULL_CSV): $(RDATA) $(NBREG_PROG) $(REG_COMMONS)
 	if ! $(NBREG_PROG) -p $(PROJECT) 2>&1 > $(NBREG_FULL_CSV)|tee $(NBREG_FULL_LOG) >&2; \
 	then \
 		rm -f $(NBREG_FULL_CSV); \
 		false; \
 	fi
 
-##$(NBREG_CHANGED_CSV): $(RDATA) $(NBREG_PROG)
-##	if ! $(NBREG_PROG) -p $(PROJECT) --changed > $(NBREG_CHANGED_CSV) 2> $(NBREG_CHANGED_LOG); \
-##	then \
-##		rm -f $(NBREG_CHANGED_CSV); \
-##		false; \
-##	fi
-##
-##$(NBREG_ANNOTATED_CSV): $(RDATA) $(NBREG_PROG)
-##	if ! $(NBREG_PROG) -p $(PROJECT) --annotated > $(NBREG_ANNOTATED_CSV) 2> $(NBREG_ANNOTATED_LOG); \
-##	then \
-##		rm -f $(NBREG_ANNOTATED_CSV); \
-##		false; \
-##	fi
-##
-##$(NBREG_ANNOTATED_CHANGED_CSV): $(RDATA) $(NBREG_PROG)
-##	if ! $(NBREG_PROG) -p $(PROJECT) --annotated --changed > $(NBREG_ANNOTATED_CHANGED_CSV) 2> $(NBREG_ANNOTATED_CHANGED_LOG); \
-##	then \
-##		rm -f $(NBREG_ANNOTATED_CHANGED_CSV); \
-##		false; \
-##	fi
-
-$(LOGITREG_FULL_CSV): $(RDATA) $(LOGITREG_PROG)
+$(LOGITREG_FULL_CSV): $(RDATA) $(LOGITREG_PROG) $(REG_COMMONS)
 	if ! $(LOGITREG_PROG) -p $(PROJECT) 2>&1 > $(LOGITREG_FULL_CSV)|tee $(LOGITREG_FULL_LOG) >&2; \
 	then \
 		rm -f $(LOGITREG_FULL_CSV); \
+		false; \
+	fi
+
+$(NBREG_BALANCED_CSV): $(RDATA) $(NBREG_PROG) $(REG_COMMONS)
+	if ! $(NBREG_PROG) -b -p $(PROJECT) 2>&1 > $(NBREG_BALANCED_CSV)|tee $(NBREG_BALANCED_LOG) >&2; \
+	then \
+		rm -f $(NBREG_BALANCED_CSV); \
+		false; \
+	fi
+
+$(LOGITREG_BALANCED_CSV): $(RDATA) $(LOGITREG_PROG) $(REG_COMMONS)
+	if ! $(LOGITREG_PROG) -b -p $(PROJECT) 2>&1 > $(LOGITREG_BALANCED_CSV)|tee $(LOGITREG_BALANCED_LOG) >&2; \
+	then \
+		rm -f $(LOGITREG_BALANCED_CSV); \
 		false; \
 	fi
 
