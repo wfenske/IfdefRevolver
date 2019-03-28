@@ -31,6 +31,10 @@ options <- list(
                 default=FALSE,
                 action="store_true",
                 help="Balance input data (via downsampling) so that there is an equal amount of annotated and non-annotated functions.  Cannot be used together with option `--annotated'. [default: %default]")
+  , make_option(c("-s", "--standardize"),
+                default=FALSE,
+                action="store_true",
+                help="Standardize all independent variables. [default: %default]")
 )
 
 args <- parse_args(OptionParser(
@@ -540,6 +544,10 @@ if (opts$changed) {
 
 if (opts$balance) {
     negBinData <- balanceAnnotatedAndUnannotatedFunctions(negBinData)
+}
+
+if (opts$standardize) {
+    negBinData <- standardizeIndependentVariables(negBinData)
 }
 
 ##ziSampleSize <- 10000

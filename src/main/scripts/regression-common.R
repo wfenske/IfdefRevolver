@@ -69,9 +69,23 @@ readData <- function(commandLineArgs) {
     return (result)
 }
 
-AGE_VAR <- "sqrtAGE"
-MRC_VAR <- "sqrtMRC"
+##AGE_VAR <- "sqrtAGE"
+##MRC_VAR <- "sqrtMRC"
+AGE_VAR <- "log2AGE"
+MRC_VAR <- "log2MRC"
 PC_VAR  <- "log2PC"
 
 FORMULA_REDUCED <- c("log2LOC", AGE_VAR, MRC_VAR, PC_VAR)
-FORMULA_FULL    <- c("FL", "FC", "CND", "NEG", "LOACratio", "log2LOC", AGE_VAR, MRC_VAR, PC_VAR)
+FORMULA_FULL    <- c("FL", "FC", "CND", "NEG", "LOACratio", "log2LOC"
+                   , AGE_VAR
+                   , MRC_VAR
+                   , PC_VAR
+                     )
+
+standardizeIndependentVariables <- function(df) {
+    sdf <- data.frame(df)
+    for (var in FORMULA_FULL) {
+        sdf[,var] <- scale(df[,var])
+    }
+    return (sdf)
+}

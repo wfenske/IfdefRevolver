@@ -44,6 +44,9 @@ NBREG_FULL_LOG                 = $(LOG_DIR)/nb-reg.log
 NBREG_BALANCED_CSV             = $(RESULTS_DIR)/nb-reg-balanced.csv
 NBREG_BALANCED_LOG             = $(LOG_DIR)/nb-reg-balanced.log
 
+NBREG_STD_CSV                  = $(RESULTS_DIR)/nb-reg-std.csv
+NBREG_STD_LOG                  = $(LOG_DIR)/nb-reg-std.log
+
 ##NBREG_CHANGED_CSV              = $(RESULTS_DIR)/nb-reg-changed.csv
 ##NBREG_CHANGED_LOG              = $(LOG_DIR)/nb-reg-changed.log
 ##
@@ -59,7 +62,10 @@ LOGITREG_FULL_LOG              = $(LOG_DIR)/logit-reg.log
 LOGITREG_BALANCED_CSV          = $(RESULTS_DIR)/logit-reg-balanced.csv
 LOGITREG_BALANCED_LOG          = $(LOG_DIR)/logit-reg-balanced.log
 
-REGRESSIONMODELS = $(NBREG_FULL_CSV) $(LOGITREG_FULL_CSV) $(NBREG_BALANCED_CSV) $(LOGITREG_BALANCED_CSV)
+LOGITREG_STD_CSV               = $(RESULTS_DIR)/logit-reg-std.csv
+LOGITREG_STD_LOG               = $(LOG_DIR)/logit-reg-std.log
+
+REGRESSIONMODELS = $(NBREG_FULL_CSV) $(LOGITREG_FULL_CSV) $(NBREG_BALANCED_CSV) $(LOGITREG_BALANCED_CSV) $(NBREG_STD_CSV) $(LOGITREG_STD_CSV)
 ## $(NBREG_CHANGED_CSV) $(NBREG_ANNOTATED_CSV) $(NBREG_ANNOTATED_CHANGED_CSV) 
 
 all: fisher ratiosplots locplots spearman regressionmodels
@@ -113,6 +119,20 @@ $(LOGITREG_BALANCED_CSV): $(RDATA) $(LOGITREG_PROG) $(REG_COMMONS)
 	if ! $(LOGITREG_PROG) -b -p $(PROJECT) 2>&1 > $(LOGITREG_BALANCED_CSV)|tee $(LOGITREG_BALANCED_LOG) >&2; \
 	then \
 		rm -f $(LOGITREG_BALANCED_CSV); \
+		false; \
+	fi
+
+$(NBREG_STD_CSV): $(RDATA) $(NBREG_PROG) $(REG_COMMONS)
+	if ! $(NBREG_PROG) -s -p $(PROJECT) 2>&1 > $(NBREG_STD_CSV)|tee $(NBREG_STD_LOG) >&2; \
+	then \
+		rm -f $(NBREG_STD_CSV); \
+		false; \
+	fi
+
+$(LOGITREG_STD_CSV): $(RDATA) $(LOGITREG_PROG) $(REG_COMMONS)
+	if ! $(LOGITREG_PROG) -s -p $(PROJECT) 2>&1 > $(LOGITREG_STD_CSV)|tee $(LOGITREG_STD_LOG) >&2; \
+	then \
+		rm -f $(LOGITREG_STD_CSV); \
 		false; \
 	fi
 
