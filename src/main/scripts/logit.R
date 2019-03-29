@@ -226,7 +226,7 @@ if (opts$balance) {
 }
 
 if (opts$standardize) {
-    modelData <- standardizeIndependentVariables(modelData)
+    modelData <- standardizeVariables(modelData)
 }
 
 haveHeader <- FALSE
@@ -240,7 +240,8 @@ header <- function() {
 }
 
 logitCsvModel <- function(dep, indeps) {
-    model <- tryLogitModel(indeps=indeps, dep=dep, data=modelData, csvOut=TRUE, csvHeader=header())
+    model <- tryLogitModel(indeps=indeps, dep=dep, data=modelData,
+                           csvOut=TRUE, csvHeader=header())
     return (model)
 }
 

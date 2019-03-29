@@ -82,9 +82,12 @@ FORMULA_FULL    <- c("FL", "FC", "CND", "NEG", "LOACratio", "log2LOC"
                    , PC_VAR
                      )
 
-standardizeIndependentVariables <- function(df) {
-    sdf <- data.frame(df)
+standardizeVariables <- function(df) {
+    sdf <- data.frame(df) ## copy original data frame
     for (var in FORMULA_FULL) {
+        sdf[,var] <- scale(df[,var])
+    }
+    for (var in c("COMMITS", "LCH")) {
         sdf[,var] <- scale(df[,var])
     }
     return (sdf)

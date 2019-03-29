@@ -547,7 +547,7 @@ if (opts$balance) {
 }
 
 if (opts$standardize) {
-    negBinData <- standardizeIndependentVariables(negBinData)
+    negBinData <- standardizeVariables(negBinData)
 }
 
 ##ziSampleSize <- 10000
@@ -604,12 +604,14 @@ header <- function() {
 }
 
 negbinCsvModel <- function(dep, indeps) {
-    model <- tryNbModel(indeps=indeps, dep=dep, data=negBinData, csvOut=TRUE, csvHeader=header())
+    model <- tryNbModel(indeps=indeps, dep=dep, data=negBinData,
+                        csvOut=TRUE, csvHeader=header())
     return (model)
 }
 
 zeroinflNegbinCsvModel <- function(dep, indeps) {
-    model <- tryZeroInflModel(indeps=indeps, dep=dep, data=ziData, csvOut=TRUE, csvHeader=header())
+    model <- tryZeroInflModel(indeps=indeps, dep=dep, data=ziData,
+                              csvOut=TRUE, csvHeader=header())
     return (model)
 }
 
