@@ -87,8 +87,8 @@ standardizeVariables <- function(df) {
     for (var in FORMULA_FULL) {
         sdf[,var] <- scale(df[,var])
     }
-    for (var in c("COMMITS", "LCH")) {
-        sdf[,var] <- scale(df[,var])
-    }
+    ##for (var in c("COMMITS", "LCH")) {
+    ##    sdf[,var] <- scale(df[,var])
+    ##}
     return (sdf)
 }
