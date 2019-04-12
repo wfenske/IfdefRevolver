@@ -122,8 +122,28 @@ public class AddChangeDistances {
         List<FunctionChangeRow>[] changesByCommitKey = groupChangesByCommitKey();
         GenealogyTracker gt = new GenealogyTracker(projectInfo, config, changesByCommitKey,
                 allFunctionsInSnapshots, annotationDataInSnapshots);
-        final LinkedGroupingListMap<Snapshot, FunctionGenealogy> functionGenealogiesBySnapshot = gt.processCommits();
-        writeAbSmellAgeSnapshotCsv(functionGenealogiesBySnapshot);
+        final LinkedGroupingListMap<Snapshot, FunctionGenealogy> functionGenealogiesBySnapshotAtWhoseStartTheyArePresent = gt.processCommits();
+        final LinkedGroupingListMap<Snapshot, FunctionGenealogy> functionGenealogiesBySnapshotInWhichTheyAreChanged = groupFunctionGenealogiesBySnapshotInWhichTheyAreChanged(functionGenealogiesBySnapshotAtWhoseStartTheyArePresent);
+
+        writeAbSmellAgeSnapshotCsv(functionGenealogiesBySnapshotAtWhoseStartTheyArePresent, functionGenealogiesBySnapshotInWhichTheyAreChanged);
+    }
+
+    private LinkedGroupingListMap<Snapshot, FunctionGenealogy> groupFunctionGenealogiesBySnapshotInWhichTheyAreChanged(LinkedGroupingListMap<Snapshot, FunctionGenealogy> functionGenealogiesBySnapshot) {
+        Set<FunctionGenealogy> allFunctionGenalogies = new HashSet<>();
+        for (List<FunctionGenealogy> gs : functionGenealogiesBySnapshot.getMap().values()) {
+            allFunctionGenalogies.addAll(gs);
+        }
+
+        LinkedGroupingListMap<Snapshot, FunctionGenealogy> result = new LinkedGroupingListMap<>();
+        for (FunctionGenealogy f : allFunctionGenalogies) {
+            for (Snapshot s : functionGenealogiesBySnapshot.getMap().keySet()) {
+                if (f.isChangedInSnapshot(s)) {
+                    result.put(s, f);
+                }
+            }
+        }
+
+        return result;
     }
 
     private List<FunctionChangeRow>[] groupChangesByCommitKey() {
@@ -152,17 +172,7 @@ public class AddChangeDistances {
         return changesByCommitKey;
     }
 
-    private static class CommitWindow {
-        public final List<Snapshot> snapshotsInWindow;
-        public final List<FunctionGenealogy> functionGenealogies;
-
-        public CommitWindow(List<Snapshot> snapshotsInWindow, List<FunctionGenealogy> functionGenealogies) {
-            this.snapshotsInWindow = snapshotsInWindow;
-            this.functionGenealogies = functionGenealogies;
-        }
-    }
-
-    private void writeAbSmellAgeSnapshotCsv(LinkedGroupingListMap<Snapshot, FunctionGenealogy> functionGenealogiesBySnapshot) {
+    private void writeAbSmellAgeSnapshotCsv(LinkedGroupingListMap<Snapshot, FunctionGenealogy> functionGenealogiesBySnapshotAtWhoseStartTheyArePresent, LinkedGroupingListMap<Snapshot, FunctionGenealogy> functionGenealogiesBySnapshotInWhichTheyAreChanged) {
         final int WINDOW_SIZE = config.getWindowSize();
         final int SLIDE = config.getWindowSlide();
 
@@ -176,8 +186,9 @@ public class AddChangeDistances {
             LOG.info("Computing window " + windows.size() + "/" + numWindows);
             final List<Snapshot> snapshotsInWindow = allSnapshots.subList(startIndex, startIndex + WINDOW_SIZE);
             final Snapshot firstSnapshot = allSnapshots.get(startIndex);
-            final List<FunctionGenealogy> functionsInFirstSnapshot = functionGenealogiesBySnapshot.get(firstSnapshot);
-            CommitWindow window = new CommitWindow(snapshotsInWindow, functionsInFirstSnapshot);
+            final List<FunctionGenealogy> functionsPresentAtSnapshotStart = functionGenealogiesBySnapshotAtWhoseStartTheyArePresent.get(firstSnapshot);
+            final List<FunctionGenealogy> functionsChangedInFirstSnapshotButNotPresentAtItsBeginning = getFunctionsChangedInFirstSnapshotButNotPresentAtItsBeginning(functionGenealogiesBySnapshotInWhichTheyAreChanged, functionsPresentAtSnapshotStart, firstSnapshot);
+            CommitWindow window = new CommitWindow(snapshotsInWindow, functionsPresentAtSnapshotStart, functionsChangedInFirstSnapshotButNotPresentAtItsBeginning);
             windows.add(window);
         }
         LOG.info("Done computing windows. " + windows.size() + " windows have been created.");
@@ -187,6 +198,14 @@ public class AddChangeDistances {
         LOG.info("Successfully output aggregated change data for all " + windows.size() + " windows.");
     }
 
+    private List<FunctionGenealogy> getFunctionsChangedInFirstSnapshotButNotPresentAtItsBeginning(LinkedGroupingListMap<Snapshot, FunctionGenealogy> functionGenealogiesBySnapshotInWhichTheyAreChanged, List<FunctionGenealogy> functionsPresentAtSnapshotStart, Snapshot firstSnapshot) {
+        List<FunctionGenealogy> changedInFirstSnapshot = functionGenealogiesBySnapshotInWhichTheyAreChanged.get(firstSnapshot);
+        if (changedInFirstSnapshot == null || changedInFirstSnapshot.isEmpty()) return Collections.emptyList();
+        Set<FunctionGenealogy> result = new LinkedHashSet<>(changedInFirstSnapshot);
+        result.removeAll(functionsPresentAtSnapshotStart);
+        return new ArrayList<>(result);
+    }
+
     private void writeAbSmellAgeSnapshotCsv(List<CommitWindow> windows) {
         CsvFileWriterHelper writerHelper = new CsvFileWriterHelper() {
             @Override
@@ -194,8 +213,13 @@ public class AddChangeDistances {
                 final Object[] headerRow = CsvEnumUtils.headerRow(JointDataColumns.class);
                 csv.printRecord(headerRow);
                 for (CommitWindow window : windows) {
-                    CsvRowProvider<FunctionGenealogy, List<Snapshot>, JointDataColumns> rowProvider = new CsvRowProvider<>(JointDataColumns.class, window.snapshotsInWindow);
-                    for (FunctionGenealogy functionGenealogy : window.functionGenealogies) {
+                    CsvRowProvider<FunctionGenealogy, CommitWindow, JointDataColumns> rowProvider = new CsvRowProvider<>(JointDataColumns.class, window);
+                    for (FunctionGenealogy functionGenealogy : window.functionsPresentAtSnapshotStart) {
+                        Object[] row = rowProvider.dataRow(functionGenealogy);
+                        csv.printRecord(row);
+                    }
+
+                    for (FunctionGenealogy functionGenealogy : window.functionsChangedInFirstSnapshotButNotPresentAtItsBeginning) {
                         Object[] row = rowProvider.dataRow(functionGenealogy);
                         csv.printRecord(row);
                     }

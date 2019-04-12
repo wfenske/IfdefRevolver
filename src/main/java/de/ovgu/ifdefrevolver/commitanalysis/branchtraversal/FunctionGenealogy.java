@@ -6,6 +6,7 @@ import de.ovgu.ifdefrevolver.commitanalysis.AbResRow;
 import de.ovgu.ifdefrevolver.commitanalysis.FunctionChangeRow;
 import de.ovgu.ifdefrevolver.commitanalysis.FunctionId;
 import de.ovgu.ifdefrevolver.commitanalysis.IAbResRow;
+import de.ovgu.ifdefrevolver.commitanalysis.distances.CommitWindow;
 import de.ovgu.skunk.util.LinkedGroupingListMap;
 import org.apache.log4j.Logger;
 
@@ -20,13 +21,11 @@ public class FunctionGenealogy {
 
     private final int uid;
     private final FunctionId firstId;
-    private final Set<FunctionId> functionIds;
     private final Map<Snapshot, AbResRow> jointFunctionAbSmellRowsBySnapshot;
     private final LinkedGroupingListMap<Snapshot, FunctionChangeRow> changesBySnapshot;
 
     public FunctionGenealogy(int uid, Set<FunctionId> functionIds, Map<Snapshot, AbResRow> jointFunctionAbSmellRowsBySnapshot, LinkedGroupingListMap<Snapshot, FunctionChangeRow> changesBySnapshot) {
         this.uid = uid;
-        this.functionIds = functionIds;
         this.jointFunctionAbSmellRowsBySnapshot = jointFunctionAbSmellRowsBySnapshot;
         this.changesBySnapshot = changesBySnapshot;
         this.firstId = functionIds.iterator().next();
@@ -45,11 +44,29 @@ public class FunctionGenealogy {
     }
 
     public AbResRow getStaticMetrics(Snapshot s) {
-        assertExistsAtStartOfSnapshot(s);
-        return jointFunctionAbSmellRowsBySnapshot.get(s);
+        AbResRow result = jointFunctionAbSmellRowsBySnapshot.get(s);
+        if (result != null) return result;
+
+        final int referenceIndex = s.getIndex();
+        int minDistance = Integer.MAX_VALUE;
+
+        for (Map.Entry<Snapshot, AbResRow> e : jointFunctionAbSmellRowsBySnapshot.entrySet()) {
+            final int dist = Math.abs(e.getKey().getIndex() - referenceIndex);
+            if (dist < minDistance) {
+                result = e.getValue();
+            }
+        }
+
+        return result;
+    }
+
+    public boolean isChangedInSnapshot(Snapshot s) {
+        final List<FunctionChangeRow> changes = changesBySnapshot.get(s);
+        return ((changes != null) && !changes.isEmpty());
     }
 
     private int countCommitsInSnapshot(Snapshot s) {
+        FIX_COUNT_COMMITS_AND_REMAINING_FUNCTION
         assertExistsAtStartOfSnapshot(s);
         final List<FunctionChangeRow> changes = changesBySnapshot.get(s);
         return (int) changes.stream()
@@ -196,20 +213,21 @@ public class FunctionGenealogy {
         return sb.toString();
     }
 
-    public OptionalInt age(List<Snapshot> window) {
-        return age(window.get(0));
+    public OptionalInt age(CommitWindow window) {
+        return age(window.getFirstSnapshot());
     }
 
-    public OptionalInt distanceToMostRecentEdit(List<Snapshot> window) {
-        return distanceToMostRecentEdit(window.get(0));
+    public OptionalInt distanceToMostRecentEdit(CommitWindow window) {
+        return distanceToMostRecentEdit(window.getFirstSnapshot());
     }
 
-    private int sumAttrValuesInWindow(List<Snapshot> window, ToIntFunction<Snapshot> getAttr) {
-        int first = getAttr.applyAsInt(window.get(0));
-        if (window.size() == 1) {
+    private int sumAttrValuesInWindow(CommitWindow window, ToIntFunction<Snapshot> getAttr) {
+        List<Snapshot> snapshots = window.snapshotsInWindow;
+        int first = getAttr.applyAsInt(snapshots.get(0));
+        if (snapshots.size() == 1) {
             return first;
         } else {
-            int rest = window.stream()
+            int rest = snapshots.stream()
                     .skip(1)
                     .filter(s -> existsAtStartOfSnapshot(s))
                     .mapToInt(getAttr)
@@ -218,11 +236,11 @@ public class FunctionGenealogy {
         }
     }
 
-    public int countCommitsInWindow(List<Snapshot> window) {
+    public int countCommitsInWindow(CommitWindow window) {
         return sumAttrValuesInWindow(window, s -> countCommitsInSnapshot(s));
     }
 
-    public int countCommitsInPreviousSnapshots(List<Snapshot> window) {
+    public int countCommitsInPreviousSnapshots(CommitWindow window) {
         Stream<FunctionChangeRow> changesInPreviousSnapshots = getModsAndMovesPreviousSnapshots(window);
         return (int) changesInPreviousSnapshots
                 .map(c -> c.commit)
@@ -230,15 +248,15 @@ public class FunctionGenealogy {
                 .count();
     }
 
-    public int countLinesChangedInPreviousSnapshots(List<Snapshot> window) {
+    public int countLinesChangedInPreviousSnapshots(CommitWindow window) {
         Stream<FunctionChangeRow> changesInPreviousSnapshots = getModsAndMovesPreviousSnapshots(window);
         return changesInPreviousSnapshots
                 .mapToInt(FunctionChangeRow::linesChanged)
                 .sum();
     }
 
-    private Stream<FunctionChangeRow> getModsAndMovesPreviousSnapshots(List<Snapshot> window) {
-        Snapshot firstSnapshotOfWindow = window.get(0);
+    private Stream<FunctionChangeRow> getModsAndMovesPreviousSnapshots(CommitWindow window) {
+        Snapshot firstSnapshotOfWindow = window.getFirstSnapshot();
         assertExistsAtStartOfSnapshot(firstSnapshotOfWindow);
         return this.changesBySnapshot.getMap()
                 .entrySet()
@@ -248,20 +266,20 @@ public class FunctionGenealogy {
                 .filter(FunctionChangeRow::isModOrMove);
     }
 
-    public int countLinesChangedInWindow(List<Snapshot> window) {
+    public int countLinesChangedInWindow(CommitWindow window) {
         return sumAttrValuesInWindow(window, s -> countLinesChangedInSnapshot(s));
     }
 
-    public int countLinesAddedInWindow(List<Snapshot> window) {
+    public int countLinesAddedInWindow(CommitWindow window) {
         return sumAttrValuesInWindow(window, s -> countLinesAddedInSnapshot(s));
     }
 
-    public int countLinesDeletedInWindow(List<Snapshot> window) {
+    public int countLinesDeletedInWindow(CommitWindow window) {
         return sumAttrValuesInWindow(window, s -> countLinesDeletedInSnapshot(s));
     }
 
-    public IAbResRow getStaticMetrics(List<Snapshot> window) {
-        final AbResRow first = getStaticMetrics(window.get(0));
+    public IAbResRow getStaticMetrics(CommitWindow window) {
+        final AbResRow first = getStaticMetrics(window.getFirstSnapshot());
 //        if (window.size() == 1) {
 //            return first;
 //        } else {
@@ -272,5 +290,19 @@ public class FunctionGenealogy {
 //            return new AggregatedAbResRow(first, rest);
 //        }
         return first;
+    }
+
+    public int getDelayOfAppearance(CommitWindow window) {
+        Snapshot firstSnapshot = window.getFirstSnapshot();
+        if (existsAtStartOfSnapshot(firstSnapshot)) return 0;
+
+        Commit windowStart = firstSnapshot.getStartCommit();
+        List<FunctionChangeRow> changesInFirstSnapshot = this.changesBySnapshot.get(firstSnapshot);
+        OptionalInt distance = changesInFirstSnapshot.stream().mapToInt((changeRow) -> changeRow.commit.distanceAmongCModifyingCommits(windowStart).get()).min();
+        if (distance.isPresent()) {
+            return -(distance.getAsInt());
+        } else {
+            throw new IllegalArgumentException("Cannot compute DelayOfAppearance: Function is not changed in first snapshot. function=" + this + ", snapshot=" + firstSnapshot);
+        }
     }
 }
