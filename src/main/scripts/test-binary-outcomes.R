@@ -133,7 +133,7 @@ ndThresh  <- 0
 negThresh <- 0
 locThreshold <- median(data$LOC)
 
-for (dep in c("COMMITS", "LCH", "CHANGED")) {
+for (dep in c("CHANGED", "COMMITS", "LCH")) {
     pf(data, indep="FL",  dep=dep, indepThresh=flThresh)
     pf(data, indep="FC",  dep=dep, indepThresh=fcThresh)
     pf(data, indep="CND", dep=dep, indepThresh=ndThresh)
