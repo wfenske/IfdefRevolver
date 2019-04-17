@@ -9,15 +9,17 @@ NAME ?= $(PROJECT)
 RESULTS_DIR  = $(PROJECT)/results
 LOG_DIR      = $(PROJECT)/logs
 
-FISHER_CSV   = $(RESULTS_DIR)/fisher.csv
-SPEARMAN_CSV = $(RESULTS_DIR)/spearman.csv
-RDATA        = $(RESULTS_DIR)/joint_data.rds
+GROUP_DIFFS_CSV  = $(RESULTS_DIR)/group_differences.csv
+GROUP_DIFFS_LOG  = $(LOG_DIR)/group_differences.log
+
+SPEARMAN_CSV     = $(RESULTS_DIR)/spearman.csv
+RDATA            = $(RESULTS_DIR)/joint_data.rds
 
 IFDEFREVOLVER_HOME ?= $(HOME)/src/skunk/IfdefRevolver/src/main/scripts
 
 COMPARE_LOCS_PROG = $(IFDEFREVOLVER_HOME)/compare-locs.R
 RATIOSCMP_PROG    = $(IFDEFREVOLVER_HOME)/ratioscmp.R
-FISHER_PROG       = $(IFDEFREVOLVER_HOME)/fisher.R
+GROUP_DIFFS_PROG  = $(IFDEFREVOLVER_HOME)/test-group-differences.R
 SPEARMAN_PROG     = $(IFDEFREVOLVER_HOME)/spearman.R
 REG_COMMONS       = $(IFDEFREVOLVER_HOME)/regression-common.R
 NBREG_PROG        = $(IFDEFREVOLVER_HOME)/nb.R
@@ -68,9 +70,9 @@ LOGITREG_STD_LOG               = $(LOG_DIR)/logit-reg-std.log
 REGRESSIONMODELS = $(NBREG_REGULAR_CSV) $(LOGITREG_REGULAR_CSV) $(NBREG_BALANCED_CSV) $(LOGITREG_BALANCED_CSV) $(NBREG_STD_CSV) $(LOGITREG_STD_CSV)
 ## $(NBREG_CHANGED_CSV) $(NBREG_ANNOTATED_CSV) $(NBREG_ANNOTATED_CHANGED_CSV) 
 
-all: fisher ratiosplots locplots spearman regressionmodels
+all: group_diffs ratiosplots locplots spearman regressionmodels
 
-fisher: $(FISHER_CSV)
+group_diffs: $(GROUP_DIFFS_CSV)
 
 spearman: $(SPEARMAN_CSV)
 
@@ -80,10 +82,10 @@ locplots: $(LOC_PLOTS)
 
 regressionmodels: $(REGRESSIONMODELS)
 
-$(FISHER_CSV): $(RDATA) $(FISHER_PROG)
-	if ! $(FISHER_PROG) -p $(PROJECT) > $(FISHER_CSV); \
+$(GROUP_DIFFS_CSV): $(RDATA) $(GROUP_DIFFS_PROG)
+	if ! $(GROUP_DIFFS_PROG) -p $(PROJECT) 2>&1 > $(GROUP_DIFFS_CSV)|tee $(GROUP_DIFFS_LOG) >&2; \
 	then \
-		rm -f $(FISHER_CSV); \
+		rm -f $(GROUP_DIFFS_CSV); \
 		false; \
 	fi
 
