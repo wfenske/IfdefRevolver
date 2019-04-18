@@ -120,7 +120,7 @@ if ( !opts$no_header ) {
     cat(sprintf(
         ##indepBelowCmp,indepAboveCmp,
         ##depBelowCmp,depAboveCmp,
-        fmt="System,I,ITh,D,P,EffectSize,Magnitude\n"))
+        fmt="System,I,ITh,D,P,PScore,EffectSize,Magnitude\n"))
 }
 
 ##r <- doTheFisher(indep=opts$independent, dep=opts$dependent, indepThresh=opts$ithresh)
