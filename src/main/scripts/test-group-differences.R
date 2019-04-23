@@ -170,10 +170,27 @@ numOuterCores <- min(numIterations, numTotalCores) ##max(1, as.integer(ceiling(n
 numInnerCores <- length(indeps) ##min(length(indeps), max(1, as.integer(ceiling(numTotalCores / numOuterCores))))
 eprintf("DEBUG Number of inner and outer cores: %d, %d\n", numInnerCores, numOuterCores)
 
-calculateResultsForSample <- function(dataChunk) {
-    chunkNum <- dataChunk[1,]$CHUNK_NUM
-    numRows <- nrow(dataChunk)
-    eprintf("DEBUG Calculating results for chunk %d/%d (%d rows) ...\n", chunkNum, numIterations, numRows)
+remainingIndices <- seq_len(fullSize)
+createSampleIndices <- function(sampleNum) {
+    eprintf("DEBUG Calculating indices for data chunk %d/%d ...\n", sampleNum, numIterations)
+    ##result <- sampleDf(remainingData, sampleSize)
+    ##remainingData <<- setdiff(remainingData, result)
+    resultIndices <- sample(remainingIndices, size = sampleSize)
+    remainingIndices <<- setdiff(remainingIndices, resultIndices)
+    ##eprintf("DEBUG Overlap for chunk %d: %d rows\n", sampleNum, nrow(intersect(remainingData, result)))
+    ##result$CHUNK_NUM <- sampleNum
+    eprintf("DEBUG typeof(resultIndices): %s\n", typeof(resultIndices))
+    resultIndices
+}
+listOfChunkIndices <- lapply(seq_len(numIterations), createSampleIndices)
+eprintf("DEBUG Done calculating sample indices.\n")
+
+calculateResultsForChunk <- function(chunkNum) {
+    chunkIndices <- listOfChunkIndices[[chunkNum]]
+    ##eprintf("DEBUG typeof(chunkIndices): %s\n", typeof(chunkIndices))
+    ##eprintf("Index: %s\n", paste(chunkIndices))
+    eprintf("DEBUG Calculating results for chunk %d/%d (%d rows) ...\n", chunkNum, numIterations, length(chunkIndices))
+    dataChunk <- data[chunkIndices, ]
     f <- function(indep) {
         ##eprintf("DEBUG indep=%s\n", indep)
         indepThresh <- ifelse(indep=="FL"
@@ -194,25 +211,9 @@ calculateResultsForSample <- function(dataChunk) {
     Reduce(rbind, resultsForAllIndeps)
 }
 
-remainingData <- data
-createSample <- function(sampleNum) {
-    eprintf("DEBUG Creating data chunk %d/%d ...\n", sampleNum, numIterations)
-    ##result <- sampleDf(remainingData, sampleSize)
-    ##remainingData <<- setdiff(remainingData, result)
-    nRemaining <- nrow(remainingData)
-    resultIndices <- sample(seq_len(nRemaining), size = sampleSize)
-    result <- remainingData[resultIndices, ]
-    remainingData <<- remainingData[-resultIndices, ]
-    ##eprintf("DEBUG Overlap for chunk %d: %d rows\n", sampleNum, nrow(intersect(remainingData, result)))
-    result$CHUNK_NUM <- sampleNum
-    result
-}
-chunkedData <- lapply(seq(1:numIterations), createSample)
-eprintf("DEBUG Done chunking data.\n")
-
 allResultsList <- mclapply(
-    chunkedData
-  , calculateResultsForSample
+    seq_len(numIterations)
+  , calculateResultsForChunk
   , mc.cores=numOuterCores
 )
 eprintf("DEBUG Calculating all %d result.\n", numIterations)
