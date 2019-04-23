@@ -3,6 +3,7 @@
 library(optparse)
 library(effsize)
 library(parallel)
+##suppressMessages(library(dplyr))
 
 ### Load some common functions
 cmdArgs <- commandArgs(trailingOnly = FALSE)
@@ -36,8 +37,8 @@ options <- list(
               , action="store_true"
                 )
   , make_option(c("--cores")
-              , help="Number of processing cores to use for parallel computation. [default: %default]"
-              , default = 32
+              , help="Number of processing cores to use for parallel computation.  On Linux, the number of available CPU cores can be determined with the commands `nproc --all' or `getconf _NPROCESSORS_ONLN'. [default: %default]"
+              , default = 4
                 )
 )
 
@@ -132,9 +133,6 @@ if ( !opts$no_header ) {
         fmt="System,I,ITh,D,P,PScore,EffectSize,Magnitude\n"))
 }
 
-##r <- testGroupDifferences(indep=opts$independent, dep=opts$dependent, indepThresh=opts$ithresh)
-##cat(r, "\n", sep="")
-
 flThresh  <- 0
 fcThresh  <- 1
 cndThresh <- 0
@@ -142,28 +140,40 @@ negThresh <- 0
 locThreshold <- median(data$LOC)
 
 fullSize <- nrow(data)
-sampleSize <- fullSize
+origSampleSize <- fullSize
+sampleSize <- origSampleSize
 if (!is.na(opts$sample_size)) {
-    sampleSize <- min(fullSize, opts$sample_size)
+    origSampleSize <- opts$sample_size
+    sampleSize <- min(fullSize, origSampleSize)
     if (sampleSize <= 0) {
         msg <- sprintf("Sample size must be a positive integer, not `%d'.", sampleSize)
         stop(msg)
     }
 }
-numIterations <- ceiling(fullSize/sampleSize)
+
+sampleSize <- max(1, as.integer(floor(fullSize/max(1, floor(fullSize/sampleSize)))))
+numIterations <- max(1, floor(fullSize/sampleSize))
+
+##numIterations <- max(1, floor(fullSize/sampleSize))
+##rawNumOmitted <- fullSize %% numIterations
+##sampleSizeInc <- floor(rawNumOmitted / numIterations)
+##sampleSize <- sampleSize + sampleSizeInc
 
 eprintf("INFO Total number of rows in input data: %d\n", fullSize)
+eprintf("INFO Adjusted sample size from %d to: %d\n", origSampleSize, sampleSize)
 eprintf("INFO Number of subsets: %d\n", numIterations)
+eprintf("INFO Number of omitted rows: %d\n", (fullSize %% sampleSize))
 
 indeps <- list("FL", "FC", "CND", "NEG", "LOC")
 numTotalCores <- max(1, opts$cores)
-numInnerCores <- min(length(indeps), numTotalCores)
-numOuterCores <- min(numIterations, max(1, as.integer(round(numTotalCores / numInnerCores))))
+numOuterCores <- min(numIterations, numTotalCores) ##max(1, as.integer(ceiling(numTotalCores / numInnerCores))))
+numInnerCores <- length(indeps) ##min(length(indeps), max(1, as.integer(ceiling(numTotalCores / numOuterCores))))
 eprintf("DEBUG Number of inner and outer cores: %d, %d\n", numInnerCores, numOuterCores)
 
-calculateResultsForSample <- function(sampleNum) {
-    eprintf("DEBUG Calculating results for sample %d/%d ...\n", sampleNum, numIterations)
-    sampleData <- sampleDf(data, sampleSize)
+calculateResultsForSample <- function(dataChunk) {
+    chunkNum <- dataChunk[1,]$CHUNK_NUM
+    numRows <- nrow(dataChunk)
+    eprintf("DEBUG Calculating results for chunk %d/%d (%d rows) ...\n", chunkNum, numIterations, numRows)
     f <- function(indep) {
         ##eprintf("DEBUG indep=%s\n", indep)
         indepThresh <- ifelse(indep=="FL"
@@ -178,18 +188,37 @@ calculateResultsForSample <- function(sampleNum) {
                                                          ,locThreshold
                                                          ,stop(indep))))))
         ##eprintf("DEBUG indepThresh=%f\n", as.double(indepThresh))
-        testGroupDifferences(sampleData, indep=indep,  dep=opts$dependent, indepThresh=indepThresh)
+        testGroupDifferences(dataChunk, indep=indep,  dep=opts$dependent, indepThresh=indepThresh)
     }
     resultsForAllIndeps <- mclapply(indeps, f, mc.cores=numInnerCores)
     Reduce(rbind, resultsForAllIndeps)
 }
 
+remainingData <- data
+createSample <- function(sampleNum) {
+    eprintf("DEBUG Creating data chunk %d/%d ...\n", sampleNum, numIterations)
+    ##result <- sampleDf(remainingData, sampleSize)
+    ##remainingData <<- setdiff(remainingData, result)
+    nRemaining <- nrow(remainingData)
+    resultIndices <- sample(seq_len(nRemaining), size = sampleSize)
+    result <- remainingData[resultIndices, ]
+    remainingData <<- remainingData[-resultIndices, ]
+    ##eprintf("DEBUG Overlap for chunk %d: %d rows\n", sampleNum, nrow(intersect(remainingData, result)))
+    result$CHUNK_NUM <- sampleNum
+    result
+}
+chunkedData <- lapply(seq(1:numIterations), createSample)
+eprintf("DEBUG Done chunking data.\n")
+
 allResultsList <- mclapply(
-    seq(1:numIterations)
+    chunkedData
   , calculateResultsForSample
   , mc.cores=numOuterCores
 )
+eprintf("DEBUG Calculating all %d result.\n", numIterations)
 
 allResultsDf <- Reduce(rbind, allResultsList)
 ##eprintf("DEBUG Number of rows in results: %d\n", nrow(allResultsDf))
 outputResults(allResultsDf)
+eprintf("DEBUG Successfully computed group differences for %s in %s.\n",
+        unique(allResultsDf$D)[1], unique(allResultsDf$System)[1])
