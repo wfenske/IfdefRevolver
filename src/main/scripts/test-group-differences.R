@@ -191,6 +191,7 @@ calculateResultsForChunk <- function(chunkNum) {
     ##eprintf("Index: %s\n", paste(chunkIndices))
     eprintf("DEBUG Calculating results for chunk %d/%d (%d rows) ...\n", chunkNum, numIterations, length(chunkIndices))
     dataChunk <- data[chunkIndices, ]
+    eprintf("DEBUG Done materializing chunk\n")
     f <- function(indep) {
         ##eprintf("DEBUG indep=%s\n", indep)
         indepThresh <- ifelse(indep=="FL"
