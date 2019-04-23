@@ -179,7 +179,7 @@ createSampleIndices <- function(sampleNum) {
     remainingIndices <<- setdiff(remainingIndices, resultIndices)
     ##eprintf("DEBUG Overlap for chunk %d: %d rows\n", sampleNum, nrow(intersect(remainingData, result)))
     ##result$CHUNK_NUM <- sampleNum
-    eprintf("DEBUG typeof(resultIndices): %s\n", typeof(resultIndices))
+    ##eprintf("DEBUG typeof(resultIndices): %s\n", typeof(resultIndices))
     resultIndices
 }
 listOfChunkIndices <- lapply(seq_len(numIterations), createSampleIndices)
