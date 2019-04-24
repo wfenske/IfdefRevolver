@@ -10,7 +10,16 @@ RESULTS_DIR  = $(PROJECT)/results
 LOG_DIR      = $(PROJECT)/logs
 
 GROUP_DIFFS_CSV  = $(RESULTS_DIR)/group_differences.csv
-GROUP_DIFFS_LOG  = $(LOG_DIR)/group_differences.log
+
+GROUP_DIFFS_CHANGED_CSV  = $(RESULTS_DIR)/group_differences_changed.csv
+GROUP_DIFFS_COMMITS_CSV  = $(RESULTS_DIR)/group_differences_commits.csv
+GROUP_DIFFS_LCH_CSV      = $(RESULTS_DIR)/group_differences_lch.csv
+
+GROUP_DIFFS_CHANGED_LOG  = $(LOG_DIR)/group_differences_changed.log
+GROUP_DIFFS_COMMITS_LOG  = $(LOG_DIR)/group_differences_commits.log
+GROUP_DIFFS_LCH_LOG      = $(LOG_DIR)/group_differences_lch.log
+
+GROUP_DIFFS_CLIFFSD_FOLD_SIZE = 100000
 
 SPEARMAN_CSV     = $(RESULTS_DIR)/spearman.csv
 RDATA            = $(RESULTS_DIR)/joint_data.rds
@@ -82,10 +91,30 @@ locplots: $(LOC_PLOTS)
 
 regressionmodels: $(REGRESSIONMODELS)
 
-$(GROUP_DIFFS_CSV): $(RDATA) $(GROUP_DIFFS_PROG)
-	if ! $(GROUP_DIFFS_PROG) -p $(PROJECT) 2>&1 > $(GROUP_DIFFS_CSV)|tee $(GROUP_DIFFS_LOG) >&2; \
+$(GROUP_DIFFS_CSV): $(GROUP_DIFFS_CHANGED_CSV) $(GROUP_DIFFS_COMMITS_CSV) $(GROUP_DIFFS_LCH_CSV)
+	csvstack -d, -q '"' $^ > $@
+
+$(GROUP_DIFFS_CHANGED_CSV): $(RDATA) $(GROUP_DIFFS_PROG)
+	rm -f $@; \
+	if ! $(GROUP_DIFFS_PROG) -p $(PROJECT) -d CHANGED 2>&1 > $@|tee $(GROUP_DIFFS_CHANGED_LOG) >&2; \
 	then \
-		rm -f $(GROUP_DIFFS_CSV); \
+		rm -f $@; \
+		false; \
+	fi
+
+$(GROUP_DIFFS_COMMITS_CSV): $(RDATA) $(GROUP_DIFFS_PROG)
+	rm -f $@; \
+	if ! $(GROUP_DIFFS_PROG) -p $(PROJECT) -d COMMITS -f $(GROUP_DIFFS_CLIFFSD_FOLD_SIZE) 2>&1 > $@|tee $(GROUP_DIFFS_COMMITS_LOG) >&2; \
+	then \
+		rm -f $@; \
+		false; \
+	fi
+
+$(GROUP_DIFFS_LCH_CSV): $(RDATA) $(GROUP_DIFFS_PROG)
+	rm -f $@; \
+	if ! $(GROUP_DIFFS_PROG) -p $(PROJECT) -d LCH -f $(GROUP_DIFFS_CLIFFSD_FOLD_SIZE) 2>&1 > $@|tee $(GROUP_DIFFS_LCH_LOG) >&2; \
+	then \
+		rm -f $@; \
 		false; \
 	fi
 
