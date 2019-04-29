@@ -9,6 +9,8 @@ NAME ?= $(PROJECT)
 RESULTS_DIR  = $(PROJECT)/results
 LOG_DIR      = $(PROJECT)/logs
 
+RDATA            = $(RESULTS_DIR)/joint_data.rds
+
 GROUP_DIFFS_CSV  = $(RESULTS_DIR)/group_differences.csv
 
 GROUP_DIFFS_CHANGED_CSV  = $(RESULTS_DIR)/group_differences_changed.csv
@@ -22,7 +24,7 @@ GROUP_DIFFS_LCH_LOG      = $(LOG_DIR)/group_differences_lch.log
 GROUP_DIFFS_CLIFFSD_FOLD_SIZE = 100000
 
 SPEARMAN_CSV     = $(RESULTS_DIR)/spearman.csv
-RDATA            = $(RESULTS_DIR)/joint_data.rds
+SPEARMAN_LOG     = $(LOG_DIR)/spearman.log
 
 IFDEFREVOLVER_HOME ?= $(HOME)/src/skunk/IfdefRevolver/src/main/scripts
 
@@ -119,7 +121,7 @@ $(GROUP_DIFFS_LCH_CSV): $(RDATA) $(GROUP_DIFFS_PROG)
 	fi
 
 $(SPEARMAN_CSV): $(RDATA) $(SPEARMAN_PROG)
-	if !  $(SPEARMAN_PROG) -p $(PROJECT) > $(SPEARMAN_CSV); \
+	if !  $(SPEARMAN_PROG) -p $(PROJECT) 2>&1 > $(SPEARMAN_CSV)|tee $(SPEARMAN_LOG) >&2; \
 	then \
 		rm -f $(SPEARMAN_CSV); \
 		false; \

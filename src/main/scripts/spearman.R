@@ -17,12 +17,16 @@
 
 library(optparse)
 
-printf  <- function(...) cat(sprintf(...), sep='', file=stdout())
-eprintf <- function(...) cat(sprintf(...), sep='', file=stderr())
+cmdArgs <- commandArgs(trailingOnly = FALSE)
+file.arg.name <- "--file="
+script.fullname <- sub(file.arg.name, "",
+                       cmdArgs[grep(file.arg.name, cmdArgs)])
+script.dir <- dirname(script.fullname)
+source(file.path(script.dir, "regression-common.R"))
 
 options <- list(
     make_option(c("-p", "--project")
-              , help="Name of the project whose data to load.  We expect the input R data to reside in `results/<projec-name>/allData.rdata' below the current working directory."
+              , help="Name of the project whose data to load.  We expect the input R data to reside in `results/<projec-name>/joint_data.rds' below the current working directory."
               , default = NULL
                 )
   , make_option(c("-H", "--no-header")
@@ -65,29 +69,6 @@ if (!is.null(opts$projectName)) {
     stop("Need to specify a system name, either explicitly via `-s'/`--system-name' or implicitly `-p'/`--project'.")
 }
 
-readData <- function(commandLineArgs) {
-    fns <- commandLineArgs$args
-    if ( length(fns) == 1 ) {
-        dataFn <- fns[1]
-    } else if ( length(fns) > 1 ) {
-        stop("Too many command line arguments.")
-    } else {
-        opts <- commandLineArgs$options
-        if ( is.null(opts$project) ) {
-            stop("Missing input files.  Either specify explicit input files or specify the name of the project the `--project' option (`-p' for short).")
-        }
-        dataFn <-  file.path("results", opts$project, "allData.rdata")
-    }
-    if (opts$debug) {
-        eprintf("DEBUG: Reading data from %s\n", dataFn)
-    }
-    result <- readRDS(dataFn)
-    if (opts$debug) {
-        eprintf("DEBUG: Sucessfully read data.")
-    }
-    return (result)
-}
-
 ## * .00-.19 ``very weak''
 ## * .20-.39 ``weak''
 ## * .40-.59 ``moderate''
@@ -103,12 +84,12 @@ effectSizeClass <- function(rho) {
 }
 
 printHeader <- function() {
-    dummy <- printf('System,I,D,rho,p,Magnitude\n')
+    dummy <- printf('System,Balanced,D,I,rho,p,Magnitude\n')
 }
 
-printRhoRow <- function(data, indep, dep, systemName) {
-    x <- eval(parse(text=paste("data", indep, sep="$")))
-    y <- eval(parse(text=paste("data", dep, sep="$")))
+printRhoRow <- function(data, indep, dep, systemName, balanced) {
+    x <- data[,indep]
+    y <- data[,dep]
     if (opts$warnings) {
         r <- cor.test(x, y, method="spearman")
     } else {
@@ -117,25 +98,37 @@ printRhoRow <- function(data, indep, dep, systemName) {
     rho <- r$estimate
     p <- r$p.value
     magnitude <- effectSizeClass(rho)
-    dummy <- printf("%s,%s,%s,%.2f,%g,%s\n",
-                    systemName, indep, dep, rho, p, magnitude)
+    cbalanced <- ifelse(balanced, "T", "F")
+    dummy <- printf("%s,%s,%9s,%9s,% 7.4f,%12g,%s\n",
+                    systemName, cbalanced, dep, indep, rho, p, magnitude)
 }
 
 allData <- readData(args)
+corrData <- removeNaFunctions(allData)
 
 if (! opts$no_header ) {
     dummy <- printHeader()
 }
 
-dummy <- printRhoRow(allData, 'FC',        'LOC', systemName)
-dummy <- printRhoRow(allData, 'FL',        'LOC', systemName)
-dummy <- printRhoRow(allData, 'ND',        'LOC', systemName)
-dummy <- printRhoRow(allData, 'NEG',       'LOC', systemName)
-dummy <- printRhoRow(allData, 'LOAC',      'LOC', systemName)
-dummy <- printRhoRow(allData, 'LOFC',      'LOC', systemName)
-dummy <- printRhoRow(allData, 'LOACratio', 'LOC', systemName)
-dummy <- printRhoRow(allData, 'LOFCratio', 'LOC', systemName)
-dummy <- printRhoRow(allData, 'LOAC',      'LOACratio', systemName)
-dummy <- printRhoRow(allData, 'LOFC',      'LOFCratio', systemName)
-dummy <- printRhoRow(allData, 'LOAC',      'LOFC',      systemName)
-dummy <- printRhoRow(allData, 'LOACratio', 'LOFCratio', systemName)
+for (balanced in c(FALSE, TRUE)) {
+    if (balanced) {
+        data <- balanceAnnotatedAndUnannotatedFunctions(corrData)
+    } else {
+        data <- corrData
+    }
+    for (dep in c('LOC', 'COMMITS', 'LCH')) {
+        dummy <- printRhoRow(data, 'FC',        dep, systemName, balanced)
+        dummy <- printRhoRow(data, 'FL',        dep, systemName, balanced)
+        dummy <- printRhoRow(data, 'CND',       dep, systemName, balanced)
+        dummy <- printRhoRow(data, 'NEG',       dep, systemName, balanced)
+        dummy <- printRhoRow(data, 'LOAC',      dep, systemName, balanced)
+        dummy <- printRhoRow(data, 'LOACratio', dep, systemName, balanced)
+        ## Control variables
+        if (dep != 'LOC') {
+            dummy <- printRhoRow(data, 'LOC',   dep, systemName, balanced)
+        }
+        dummy <- printRhoRow(data, 'AGE',       dep, systemName, balanced)
+        dummy <- printRhoRow(data, 'MRC',       dep, systemName, balanced)
+        dummy <- printRhoRow(data, 'PC',        dep, systemName, balanced)
+    }
+}
