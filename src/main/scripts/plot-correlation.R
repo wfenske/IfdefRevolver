@@ -3,7 +3,12 @@
 library(optparse)
 library(ggplot2)
 
-eprintf <- function(...) cat(sprintf(...), sep='', file=stderr())
+cmdArgs <- commandArgs(trailingOnly = FALSE)
+file.arg.name <- "--file="
+script.fullname <- sub(file.arg.name, "",
+                       cmdArgs[grep(file.arg.name, cmdArgs)])
+script.dir <- dirname(script.fullname)
+source(file.path(script.dir, "regression-common.R"))
 
 options <- list(
     make_option(c("-o", "--output")
@@ -11,7 +16,7 @@ options <- list(
               , default = NULL
                 )
   , make_option(c("-p", "--project")
-              , help="Name of the project whose data to load.  We expect the input R data to reside in `results/<projec-name>/allData.rdata' below the current working directory."
+              , help="Name of the project whose data to load.  We expect the input R data to reside in `<projec-name>/results/joint_data.rds' below the current working directory."
               , default = NULL
                 )
   , make_option(c("-i", "--independent")
@@ -78,22 +83,6 @@ args <- parse_args(OptionParser(
   , positional_arguments = c(0, 1))
 
 opts <- args$options
-
-readData <- function(commandLineArgs) {
-    opts <- commandLineArgs$options
-    if ( is.null(opts$project) ) {
-        stop("Specify the name of the project the `--project' option (`-p' for short).")
-    }
-    dataFn <-  file.path("results", opts$project, "allData.rdata")
-    if (opts$debug) {
-        write(sprintf(dataFn, fmt="DEBUG: Reading data from %s"), stderr())
-    }
-    result <- readRDS(dataFn)
-    if (opts$debug) {
-        write("DEBUG: Sucessfully read data.", stderr())
-    }
-    return (result)
-}
 
 if ( is.null(opts$systemname) ) {
     systemname <- opts$project

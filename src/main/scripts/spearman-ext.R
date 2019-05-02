@@ -17,12 +17,16 @@
 
 library(optparse)
 
-printf  <- function(...) cat(sprintf(...), sep='', file=stdout())
-eprintf <- function(...) cat(sprintf(...), sep='', file=stderr())
+cmdArgs <- commandArgs(trailingOnly = FALSE)
+file.arg.name <- "--file="
+script.fullname <- sub(file.arg.name, "",
+                       cmdArgs[grep(file.arg.name, cmdArgs)])
+script.dir <- dirname(script.fullname)
+source(file.path(script.dir, "regression-common.R"))
 
 options <- list(
     make_option(c("-p", "--project")
-              , help="Name of the project whose data to load.  We expect the input R data to reside in `results/<projec-name>/allData.rdata' below the current working directory."
+              , help="Name of the project whose data to load.  We expect the input R data to reside in `<projec-name>/results/allData.rdata' below the current working directory."
               , default = NULL
                 )
   , make_option(c("-H", "--no-header")
@@ -65,29 +69,6 @@ if (!is.null(opts$projectName)) {
     stop("Need to specify a system name, either explicitly via `-s'/`--system-name' or implicitly `-p'/`--project'.")
 }
 
-readData <- function(commandLineArgs) {
-    fns <- commandLineArgs$args
-    if ( length(fns) == 1 ) {
-        dataFn <- fns[1]
-    } else if ( length(fns) > 1 ) {
-        stop("Too many command line arguments.")
-    } else {
-        opts <- commandLineArgs$options
-        if ( is.null(opts$project) ) {
-            stop("Missing input files.  Either specify explicit input files or specify the name of the project the `--project' option (`-p' for short).")
-        }
-        dataFn <-  file.path("results", opts$project, "allData.rdata")
-    }
-    if (opts$debug) {
-        eprintf("DEBUG: Reading data from %s\n", dataFn)
-    }
-    result <- readRDS(dataFn)
-    if (opts$debug) {
-        eprintf("DEBUG: Sucessfully read data.")
-    }
-    return (result)
-}
-
 printHeader <- function() {
     dummy <- printf('System,ChangedOnly,AnnotatedOnly,Independent')
     for (dep in deps) {
@@ -115,19 +96,6 @@ printRhoRow <- function(data, indep, systemName, changedOnly, annotatedOnly) {
 
 allData <- readData(args)
 
-allData$log2LOC <- log2(allData$LOC)
-allData$log2log2LOC <- log2(allData$log2LOC)
-allData$sqrtLOC <- sqrt(allData$LOC)
-
-allData$COMMITSlog2Ratio <- allData$COMMITS / allData$log2LOC
-allData$COMMITSsqrtRatio <- allData$COMMITS / allData$sqrtLOC
-
-allData$LCHlog2Ratio <- allData$LCH / allData$log2LOC
-allData$LCHlog2log2Ratio <- allData$LCH / allData$log2log2LOC
-allData$LCHsqrtRatio <- allData$LCH / allData$sqrtLOC
-
-allData$CND <- allData$NONEST
-
 allData[is.na(allData)] <- 0.0
 
 ##indeps <- c("FL", "FC", "CND", "NEG", "LOAC", "LOC")
@@ -138,15 +106,15 @@ indeps <- c("CND", "FC", "FL", "LOAC", "LOC", "NEG") # alphabetical order
 ## stays the same whether log-transform or not.
 
 deps <- c("COMMITS", "LCH"
-        , "COMMITSratio", "LCHratio"
-        , "COMMITSlog2Ratio", "LCHlog2Ratio"
-        , "COMMITSsqrtRatio", "LCHsqrtRatio"
+        ##, "COMMITSratio", "LCHratio"
+        ##, "COMMITSlog2Ratio", "LCHlog2Ratio"
+        ##, "COMMITSsqrtRatio", "LCHsqrtRatio"
           )
 
-for (indep in indeps) {
-    eprintf("WARN: rounding independent variable values of `%s'!\n", indep)
-    allData[,indep] <- round(allData[,indep])
-}
+##for (indep in indeps) {
+##    eprintf("WARN: rounding independent variable values of `%s'!\n", indep)
+##    allData[,indep] <- round(allData[,indep])
+##}
 
 if (! opts$no_header ) {
     dummy <- printHeader()

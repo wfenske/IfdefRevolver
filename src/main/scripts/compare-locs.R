@@ -1,16 +1,17 @@
 #!/usr/bin/env Rscript
 
-### Performs linear regression the totals over all snapshots of a system
-###
-### Input files are the snapshot files under Correlated/
-
-## Example by Fisher:
-
 library(optparse)
+
+cmdArgs <- commandArgs(trailingOnly = FALSE)
+file.arg.name <- "--file="
+script.fullname <- sub(file.arg.name, "",
+                       cmdArgs[grep(file.arg.name, cmdArgs)])
+script.dir <- dirname(script.fullname)
+source(file.path(script.dir, "regression-common.R"))
 
 options <- list(
     make_option(c("-p", "--project")
-              , help="Name of the project whose data to load.  We expect the input R data to reside in `<projec-name>/results/allDataAge.rdata' below the current working directory."
+              , help="Name of the project whose data to load.  We expect the input R data to reside in `<projec-name>/results/joint_data.rds' below the current working directory."
               , default = NULL
                 )
     
@@ -20,7 +21,7 @@ options <- list(
                 )
     
   , make_option(c("-d", "--divisions")
-              , help="Number of divisions to make."
+              , help="Number of divisions to make. [default=%default]"
               , default = 3
                 )
   , make_option(c("-o", "--output")
@@ -57,53 +58,56 @@ args <- parse_args(OptionParser(
   , positional_arguments = c(0, 1))
 opts <- args$options
 
-readData <- function(commandLineArgs) {
-    fns <- commandLineArgs$args
-    if ( length(fns) == 1 ) {
-        dataFn <- fns[1]
-    } else {
-        opts <- commandLineArgs$options
-        if ( is.null(opts$project) ) {
-            stop("Missing input files.  Either specify explicit input files or specify the name of the project the `--project' option (`-p' for short).")
-        }
-        dataFn <-  file.path(opts$project, "results", "allDataAge.rdata")
+getPrettySystemName <-function() {
+    if (is.null(opts$name)) {
+        stop("Missing pretty name.  Specify via `--name' (`-n').")
     }
-    write(paste("DEBUG: Reading data from ", dataFn, sep=""), stderr())
-    result <- readRDS(dataFn)
-    write("DEBUG: Sucessfully read data.", stderr())
-    return (result)
-}
-
-if (is.null(opts$name)) {
-    stop("Missing pretty name.  Specify via `--name' (`-n').")
 }
 
 allData <- readData(args)
-allData$CND <- allData$ND
 
-threshold <- opts$divisions - 1
-aboveThreshold <- paste((threshold), "+", sep="")
-labels <- c("0", "1", "2", "3", "4", "5", "6", "7", "8", "9", "10", "11", "12", "13")
+if (opts$independent == 'LOACratio') {
+    stepWidthPercent <- 10.0
+    threshold <- (opts$divisions - 1) * (stepWidthPercent / 100.0)
+    aboveThresholdLabel <- sprintf("%d%%+", as.integer(round(threshold * 100)))
 
-valGroup <- function(v) {
-    if (v < threshold) {
-        return (labels[[ v + 1]]);
-    } else {
-        return (aboveThreshold);
+    findUpperBound <- function(v, bound) {
+        ifelse(v < (bound * stepWidthPercent), bound, findUpperBound(v, bound+1))
+    }
+    
+    valGroup <- function(v) {
+        upper <- findUpperBound(v * 100, 1)
+        lower <- upper -1
+        upperPercent <- as.integer(round(upper*stepWidthPercent))
+        lowerPercent <- as.integer(round(lower*stepWidthPercent))
+        
+        ifelse(v < threshold
+             , sprintf("%d...%d%%"
+                     , lowerPercent
+                     , upperPercent)
+             , aboveThresholdLabel)
+    }
+} else {
+    threshold <- opts$divisions - 1
+    aboveThresholdLabel <- paste((threshold), "+", sep="")
+    valGroup <- function(v) {
+        ifelse(v < threshold, sprintf("%d", v), aboveThresholdLabel)
     }
 }
 
-allData$grouped <- mapply(valGroup, eval(parse(text=paste("allData", opts$independent, sep="$"))))
+##allData$grouped <- mapply(valGroup, eval(parse(text=paste("allData", opts$independent, sep="$"))))
+allData$grouped <- valGroup(allData[,opts$independent])
 
 if (is.null(opts$output)) {
-    outputFn <- paste("LOC_", opts$name, ".pdf", sep="")
+    outputFn <- paste("LOC_", getPrettySystemName(), ".pdf", sep="")
 } else {
     outputFn <- opts$output
 }
 
 ### Begin plot creation
 
-pdf(file=outputFn,width=7.5,height=3.6)
+##pdf(file=outputFn,width=7.5,height=3.6)
+cairo_pdf(file=outputFn,width=10,height=5)
 
 ##x <- allData$FLgrouped
 ##y <- allData$LOC
@@ -117,7 +121,12 @@ pdf(file=outputFn,width=7.5,height=3.6)
 ##} else {
 ##    stop(paste("Invalid independent variable name: ", opts$independent))
 ##}
-yLab <- opts$independent
+
+if (opts$independent == "LOACratio") {
+    yLab <- "loac/loc"
+} else {
+    yLab <- tolower(opts$independent)
+}
 
 if (is.null(opts$ymax)) {
     yLims <- c()
@@ -126,7 +135,7 @@ if (is.null(opts$ymax)) {
 }
 
 # Decrease `horizontalScale' to move boxes in boxplot closer together
-horizontalScale <- 0.75
+horizontalScale <- 0.9
 xAxisPositions <- seq(1,by=horizontalScale,length.out=opts$divisions)
 ##xLims <- c(xAxisPositions[1]-0.5,xAxisPositions[opts$divisions] + 0.3 * horizontalScale)
 
@@ -134,13 +143,13 @@ if (opts$noXLabels) {
     xLab <- ""
     xAxt <- "n"
 } else {
-    xLab <- "LOC"
+    xLab <- "loc"
     xAxt <- NULL # default value
 }
 
 colors <- topo.colors(opts$divisions)
 
-txtScale <- 1.2
+txtScale <- 1.1
 
 bp <- invisible(boxplot(LOC ~ grouped
             , data=allData
@@ -153,7 +162,7 @@ bp <- invisible(boxplot(LOC ~ grouped
             , xlab=xLab
             #, yaxt=yAxt
             , ylab=yLab
-            , main=(if (opts$noTitle) NULL else opts$name)
+            , main=(if (opts$noTitle) NULL else getPrettySystemName())
             , outline=FALSE
             , varwidth=T
             , at=xAxisPositions
@@ -172,7 +181,7 @@ bp <- invisible(boxplot(LOC ~ grouped
 ##      )
 
 legend("bottomright", ##inset=.02
-     , title="Number of functions"
+     , title="Number of functions per box"
      , c(paste("", bp$n, sep = ""))
      , fill=colors, horiz=TRUE, cex=txtScale)
 
