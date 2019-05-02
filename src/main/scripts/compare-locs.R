@@ -149,12 +149,12 @@ if (opts$noXLabels) {
 
 colors <- topo.colors(opts$divisions)
 
-txtScale <- 1.1
+txtScale <- 1.0
 
 bp <- invisible(boxplot(LOC ~ grouped
             , data=allData
             , cex=txtScale
-            , cex.lab=txtScale
+            , cex.lab=1.2*txtScale
             , cex.axis=txtScale # size of value labels on x & y axis
             #, cex.main=1
             #, cex.sub=1
