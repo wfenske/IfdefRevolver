@@ -37,7 +37,7 @@ NBREG_PROG        = $(IFDEFREVOLVER_HOME)/nb.R
 LOGITREG_PROG     = $(IFDEFREVOLVER_HOME)/logit.R
 RDS_FROM_CSV_PROG = $(IFDEFREVOLVER_HOME)/rds-from-csv.R
 
-COMPARE_LOC_OPTS ?= --no-title --ymax=350
+COMPARE_LOC_OPTS ?= --no-title --ymax=400
 RDS_FROM_CSV_OPTS ?=
 
 INPUT_CSV = $(RESULTS_DIR)/joint_data.csv
