@@ -66,7 +66,9 @@ getPrettySystemName <-function() {
 
 allData <- readData(args)
 
-if (opts$independent == 'LOACratio') {
+isLoacRatio <- opts$independent == "LOACratio"
+
+if (isLoacRatio) {
     stepWidthPercent <- 10.0
     threshold <- (opts$divisions - 1) * (stepWidthPercent / 100.0)
     aboveThresholdLabel <- sprintf("%d%%+", as.integer(round(threshold * 100)))
@@ -107,7 +109,7 @@ if (is.null(opts$output)) {
 ### Begin plot creation
 
 ##pdf(file=outputFn,width=7.5,height=3.6)
-cairo_pdf(file=outputFn,width=10,height=5)
+cairo_pdf(file=outputFn,width=8,height=3.6)
 
 ##x <- allData$FLgrouped
 ##y <- allData$LOC
@@ -122,8 +124,8 @@ cairo_pdf(file=outputFn,width=10,height=5)
 ##    stop(paste("Invalid independent variable name: ", opts$independent))
 ##}
 
-if (opts$independent == "LOACratio") {
-    yLab <- "loac/loc"
+if (isLoacRatio) {
+    yLab <- expression(frac(loac, loc)) ##"loac/loc"
 } else {
     yLab <- tolower(opts$independent)
 }
@@ -149,19 +151,34 @@ if (opts$noXLabels) {
 
 colors <- topo.colors(opts$divisions)
 
-txtScale <- 1.0
+txtScale <- 1.2
+
+## Format of margins is c(bottom, left, top, right)
+margins <- par()$mar
+margins[2] <- margins[2] + 4.5 ## increase left margin
+margins[3] <- margins[3] - 4 ## decrease top margin
+if (opts$noXLabels) {
+    margins[1] <- margins[1] - 5 ## decrease bottom margin
+} else {
+    margins[1] <- margins[1] - 1 ## decrease bottom margin
+}
+margins[4] <- margins[4] - 2 ## decrease right margin
+
+par(mar = margins)
+
+cex.lab <- 1.2*txtScale
 
 bp <- invisible(boxplot(LOC ~ grouped
             , data=allData
             , cex=txtScale
-            , cex.lab=1.2*txtScale
+            , cex.lab=cex.lab
             , cex.axis=txtScale # size of value labels on x & y axis
             #, cex.main=1
             #, cex.sub=1
             , xaxt=xAxt
             , xlab=xLab
             #, yaxt=yAxt
-            , ylab=yLab
+            #, ylab=
             , main=(if (opts$noTitle) NULL else getPrettySystemName())
             , outline=FALSE
             , varwidth=T
@@ -170,7 +187,11 @@ bp <- invisible(boxplot(LOC ~ grouped
             , ylim=yLims
             , horizontal = TRUE
             , col = colors
+            , las = 2
               ))
+
+title(ylab=yLab, line=ifelse(isLoacRatio, 5.5, 3), cex.lab=cex.lab)
+
 ##text(1:5,rep(min(y),5),paste("n=",tapply(y,x,length)) )
 
 ## Add number of observations per box plot.  Taken from
@@ -182,7 +203,8 @@ bp <- invisible(boxplot(LOC ~ grouped
 
 legend("bottomright", ##inset=.02
      , title="Number of functions per box"
-     , c(paste("", bp$n, sep = ""))
+       ##, c(paste("", bp$n, sep = ""))
+     , format(bp$n, big.mark=",")
      , fill=colors, horiz=TRUE, cex=txtScale)
 
 invisible(dev.off())

@@ -37,7 +37,7 @@ NBREG_PROG        = $(IFDEFREVOLVER_HOME)/nb.R
 LOGITREG_PROG     = $(IFDEFREVOLVER_HOME)/logit.R
 RDS_FROM_CSV_PROG = $(IFDEFREVOLVER_HOME)/rds-from-csv.R
 
-COMPARE_LOC_OPTS ?= --no-title ##--ymax 400
+COMPARE_LOC_OPTS ?= --no-title --ymax=350
 RDS_FROM_CSV_OPTS ?=
 
 INPUT_CSV = $(RESULTS_DIR)/joint_data.csv
@@ -49,7 +49,7 @@ RATIOS_PLOTS = \
 	$(addprefix ratios-plots/$(PROJECT)/ratios-,$(addsuffix -LCH.COUNT.pdf,$(INDEPS)))     \
 	$(addprefix ratios-plots/$(PROJECT)/ratios-,$(addsuffix -LCH.LOC.pdf,$(INDEPS)))
 
-LOC_PLOTS = $(addprefix $(RESULTS_DIR)/loc-plot-,$(addsuffix .pdf,$(INDEPS) LOACratio))
+LOC_PLOTS = $(addprefix $(RESULTS_DIR)/loc-plot-,$(addsuffix -x.pdf,$(INDEPS) LOACratio) $(addsuffix -nox.pdf,$(INDEPS) LOACratio))
 
 NBREG_REGULAR_CSV              = $(RESULTS_DIR)/nb-reg.csv
 NBREG_REGULAR_LOG              = $(LOG_DIR)/nb-reg.log
@@ -81,7 +81,7 @@ LOGITREG_STD_LOG               = $(LOG_DIR)/logit-reg-std.log
 REGRESSIONMODELS = $(NBREG_REGULAR_CSV) $(LOGITREG_REGULAR_CSV) $(NBREG_BALANCED_CSV) $(LOGITREG_BALANCED_CSV) $(NBREG_STD_CSV) $(LOGITREG_STD_CSV)
 ## $(NBREG_CHANGED_CSV) $(NBREG_ANNOTATED_CSV) $(NBREG_ANNOTATED_CHANGED_CSV) 
 
-all: group_diffs ratiosplots locplots spearman regressionmodels
+all: group_diffs locplots spearman regressionmodels  #ratiosplots
 
 group_diffs: $(GROUP_DIFFS_CSV)
 
@@ -240,23 +240,44 @@ ratios-plots/$(PROJECT)/ratios-NEG-LCH.LOC.pdf: $(RDATA) $(RATIOSCMP_PROG)
 	mkdir -p `dirname $@` 
 	$(RATIOSCMP_PROG) -p $(PROJECT) -n $(NAME) -i NEG -d LCH -s LOC -o $@
 
-## LOC plots
-$(RESULTS_DIR)/loc-plot-FC.pdf: $(RDATA) $(COMPARE_LOCS_PROG)
+## LOC plots without x-axis labels and ticks
+$(RESULTS_DIR)/loc-plot-FC-nox.pdf: $(RDATA) $(COMPARE_LOCS_PROG)
 	mkdir -p `dirname $@` 
-	 $(COMPARE_LOCS_PROG) -p $(PROJECT) -i FC        $(COMPARE_LOC_OPTS) -o $@
+	 $(COMPARE_LOCS_PROG) -p $(PROJECT) -i FC        -X $(COMPARE_LOC_OPTS) -o $@
 
-$(RESULTS_DIR)/loc-plot-FL.pdf: $(RDATA) $(COMPARE_LOCS_PROG)
+$(RESULTS_DIR)/loc-plot-FL-nox.pdf: $(RDATA) $(COMPARE_LOCS_PROG)
 	mkdir -p `dirname $@` 
-	 $(COMPARE_LOCS_PROG) -p $(PROJECT) -i FL        $(COMPARE_LOC_OPTS) -o $@
+	 $(COMPARE_LOCS_PROG) -p $(PROJECT) -i FL        -X $(COMPARE_LOC_OPTS) -o $@
 
-$(RESULTS_DIR)/loc-plot-CND.pdf: $(RDATA) $(COMPARE_LOCS_PROG)
+$(RESULTS_DIR)/loc-plot-CND-nox.pdf: $(RDATA) $(COMPARE_LOCS_PROG)
 	mkdir -p `dirname $@` 
-	 $(COMPARE_LOCS_PROG) -p $(PROJECT) -i CND       $(COMPARE_LOC_OPTS) -o $@
+	 $(COMPARE_LOCS_PROG) -p $(PROJECT) -i CND       -X $(COMPARE_LOC_OPTS) -o $@
 
-$(RESULTS_DIR)/loc-plot-NEG.pdf: $(RDATA) $(COMPARE_LOCS_PROG)
+$(RESULTS_DIR)/loc-plot-NEG-nox.pdf: $(RDATA) $(COMPARE_LOCS_PROG)
 	mkdir -p `dirname $@` 
-	 $(COMPARE_LOCS_PROG) -p $(PROJECT) -i NEG       $(COMPARE_LOC_OPTS) -o $@
+	 $(COMPARE_LOCS_PROG) -p $(PROJECT) -i NEG       -X $(COMPARE_LOC_OPTS) -o $@
 
-$(RESULTS_DIR)/loc-plot-LOACratio.pdf: $(RDATA) $(COMPARE_LOCS_PROG)
+$(RESULTS_DIR)/loc-plot-LOACratio-nox.pdf: $(RDATA) $(COMPARE_LOCS_PROG)
 	mkdir -p `dirname $@` 
-	 $(COMPARE_LOCS_PROG) -p $(PROJECT) -i LOACratio $(COMPARE_LOC_OPTS) -o $@
+	 $(COMPARE_LOCS_PROG) -p $(PROJECT) -i LOACratio -X $(COMPARE_LOC_OPTS) -o $@
+
+## LOC plots with x-axis labels and ticks
+$(RESULTS_DIR)/loc-plot-FC-x.pdf: $(RDATA) $(COMPARE_LOCS_PROG)
+	mkdir -p `dirname $@` 
+	 $(COMPARE_LOCS_PROG) -p $(PROJECT) -i FC           $(COMPARE_LOC_OPTS) -o $@
+
+$(RESULTS_DIR)/loc-plot-FL-x.pdf: $(RDATA) $(COMPARE_LOCS_PROG)
+	mkdir -p `dirname $@` 
+	 $(COMPARE_LOCS_PROG) -p $(PROJECT) -i FL           $(COMPARE_LOC_OPTS) -o $@
+
+$(RESULTS_DIR)/loc-plot-CND-x.pdf: $(RDATA) $(COMPARE_LOCS_PROG)
+	mkdir -p `dirname $@` 
+	 $(COMPARE_LOCS_PROG) -p $(PROJECT) -i CND          $(COMPARE_LOC_OPTS) -o $@
+
+$(RESULTS_DIR)/loc-plot-NEG-x.pdf: $(RDATA) $(COMPARE_LOCS_PROG)
+	mkdir -p `dirname $@` 
+	 $(COMPARE_LOCS_PROG) -p $(PROJECT) -i NEG          $(COMPARE_LOC_OPTS) -o $@
+
+$(RESULTS_DIR)/loc-plot-LOACratio-x.pdf: $(RDATA) $(COMPARE_LOCS_PROG)
+	mkdir -p `dirname $@` 
+	 $(COMPARE_LOCS_PROG) -p $(PROJECT) -i LOACratio    $(COMPARE_LOC_OPTS) -o $@
