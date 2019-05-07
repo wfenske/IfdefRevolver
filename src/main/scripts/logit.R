@@ -3,7 +3,7 @@
 ### Performs regression over all snapshots of a system
 
 library(optparse)
-##library(methods)
+library(parallel)
 suppressMessages(library(aod))
 
 cmdArgs <- commandArgs(trailingOnly = FALSE)
@@ -46,7 +46,7 @@ if ( ! is.null(opts$project) ) {
 
 allData <- readData(args)
 
-reportModel <- function(model, modelName, mcfadden, csvOut=TRUE, csvHeader=TRUE, warnings=0, warningMessages="") {
+reportModel <- function(model, modelName, mcfadden, csvOut=TRUE, warnings=0, warningMessages="") {
     modelSummary <- summary(model)
     ##print(summary(model))
     ##print(exp(cbind(OR = coef(model), suppressMessages(confint(model)))))
@@ -80,9 +80,6 @@ reportModel <- function(model, modelName, mcfadden, csvOut=TRUE, csvHeader=TRUE,
         }
         printf("\n")
     } else {
-        if (csvHeader) {
-            printf("SYSTEM,D,FORMULA,AIC,MCFADDEN,I,COEF,OR,Z,P,PCODE,WARNINGS,WARNING_MESSAGES\n")
-        }
         msCoefs <- modelSummary$coefficients
         ## Name of dependent variable
         terms <- modelSummary$terms
@@ -109,7 +106,7 @@ sysname, dName, iFormula
     
 }
 
-tryLogitModel <- function(indeps, dep, data, csvOut=FALSE, csvHeader=FALSE) {
+tryLogitModel <- function(indeps, dep, data, csvOut=FALSE) {
     indepsFormula <- paste(indeps, collapse=" + ") # without interactions
     ##indepsFormula <- paste(indeps, collapse=" * ") # with interactions
     ## This formula also considers 2-way interactions
@@ -153,10 +150,20 @@ tryLogitModel <- function(indeps, dep, data, csvOut=FALSE, csvHeader=FALSE) {
         warnMsg <- gsub("  *", " ", warnMsg)
         warnMsg <- gsub(" $", "", warnMsg)
     }
+
+    if (numWarnings == 0) {
+        sWithWarnings <- "without warnings"
+    } else {
+        if (numWarnings == 1) {
+            sWithWarnings <- "with 1 warning"
+        } else {
+            sWithWarnings <- sprintf("with %d warnings", numWarnings)
+        }
+    }
+    eprintf("INFO: *** Logistic regression %s completed %s ***\n",
+            formulaString, sWithWarnings)
     
-    reportModel(model, modelName, mcfadden, csvOut=csvOut,csvHeader=csvHeader, warnings=numWarnings, warningMessages=warnMsg)
-    
-    return (model)
+    return (function() reportModel(model, modelName, mcfadden, csvOut=csvOut, warnings=numWarnings, warningMessages=warnMsg))
 }
 
 ### Independent variables for taking smell presence into account
@@ -184,7 +191,7 @@ eprintf("Median COMMITS/LCHG of changed functions:\n%.2g,%.2g\n"
 
 ##cat("Median changed lines/LOC for all changed functions: ", medianLCHratio, "\n", sep="")
 
-allData$CHANGE_PRONE <- allData$COMMITS > 0
+allData$CHANGED <- allData$COMMITS > 0
 
 allData$CHURN_PRONE <- allData$LCHratio > medianLCHratio
 
@@ -229,37 +236,20 @@ if (opts$standardize) {
     modelData <- standardizeVariables(modelData)
 }
 
-haveHeader <- FALSE
-header <- function() {
-    if (haveHeader) {
-        return (FALSE)
-    } else {
-        haveHeader <<- TRUE
-        return (TRUE)
-    }
-}
+options(mc.cores = detectCores())
 
-logitCsvModel <- function(dep, indeps) {
-    model <- tryLogitModel(indeps=indeps, dep=dep, data=modelData,
-                           csvOut=TRUE, csvHeader=header())
-    return (model)
-}
+allModelClosures <- lapply(
+    c(0, 1)
+  , function(formulaCode) {
+      if (formulaCode == 0)
+          formula <- FORMULA_REDUCED
+      else
+          formula <- FORMULA_FULL
+       tryLogitModel(indeps=formula, dep="CHANGED", data=modelData,
+                     csvOut=TRUE)
+   })
 
-
-csvModel <- logitCsvModel
-
-for (dep in c("CHANGE_PRONE")) { 
-    ##dummy <- csvModel(dep, c("log2LOC"))
-    dummy <- csvModel(dep, FORMULA_REDUCED)
-    ##dummy <- csvModel(dep, c("FL", "FC", "CND", "NEG", "LOACratio"))
-    ##dummy <- csvModel(dep, c("FL", "FC", "CND", "NEG", "LOACratio", "log2LOC"))
-    dummy <- csvModel(dep, FORMULA_FULL)
-
-    ##dummy <- csvModel(dep, c(mrcVar, pcVar))
-    ##dummy <- csvModel(dep, c("log2LOC", mrcVar, pcVar))
-    ##dummy <- csvModel(dep, c("FL", "FC", "CND", "NEG", "LOACratio"))
-    ##dummy <- csvModel(dep, c("FL", "FC", "CND", "NEG", "LOACratio", "log2LOC"))
-    ##dummy <- csvModel(dep, c("FL", "FC", "CND", "NEG", "LOACratio", "log2LOC", mrcVar, pcVar))
-}
+printf("SYSTEM,D,FORMULA,AIC,MCFADDEN,I,COEF,OR,Z,P,PCODE,WARNINGS,WARNING_MESSAGES\n")
+dummy <- lapply(allModelClosures, function(closure) closure())
 
 eprintf("INFO: Successfully computed logistic regression models for `%s'.\n", sysname)
