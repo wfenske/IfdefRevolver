@@ -3,6 +3,7 @@
 ### Performs regression over all snapshots of a system
 
 library(optparse)
+library(parallel)
 suppressMessages(library(aod))
 suppressMessages(library(MASS)) # for glm.nb
 suppressMessages(library(pscl)) # for Zero-inflated Poisson models
@@ -58,7 +59,7 @@ allData <- readData(args)
 ##    return (testRes$result$chi2["P"])
 ##}
 
-calculateChiSqStat <- function(modelSummary) {
+calculateChiSqStat <- function(modelSummary, modelName) {
     chisqp <- TRUE
     if (is.null(modelSummary$deviance)) {
         eprintf("WARN: Cannot determine model fitness: modelSummary$deviance is missing.\n")
@@ -76,14 +77,14 @@ calculateChiSqStat <- function(modelSummary) {
         } else {
             judgement <- "does *not* fit the data"
         }
-        eprintf("INFO: Model %s: Chi-square-test statistic: %.3f (should be > %.3f).\n", judgement, chiSqStat, chiSqStatThreshold)
+        eprintf("INFO: Model %s %s: Chi-square-test statistic: %.3f (should be > %.3f).\n", modelName, judgement, chiSqStat, chiSqStatThreshold)
         return (chiSqStat)
     } else {
         return (NA)
     }
 }
 
-reportModel <- function(model, modelName, mcfadden, csvOut=TRUE, csvHeader=TRUE, warnings=0, warningMessages="") {
+reportModel <- function(model, modelName, mcfadden, csvOut=TRUE, warnings=0, warningMessages="") {
     modelSummary <- summary(model)
     ##print(summary(model))
     ##print(exp(cbind(OR = coef(model), suppressMessages(confint(model)))))
@@ -116,12 +117,9 @@ reportModel <- function(model, modelName, mcfadden, csvOut=TRUE, csvHeader=TRUE,
             printf("% 13s", significanceCode(p))
         }
         printf("\n")
-        dummy <- calculateChiSqStat(modelSummary)
+        dummy <- calculateChiSqStat(modelSummary, modelName)
     } else {
-        if (csvHeader) {
-            printf("SYSTEM,D,FORMULA,AIC,MCFADDEN,CHISQ,I,COEF,Z,P,PCODE,WARNINGS,WARNING_MESSAGES\n")
-        }
-        chisq <- calculateChiSqStat(modelSummary)
+        chisq <- calculateChiSqStat(modelSummary, modelName)
         msCoefs <- modelSummary$coefficients
         ## Name of dependent variable
         terms <- modelSummary$terms
@@ -210,7 +208,7 @@ reportModel <- function(model, modelName, mcfadden, csvOut=TRUE, csvHeader=TRUE,
 ##    return (model)
 ##}
 
-tryNbModel <- function(indeps, dep, data, csvOut=FALSE, csvHeader=FALSE) {
+tryNbModel <- function(indeps, dep, data, csvOut=FALSE) {
     indepsFormula <- paste(indeps, collapse=" + ")
     ## This formula also considers 2-way interactions
     ##formulaString <- sprintf("%s ~ (%s)^2 - 1 ", dep, indepsFormula)
@@ -225,7 +223,7 @@ tryNbModel <- function(indeps, dep, data, csvOut=FALSE, csvHeader=FALSE) {
     numWarnings <- 0
     warnMsg <- NULL
     wHandler <- function(w) {
-        eprintf("WARN: %s\n", w)
+        eprintf("WARN: %s: %s\n", formulaString, w)
         numWarnings <<- numWarnings + 1
         if (is.null(warnMsg)) {
             warnMsg <<- w
@@ -243,35 +241,6 @@ tryNbModel <- function(indeps, dep, data, csvOut=FALSE, csvHeader=FALSE) {
 
     mcfadden <- mcfaddensPseudoRSquared(model, nullModel)
     
-##    if (csvOut) {
-##        if (csvHeader) {
-##            printf("SYSTEM,AIC,MCFADDEN,DEPENDENT,TERM_COUNT,TERMS\n")
-##        }
-##        coefficients <- model$coefficients
-##        ## Names, such as '(Intercept)', 'FL', etc.
-##        ##coefficientNames <- labels(coefficients)
-##        ## Coefficient values can be accessed via `coefficients[i]',
-##        ## with coefficients[1] being the intercept. `i' can be either
-##        ## an 1-based index or a names, such as '(Intercept)' or 'FL'.
-##
-##        ## p-Values for each coefficient. The first one is the
-##        ## intercept. The values can be accessed via `pValues[i]',
-##        ## where `i' is either a 1-based index or a name, such as
-##        ## '(Intercept)' or 'FL'.
-##        pValues <- summary(model)$coefficients[,"Pr(>|z|)"]
-##
-##        ## Other interesting attributes of nb-models:
-##        ## > model$converged
-##        ## [1] TRUE
-##        ## > model$th.warn
-##        ## [1] "Grenze der Alternierungen erreicht"
-##        
-##        printf("%7s,%7.0f,%.4f,%s,%d,%s\n", sysname, model$aic, mcfadden, dep, length(indeps), indepsFormula)
-##        ## NOTE: Smaller values of AIC are better.  (Cf. https://ncss-wpengine.netdna-ssl.com/wp-content/themes/ncss/pdf/Procedures/NCSS/Negative_Binomial_Regression.pdf)
-##    } else {
-##        ##print(summary(model))
-    ##    }
-
     if (is.null(warnMsg)) {
         warnMsg <- ""
     } else {
@@ -279,13 +248,25 @@ tryNbModel <- function(indeps, dep, data, csvOut=FALSE, csvHeader=FALSE) {
         warnMsg <- gsub("  *", " ", warnMsg)
         warnMsg <- gsub(" $", "", warnMsg)
     }
+
+    if (numWarnings == 0) {
+        sWithWarnings <- "without warnings"
+    } else {
+        if (numWarnings == 1) {
+            sWithWarnings <- "with 1 warning"
+        } else {
+            sWithWarnings <- sprintf("with %d warnings", numWarnings)
+        }
+    }
+    eprintf("INFO: *** N-b regression %s completed %s ***\n",
+            formulaString, sWithWarnings)
     
-    reportModel(model, modelName, mcfadden, csvOut=csvOut,csvHeader=csvHeader, warnings=numWarnings, warningMessages=warnMsg)
+    return (function() reportModel(model, modelName, mcfadden, csvOut=csvOut, warnings=numWarnings, warningMessages=warnMsg))
     
     ##cat("\n")
     ##cat(paste("*** ANOVA of model '", modelName, "' ***\n", sep=""))
     ##print(anova(model, test ="Chisq"))
-    return (model)
+    ##return (model)
 }
 
 ##tryGlmModel2 <- function(family, indeps, dep, data) {
@@ -300,114 +281,97 @@ tryNbModel <- function(indeps, dep, data, csvOut=FALSE, csvHeader=FALSE) {
 ##    return (model)
 ##}
 
-tryZeroInflModel <- function(indeps, dep, data, csvOut=FALSE,csvHeader=FALSE) {
-    ## See for more information on how to interpret these models:
-    ##
-    ## http://datavoreconsulting.com/programming-tips/count-data-glms-choosing-poisson-negative-binomial-zero-inflated-poisson/
-
-    indepsStr <- paste(indeps, collapse=" + ")
-
-    ## Step 1: find out whether there are significantly more zeros
-    ## than expected for a Poisson distribution.
-    ##
-    ## Formula: y ~ x|1.
-    ##
-    ## Probably, the intercept of the zero model is significant if
-    ## there are mode zeros than expected for a Poisson distribution.
-    formulaString <- paste(dep, " ~ ", indepsStr, "|log2AGE + log2LAST_EDIT", sep="")
-    formula <- as.formula(formulaString)
-
-    ## Step 2: Fit a zero-inflated model to test a treatment effect
-    ## for both the counts and the zeros (with '~ x|x') and check
-    ## whether the probability of zero is significantly different
-    ## between the two.
-    ##
-    ## Formula: y ~ x|x
-    ##
-    ## I don't know how to find that out. :-(
-    ##formulaString2 <- paste(dep, " ~ ", indepsStr, "|", indepsStr, sep="")
-    ##formula2 <- as.formula(formulaString2)
-
-    ## Step 3: Test for overdispersion in the count part of the
-    ## zero-inflated model by specifying a negative binomial
-    ## distribution.
-    ##
-    ## Formula: y ~ x|1 ... dist="negbin"
-    ##
-    ## If the estimated theta parameter is **not** significant, the
-    ## zero-inflated Poisson model is appropriate.  Otherwise, the
-    ## negative binomial model is appropriate.
-    
-    ## A simple inflation model where all zero counts have the same
-    ## probability of belonging to the zero component can by specified
-    ## by the formula y ~ x1 + x2 | 1.
-
-##    if (FALSE) {
-##        modelName1 <- paste("zero-inflated:", formulaStringIntercept)
-##        cat("\n\n")
-##        cat("***************************\n")
-##        cat("*** "); cat(modelName1); cat(" ***\n")
-##        
-##        model.poisson1 <- zeroinfl(formula, data = data)
-##        print(summary(model.poisson1))
-##        
-##        modelName2 <- paste("zero-inflated:", formulaString2)
-##        cat("\n\n")
-##        cat("***************************\n")
-##        cat("*** "); cat(modelName2); cat(" ***\n")
-##        model.poisson2 <- zeroinfl(formula2, data = data)
-##        print(summary(model.poisson2))
-##    }
-    
-    ## If the estimated theta parameter is **not** significant, this
-    ## indicates that the zero-inflated Poisson model is more
-    ## appropriate than the neg-bin model.
-
-    modelNameNegbin <- paste("zero-inflated negative binomial:", formulaString)
-    eprintf("\n\n")
-    eprintf("***************************\n")
-    eprintf("*** %s ***\n", modelNameNegbin)
-    model.negbin <- zeroinfl(formula, data = data, dist = "negbin")
-    m <- model.negbin
-    mName <- modelNameNegbin
-    ##print(summary(model.negbinIntercept))
-    if (csvOut) {
-        if (csvHeader) {
-            printf("SYSTEM,AIC,DEPENDENT,TERM_COUNT,TERMS\n")
-        }
-
-        ## p-Values for each coefficient of the count model. The first
-        ## one is the intercept. The values can be accessed via
-        ## `pValues[i]', where `i' is either a 1-based index or a
-        ## name, such as '(Intercept)' or 'FL'.  The last pValue is
-        ## for Log(theta).
-        pValues <- summary(m)$coefficients$count[,"Pr(>|z|)"]
-
-        ## Other interesting attributes of nb-models:
-        ## > nb.model$converged
-        ## [1] TRUE
-        ## > nb.model$th.warn
-        ## [1] "Grenze der Alternierungen erreicht"
-        
-        printf("%7s,%7.0f,%s,%d,%s\n", sysname, AIC(logLik(m)), dep, length(indeps), indepsStr)
-        ## NOTE: Smaller values of AIC are better.  (Cf. https://ncss-wpengine.netdna-ssl.com/wp-content/themes/ncss/pdf/Procedures/NCSS/Negative_Binomial_Regression.pdf)
-    } else {
-        print(summary(m))
-        reportModel(m, mName, -1, csvOut=csvOut,csvHeader=csvHeader, warnings=0, warningMessages="")
-    }
-
-
-##    if (FALSE) {
-##    modelName2negbin <- paste("zero-inflated negative binomial:", formulaString2)
-##    cat("\n\n")
-##    cat("***************************\n")
-##    cat("*** "); cat(modelName2negbin); cat(" ***\n")
-##    model.negbin2 <- zeroinfl(formula2, data = data, dist = "negbin")
-##    print(summary(model.negbin2))
-##    }
-    
-    return (model.negbin)
-}
+## tryZeroInflModel <- function(indeps, dep, data, csvOut=FALSE) {
+##     ## See for more information on how to interpret these models:
+##     ##
+##     ## http://datavoreconsulting.com/programming-tips/count-data-glms-choosing-poisson-negative-binomial-zero-inflated-poisson/
+## 
+##     indepsStr <- paste(indeps, collapse=" + ")
+## 
+##     ## Step 1: find out whether there are significantly more zeros
+##     ## than expected for a Poisson distribution.
+##     ##
+##     ## Formula: y ~ x|1.
+##     ##
+##     ## Probably, the intercept of the zero model is significant if
+##     ## there are mode zeros than expected for a Poisson distribution.
+##     formulaString <- paste(dep, " ~ ", indepsStr, "|log2AGE + log2LAST_EDIT", sep="")
+##     formula <- as.formula(formulaString)
+## 
+##     ## Step 2: Fit a zero-inflated model to test a treatment effect
+##     ## for both the counts and the zeros (with '~ x|x') and check
+##     ## whether the probability of zero is significantly different
+##     ## between the two.
+##     ##
+##     ## Formula: y ~ x|x
+##     ##
+##     ## I don't know how to find that out. :-(
+##     ##formulaString2 <- paste(dep, " ~ ", indepsStr, "|", indepsStr, sep="")
+##     ##formula2 <- as.formula(formulaString2)
+## 
+##     ## Step 3: Test for overdispersion in the count part of the
+##     ## zero-inflated model by specifying a negative binomial
+##     ## distribution.
+##     ##
+##     ## Formula: y ~ x|1 ... dist="negbin"
+##     ##
+##     ## If the estimated theta parameter is **not** significant, the
+##     ## zero-inflated Poisson model is appropriate.  Otherwise, the
+##     ## negative binomial model is appropriate.
+##     
+##     ## A simple inflation model where all zero counts have the same
+##     ## probability of belonging to the zero component can by specified
+##     ## by the formula y ~ x1 + x2 | 1.
+## 
+##     ## If the estimated theta parameter is **not** significant, this
+##     ## indicates that the zero-inflated Poisson model is more
+##     ## appropriate than the neg-bin model.
+## 
+##     modelNameNegbin <- paste("zero-inflated negative binomial:", formulaString)
+##     eprintf("\n\n")
+##     eprintf("***************************\n")
+##     eprintf("*** %s ***\n", modelNameNegbin)
+##     model.negbin <- zeroinfl(formula, data = data, dist = "negbin")
+##     m <- model.negbin
+##     mName <- modelNameNegbin
+##     ##print(summary(model.negbinIntercept))
+##     if (csvOut) {
+##         if (csvHeader) {
+##             printf("SYSTEM,AIC,DEPENDENT,TERM_COUNT,TERMS\n")
+##         }
+## 
+##         ## p-Values for each coefficient of the count model. The first
+##         ## one is the intercept. The values can be accessed via
+##         ## `pValues[i]', where `i' is either a 1-based index or a
+##         ## name, such as '(Intercept)' or 'FL'.  The last pValue is
+##         ## for Log(theta).
+##         pValues <- summary(m)$coefficients$count[,"Pr(>|z|)"]
+## 
+##         ## Other interesting attributes of nb-models:
+##         ## > nb.model$converged
+##         ## [1] TRUE
+##         ## > nb.model$th.warn
+##         ## [1] "Grenze der Alternierungen erreicht"
+##         
+##         printf("%7s,%7.0f,%s,%d,%s\n", sysname, AIC(logLik(m)), dep, length(indeps), indepsStr)
+##         ## NOTE: Smaller values of AIC are better.  (Cf. https://ncss-wpengine.netdna-ssl.com/wp-content/themes/ncss/pdf/Procedures/NCSS/Negative_Binomial_Regression.pdf)
+##     } else {
+##         print(summary(m))
+##         reportModel(m, mName, -1, csvOut=csvOut, warnings=0, warningMessages="")
+##     }
+## 
+## 
+## ##    if (FALSE) {
+## ##    modelName2negbin <- paste("zero-inflated negative binomial:", formulaString2)
+## ##    cat("\n\n")
+## ##    cat("***************************\n")
+## ##    cat("*** "); cat(modelName2negbin); cat(" ***\n")
+## ##    model.negbin2 <- zeroinfl(formula2, data = data, dist = "negbin")
+## ##    print(summary(model.negbin2))
+## ##    }
+##     
+##     return (model.negbin)
+## }
 
 plotResiduals <- function(model) {
     ## Taken from https://www.r-bloggers.com/model-validation-interpreting-residual-plots/
@@ -603,41 +567,39 @@ header <- function() {
     }
 }
 
-negbinCsvModel <- function(dep, indeps) {
-    model <- tryNbModel(indeps=indeps, dep=dep, data=negBinData,
-                        csvOut=TRUE, csvHeader=header())
-    return (model)
-}
-
-zeroinflNegbinCsvModel <- function(dep, indeps) {
-    model <- tryZeroInflModel(indeps=indeps, dep=dep, data=ziData,
-                              csvOut=TRUE, csvHeader=header())
-    return (model)
-}
+##negbinCsvModel <- function(dep, indeps) {
+##    model <- tryNbModel(indeps=indeps, dep=dep, data=negBinData,
+##                        csvOut=TRUE, csvHeader=header())
+##    return (model)
+##}
+##
+##zeroinflNegbinCsvModel <- function(dep, indeps) {
+##    model <- tryZeroInflModel(indeps=indeps, dep=dep, data=ziData,
+##                              csvOut=TRUE, csvHeader=header())
+##    return (model)
+##}
 
 ##csvModel <- zeroinflNegbinCsvModel
-csvModel <- negbinCsvModel
+##csvModel <- negbinCsvModel
 
-for (dep in c("COMMITS"
-              ##, "HUNKS"
-            , "LCH"
-              )) { 
-    ## Note, 2019-02-05, wf: We use the log2-scaled variant of
-    ## PREVIOUS_COMMITS because in OpenVPN (maybe others, too) the
-    ## model does not converge if PREVIOUS_COMMITS is included as is.
-    ## Moreover, McFadden is better with the scaled variant compared
-    ## to the unscaled variant.
+options(mc.cores = detectCores())
 
-    ## Note, 2019-02-05, wf: If we do include AGE at all, then without
-    ## log2, i.e., unscaled.  Doing so gives better McFadden values
-    ## compared to including it in log2-scaled form.
+allModelClosures <- mclapply(
+    c(0,1,2,3),
+    function(code) {
+        if (code %% 2 == 0)
+            dep <- "COMMITS"
+        else
+            dep <- "LCH"
+        if (code %/% 2 == 0)
+            formula <- FORMULA_REDUCED
+        else
+            formula <- FORMULA_FULL
+        tryNbModel(indeps=formula, dep=dep, data=negBinData, csvOut=TRUE)
+})
 
-    ##dummy <- csvModel(dep, c("log2LOC"))
-    dummy <- csvModel(dep, FORMULA_REDUCED)
-    ##dummy <- csvModel(dep, c("FL", "FC", "CND", "NEG", "LOACratio"))
-    ##dummy <- csvModel(dep, c("FL", "FC", "CND", "NEG", "LOACratio", "log2LOC"))
-    dummy <- csvModel(dep, FORMULA_FULL)
-}
+printf("SYSTEM,D,FORMULA,AIC,MCFADDEN,CHISQ,I,COEF,Z,P,PCODE,WARNINGS,WARNING_MESSAGES\n")
+dummy <- lapply(allModelClosures, function(closure) closure())
 
 ##model.zip.COMMITS <- tryZeroInflModel(indeps=ziIndeps, dep="COMMITS", data=ziData)
 

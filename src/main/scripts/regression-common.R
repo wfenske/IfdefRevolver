@@ -66,6 +66,11 @@ readData <- function(commandLineArgs) {
     eprintf("DEBUG: Reading data from %s\n", dataFn)
     result <- readRDS(dataFn)
     eprintf("DEBUG: Sucessfully read data.\n")
+    sizePerSnapshotTable <- table(result$SNAPSHOT_DATE)
+    ## Total number of functions in the snapshot
+    result$TNF <- sizePerSnapshotTable[result$SNAPSHOT_DATE]
+    result$log2TNF <- log2(result$TNF + 1)
+    
     return (result)
 }
 
@@ -74,12 +79,17 @@ readData <- function(commandLineArgs) {
 AGE_VAR <- "log2AGE"
 MRC_VAR <- "log2MRC"
 PC_VAR  <- "log2PC"
+TNF_VAR <- "log2TNF" # total number of functions
 
-FORMULA_REDUCED <- c("log2LOC", AGE_VAR, MRC_VAR, PC_VAR)
-FORMULA_FULL    <- c("FL", "FC", "CND", "NEG", "LOACratio", "log2LOC"
+FORMULA_REDUCED <- c("log2LOC", AGE_VAR, MRC_VAR, PC_VAR
+                   , TNF_VAR
+                     )
+FORMULA_FULL    <- c("log2FL", "log2FC", "log2CND", "log2NEG", "LOACratio"
+                   , "log2LOC"
                    , AGE_VAR
                    , MRC_VAR
                    , PC_VAR
+                   , TNF_VAR
                      )
 
 standardizeVariables <- function(df) {
