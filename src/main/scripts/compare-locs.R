@@ -178,7 +178,6 @@ bp <- invisible(boxplot(LOC ~ grouped
             , xaxt=xAxt
             , xlab=xLab
             #, yaxt=yAxt
-            #, ylab=
             , main=(if (opts$noTitle) NULL else getPrettySystemName())
             , outline=FALSE
             , varwidth=T
@@ -187,10 +186,15 @@ bp <- invisible(boxplot(LOC ~ grouped
             , ylim=yLims
             , horizontal = TRUE
             , col = colors
-            , las = 2
+            , las = 1
               ))
 
-title(ylab=yLab, line=ifelse(isLoacRatio, 5.5, 3), cex.lab=cex.lab)
+yLabelScale <- 1.0
+if (isLoacRatio) {
+    yLabelScale <- 1.2
+}
+mtext(yLab, side=2, line=5.5, cex=yLabelScale * txtScale, las=1)
+title(line=ifelse(isLoacRatio, 5.5, 3), cex.lab=cex.lab)
 
 ##text(1:5,rep(min(y),5),paste("n=",tapply(y,x,length)) )
 
