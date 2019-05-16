@@ -157,11 +157,11 @@ txtScale <- 1.2
 margins <- par()$mar
 margins[2] <- margins[2] + 4.5 ## increase left margin
 margins[3] <- margins[3] - 4 ## decrease top margin
-if (opts$noXLabels) {
-    margins[1] <- margins[1] - 5 ## decrease bottom margin
-} else {
+##if (opts$noXLabels) {
+##    margins[1] <- margins[1] - 5 ## decrease bottom margin
+##} else {
     margins[1] <- margins[1] - 1 ## decrease bottom margin
-}
+##}
 margins[4] <- margins[4] - 2 ## decrease right margin
 
 par(mar = margins)
@@ -189,12 +189,14 @@ bp <- invisible(boxplot(LOC ~ grouped
             , las = 1
               ))
 
-yLabelScale <- 1.0
+ycex <- cex.lab
 if (isLoacRatio) {
-    yLabelScale <- 1.2
+    mtext(yLab, side=2, line=5.7, cex=ycex, las=1)
+} else {
+    mtext(yLab, side=2, line=2.5, cex=ycex, las=1)
 }
-mtext(yLab, side=2, line=5.5, cex=yLabelScale * txtScale, las=1)
-title(line=ifelse(isLoacRatio, 5.5, 3), cex.lab=cex.lab)
+
+##title(line=ifelse(isLoacRatio, 5.5, 3), cex.lab=cex.lab)
 
 ##text(1:5,rep(min(y),5),paste("n=",tapply(y,x,length)) )
 
