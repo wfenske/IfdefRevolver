@@ -125,7 +125,7 @@ cairo_pdf(file=outputFn,width=8,height=3.6)
 ##}
 
 if (isLoacRatio) {
-    yLab <- expression(frac(loac, loc)) ##"loac/loc"
+    yLab <- expression(frac(italic(loac), italic(loc))) ##"loac/loc"
 } else {
     yLab <- tolower(opts$independent)
 }
@@ -157,11 +157,11 @@ txtScale <- 1.2
 margins <- par()$mar
 margins[2] <- margins[2] + 4.5 ## increase left margin
 margins[3] <- margins[3] - 4 ## decrease top margin
-if (opts$noXLabels) {
-    margins[1] <- margins[1] - 5 ## decrease bottom margin
-} else {
+##if (opts$noXLabels) {
+##    margins[1] <- margins[1] - 5 ## decrease bottom margin
+##} else {
     margins[1] <- margins[1] - 1 ## decrease bottom margin
-}
+##}
 margins[4] <- margins[4] - 2 ## decrease right margin
 
 par(mar = margins)
@@ -176,7 +176,6 @@ bp <- invisible(boxplot(LOC ~ grouped
             #, cex.main=1
             #, cex.sub=1
             , xaxt=xAxt
-            , xlab=xLab
             #, yaxt=yAxt
             , main=(if (opts$noTitle) NULL else getPrettySystemName())
             , outline=FALSE
@@ -189,12 +188,25 @@ bp <- invisible(boxplot(LOC ~ grouped
             , las = 1
               ))
 
-yLabelScale <- 1.0
-if (isLoacRatio) {
-    yLabelScale <- 1.2
+ycex <- cex.lab
+
+if (is.null(xAxt)) {
+    mtext(xLab, side=1, line=2.7, cex=ycex
+        , font = 3 # 3=italics
+        , family = "serif")
 }
-mtext(yLab, side=2, line=5.5, cex=yLabelScale * txtScale, las=1)
-title(line=ifelse(isLoacRatio, 5.5, 3), cex.lab=cex.lab)
+
+if (isLoacRatio) {
+    mtext(yLab, side=2, line=5.7, cex=ycex, las=1
+        , font = 3 # 3=italics
+        , family = "serif")
+} else {
+    mtext(yLab, side=2, line=2.5, cex=ycex, las=1
+        , font = 3 # 3=italics
+        , family = "serif")
+}
+
+##title(line=ifelse(isLoacRatio, 5.5, 3), cex.lab=cex.lab)
 
 ##text(1:5,rep(min(y),5),paste("n=",tapply(y,x,length)) )
 
