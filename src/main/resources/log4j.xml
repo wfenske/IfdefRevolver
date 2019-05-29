@@ -75,7 +75,7 @@
     </logger>
 
     <logger name="de.ovgu.ifdefrevolver.commitanalysis.distances.AddChangeDistances">
-        <level value="debug"/>
+        <level value="info"/>
     </logger>
 
     <logger name="de.ovgu.ifdefrevolver.commitanalysis.branchtraversal">
@@ -83,7 +83,7 @@
     </logger>
 
     <logger name="de.ovgu.ifdefrevolver.commitanalysis.branchtraversal.GenealogyTracker">
-        <level value="debug"/>
+        <level value="info"/>
     </logger>
 
     <!--logger name="de.ovgu.ifdefrevolver.commitanalysis.branchtraversal.WriteSnapshotsToCsvFilesStrategy">

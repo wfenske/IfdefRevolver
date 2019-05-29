@@ -2,7 +2,6 @@ package de.ovgu.ifdefrevolver.commitanalysis;
 
 import de.ovgu.skunk.detection.data.Method;
 import de.ovgu.skunk.util.GroupingListMap;
-import org.apache.commons.text.similarity.LevenshteinDistance;
 import org.apache.log4j.Logger;
 
 import java.util.*;
@@ -24,6 +23,10 @@ public class AddDelMergingConsumer implements Consumer<FunctionChangeHunk> {
     private GroupingListMap<Method, FunctionChangeHunk> retainedMods = new GroupingListMap<>();
 
     private final Consumer<FunctionChangeHunk> parent;
+    private static final float MIN_SIMILARITY = 0.6f;
+
+    private static int similarityAllTests = 0;
+    private static int similarityAgree = 0;
 
     public AddDelMergingConsumer(Consumer<FunctionChangeHunk> parent) {
         this.parent = parent;
@@ -107,55 +110,57 @@ public class AddDelMergingConsumer implements Consumer<FunctionChangeHunk> {
         }
     }
 
-    private void mergeAndPublishFuzzyMatchingAddsAndDels() {
-        class FunctionDistance implements Comparable<FunctionDistance> {
-            final Method oldFunction;
-            final Method newFunction;
-            final float distance;
+    private static class FunctionSimilarity implements Comparable<FunctionSimilarity> {
+        final Method oldFunction;
+        final Method newFunction;
+        final float similarity;
 
-            public FunctionDistance(Method oldFunction, Method newFunction, float distance) {
-                this.oldFunction = oldFunction;
-                this.newFunction = newFunction;
-                this.distance = distance;
-            }
-
-            @Override
-            public int compareTo(FunctionDistance o) {
-                int r = (int) Math.signum(this.distance - o.distance);
-                if (r != 0) return r;
-                return Method.COMP_BY_FILE_AND_SIGNATURE.compare(this.oldFunction, this.newFunction);
-            }
-
-            @Override
-            public boolean equals(Object o) {
-                if (this == o) return true;
-                if (o == null || getClass() != o.getClass()) return false;
-                FunctionDistance that = (FunctionDistance) o;
-                return oldFunction.equals(that.oldFunction) &&
-                        newFunction.equals(that.newFunction);
-            }
-
-            @Override
-            public int hashCode() {
-                return Objects.hash(oldFunction, newFunction);
-            }
+        public FunctionSimilarity(Method oldFunction, Method newFunction, float similarity) {
+            this.oldFunction = oldFunction;
+            this.newFunction = newFunction;
+            this.similarity = similarity;
         }
 
+        @Override
+        public int compareTo(FunctionSimilarity o) {
+            int r = (int) Math.signum(this.similarity - o.similarity);
+            if (r != 0) return r;
+            return Method.COMP_BY_FILE_AND_SIGNATURE.compare(this.oldFunction, this.newFunction);
+        }
+
+        @Override
+        public boolean equals(Object o) {
+            if (this == o) return true;
+            if (o == null || getClass() != o.getClass()) return false;
+            FunctionSimilarity that = (FunctionSimilarity) o;
+            return oldFunction.equals(that.oldFunction) &&
+                    newFunction.equals(that.newFunction);
+        }
+
+        @Override
+        public int hashCode() {
+            return Objects.hash(oldFunction, newFunction);
+        }
+    }
+
+    private void mergeAndPublishFuzzyMatchingAddsAndDels() {
         List<Method> deletedFunctions = extractFunctions(delsByFunctionName);
         List<Method> addedFunctions = extractFunctions(addsByFunctionName);
 
-        SortedSet<FunctionDistance> allDistances = new TreeSet<>();
+        logSimilarities(deletedFunctions, addedFunctions);
+
+        SortedSet<FunctionSimilarity> allSimilarities = new TreeSet<>(Comparator.reverseOrder());
         for (Method oldFunction : deletedFunctions) {
             for (Method newFunction : addedFunctions) {
-                float dist = computeDissimilarity(oldFunction, newFunction);
-                if (Float.isFinite(dist)) {
-                    FunctionDistance d = new FunctionDistance(oldFunction, newFunction, dist);
-                    allDistances.add(d);
+                float similarity = FunctionSimilarityComputer.levenshteinSimilarity(oldFunction, newFunction);
+                if (similarity >= MIN_SIMILARITY) {
+                    FunctionSimilarity d = new FunctionSimilarity(oldFunction, newFunction, similarity);
+                    allSimilarities.add(d);
                 }
             }
         }
 
-        for (FunctionDistance d : allDistances) {
+        for (FunctionSimilarity d : allSimilarities) {
             final Method oldFunction = d.oldFunction;
             final Method newFunction = d.newFunction;
             final String oldFunctionName = oldFunction.functionName;
@@ -166,26 +171,109 @@ public class AddDelMergingConsumer implements Consumer<FunctionChangeHunk> {
 
             if ((dels != null) && (adds != null)) {
                 LOG.info("Merging deletion and addition into a rename: " + oldFunction + " -> " + newFunction +
-                        " edit distance=" + d.distance);
+                        " similarity=" + d.similarity);
 
                 mergeAndPublishHunks(dels, adds);
                 delsByFunctionName.remove(oldFunctionName);
                 addsByFunctionName.remove(newFunctionName);
             }
         }
+    }
 
-        if (LOG.isDebugEnabled()) {
-            Set<String> oldFunctionNamesSeen = new HashSet<>();
-            for (FunctionDistance d : allDistances) {
-                String oldFunctionName = d.oldFunction.functionName;
-                if (!delsByFunctionName.containsKey(oldFunctionName)) continue;
-                if (oldFunctionNamesSeen.contains(oldFunctionName)) continue;
-                oldFunctionNamesSeen.add(oldFunctionName);
-                LOG.debug("Not merging deletion with any add.  Best match would have been: "
-                        + d.oldFunction + " -> " + d.newFunction
-                        + " edit distance=" + d.distance);
+    private void logSimilarities(List<Method> deletedFunctions, List<Method> addedFunctions) {
+        if (!LOG.isDebugEnabled() || deletedFunctions.isEmpty() || addedFunctions.isEmpty()) {
+            return;
+        }
+
+        for (Method oldFunction : deletedFunctions) {
+            FunctionSimilarity highestLevenshteinSimilarity = addedFunctions.stream()
+                    .map(newFunction -> new FunctionSimilarity(oldFunction, newFunction, FunctionSimilarityComputer.levenshteinSimilarity(oldFunction, newFunction)))
+                    .max(Comparator.naturalOrder()).get();
+            FunctionSimilarity highestDiffSimilarity = addedFunctions.stream()
+                    .map(newFunction -> new FunctionSimilarity(oldFunction, newFunction, FunctionSimilarityComputer.getRatioOfCommonLines(oldFunction, newFunction)))
+                    .max(Comparator.naturalOrder()).get();
+            Method winnerLevenshtein = highestLevenshteinSimilarity.newFunction;
+            Method winnerDiff = highestDiffSimilarity.newFunction;
+
+            String oldName = oldFunction.functionName;
+
+            int agree = 0;
+            float THRESH = 0.4f;
+            if (winnerLevenshtein == winnerDiff) {
+                Method winner = winnerLevenshtein;
+                LOG.debug("Most similar function to " + oldName + " is " + winner.functionName +
+                        " Levenshtein similarity=" + highestLevenshteinSimilarity.similarity +
+                        " Diff similarity=" + highestDiffSimilarity.similarity +
+                        " Definitions:\n" + sideByBySide(oldFunction.getSourceCode(), winner.getSourceCode()));
+                agree = 1;
+            } else {
+                if ((highestLevenshteinSimilarity.similarity < THRESH) && (highestDiffSimilarity.similarity < THRESH)) {
+                    agree = 1;
+                }
+                StringBuilder msg = new StringBuilder();
+
+                if (highestLevenshteinSimilarity.similarity >= THRESH) {
+                    msg.append("Maybe similar: Most Levenshtein-similar function to " + oldName + " is " + winnerLevenshtein.functionName +
+                            " Similarity=" + highestLevenshteinSimilarity.similarity +
+                            " Definitions:\n" +
+                            sideByBySide(oldFunction.getSourceCode(), winnerLevenshtein.getSourceCode()));
+                }
+
+                if (highestDiffSimilarity.similarity >= THRESH) {
+                    if (msg.length() != 0) msg.append('\n');
+                    msg.append("Maybe similar: Most Diff-similar function to " + oldName + " is " + winnerDiff.functionName +
+                            " Similarity=" + highestDiffSimilarity.similarity +
+                            " Definitions:\n" +
+                            sideByBySide(oldFunction.getSourceCode(), winnerDiff.getSourceCode()));
+                }
+
+                LOG.debug(msg);
+            }
+
+            synchronized (AddDelMergingConsumer.class) {
+                AddDelMergingConsumer.similarityAllTests += 1;
+                AddDelMergingConsumer.similarityAgree += agree;
+                LOG.debug("Similarity agree: " + AddDelMergingConsumer.similarityAgree + "," + AddDelMergingConsumer.similarityAllTests + "," + Math.round(AddDelMergingConsumer.similarityAgree * 100f / AddDelMergingConsumer.similarityAllTests));
             }
         }
+    }
+
+    private static String shortenLongString(String s) {
+        final int MAX_LEN = 80;
+        int len = s.length();
+        if (len <= MAX_LEN) {
+            return s;
+        } else {
+            return s.substring(0, MAX_LEN - 4) + " ...";
+        }
+    }
+
+    private static String sideByBySide(String a, String b) {
+        String aLines[] = toLines(a);
+        String bLines[] = toLines(b);
+
+
+        int maxLineLen = 0;
+        for (int i = 0; i < aLines.length; i++) {
+            String l = shortenLongString(aLines[i]);
+            aLines[i] = l;
+            int len = l.length();
+            maxLineLen = Math.max(len, maxLineLen);
+        }
+
+        final int maxLines = Math.max(aLines.length, bLines.length);
+        StringBuilder out = new StringBuilder();
+        for (int i = 0; i < maxLines; i++) {
+            String aLine = (i < aLines.length) ? aLines[i] : "";
+            String bLine = (i < bLines.length) ? shortenLongString(bLines[i]) : "";
+            String sideBySide = String.format("%-" + maxLineLen + "s | %s\n", aLine, bLine);
+            out.append(sideBySide);
+        }
+        return out.toString();
+    }
+
+    private static String[] toLines(String txt) {
+        return txt.replace("\t", "        ").split("\\n");
     }
 
     private static List<Method> extractFunctions(Map<String, LinkedList<FunctionChangeHunk>> delsOrDelsByFunctionName) {
@@ -194,80 +282,6 @@ public class AddDelMergingConsumer implements Consumer<FunctionChangeHunk> {
                 .stream()
                 .filter(l -> !l.isEmpty())
                 .map(l -> l.getFirst().getFunction()).collect(Collectors.toList());
-    }
-
-//    private static int computeRenameDistance(FunctionChangeHunk del, FunctionChangeHunk add) {
-//        Method delFunction = del.getFunction();
-//        Method addFunction = add.getFunction();
-//
-//        return computeRenameDistance(delFunction, addFunction);
-//    }
-//
-//    private static int computeRenameDistance(Method delFunction, Method addFunction) {
-//        return computeRenameDistance(delFunction.functionName, addFunction.functionName);
-//    }
-
-    private static float computeDissimilarity(Method oldFunction, Method newFunction) {
-        String oldDef = oldFunction.getSourceCode();
-        String newDef = newFunction.getSourceCode();
-        int threshold = (int) Math.round(Math.min(oldDef.length(), newDef.length()) / 4.0);
-        threshold = Math.max(threshold, 1);
-        final boolean isLogDebug = LOG.isDebugEnabled();
-        // Returns distance if initialized without threshold; returns -1 if initialized with threshold in case that the edit distance is too large
-        LevenshteinDistance distMeasure = new LevenshteinDistance(threshold);
-        int dist = distMeasure.apply(oldDef, newDef);
-        if (dist >= 0) {
-            LOG.info("Functions could be similar enough for a rename: " + oldFunction.functionName + " -> " + newFunction.functionName +
-                    " threshold=" + threshold + " actual distance=" + dist);
-            if (isLogDebug) {
-                LOG.debug("Functions could be similar enough for a rename: " + oldFunction.functionName + " -> " + newFunction.functionName +
-                        " threshold=" + threshold + " actual distance=" + dist + ". Bodies:\n"
-                        + oldDef + "\n->\n" + newDef);
-            }
-            return ((float) dist / threshold);
-        } else {
-            LOG.info("Functions are too dissimilar for a rename: " + oldFunction.functionName + " -> " + newFunction.functionName +
-                    " threshold=" + threshold);
-            if (isLogDebug) {
-                distMeasure = new LevenshteinDistance();
-                dist = distMeasure.apply(oldDef, newDef);
-                LOG.debug("Functions are too dissimilar for a rename: " + oldFunction.functionName + " -> " + newFunction.functionName +
-                        " threshold=" + threshold + " actual distance=" + dist + ". Bodies:\n"
-                        + oldDef + "\n->\n" + newDef);
-            }
-            return Float.POSITIVE_INFINITY;
-        }
-    }
-
-    private static float computeRenameDistance(String oldFunctionName, String newFunctionName) {
-        int threshold = (int) Math.round(Math.min(oldFunctionName.length(), newFunctionName.length()) / 3.0);
-        threshold = Math.max(threshold, 1);
-        LevenshteinDistance distMeasure = new LevenshteinDistance();
-        int dist = distMeasure.apply(oldFunctionName.toLowerCase(), newFunctionName.toLowerCase());
-        if (dist <= threshold) {
-            LOG.info("Function names could be similar enough for a rename: " + oldFunctionName + " -> " + newFunctionName +
-                    " threshold=" + threshold + " actual distance=" + dist);
-            return ((float) dist / threshold);
-        } else {
-            LOG.info("Function names are too dissimilar for a rename: " + oldFunctionName + " -> " + newFunctionName +
-                    " threshold=" + threshold + " actual distance=" + dist);
-            return Float.POSITIVE_INFINITY;
-        }
-
-//        String delSignature = delFunction.functionSignatureXml;
-//        String addSignature = addFunction.functionSignatureXml;
-//
-//        threshold = (Math.min(delSignature.length(), addSignature.length()) * 4) / 5;
-//        threshold = Math.max(threshold, 1);
-//        distMeasure = new LevenshteinDistance();
-//        // If initialized with a threshold, apply will return -1 if the threshold is exceeded.
-//        dist = distMeasure.apply(delSignature, addSignature);
-//        if (dist < threshold) {
-//            LOG.debug("Function signatures are similar enough for a rename: " + delSignature + " -> " + addSignature);
-//            return true;
-//        } else {
-//            LOG.debug("Function signatures are too dissimilar enough for a rename: " + delSignature + " -> " + addSignature);
-//        }
     }
 
     private void remapAndPublishMods() {
