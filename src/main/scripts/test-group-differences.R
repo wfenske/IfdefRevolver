@@ -52,6 +52,7 @@ opts <- args$options
 
 data <- readData(args)
 data$CHANGED <- data$COMMITS > 0
+OUTCOME_IS_CHANGED <- (opts$dependent == "CHANGED")
 
 testGroupDifferences <- function(data, indep, dep, indepThresh) {
     data <- data.frame(data)
@@ -64,7 +65,7 @@ testGroupDifferences <- function(data, indep, dep, indepThresh) {
                       fmt="DEBUG: %s averages: median(all), mean(all), median(changed), mean(changed): %.3f, %.3f, %.3f, %.3f"), stderr())
     }
 
-    if (dep == "CHANGED") {
+    if (OUTCOME_IS_CHANGED) {
         fisherTable <- table(data$HAS_CRIT, data$CHANGED, dnn=c("annotation", "change_status"))
         colnames(fisherTable) <- c('unchanged', 'changed')
         rownames(fisherTable) <- c('unannotated', 'annotated')
@@ -76,6 +77,26 @@ testGroupDifferences <- function(data, indep, dep, indepThresh) {
         p.value  <- fisherResults$p.value
         effectSize <- fisherResults$estimate ## Odds ratio
         magnitude <- ""
+
+        ## row first, quoted column name second, and case does matter
+        ##
+        ## row is not annotation / annotated
+        ##
+        ## column is not changed / changed
+        ev.trt <- fisherTable['annotated', 'changed']
+        n.trt <- sum(fisherTable['annotated',]) # all annotated
+
+        ev.ctrl <- fisherTable['unannotated', 'changed']
+        n.ctrl <- sum(fisherTable['unannotated',]) # all un-annotated
+    
+        data.frame(System=opts$project
+                  ,I=indep
+                  ,ITh=indepThresh
+                  ,D=dep
+                  ,P=p.value ##, significanceCode(p.value)
+                  ,EffectSize=effectSize
+                  ,ev.trt=ev.trt, n.trt=n.trt
+                  ,ev.ctrl=ev.ctrl, n.ctrl=n.ctrl)
     } else {
         tGroup <- subset(data, HAS_CRIT)[,dep]
         cGroup <- subset(data, !HAS_CRIT)[,dep]
@@ -88,14 +109,14 @@ testGroupDifferences <- function(data, indep, dep, indepThresh) {
                                 )
         effectSize <- cliffRes$estimate
         magnitude <- sprintf("%s", cliffRes$magnitude)
-    }
     
-    data.frame(System=opts$project
-              ,I=indep
-              ,ITh=indepThresh
-              ,D=dep
-              ,P=p.value ##, significanceCode(p.value)
-              ,EffectSize=effectSize)
+        data.frame(System=opts$project
+                  ,I=indep
+                  ,ITh=indepThresh
+                  ,D=dep
+                  ,P=p.value ##, significanceCode(p.value)
+                  ,EffectSize=effectSize)
+    }
 }
 
 cliffMagnitude <- function(cliffsD) {
@@ -108,34 +129,66 @@ cliffMagnitude <- function(cliffsD) {
            "large")))
 }
 
-outputResults <- function(resultsDf) {
+outputBinaryResults <- function(resultsDf) {
     system <- unique(resultsDf$System)[1]
     dep <- unique(resultsDf$D)[1]
-    magFun <- ifelse(dep=="CHANGED", function(OR) { "" }, cliffMagnitude)
     for (indep in unique(resultsDf$I)) {
         r <- subset(resultsDf, I==indep & D==dep)
-        sdf <- ifelse(nrow(r) > 1, sd, function(v) 0.0)
+        if (nrow(r) > 1) {
+            stop("Cannot have multiple rows when outcome is binary.")
+        }
+        indepThreshold <- unique(r$ITh)[1]
+        p.value <- r$P
+        ##      Sys  I   ITh D   P     PC  OR    ev.trt,n.trt,ev.ctrl,n.ctrl
+        printf("%15s,%3s,%3d,%8s,%9.3g,%3s,%5.2f,%d,%d,%d,%d\n"
+              ,system
+              ,indep,indepThreshold
+              ,dep
+              ,p.value,significanceCode(p.value)
+              ,r$EffectSize
+              ,r$ev.trt,r$n.trt,r$ev.ctrl,r$n.ctrl
+               )
+    }
+}
+
+outputMetricResults <- function(resultsDf) {
+    system <- unique(resultsDf$System)[1]
+    dep <- unique(resultsDf$D)[1]
+    for (indep in unique(resultsDf$I)) {
+        r <- subset(resultsDf, I==indep & D==dep)
+        getSd <- ifelse(nrow(r) > 1, sd, function(v) 0.0)
         indepThreshold <- unique(r$ITh)[1]
         p.value <- mean(r$P)
-        sd.p.value <- sdf(r$P)
+        sd.p.value <- getSd(r$P)
         effectSize <- mean(r$EffectSize)
-        sd.effectSize <- sdf(r$EffectSize)
+        sd.effectSize <- getSd(r$EffectSize)
         ##      Sys  I   ITh D   P     SD(P) PC  E     SD(E),Magnitude
         printf("%15s,%3s,%3d,%8s,%9.3g,%9.3g,%3s,%5.2f,%9.3g,%10s\n"
               ,system
               ,indep,indepThreshold
               ,dep
               ,p.value,sd.p.value,significanceCode(p.value)
-              ,effectSize,sd.effectSize,magFun(effectSize)
+              ,effectSize,sd.effectSize,cliffMagnitude(effectSize)
                )
     }
 }
 
+printHeader <- function() {
+    ALL_FIELDS <- c("System", "I", "ITh", "D", "P", "SDP", "PScore",
+                    "EffectSize", "SDEffectSize", "Magnitude",
+                    "ev.trt", "n.trt", "ev.ctrl", "n.ctrl")
+    METRIC_ONLY_FIELDS <- c("SDP", "SDEffectSize", "Magnitude")
+    BINARY_ONLY_FIELDS <- c("ev.trt", "n.trt", "ev.ctrl", "n.ctrl")
+    if (OUTCOME_IS_CHANGED) {
+        headerFields <- ALL_FIELDS[!ALL_FIELDS %in% METRIC_ONLY_FIELDS]
+    } else {
+        headerFields <- ALL_FIELDS[!ALL_FIELDS %in% BINARY_ONLY_FIELDS]
+    }
+    printf("%s\n", paste(headerFields, collapse=','))
+}
+
 if ( !opts$no_header ) {
-    cat(sprintf(
-        ##indepBelowCmp,indepAboveCmp,
-        ##depBelowCmp,depAboveCmp,
-        fmt="System,I,ITh,D,P,SDP,PScore,EffectSize,SDEffectSize,Magnitude\n"))
+    printHeader()
 }
 
 flThresh  <- 0
@@ -145,19 +198,22 @@ negThresh <- 0
 locThreshold <- median(data$LOC)
 
 fullSize <- nrow(data)
-origFoldSize <- fullSize
-foldSize <- origFoldSize
-if (!is.na(opts$fold_size)) {
+
+if (OUTCOME_IS_CHANGED || is.na(opts$fold_size)) {
+    origFoldSize <- fullSize
+    foldSize <- origFoldSize
+    numFolds <- 1
+} else {
     origFoldSize <- opts$fold_size
     foldSize <- min(fullSize, origFoldSize)
     if (foldSize <= 0) {
         msg <- sprintf("Sample size must be a positive integer, not `%d'.", foldSize)
         stop(msg)
     }
+    
+    foldSize <- max(1, as.integer(floor(fullSize/max(1, floor(fullSize/foldSize)))))
+    numFolds <- max(1, floor(fullSize/foldSize))
 }
-
-foldSize <- max(1, as.integer(floor(fullSize/max(1, floor(fullSize/foldSize)))))
-numFolds <- max(1, floor(fullSize/foldSize))
 
 ##numFolds <- max(1, floor(fullSize/foldSize))
 ##rawNumOmitted <- fullSize %% numFolds
@@ -220,6 +276,10 @@ eprintf("DEBUG Calculating all %d result.\n", numFolds)
 
 allResultsDf <- Reduce(rbind, allResultsList)
 ##eprintf("DEBUG Number of rows in results: %d\n", nrow(allResultsDf))
-outputResults(allResultsDf)
+if (OUTCOME_IS_CHANGED) {
+    outputBinaryResults(allResultsDf)
+} else {
+    outputMetricResults(allResultsDf)
+}
 eprintf("DEBUG Successfully computed group differences for %s in %s.\n",
         unique(allResultsDf$D)[1], unique(allResultsDf$System)[1])
