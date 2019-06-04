@@ -6,7 +6,9 @@ import org.apache.log4j.Logger;
 
 import java.util.*;
 import java.util.function.Consumer;
+import java.util.function.Function;
 import java.util.stream.Collectors;
+import java.util.stream.Stream;
 
 /**
  * Consumes change hunks of different types. In case a function is deleted and subsequently moved, the two edits are
@@ -24,9 +26,6 @@ public class AddDelMergingConsumer implements Consumer<FunctionChangeHunk> {
 
     private final Consumer<FunctionChangeHunk> parent;
     private static final float MIN_SIMILARITY = 0.6f;
-
-    private static int similarityAllTests = 0;
-    private static int similarityAgree = 0;
 
     public AddDelMergingConsumer(Consumer<FunctionChangeHunk> parent) {
         this.parent = parent;
@@ -115,6 +114,15 @@ public class AddDelMergingConsumer implements Consumer<FunctionChangeHunk> {
         final Method newFunction;
         final float similarity;
 
+        public static Comparator<FunctionSimilarity> BY_FUNCTION_FILE_AND_SIGNATURE = new Comparator<FunctionSimilarity>() {
+            @Override
+            public int compare(FunctionSimilarity o1, FunctionSimilarity o2) {
+                int r = Method.COMP_BY_FILE_AND_SIGNATURE.compare(o1.oldFunction, o2.oldFunction);
+                if (r != 0) return r;
+                return Method.COMP_BY_FILE_AND_SIGNATURE.compare(o1.newFunction, o2.newFunction);
+            }
+        };
+
         public FunctionSimilarity(Method oldFunction, Method newFunction, float similarity) {
             this.oldFunction = oldFunction;
             this.newFunction = newFunction;
@@ -149,16 +157,29 @@ public class AddDelMergingConsumer implements Consumer<FunctionChangeHunk> {
 
         logSimilarities(deletedFunctions, addedFunctions);
 
-        SortedSet<FunctionSimilarity> allSimilarities = new TreeSet<>(Comparator.reverseOrder());
-        for (Method oldFunction : deletedFunctions) {
-            for (Method newFunction : addedFunctions) {
-                float similarity = FunctionSimilarityComputer.levenshteinSimilarity(oldFunction, newFunction);
-                if (similarity >= MIN_SIMILARITY) {
-                    FunctionSimilarity d = new FunctionSimilarity(oldFunction, newFunction, similarity);
-                    allSimilarities.add(d);
-                }
-            }
-        }
+//        SortedSet<FunctionSimilarity> allSimilarities = new TreeSet<>(Comparator.reverseOrder());
+//
+//        for (Method oldFunction : deletedFunctions) {
+//            for (Method newFunction : addedFunctions) {
+//                float similarity = FunctionSimilarityComputer.levenshteinSimilarity(oldFunction, newFunction);
+//                if (similarity >= MIN_SIMILARITY) {
+//                    FunctionSimilarity d = new FunctionSimilarity(oldFunction, newFunction, similarity);
+//                    allSimilarities.add(d);
+//                }
+//            }
+//        }
+
+        final int numExpectedComparisons = deletedFunctions.size() * addedFunctions.size();
+        final Function<Collection<Method>, Stream<Method>> toStream = getSimilarityStreamFunction(numExpectedComparisons);
+
+        List<FunctionSimilarity> allSimilarities =
+                toStream.apply(deletedFunctions)
+                        .flatMap(oldFunction ->
+                                toStream.apply(addedFunctions)
+                                        .map(computeLevenshteinSimilarity(oldFunction))
+                                        .filter(sim -> sim.similarity >= MIN_SIMILARITY))
+                        .sorted(Comparator.reverseOrder())
+                        .collect(Collectors.toList());
 
         for (FunctionSimilarity d : allSimilarities) {
             final Method oldFunction = d.oldFunction;
@@ -185,13 +206,34 @@ public class AddDelMergingConsumer implements Consumer<FunctionChangeHunk> {
             return;
         }
 
-        for (Method oldFunction : deletedFunctions) {
-            FunctionSimilarity highestLevenshteinSimilarity = addedFunctions.stream()
-                    .map(newFunction -> new FunctionSimilarity(oldFunction, newFunction, FunctionSimilarityComputer.levenshteinSimilarity(oldFunction, newFunction)))
-                    .max(Comparator.naturalOrder()).get();
-            FunctionSimilarity highestDiffSimilarity = addedFunctions.stream()
-                    .map(newFunction -> new FunctionSimilarity(oldFunction, newFunction, FunctionSimilarityComputer.getRatioOfCommonLines(oldFunction, newFunction)))
-                    .max(Comparator.naturalOrder()).get();
+        int similarityAgree = 0;
+
+        final int numExpectedComparisons = deletedFunctions.size() * addedFunctions.size();
+        final Function<Collection<Method>, Stream<Method>> toStream = getSimilarityStreamFunction(numExpectedComparisons);
+
+        List<FunctionSimilarity> levenshteinSimilarities =
+                toStream.apply(deletedFunctions)
+                        .map(oldFunction ->
+                                toStream.apply(addedFunctions)
+                                        .map(computeLevenshteinSimilarity(oldFunction))
+                                        .max(Comparator.naturalOrder()).get())
+                        .sorted(FunctionSimilarity.BY_FUNCTION_FILE_AND_SIGNATURE)
+                        .collect(Collectors.toList());
+
+        List<FunctionSimilarity> commonLinesSimilarities =
+                toStream.apply(deletedFunctions)
+                        .map(oldFunction ->
+                                toStream.apply(addedFunctions)
+                                        .map(computeCommonLinesSimilarity(oldFunction))
+                                        .max(Comparator.naturalOrder()).get())
+                        .sorted(FunctionSimilarity.BY_FUNCTION_FILE_AND_SIGNATURE)
+                        .collect(Collectors.toList());
+
+        final int numDeletedFunctions = levenshteinSimilarities.size();
+        for (int i = 0; i < numDeletedFunctions; i++) {
+            FunctionSimilarity highestLevenshteinSimilarity = levenshteinSimilarities.get(i);
+            FunctionSimilarity highestDiffSimilarity = commonLinesSimilarities.get(i);
+            Method oldFunction = highestLevenshteinSimilarity.oldFunction;
             Method winnerLevenshtein = highestLevenshteinSimilarity.newFunction;
             Method winnerDiff = highestDiffSimilarity.newFunction;
 
@@ -230,12 +272,26 @@ public class AddDelMergingConsumer implements Consumer<FunctionChangeHunk> {
                 LOG.debug(msg);
             }
 
-            synchronized (AddDelMergingConsumer.class) {
-                AddDelMergingConsumer.similarityAllTests += 1;
-                AddDelMergingConsumer.similarityAgree += agree;
-                LOG.debug("Similarity agree: " + AddDelMergingConsumer.similarityAgree + "," + AddDelMergingConsumer.similarityAllTests + "," + Math.round(AddDelMergingConsumer.similarityAgree * 100f / AddDelMergingConsumer.similarityAllTests));
-            }
+            similarityAgree += agree;
         }
+
+        LOG.debug("Similarity agree: " + similarityAgree + "," + numDeletedFunctions + "," + Math.round(similarityAgree * 100f / numDeletedFunctions));
+    }
+
+    private static <E> Function<Collection<E>, Stream<E>> getSimilarityStreamFunction(int numExpectedComparisons) {
+        if (numExpectedComparisons > 1000) {
+            return Collection::parallelStream;
+        } else {
+            return Collection::stream;
+        }
+    }
+
+    private static Function<Method, FunctionSimilarity> computeCommonLinesSimilarity(Method oldFunction) {
+        return newFunction -> new FunctionSimilarity(oldFunction, newFunction, FunctionSimilarityComputer.getRatioOfCommonLines(oldFunction, newFunction));
+    }
+
+    private static Function<Method, FunctionSimilarity> computeLevenshteinSimilarity(Method oldFunction) {
+        return newFunction -> new FunctionSimilarity(oldFunction, newFunction, FunctionSimilarityComputer.levenshteinSimilarity(oldFunction, newFunction));
     }
 
     private static String shortenLongString(String s) {
