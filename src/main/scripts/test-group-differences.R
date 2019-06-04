@@ -129,6 +129,21 @@ cliffMagnitude <- function(cliffsD) {
            "large")))
 }
 
+printHeader <- function() {
+    ALL_FIELDS <- c("System", "I", "ITh", "D", "P", "PScore", "EffectSize",
+                    "ev.trt", "n.trt", "ev.ctrl", "n.ctrl", # only for Fisher's test
+                    "SDEffectSize", "Magnitude", "SDP" # only for Cliff's delta
+                    )
+    ##METRIC_ONLY_FIELDS <- c("SDP", "SDEffectSize", "Magnitude")
+    ##BINARY_ONLY_FIELDS <- c("ev.trt", "n.trt", "ev.ctrl", "n.ctrl")
+    ##if (OUTCOME_IS_CHANGED) {
+    ##    headerFields <- ALL_FIELDS[!ALL_FIELDS %in% METRIC_ONLY_FIELDS]
+    ##} else {
+    ##    headerFields <- ALL_FIELDS[!ALL_FIELDS %in% BINARY_ONLY_FIELDS]
+    ##}
+    printf("%s\n", paste(ALL_FIELDS, collapse=','))
+}
+
 outputBinaryResults <- function(resultsDf) {
     system <- unique(resultsDf$System)[1]
     dep <- unique(resultsDf$D)[1]
@@ -140,7 +155,7 @@ outputBinaryResults <- function(resultsDf) {
         indepThreshold <- unique(r$ITh)[1]
         p.value <- r$P
         ##      Sys  I   ITh D   P     PC  OR    ev.trt,n.trt,ev.ctrl,n.ctrl
-        printf("%15s,%3s,%3d,%8s,%9.3g,%3s,%5.2f,%d,%d,%d,%d\n"
+        printf("%15s,%3s,%3d,%8s,%9.3g,%3s,%5.2f,%d,%d,%d,%d,,,\n"
               ,system
               ,indep,indepThreshold
               ,dep
@@ -162,29 +177,16 @@ outputMetricResults <- function(resultsDf) {
         sd.p.value <- getSd(r$P)
         effectSize <- mean(r$EffectSize)
         sd.effectSize <- getSd(r$EffectSize)
-        ##      Sys  I   ITh D   P     SD(P) PC  E     SD(E),Magnitude
-        printf("%15s,%3s,%3d,%8s,%9.3g,%9.3g,%3s,%5.2f,%9.3g,%10s\n"
+        ##      Sys  I   ITh D   P     PC  E         SD(E),Mag. SD(P)
+        printf("%15s,%3s,%3d,%8s,%9.3g,%3s,%5.2f,,,,,%9.3g,%10s,%9.3g\n"
               ,system
               ,indep,indepThreshold
               ,dep
-              ,p.value,sd.p.value,significanceCode(p.value)
+              ,p.value,significanceCode(p.value)
               ,effectSize,sd.effectSize,cliffMagnitude(effectSize)
+              ,sd.p.value
                )
     }
-}
-
-printHeader <- function() {
-    ALL_FIELDS <- c("System", "I", "ITh", "D", "P", "SDP", "PScore",
-                    "EffectSize", "SDEffectSize", "Magnitude",
-                    "ev.trt", "n.trt", "ev.ctrl", "n.ctrl")
-    METRIC_ONLY_FIELDS <- c("SDP", "SDEffectSize", "Magnitude")
-    BINARY_ONLY_FIELDS <- c("ev.trt", "n.trt", "ev.ctrl", "n.ctrl")
-    if (OUTCOME_IS_CHANGED) {
-        headerFields <- ALL_FIELDS[!ALL_FIELDS %in% METRIC_ONLY_FIELDS]
-    } else {
-        headerFields <- ALL_FIELDS[!ALL_FIELDS %in% BINARY_ONLY_FIELDS]
-    }
-    printf("%s\n", paste(headerFields, collapse=','))
 }
 
 if ( !opts$no_header ) {
