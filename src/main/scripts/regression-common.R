@@ -84,7 +84,7 @@ TNF_VAR <- "log2TNF" # total number of functions
 FORMULA_REDUCED <- c("log2LOC", AGE_VAR, MRC_VAR, PC_VAR
                    , TNF_VAR
                      )
-FORMULA_FULL    <- c("log2FL", "log2FC", "log2CND", "log2NEG", "LOACratio"
+FORMULA_FULL    <- c("FL", "FC", "CND", "NEG", "LOACratio"
                    , "log2LOC"
                    , AGE_VAR
                    , MRC_VAR
