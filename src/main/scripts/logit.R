@@ -51,9 +51,9 @@ printCsvLine <- function(sysname
                        , iFormula
                        , aic=-1, mcfadden=-1
                        , iName
-                       , coefValue=-1, or=-1, coefZ=-1
+                       , coefValue=0, or=1, coefZ=-1
                        , p=1
-                       , warnings=42
+                       , warnings=0
                        , warningMessages="") {
     printf("%s,%s,%s,%.0f,%.4f,%s,% .6f,%.3f,%.2f,%.4f,%s,%d,\"%s\"\n",
            sysname, dName, iFormula

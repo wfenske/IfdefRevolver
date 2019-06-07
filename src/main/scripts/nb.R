@@ -89,7 +89,7 @@ printCsvLine <- function(sysname
                        , iFormula
                        , aic=-1, mcfadden=-1, chisq=-1
                        , iName
-                       , coefValue=-1, coefZ=-1
+                       , coefValue=0, coefZ=-1
                        , p=1
                        , warnings=0
                        , warningMessages="") {
