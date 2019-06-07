@@ -74,6 +74,17 @@ readData <- function(commandLineArgs) {
     return (result)
 }
 
+csvCleanWarnMsg <- function(warnMsg) {
+    if (is.null(warnMsg)) {
+        warnMsg <- ""
+    } else {
+        warnMsg <- gsub("[\r\n\t]", " ", warnMsg)
+        warnMsg <- gsub("  *", " ", warnMsg)
+        warnMsg <- gsub(" $", "", warnMsg)
+    }
+    return(warnMsg)
+}
+
 ##AGE_VAR <- "sqrtAGE"
 ##MRC_VAR <- "sqrtMRC"
 AGE_VAR <- "log2AGE"
@@ -81,20 +92,37 @@ MRC_VAR <- "log2MRC"
 PC_VAR  <- "log2PC"
 TNF_VAR <- "log2TNF" # total number of functions
 
-FORMULA_REDUCED <- c("log2LOC", AGE_VAR, MRC_VAR, PC_VAR
-                   , TNF_VAR
-                     )
-FORMULA_FULL    <- c("FL", "FC", "CND", "NEG", "LOACratio"
-                   , "log2LOC"
-                   , AGE_VAR
-                   , MRC_VAR
-                   , PC_VAR
-                   , TNF_VAR
-                     )
+VARS_CONTROLS            <- c("log2LOC", AGE_VAR, MRC_VAR, PC_VAR, TNF_VAR)
+VARS_CPP_UNTRANSFORMED   <- c("FL", "FC", "CND", "NEG", "LOACratio")
+VARS_CPP_LOG_TRANSFORMED <- c("log2FL", "log2FC", "log2CND", "log2NEG", "LOACratio")
+
+FORMULA_CONTROLS                 <- VARS_CONTROLS
+FORMULA_CPP_UNTRANSFORMED_ONLY   <- VARS_CPP_UNTRANSFORMED
+FORMULA_CPP_LOG_TRANSFORMED_ONLY <- VARS_CPP_LOG_TRANSFORMED
+FORMULA_FULL_UNTRANSFORMED       <- c(VARS_CPP_UNTRANSFORMED,   VARS_CONTROLS)
+FORMULA_FULL_LOG_TRANSFORMED     <- c(VARS_CPP_LOG_TRANSFORMED, VARS_CONTROLS)
+
+MAX_FORMULA_CODE <- 4
+
+getRegressionIndepsByNumber <- function(formulaCode) {
+    if (formulaCode == 0)
+        return(FORMULA_CONTROLS)
+    if (formulaCode == 1)
+        return(FORMULA_CPP_UNTRANSFORMED_ONLY)
+    if (formulaCode == 2)
+        return(FORMULA_CPP_LOG_TRANSFORMED_ONLY)
+    if (formulaCode == 3)
+        return(FORMULA_FULL_UNTRANSFORMED)
+    if (formulaCode == 4)
+        return(FORMULA_FULL_LOG_TRANSFORMED)
+}
 
 standardizeVariables <- function(df) {
     sdf <- data.frame(df) ## copy original data frame
-    for (var in FORMULA_FULL) {
+    allIndeps <- c(VARS_CONTROLS, VARS_CPP_UNTRANSFORMED, VARS_CPP_LOG_TRANSFORMED)
+    allUniqueIndeps <- allIndeps[!duplicated(allIndeps)]
+    for (var in allUniqueIndeps) {
+        eprintf("DEBUG: standardizing independent variable %s\n", var)
         sdf[,var] <- scale(df[,var])
     }
     ##for (var in c("COMMITS", "LCH")) {

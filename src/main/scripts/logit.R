@@ -46,13 +46,42 @@ if ( ! is.null(opts$project) ) {
 
 allData <- readData(args)
 
-reportModel <- function(model, modelName, mcfadden, csvOut=TRUE, warnings=0, warningMessages="") {
+printCsvLine <- function(sysname
+                       , dName
+                       , iFormula
+                       , aic=-1, mcfadden=-1
+                       , iName
+                       , coefValue=-1, or=-1, coefZ=-1
+                       , p=1
+                       , warnings=42
+                       , warningMessages="") {
+    printf("%s,%s,%s,%.0f,%.4f,%s,% .6f,%.3f,%.2f,%.4f,%s,%d,\"%s\"\n",
+           sysname, dName, iFormula
+         , aic, mcfadden
+         , iName, coefValue, or
+         , coefZ, p, significanceCode(p)
+         , warnings, warningMessages)
+}
+
+reportFailedModel <- function(dName, indeps, err) {
+    iFormula <- paste(indeps, collapse="+")
+    errorText <- csvCleanWarnMsg(sprintf("%s", err))
+    for (iName in c("(Intercept)", indeps)) {
+        printCsvLine(sysname=sysname
+                   , dName=dName
+                   , iFormula=iFormula
+                   , iName=iName
+                   , warnings=42, warningMessages=errorText)
+    }
+}
+
+reportModel <- function(model, modelName, mcfadden, warnings=0, warningMessages="") {
     modelSummary <- summary(model)
     ##print(summary(model))
     ##print(exp(cbind(OR = coef(model), suppressMessages(confint(model)))))
     ##checkSignificanceOfIndividualPredictors(model, modelName)
 
-    if (!csvOut) {
+    if (FALSE) {
         cat("Coefficients:\n"); print(coef(model))
         coefValues <- modelSummary$coefficients[,"Estimate"]
         pValues <- modelSummary$coefficients[,"Pr(>|z|)"]
@@ -93,20 +122,27 @@ reportModel <- function(model, modelName, mcfadden, csvOut=TRUE, warnings=0, war
             or <- exp(c)
             z <- msCoefs[i, "z value"]
             p <- msCoefs[i, "Pr(>|z|)"]
-            ##printf("%s,%7s,% 27s,%7.0f,%.4f,%.2f,%11s,%- 6.4f,%3s,%.4f,%d,\"%s\"\n",
-            printf("%s,%s,%s,%.0f,%.4f,%s,% .6f,%.3f,%.2f,%.4f,%s,%d,\"%s\"\n",
-sysname, dName, iFormula
-, model$aic, mcfadden
-, cName, c, or
-, z, p, significanceCode(p)
-, warnings, warningMessages)
+            printCsvLine(
+                sysname=sysname
+              , dName=dName
+              , iFormula=iFormula
+              , aic=model$aic
+              , mcfadden=mcfadden
+              , iName=cName
+              , coefValue=c
+              , or=or
+              , coefZ=z
+              , p=p
+              , warnings=warnings
+              , warningMessages=warningMessages
+            )
         }
     }
 
     
 }
 
-tryLogitModel <- function(indeps, dep, data, csvOut=FALSE) {
+tryLogitModel <- function(indeps, dep, data) {
     indepsFormula <- paste(indeps, collapse=" + ") # without interactions
     ##indepsFormula <- paste(indeps, collapse=" * ") # with interactions
     ## This formula also considers 2-way interactions
@@ -116,7 +152,6 @@ tryLogitModel <- function(indeps, dep, data, csvOut=FALSE) {
     formula <- as.formula(formulaString)
     modelName <- paste("logit:", formulaString)
 
-    eprintf("\nDEBUG: ***************************\n")
     eprintf("DEBUG: *** %s ***\n", modelName)
 
     numWarnings <- 0
@@ -132,24 +167,36 @@ tryLogitModel <- function(indeps, dep, data, csvOut=FALSE) {
         invokeRestart("muffleWarning")
     }
 
-    model <- withCallingHandlers(glm(formula = formula
-                                   , data = data
-                                   , family = binomial(link='logit'))
-                               , warning=wHandler)
+    regressionError <- NULL
+    eHandler <- function(cond) {
+        eprintf("WARN: *** Logistic regression %s failed: %s ***\n",
+                formulaString, cond)
+        regressionError <<- cond
+        return(NA)
+    }
+
+    model <- tryCatch(
+        withCallingHandlers(glm(formula = formula
+                              , data = data
+                              , family = binomial(link='logit'))
+                          , warning=wHandler)
+      , error=eHandler
+    )
+    
+    if (!is.null(regressionError)) {
+        return (function() reportFailedModel(dName=dep
+                                           , indeps=indeps
+                                           , err=regressionError))
+    }
+    
     nullModel <- glm(as.formula(paste(dep, "1", sep="~"))
                    , data=data
                    , family = binomial(link='logit')
                         )
 
     mcfadden <- mcfaddensPseudoRSquared(model, nullModel)
-    
-    if (is.null(warnMsg)) {
-        warnMsg <- ""
-    } else {
-        warnMsg <- gsub("[\r\n\t]", " ", warnMsg)
-        warnMsg <- gsub("  *", " ", warnMsg)
-        warnMsg <- gsub(" $", "", warnMsg)
-    }
+
+    warnMsg <- csvCleanWarnMsg(warnMsg)
 
     if (numWarnings == 0) {
         sWithWarnings <- "without warnings"
@@ -163,7 +210,7 @@ tryLogitModel <- function(indeps, dep, data, csvOut=FALSE) {
     eprintf("INFO: *** Logistic regression %s completed %s ***\n",
             formulaString, sWithWarnings)
     
-    return (function() reportModel(model, modelName, mcfadden, csvOut=csvOut, warnings=numWarnings, warningMessages=warnMsg))
+    return (function() reportModel(model, modelName, mcfadden, warnings=numWarnings, warningMessages=warnMsg))
 }
 
 ### Independent variables for taking smell presence into account
@@ -238,15 +285,12 @@ if (opts$standardize) {
 
 options(mc.cores = detectCores())
 
-allModelClosures <- lapply(
-    c(0, 1)
+allModelClosures <- mclapply(
+    0:MAX_FORMULA_CODE
   , function(formulaCode) {
-      if (formulaCode == 0)
-          formula <- FORMULA_REDUCED
-      else
-          formula <- FORMULA_FULL
-       tryLogitModel(indeps=formula, dep="CHANGED", data=modelData,
-                     csvOut=TRUE)
+      indeps <- getRegressionIndepsByNumber(formulaCode)
+      tryLogitModel(indeps=indeps, dep="CHANGED", data=modelData)
+      ##function() printf("CHANGED~%s\n", paste(indeps,collapse='+'))
    })
 
 printf("SYSTEM,D,FORMULA,AIC,MCFADDEN,I,COEF,OR,Z,P,PCODE,WARNINGS,WARNING_MESSAGES\n")
