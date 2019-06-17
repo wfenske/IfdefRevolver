@@ -97,23 +97,69 @@ VARS_CPP_UNTRANSFORMED   <- c("FL", "FC", "CND", "NEG", "LOACratio")
 VARS_CPP_LOG_TRANSFORMED <- c("log2FL", "log2FC", "log2CND", "log2NEG", "LOACratio")
 
 FORMULA_CONTROLS                 <- VARS_CONTROLS
-FORMULA_CPP_UNTRANSFORMED_ONLY   <- VARS_CPP_UNTRANSFORMED
-FORMULA_CPP_LOG_TRANSFORMED_ONLY <- VARS_CPP_LOG_TRANSFORMED
+
+##FORMULA_CPP_UNTRANSFORMED_ONLY   <- VARS_CPP_UNTRANSFORMED
+##FORMULA_CPP_LOG_TRANSFORMED_ONLY <- VARS_CPP_LOG_TRANSFORMED
+
 FORMULA_FULL_UNTRANSFORMED       <- c(VARS_CPP_UNTRANSFORMED,   VARS_CONTROLS)
 FORMULA_FULL_LOG_TRANSFORMED     <- c(VARS_CPP_LOG_TRANSFORMED, VARS_CONTROLS)
 
-MAX_FORMULA_CODE <- 4
+MAX_FORMULA_CODE <- 2
+
+### > aggregate(df.mcfaddens$MCFADDEN, by=list(Formula=df.mcfaddens$FORMULA), FUN=mean)
+###                                                                          Formula          x
+### 1                                                        FL+FC+CND+NEG+LOACratio 0.01361250
+### 2                         FL+FC+CND+NEG+LOACratio+log2LOC+log2AGE+log2MRC+log2PC 0.13900000
+### 3                 FL+FC+CND+NEG+LOACratio+log2LOC+log2AGE+log2MRC+log2PC+log2TNF 0.14987368 - log/no log
+### 4                                        log2FL+log2FC+log2CND+log2NEG+LOACratio 0.02133684
+### 5         log2FL+log2FC+log2CND+log2NEG+LOACratio+log2LOC+log2AGE+log2MRC+log2PC 0.13912105
+### 6 log2FL+log2FC+log2CND+log2NEG+LOACratio+log2LOC+log2AGE+log2MRC+log2PC+log2TNF 0.14994737 * log/no log
+### 7                                                 log2LOC+log2AGE+log2MRC+log2PC 0.13723158 - tnf/no tnf
+### 8                                         log2LOC+log2AGE+log2MRC+log2PC+log2TNF 0.14822105 * tnf/no tnf
+### 
+### > aggregate(df.mcfaddens$MCFADDEN, by=list(Formula=df.mcfaddens$FORMULA), FUN=median)
+###                                                                          Formula      x
+### 1                                                        FL+FC+CND+NEG+LOACratio 0.0101
+### 2                         FL+FC+CND+NEG+LOACratio+log2LOC+log2AGE+log2MRC+log2PC 0.1330
+### 3                 FL+FC+CND+NEG+LOACratio+log2LOC+log2AGE+log2MRC+log2PC+log2TNF 0.1463 - log/no log
+### 4                                        log2FL+log2FC+log2CND+log2NEG+LOACratio 0.0149
+### 5         log2FL+log2FC+log2CND+log2NEG+LOACratio+log2LOC+log2AGE+log2MRC+log2PC 0.1331
+### 6 log2FL+log2FC+log2CND+log2NEG+LOACratio+log2LOC+log2AGE+log2MRC+log2PC+log2TNF 0.1464 * log/no log
+### 7                                                 log2LOC+log2AGE+log2MRC+log2PC 0.1323 - tnf/no tnf
+### 8                                         log2LOC+log2AGE+log2MRC+log2PC+log2TNF 0.1413 * tnf/no tnf
+
+### The table above (representing the values of all logistic
+### regression models, except the one for blender) shows two things:
+### 1) Log-transforming the annotation-related metrics is better than
+### including them without transformation. 2) Including TNF (the total
+### number of function in the current snapshot) as an additional
+### predictor improves the models compared to not including TNF.
 
 getRegressionIndepsByNumber <- function(formulaCode) {
+###    if (formulaCode == 0)
+###        return(FORMULA_CONTROLS)
+###    if (formulaCode == 1)
+###        return(FORMULA_CONTROLS_TNF)
+###    
+###    if (formulaCode == 2)
+###        return(FORMULA_CPP_UNTRANSFORMED_ONLY)
+###    if (formulaCode == 3)
+###        return(FORMULA_CPP_LOG_TRANSFORMED_ONLY)
+###    
+###    if (formulaCode == 4)
+###        return(FORMULA_FULL_UNTRANSFORMED)
+###    if (formulaCode == 5)
+###        return(FORMULA_FULL_LOG_TRANSFORMED)
+###    
+###    if (formulaCode == 6)
+###        return(FORMULA_FULL_UNTRANSFORMED_TNF)
+###    if (formulaCode == 7)
+###        return(FORMULA_FULL_LOG_TRANSFORMED_TNF)
     if (formulaCode == 0)
         return(FORMULA_CONTROLS)
     if (formulaCode == 1)
-        return(FORMULA_CPP_UNTRANSFORMED_ONLY)
-    if (formulaCode == 2)
-        return(FORMULA_CPP_LOG_TRANSFORMED_ONLY)
-    if (formulaCode == 3)
         return(FORMULA_FULL_UNTRANSFORMED)
-    if (formulaCode == 4)
+    if (formulaCode == 2)
         return(FORMULA_FULL_LOG_TRANSFORMED)
 }
 

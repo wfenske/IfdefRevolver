@@ -284,6 +284,7 @@ if (opts$standardize) {
 }
 
 options(mc.cores = detectCores())
+##options(mc.cores = 4)
 
 allModelClosures <- mclapply(
     0:MAX_FORMULA_CODE
