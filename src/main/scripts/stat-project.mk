@@ -11,6 +11,9 @@ LOG_DIR      = $(PROJECT)/logs
 
 RDATA            = $(RESULTS_DIR)/joint_data.rds
 
+SUBJECT_STATS_TEX = $(RESULTS_DIR)/subject_stats.tex
+SUBJECT_STATS_LOG = $(LOG_DIR)/subject_stats.log
+
 GROUP_DIFFS_CSV  = $(RESULTS_DIR)/group_differences.csv
 
 GROUP_DIFFS_CHANGED_CSV  = $(RESULTS_DIR)/group_differences_changed.csv
@@ -36,6 +39,7 @@ REG_COMMONS       = $(IFDEFREVOLVER_HOME)/regression-common.R
 NBREG_PROG        = $(IFDEFREVOLVER_HOME)/nb.R
 LOGITREG_PROG     = $(IFDEFREVOLVER_HOME)/logit.R
 RDS_FROM_CSV_PROG = $(IFDEFREVOLVER_HOME)/rds-from-csv.R
+STAT_SUBJECT_PROG = $(IFDEFREVOLVER_HOME)/stat-subject.sh
 
 COMPARE_LOC_OPTS ?= --no-title --ymax=400
 RDS_FROM_CSV_OPTS ?=
@@ -82,7 +86,7 @@ REGRESSIONMODELS = $(NBREG_REGULAR_CSV) $(LOGITREG_REGULAR_CSV) $(NBREG_BALANCED
 ##REGRESSIONMODELS = $(LOGITREG_REGULAR_CSV)
 ## $(NBREG_CHANGED_CSV) $(NBREG_ANNOTATED_CSV) $(NBREG_ANNOTATED_CHANGED_CSV) 
 
-all: group_diffs locplots spearman regressionmodels  #ratiosplots
+all: group_diffs locplots spearman regressionmodels subject_stats  #ratiosplots
 
 group_diffs: $(GROUP_DIFFS_CSV)
 
@@ -93,6 +97,16 @@ ratiosplots: $(RATIOS_PLOTS)
 locplots: $(LOC_PLOTS)
 
 regressionmodels: $(REGRESSIONMODELS)
+
+subject_stats: $(SUBJECT_STATS_TEX)
+
+$(SUBJECT_STATS_TEX): $(RDATA) $(STAT_SUBJECT_PROG) $(RESULTS_DIR)/commitParents.csv $(RESULTS_DIR)/revisionsFull.csv $(RESULTS_DIR)/snapshots.csv
+	rm -f $@; \
+	if ! $(STAT_SUBJECT_PROG) -p $(PROJECT) 2>&1 > $@|tee $(SUBJECT_STATS_LOG) >&2; \
+	then \
+		rm -f $@; \
+		false; \
+	fi
 
 $(GROUP_DIFFS_CSV): $(GROUP_DIFFS_CHANGED_CSV) $(GROUP_DIFFS_COMMITS_CSV) $(GROUP_DIFFS_LCH_CSV)
 	csvstack -d, -q '"' $^ > $@

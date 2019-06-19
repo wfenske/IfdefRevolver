@@ -85,18 +85,31 @@ help()
 ## Purpose: Get the value of a field from a simple CSV-like output (quoting and escaped are not supported!)
 ##
 ## Usage get_csv_field CSV_STRING FIELD_NUM
-get_csv_field()
+get_csv_field0()
 {
     printf '%s\n' "$1"|cut -d ',' -f $2
+}
+
+## Purpose: Get the value of a named column from a CSV table with a
+## header row and a single content row.  Remove the header.
+##
+## Usage get_csv_field CSV_STRING_WITH_HEADER COLUMN_NAME
+get_csv_field()
+{
+    printf '%s\n' "$1"|csvcut -c "$2"|tail -n +2
 }
 
 ## Purpose: reformat a date from format YYYY-MM-DD (possibly with
 ## some garbage following) to MM/YYYY
 ## 
-## Usage: reformat_date <date>
-reformat_date()
+## Usage: mm_yyyy_date_from_timestamp <date>
+mm_yyyy_date_from_timestamp()
 {
-    printf '%s\n' "${1:?}"|sed 's,\([0-9][0-9][0-9][0-9]\)-\([0-9][0-9]\)-\([0-9][0-9]\).*,\2/\1,'|sed 's/^0//'
+    printf '%s\n' "${1:?}"|sed 's,\([0-9][0-9][0-9][0-9]\)-\([0-9][0-9]\)-\([0-9][0-9]\).*,\\wfmmyy{\2}{\1},'|sed 's/{0\{1,\}/{/g'
+}
+
+thousep() {
+    printf '%s\n' "$1"|perl -wpe '1 while s/(\d+)(\d\d\d)/$1\\thousep{}$2/;'
 }
 
 unset o_project
@@ -140,8 +153,8 @@ fi
 
 if [ -z ${o_name+x} ]
 then
-    log_info "No pretty project name given, assuming project name, \`$o_project'"
-    o_name="$o_project"
+    o_name=$(printf '\\subject%s\n' "$o_project"|tr -d '[0-9]')
+    log_info "No pretty project name given, assuming, \`$o_name'"
 fi
 
 if [ $# -ne 0 ]
@@ -149,9 +162,9 @@ then
     log_warn "Ignoring positional arguments (none were expected): \`$@'"
 fi
 
-### Get start and end date and number of .c files
-proj_info_file="results/${o_project:?}/projectInfo.csv"
-log_info "Getting start and end date and number of .c files from ${proj_info_file:?}"
+### Get start and end date
+proj_info_file="${o_project:?}/results/commitParents.csv"
+log_info "Getting start and end date from ${proj_info_file:?}"
 
 if [ ! -e "$proj_info_file" ]
 then
@@ -163,94 +176,104 @@ then
     edie "Cannot read file: $proj_info_file"
 fi
 
-## NOTE, 2017-06-17, wf: There's some warning about a missing header
-## row. That's why we redirect stderr to /dev/null
-endsnapshot_files=$(csvsql -q '"' -d ',' -H --tables info --query 'select mm.end_date,info.c as end_files from info join (select max(b) end_date from info) as mm on info.b = mm.end_date' "${proj_info_file:?}" 2>/dev/null)
+start_end_totalcommits=$(csvsql -q '"' -d ',' --tables commits --query "SELECT MIN(timestamp) AS starttime, MAX(timestamp) AS endtime, COUNT(distinct \`commit\`) AS total_commits FROM commits" "${proj_info_file:?}")
 if [ $? -ne 0 ]
 then
-    edie "Failed to gather start and end date and number of files from ${proj_info_file:?}"
+    edie "Failed to gather start and end date from ${proj_info_file:?}"
 fi
-log_debug "$endsnapshot_files"
+log_debug "$start_end_totalcommits"
 
 ## Result will look sth. like this:
 ##
-## start_date,end_date,end_files
-## 1996-01-14,2017-01-27,320
+## starttime,endtime,total_commits
+## 2005-09-26 05:28:27.000000,2019-01-22 15:50:32.000000,3309
 
-## Remove header
-endsnapshot_files=$( printf '%s\n' "$endsnapshot_files"|tail -n +2 )
+starttime=$(get_csv_field "$start_end_totalcommits" starttime)
+endtime=$(get_csv_field "$start_end_totalcommits" endtime)
+num_all_commits=$(get_csv_field "$start_end_totalcommits" total_commits)
 
-end_snapshot=$(get_csv_field "$endsnapshot_files" 1)
-num_files=$(get_csv_field "$endsnapshot_files" 2)
-
-### Get #funcs etc. of last snapshot
-end_snapshot_file="results/${o_project:?}/${end_snapshot:?}/joint_function_ab_smell_snapshot.csv"
-log_info "Getting number functions and so on of last snapshot from ${end_snapshot_file:?}"
-
-funcs_fkloc_floacratio=$(csvsql -q '"' -d ',' --tables subject --query 'select count(*) functions, sum(FUNCTION_LOC) / 1000.0 as kloc, sum(LOAC) * 100.0 / sum(FUNCTION_LOC) as loacratio from subject' "$end_snapshot_file")
-if [ $? -ne 0 ]
-then
-    edie "Failed to get statistics of last snapshot from ${end_snapshot_file:?}"
-fi
-log_debug "$funcs_fkloc_floacratio"
-
-## Remove header
-funcs_fkloc_floacratio=$( printf '%s\n' "$funcs_fkloc_floacratio"|tail -n +2 )
-
-num_funcs=$(get_csv_field "$funcs_fkloc_floacratio" 1)
-fkloc=$(get_csv_field     "$funcs_fkloc_floacratio" 2)
-flocratio=$(get_csv_field "$funcs_fkloc_floacratio" 3)
-
-### Get % of annotated funcs of last snapshot
-log_info "Getting percentage of annotated functions of last snapsnot from ${end_snapshot_file:?}"
-
-feature_funcs_ratio=$(csvsql -q '"' -d ',' --tables subject --query \
-			     'select (select count(*) from subject where NOFL > 0) * 100.0 / count(*) as annotated_funcs_percent from subject' \
-		      "${end_snapshot_file:?}" )
-if [ $? -ne 0 ]
-then
-    edie "Failed to get statistics of last snapshot from ${end_snapshot_file:?}"
-fi
-log_debug "$feature_funcs_ratio"
-
-## Remove header
-feature_funcs_ratio=$( printf '%s\n' "$feature_funcs_ratio"|tail -n +2 )
-
-
-### Determine number of all commits, irrespective of whether they are
-### merges or modify .c files
-repo_dir=repos/"${o_project:?}"
-num_all_commits=$(cd "${repo_dir:?}" && git rev-list --all --count)
-if [ $? -ne 0 ]
-then
-    edie "Failed to count commits in repository ${repo_dir:?}"
-fi
+### Reformat the dates
+out_start_date=$( mm_yyyy_date_from_timestamp "$starttime" )
+out_end_date=$( mm_yyyy_date_from_timestamp   "$endtime" )
+log_debug "start date: $out_start_date"
+log_debug "end date: $out_end_date"
 
 ### Determine number of relevant commits (non-merge, .c-modifying commits)
-commits_file="results/${o_project:?}/revisionsFull.csv"
-log_info "Determining oldest and newest commit and number of relevant commits from ${commits_file:?}"
+commits_file="${o_project:?}/results/revisionsFull.csv"
+log_info "Determining number of relevant commits from ${commits_file:?}"
 
-mint_maxt_relcomms=$(csvsql -q '"' -d ',' --tables revs --query 'select min(` timestamp`), max(` timestamp`), count(*) from revs' "${commits_file:?}")
+relevant_commits=$(csvsql -q '"' -d ',' --tables revs --query 'SELECT COUNT(DISTINCT commit_id) AS relevant_commits FROM revs' "${commits_file:?}")
 if [ $? -ne 0 ]
 then
     edie "Failed to count commits in ${commit_file:?}"
 fi
-log_debug "$mint_maxt_relcomms"
-mint_maxt_relcomms=$( printf '%s\n' "$mint_maxt_relcomms"|tail -n +2 )
-first_commit_datetime=$(get_csv_field "$mint_maxt_relcomms" 1)
-last_commit_datetime=$(get_csv_field "$mint_maxt_relcomms" 2)
-num_relevant_commits=$(get_csv_field "$mint_maxt_relcomms" 3)
-log_debug "first_commit_datetime: $first_commit_datetime"
-log_debug "last_commit_datetime: $last_commit_datetime"
+log_debug "$relevant_commits"
+num_relevant_commits=$(get_csv_field "$relevant_commits" relevant_commits)
 log_debug "num_relevant_commits: $num_relevant_commits"
 
-### Reformat the dates
-out_start_date=$( reformat_date "$first_commit_datetime" )
-out_end_date=$( reformat_date   "$last_commit_datetime" )
+### Get date of last snapshot
+snapshots_file="${o_project:?}/results/snapshots.csv"
+log_info "Determining newest snapshot from ${snapshots_file:?}"
+
+newest_snapshot_date=$(csvsql -q '"' -d ',' --tables snapshots --query 'SELECT snapshot_date FROM snapshots ORDER BY snapshot_date DESC LIMIT 1' "${snapshots_file:?}")
+if [ $? -ne 0 ]
+then
+    edie "Failed to determine newest snapshot ${snapshots_file:?}"
+fi
+log_debug "$newest_snapshot_date"
+newest_snapshot_date=$(get_csv_field "$newest_snapshot_date" SNAPSHOT_DATE)
+log_debug "newest_snapshot_date: $newest_snapshot_date"
+
+### Get #funcs etc. of last snapshot
+all_functions_file="${o_project:?}/results/${newest_snapshot_date:?}/all_functions.csv"
+abres_file="${o_project:?}/results/${newest_snapshot_date:?}/ABRes.csv"
+log_info "Getting number files, functions, total LOC and LOAC of last snapshot from ${all_functions_file:?} and ${abres_file:?}"
+
+
+tmp_all_funcs_file=$(mktemp -t stat-subject.all_funcs.XXXXXXXX.csv) || edie "Failed to create temp file"
+tmp_ab_funcs_file=$(mktemp -t stat-subject.ab_funcs.XXXXXXXX.csv) || edie "Failed to create temp file"
+
+csvsql -q '"' -d ',' --tables allf,ab --query "SELECT COUNT(DISTINCT allf.FILE) AS num_files, COUNT(*) AS total_functions, SUM(FUNCTION_LOC) AS total_loc, SUM(LOAC) as total_loac FROM allf LEFT JOIN ab ON allf.FILE = ab.FILE AND allf.FUNCTION_SIGNATURE=ab.FUNCTION_SIGNATURE" "$all_functions_file" "$abres_file" > "${tmp_all_funcs_file:?}"
+if [ $? -ne 0 ]
+then
+    edie "Failed to get statistics of last snapshot from ${all_functions_file:?} and ${abres_file:?}"
+fi
+
+csvsql -q '"' -d ',' --tables ab --query "SELECT COUNT(*) AS ab_functions FROM ab" "$abres_file" > "${tmp_ab_funcs_file}"
+if [ $? -ne 0 ]
+then
+    edie "Failed to get statistics of last snapshot from ${abres_file:?}"
+fi
+
+files_allfuncs_loc_loac_abfuncs=$(csvjoin -d ',' -q '"' "$tmp_all_funcs_file" "$tmp_ab_funcs_file")
+
+log_debug "$files_allfuncs_loc_loac_abfuncs"
+rm -f "$tmp_all_funcs_file" "$tmp_ab_funcs_file"
+
+perc_abfuncs_perc_loac_kloc=$(printf '%s\n' "$files_allfuncs_loc_loac_abfuncs"|csvsql -d ',' -q '"' --tables t --query "SELECT CAST(ROUND((100.0 * ab_functions) / total_functions, 0) AS INT) perc_abfuncs,CAST(ROUND((100.0 * total_loac) / total_loc, 0) AS INT) perc_loac, CAST(ROUND(total_loc/1000.0, 0) AS INT) kloc FROM t" /dev/stdin)
+
+log_debug "$perc_abfuncs_perc_loac_kloc"
+
+num_files=$(get_csv_field "$files_allfuncs_loc_loac_abfuncs" num_files)
+num_funcs=$(get_csv_field "$files_allfuncs_loc_loac_abfuncs" total_functions)
+fkloc=$(get_csv_field     "$perc_abfuncs_perc_loac_kloc" kloc)
+flocratio=$(get_csv_field "$perc_abfuncs_perc_loac_kloc" perc_loac)
+feature_funcs_ratio=$(get_csv_field "$perc_abfuncs_perc_loac_kloc" perc_abfuncs)
+
+log_debug "num_files: $num_files"
+log_debug "num_funcs: $num_funcs"
+log_debug "fkloc: $fkloc"
+log_debug "flocratio: $flocratio"
+log_debug "feature_funcs_ratio: $feature_funcs_ratio"
+
+out_num_all_commits=$(thousep "$num_all_commits")
+out_num_files=$(thousep "$num_files")
+out_num_funcs=$(thousep "$num_funcs")
+out_fkloc=$(thousep "$fkloc")
 
 ### Final output
 export LC_NUMERIC=C
 log_info "Statistics for project $o_project"
 log_info "Format: <name> & start-date & end-date & commits & files & funcs & (%annotated funcs) & fkloc & floac%"
-printf '%9s & %7s & %7s & %d & %5d & %6d & (%.1f\\,\\%%) & %5.1f & (%.1f\\,\\%%)\n' \
-       "${o_name}" "$out_start_date" "$out_end_date" $num_all_commits $num_files $num_funcs "$feature_funcs_ratio" "$fkloc" "$flocratio"
+printf             '%18s & %17s & %17s & %s & %s & %s & \\subjectPercentAnnotatedFunctions{%d} & %s & \\subjectPercentFunctionLoac{%d} \\\\\n' \
+       "${o_name}" "$out_start_date" "$out_end_date" "$out_num_all_commits" "$out_num_files" "$out_num_funcs" "$feature_funcs_ratio" "$out_fkloc" "$flocratio"
