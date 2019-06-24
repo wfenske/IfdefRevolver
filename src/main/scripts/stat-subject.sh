@@ -190,7 +190,8 @@ log_debug "$start_end_totalcommits"
 
 starttime=$(get_csv_field "$start_end_totalcommits" starttime)
 endtime=$(get_csv_field "$start_end_totalcommits" endtime)
-num_all_commits=$(get_csv_field "$start_end_totalcommits" total_commits)
+##num_all_commits=$(get_csv_field "$start_end_totalcommits" total_commits)
+num_all_commits=$(git -C "repos/${o_project:?}" rev-list HEAD --count)
 
 ### Reformat the dates
 out_start_date=$( mm_yyyy_date_from_timestamp "$starttime" )
@@ -260,6 +261,14 @@ fkloc=$(get_csv_field     "$perc_abfuncs_perc_loac_kloc" kloc)
 flocratio=$(get_csv_field "$perc_abfuncs_perc_loac_kloc" perc_loac)
 feature_funcs_ratio=$(get_csv_field "$perc_abfuncs_perc_loac_kloc" perc_abfuncs)
 
+domain_file="${o_project:?}/results/domain.csv"
+domain=$(cat "$domain_file")
+if [ $? -ne 0 ]
+then
+    edie "Failed to read domain from ${domain_file:?}"
+fi
+domain=$(get_csv_field "$domain" domain)
+
 log_debug "num_files: $num_files"
 log_debug "num_funcs: $num_funcs"
 log_debug "fkloc: $fkloc"
@@ -270,10 +279,12 @@ out_num_all_commits=$(thousep "$num_all_commits")
 out_num_files=$(thousep "$num_files")
 out_num_funcs=$(thousep "$num_funcs")
 out_fkloc=$(thousep "$fkloc")
+out_feature_funcs_ratio=$(printf '\\subjectPercentAnnotatedFunctions{%d}\n' $feature_funcs_ratio)
+out_flocratio=$(printf           '\\subjectPercentFunctionLoac{%d}\n'       $flocratio)
 
 ### Final output
 export LC_NUMERIC=C
 log_info "Statistics for project $o_project"
-log_info "Format: <name> & start-date & end-date & commits & files & funcs & (%annotated funcs) & fkloc & floac%"
-printf             '%18s & %17s & %17s & %s & %s & %s & \\subjectPercentAnnotatedFunctions{%d} & %s & \\subjectPercentFunctionLoac{%d} \\\\\n' \
-       "${o_name}" "$out_start_date" "$out_end_date" "$out_num_all_commits" "$out_num_files" "$out_num_funcs" "$feature_funcs_ratio" "$out_fkloc" "$flocratio"
+log_info "Format: <name> & start-date & end-date & commits & files & funcs & (%annotated funcs) & fkloc & floac & domain%"
+printf             '%18s & %17s & %17s & %17s & %17s & %17s & %37s & %5s & %31s & %37s \\\\\n' \
+       "${o_name}" "$out_start_date" "$out_end_date" "$out_num_all_commits" "$out_num_files" "$out_num_funcs" "$out_feature_funcs_ratio" "$out_fkloc" "$out_flocratio" "$domain"

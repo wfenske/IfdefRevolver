@@ -100,7 +100,7 @@ regressionmodels: $(REGRESSIONMODELS)
 
 subject_stats: $(SUBJECT_STATS_TEX)
 
-$(SUBJECT_STATS_TEX): $(RDATA) $(STAT_SUBJECT_PROG) $(RESULTS_DIR)/commitParents.csv $(RESULTS_DIR)/revisionsFull.csv $(RESULTS_DIR)/snapshots.csv
+$(SUBJECT_STATS_TEX): $(RDATA) $(STAT_SUBJECT_PROG) $(RESULTS_DIR)/commitParents.csv $(RESULTS_DIR)/revisionsFull.csv $(RESULTS_DIR)/snapshots.csv $(RESULTS_DIR)/domain.csv
 	rm -f $@; \
 	if ! $(STAT_SUBJECT_PROG) -p $(PROJECT) 2>&1 > $@|tee $(SUBJECT_STATS_LOG) >&2; \
 	then \
