@@ -22,8 +22,8 @@ sysNames <- args$args
 getDescriptiveStatistics <- function(projectPath) {
     sysName <- basename(projectPath)
     rdsName <- file.path(projectPath, "results", "joint_data.rds")
-    fnameOutBinaryVariables <- file.path(projectPath, "results", "descriptive-stats-binary.csv")
-    fnameOutMetricVariables <- file.path(projectPath, "results", "descriptive-stats-metric.csv")
+    fnameOutBinaryVariables <- file.path(projectPath, "results", "descriptive_stats_binary.csv")
+    fnameOutMetricVariables <- file.path(projectPath, "results", "descriptive_stats_metric.csv")
     
     eprintf("DEBUG: Reading data for %s\n", sysName)
     df <- readRDS(rdsName)
