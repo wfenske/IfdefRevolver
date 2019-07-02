@@ -20,6 +20,11 @@ GROUP_DIFFS_CHANGED_CSV  = $(RESULTS_DIR)/group_differences_changed.csv
 GROUP_DIFFS_COMMITS_CSV  = $(RESULTS_DIR)/group_differences_commits.csv
 GROUP_DIFFS_LCH_CSV      = $(RESULTS_DIR)/group_differences_lch.csv
 
+DESCRIPTIVE_STATS_BINARY_CSV = $(RESULTS_DIR)/descriptive_stats_binary.csv
+DESCRIPTIVE_STATS_METRIC_CSV = $(RESULTS_DIR)/descriptive_stats_metric.csv
+DESCRIPTIVE_STATS_BINARY_LOG = $(LOG_DIR)/descriptive_stats_binary.log
+DESCRIPTIVE_STATS_METRIC_LOG = $(LOG_DIR)/descriptive_stats_metric.log
+
 GROUP_DIFFS_CHANGED_LOG  = $(LOG_DIR)/group_differences_changed.log
 GROUP_DIFFS_COMMITS_LOG  = $(LOG_DIR)/group_differences_commits.log
 GROUP_DIFFS_LCH_LOG      = $(LOG_DIR)/group_differences_lch.log
@@ -31,15 +36,16 @@ SPEARMAN_LOG     = $(LOG_DIR)/spearman.log
 
 IFDEFREVOLVER_HOME ?= $(HOME)/src/skunk/IfdefRevolver/src/main/scripts
 
-COMPARE_LOCS_PROG = $(IFDEFREVOLVER_HOME)/compare-locs.R
-RATIOSCMP_PROG    = $(IFDEFREVOLVER_HOME)/ratioscmp.R
-GROUP_DIFFS_PROG  = $(IFDEFREVOLVER_HOME)/test-group-differences.R
-SPEARMAN_PROG     = $(IFDEFREVOLVER_HOME)/spearman.R
-REG_COMMONS       = $(IFDEFREVOLVER_HOME)/regression-common.R
-NBREG_PROG        = $(IFDEFREVOLVER_HOME)/nb.R
-LOGITREG_PROG     = $(IFDEFREVOLVER_HOME)/logit.R
-RDS_FROM_CSV_PROG = $(IFDEFREVOLVER_HOME)/rds-from-csv.R
-STAT_SUBJECT_PROG = $(IFDEFREVOLVER_HOME)/stat-subject.sh
+COMPARE_LOCS_PROG      = $(IFDEFREVOLVER_HOME)/compare-locs.R
+RATIOSCMP_PROG         = $(IFDEFREVOLVER_HOME)/ratioscmp.R
+GROUP_DIFFS_PROG       = $(IFDEFREVOLVER_HOME)/test-group-differences.R
+SPEARMAN_PROG          = $(IFDEFREVOLVER_HOME)/spearman.R
+REG_COMMONS            = $(IFDEFREVOLVER_HOME)/regression-common.R
+NBREG_PROG             = $(IFDEFREVOLVER_HOME)/nb.R
+LOGITREG_PROG          = $(IFDEFREVOLVER_HOME)/logit.R
+RDS_FROM_CSV_PROG      = $(IFDEFREVOLVER_HOME)/rds-from-csv.R
+STAT_SUBJECT_PROG      = $(IFDEFREVOLVER_HOME)/stat-subject.sh
+DESCRIPTIVE_STATS_PROG = $(IFDEFREVOLVER_HOME)/descriptive-statistics.R
 
 COMPARE_LOC_OPTS ?= --no-title --ymax=400
 RDS_FROM_CSV_OPTS ?=
@@ -64,15 +70,6 @@ NBREG_BALANCED_LOG             = $(LOG_DIR)/nb-reg-balanced.log
 NBREG_STD_CSV                  = $(RESULTS_DIR)/nb-reg-std.csv
 NBREG_STD_LOG                  = $(LOG_DIR)/nb-reg-std.log
 
-##NBREG_CHANGED_CSV              = $(RESULTS_DIR)/nb-reg-changed.csv
-##NBREG_CHANGED_LOG              = $(LOG_DIR)/nb-reg-changed.log
-##
-##NBREG_ANNOTATED_CSV            = $(RESULTS_DIR)/nb-reg-annotated.csv
-##NBREG_ANNOTATED_LOG            = $(LOG_DIR)/nb-reg-annotated.log
-##
-##NBREG_ANNOTATED_CHANGED_CSV    = $(RESULTS_DIR)/nb-reg-annotated-changed.csv
-##NBREG_ANNOTATED_CHANGED_LOG    = $(LOG_DIR)/nb-reg-annotated-changed.log
-
 LOGITREG_REGULAR_CSV           = $(RESULTS_DIR)/logit-reg.csv
 LOGITREG_REGULAR_LOG           = $(LOG_DIR)/logit-reg.log
 
@@ -82,11 +79,10 @@ LOGITREG_BALANCED_LOG          = $(LOG_DIR)/logit-reg-balanced.log
 LOGITREG_STD_CSV               = $(RESULTS_DIR)/logit-reg-std.csv
 LOGITREG_STD_LOG               = $(LOG_DIR)/logit-reg-std.log
 
-REGRESSIONMODELS = $(NBREG_REGULAR_CSV) $(LOGITREG_REGULAR_CSV) $(NBREG_BALANCED_CSV) $(LOGITREG_BALANCED_CSV) $(NBREG_STD_CSV) $(LOGITREG_STD_CSV)
+REGRESSIONMODELS = $(LOGITREG_REGULAR_CSV) $(NBREG_REGULAR_CSV) $(LOGITREG_BALANCED_CSV) $(LOGITREG_STD_CSV)
 ##REGRESSIONMODELS = $(LOGITREG_REGULAR_CSV)
-## $(NBREG_CHANGED_CSV) $(NBREG_ANNOTATED_CSV) $(NBREG_ANNOTATED_CHANGED_CSV) 
 
-all: group_diffs locplots spearman regressionmodels subject_stats  #ratiosplots
+all: group_diffs locplots spearman regressionmodels subject_stats descriptive_stats #ratiosplots
 
 group_diffs: $(GROUP_DIFFS_CSV)
 
@@ -99,6 +95,24 @@ locplots: $(LOC_PLOTS)
 regressionmodels: $(REGRESSIONMODELS)
 
 subject_stats: $(SUBJECT_STATS_TEX)
+
+descriptive_stats: $(DESCRIPTIVE_STATS_BINARY_CSV) $(DESCRIPTIVE_STATS_METRIC_CSV)
+
+$(DESCRIPTIVE_STATS_BINARY_CSV): $(RDATA) $(DESCRIPTIVE_STATS_PROG)
+	rm -f $@; \
+	if ! $(DESCRIPTIVE_STATS_PROG) --type=binary $(PROJECT) 2>&1|tee $(DESCRIPTIVE_STATS_BINARY_LOG) >&2; \
+	then \
+		rm -f $@; \
+		false; \
+	fi
+
+$(DESCRIPTIVE_STATS_METRIC_CSV): $(RDATA) $(DESCRIPTIVE_STATS_PROG)
+	rm -f $@; \
+	if ! $(DESCRIPTIVE_STATS_PROG) --type=metric $(PROJECT) 2>&1|tee $(DESCRIPTIVE_STATS_METRIC_LOG) >&2; \
+	then \
+		rm -f $@; \
+		false; \
+	fi
 
 $(SUBJECT_STATS_TEX): $(RDATA) $(STAT_SUBJECT_PROG) $(RESULTS_DIR)/commitParents.csv $(RESULTS_DIR)/revisionsFull.csv $(RESULTS_DIR)/snapshots.csv $(RESULTS_DIR)/domain.csv
 	rm -f $@; \
@@ -156,12 +170,12 @@ $(LOGITREG_REGULAR_CSV): $(RDATA) $(LOGITREG_PROG) $(REG_COMMONS)
 		false; \
 	fi
 
-$(NBREG_BALANCED_CSV): $(RDATA) $(NBREG_PROG) $(REG_COMMONS)
-	if ! $(NBREG_PROG) -b -p $(PROJECT) 2>&1 > $(NBREG_BALANCED_CSV)|tee $(NBREG_BALANCED_LOG) >&2; \
-	then \
-		rm -f $(NBREG_BALANCED_CSV); \
-		false; \
-	fi
+##$(NBREG_BALANCED_CSV): $(RDATA) $(NBREG_PROG) $(REG_COMMONS)
+##	if ! $(NBREG_PROG) -b -p $(PROJECT) 2>&1 > $(NBREG_BALANCED_CSV)|tee $(NBREG_BALANCED_LOG) >&2; \
+##	then \
+##		rm -f $(NBREG_BALANCED_CSV); \
+##		false; \
+##	fi
 
 $(LOGITREG_BALANCED_CSV): $(RDATA) $(LOGITREG_PROG) $(REG_COMMONS)
 	if ! $(LOGITREG_PROG) -b -p $(PROJECT) 2>&1 > $(LOGITREG_BALANCED_CSV)|tee $(LOGITREG_BALANCED_LOG) >&2; \
@@ -170,12 +184,12 @@ $(LOGITREG_BALANCED_CSV): $(RDATA) $(LOGITREG_PROG) $(REG_COMMONS)
 		false; \
 	fi
 
-$(NBREG_STD_CSV): $(RDATA) $(NBREG_PROG) $(REG_COMMONS)
-	if ! $(NBREG_PROG) -s -p $(PROJECT) 2>&1 > $(NBREG_STD_CSV)|tee $(NBREG_STD_LOG) >&2; \
-	then \
-		rm -f $(NBREG_STD_CSV); \
-		false; \
-	fi
+##$(NBREG_STD_CSV): $(RDATA) $(NBREG_PROG) $(REG_COMMONS)
+##	if ! $(NBREG_PROG) -s -p $(PROJECT) 2>&1 > $(NBREG_STD_CSV)|tee $(NBREG_STD_LOG) >&2; \
+##	then \
+##		rm -f $(NBREG_STD_CSV); \
+##		false; \
+##	fi
 
 $(LOGITREG_STD_CSV): $(RDATA) $(LOGITREG_PROG) $(REG_COMMONS)
 	if ! $(LOGITREG_PROG) -s -p $(PROJECT) 2>&1 > $(LOGITREG_STD_CSV)|tee $(LOGITREG_STD_LOG) >&2; \

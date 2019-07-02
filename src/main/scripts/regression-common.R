@@ -33,7 +33,7 @@ balanceAnnotatedAndUnannotatedFunctions <- function(df) {
 }
 
 removeNaFunctions <- function(df) {
-    subset(df, !is.na(AGE) && is.finite(AGE) && !is.na(MRC) && is.finite(MRC))
+    subset(df, !is.na(AGE) & is.finite(AGE) & !is.na(MRC) & is.finite(MRC) & !is.na(PC) & is.finite(PC))
 }
 
 mcfaddensPseudoRSquared <- function(model, nullmodel) {
@@ -70,6 +70,7 @@ readData <- function(commandLineArgs) {
     ## Total number of functions in the snapshot
     result$TNF <- sizePerSnapshotTable[result$SNAPSHOT_DATE]
     result$log2TNF <- log2(result$TNF + 1)
+    result$log2LOACratio <- log2(result$LOACratio + 1)
     
     return (result)
 }
@@ -87,24 +88,17 @@ csvCleanWarnMsg <- function(warnMsg) {
 
 ##AGE_VAR <- "sqrtAGE"
 ##MRC_VAR <- "sqrtMRC"
-AGE_VAR <- "log2AGE"
+##AGE_VAR <- "log2AGE"
 MRC_VAR <- "log2MRC"
 PC_VAR  <- "log2PC"
-TNF_VAR <- "log2TNF" # total number of functions
+##TNF_VAR <- "log2TNF" # total number of functions
 
-VARS_CONTROLS            <- c("log2LOC", AGE_VAR, MRC_VAR, PC_VAR, TNF_VAR)
-VARS_CPP_UNTRANSFORMED   <- c("FL", "FC", "CND", "NEG", "LOACratio")
-VARS_CPP_LOG_TRANSFORMED <- c("log2FL", "log2FC", "log2CND", "log2NEG", "LOACratio")
+VARS_CONTROLS            <- c("log2LOC", MRC_VAR, PC_VAR)
+VARS_CPP                 <- c("log2CND", "log2FC", "log2FL", "log2NEG", "LOACratio")
 
-FORMULA_CONTROLS                 <- VARS_CONTROLS
+FORMULA_CONTROLS         <- VARS_CONTROLS
 
-##FORMULA_CPP_UNTRANSFORMED_ONLY   <- VARS_CPP_UNTRANSFORMED
-##FORMULA_CPP_LOG_TRANSFORMED_ONLY <- VARS_CPP_LOG_TRANSFORMED
-
-FORMULA_FULL_UNTRANSFORMED       <- c(VARS_CPP_UNTRANSFORMED,   VARS_CONTROLS)
-FORMULA_FULL_LOG_TRANSFORMED     <- c(VARS_CPP_LOG_TRANSFORMED, VARS_CONTROLS)
-
-MAX_FORMULA_CODE <- 2
+FORMULA_FULL             <- c(VARS_CPP, VARS_CONTROLS)
 
 ### > aggregate(df.mcfaddens$MCFADDEN, by=list(Formula=df.mcfaddens$FORMULA), FUN=mean)
 ###                                                                          Formula          x
@@ -135,6 +129,8 @@ MAX_FORMULA_CODE <- 2
 ### number of function in the current snapshot) as an additional
 ### predictor improves the models compared to not including TNF.
 
+MAX_FORMULA_CODE <- 1
+
 getRegressionIndepsByNumber <- function(formulaCode) {
 ###    if (formulaCode == 0)
 ###        return(FORMULA_CONTROLS)
@@ -158,14 +154,12 @@ getRegressionIndepsByNumber <- function(formulaCode) {
     if (formulaCode == 0)
         return(FORMULA_CONTROLS)
     if (formulaCode == 1)
-        return(FORMULA_FULL_UNTRANSFORMED)
-    if (formulaCode == 2)
-        return(FORMULA_FULL_LOG_TRANSFORMED)
+        return(FORMULA_FULL)
 }
 
 standardizeVariables <- function(df) {
     sdf <- data.frame(df) ## copy original data frame
-    allIndeps <- c(VARS_CONTROLS, VARS_CPP_UNTRANSFORMED, VARS_CPP_LOG_TRANSFORMED)
+    allIndeps <- c(VARS_CONTROLS, VARS_CPP)
     allUniqueIndeps <- allIndeps[!duplicated(allIndeps)]
     for (var in allUniqueIndeps) {
         eprintf("DEBUG: standardizing independent variable %s\n", var)
