@@ -43,6 +43,7 @@ getDescriptiveStatistics <- function(projectPath) {
              , 'LOAC'
              , 'LOACratio'
              , 'LOC'
+             , 'AGE'
              , 'MRC'
              , 'PC'
              , 'COMMITS'
