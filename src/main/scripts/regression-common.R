@@ -86,19 +86,25 @@ csvCleanWarnMsg <- function(warnMsg) {
     return(warnMsg)
 }
 
-##AGE_VAR <- "sqrtAGE"
-##MRC_VAR <- "sqrtMRC"
-##AGE_VAR <- "log2AGE"
+AGE_VAR <- "log2AGE"
 MRC_VAR <- "log2MRC"
 PC_VAR  <- "log2PC"
 ##TNF_VAR <- "log2TNF" # total number of functions
 
 VARS_CONTROLS            <- c("log2LOC", MRC_VAR, PC_VAR)
-VARS_CPP                 <- c("log2CND", "log2FC", "log2FL", "log2NEG", "LOACratio")
+VARS_CONTROLS_AGE        <- c(VARS_CONTROLS, AGE_VAR)
+
+VARS_CPP_NT              <- c(    "CND",     "FC",     "FL",     "NEG", "LOACratio")
+VARS_CPP_LOG             <- c("log2CND", "log2FC", "log2FL", "log2NEG", "LOACratio")
 
 FORMULA_CONTROLS         <- VARS_CONTROLS
+FORMULA_CONTROLS_AGE     <- VARS_CONTROLS_AGE
 
-FORMULA_FULL             <- c(VARS_CPP, VARS_CONTROLS)
+FORMULA_FULL_NT          <- c(VARS_CPP_NT, VARS_CONTROLS)
+FORMULA_FULL_NT_AGE      <- c(VARS_CPP_NT, VARS_CONTROLS_AGE)
+
+FORMULA_FULL_LOG         <- c(VARS_CPP_LOG, VARS_CONTROLS)
+FORMULA_FULL_LOG_AGE     <- c(VARS_CPP_LOG, VARS_CONTROLS_AGE)
 
 ### > aggregate(df.mcfaddens$MCFADDEN, by=list(Formula=df.mcfaddens$FORMULA), FUN=mean)
 ###                                                                          Formula          x
@@ -129,37 +135,28 @@ FORMULA_FULL             <- c(VARS_CPP, VARS_CONTROLS)
 ### number of function in the current snapshot) as an additional
 ### predictor improves the models compared to not including TNF.
 
-MAX_FORMULA_CODE <- 1
-
 getRegressionIndepsByNumber <- function(formulaCode) {
-###    if (formulaCode == 0)
-###        return(FORMULA_CONTROLS)
-###    if (formulaCode == 1)
-###        return(FORMULA_CONTROLS_TNF)
-###    
-###    if (formulaCode == 2)
-###        return(FORMULA_CPP_UNTRANSFORMED_ONLY)
-###    if (formulaCode == 3)
-###        return(FORMULA_CPP_LOG_TRANSFORMED_ONLY)
-###    
-###    if (formulaCode == 4)
-###        return(FORMULA_FULL_UNTRANSFORMED)
-###    if (formulaCode == 5)
-###        return(FORMULA_FULL_LOG_TRANSFORMED)
-###    
-###    if (formulaCode == 6)
-###        return(FORMULA_FULL_UNTRANSFORMED_TNF)
-###    if (formulaCode == 7)
-###        return(FORMULA_FULL_LOG_TRANSFORMED_TNF)
     if (formulaCode == 0)
         return(FORMULA_CONTROLS)
     if (formulaCode == 1)
-        return(FORMULA_FULL)
+        return(FORMULA_CONTROLS_AGE)
+    
+    if (formulaCode == 2)
+        return(FORMULA_FULL_NT)
+    if (formulaCode == 3)
+        return(FORMULA_FULL_NT_AGE)
+    
+    if (formulaCode == 4)
+        return(FORMULA_FULL_LOG)
+    if (formulaCode == 5)
+        return(FORMULA_FULL_LOG_AGE)
 }
+
+MAX_FORMULA_CODE <- 5
 
 standardizeVariables <- function(df) {
     sdf <- data.frame(df) ## copy original data frame
-    allIndeps <- c(VARS_CONTROLS, VARS_CPP)
+    allIndeps <- c(VARS_CONTROLS, VARS_CONTROLS_AGE, VARS_CPP_NT, VARS_CPP_LOG)
     allUniqueIndeps <- allIndeps[!duplicated(allIndeps)]
     for (var in allUniqueIndeps) {
         eprintf("DEBUG: standardizing independent variable %s\n", var)
