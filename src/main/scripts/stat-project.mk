@@ -11,7 +11,7 @@ LOG_DIR      = $(PROJECT)/logs
 
 RDATA            = $(RESULTS_DIR)/joint_data.rds
 
-SUBJECT_STATS_TEX = $(RESULTS_DIR)/subject_stats.tex
+SUBJECT_STATS_CSV = $(RESULTS_DIR)/subject_stats.csv
 SUBJECT_STATS_LOG = $(LOG_DIR)/subject_stats.log
 
 GROUP_DIFFS_CSV  = $(RESULTS_DIR)/group_differences.csv
@@ -94,7 +94,7 @@ locplots: $(LOC_PLOTS)
 
 regressionmodels: $(REGRESSIONMODELS)
 
-subject_stats: $(SUBJECT_STATS_TEX)
+subject_stats: $(SUBJECT_STATS_CSV)
 
 descriptive_stats: $(DESCRIPTIVE_STATS_BINARY_CSV) $(DESCRIPTIVE_STATS_METRIC_CSV)
 
@@ -114,9 +114,9 @@ $(DESCRIPTIVE_STATS_METRIC_CSV): $(RDATA) $(DESCRIPTIVE_STATS_PROG)
 		false; \
 	fi
 
-$(SUBJECT_STATS_TEX): $(RDATA) $(STAT_SUBJECT_PROG) $(RESULTS_DIR)/commitParents.csv $(RESULTS_DIR)/revisionsFull.csv $(RESULTS_DIR)/snapshots.csv $(RESULTS_DIR)/domain.csv
+$(SUBJECT_STATS_CSV): $(RDATA) $(STAT_SUBJECT_PROG) $(RESULTS_DIR)/commitParents.csv $(RESULTS_DIR)/revisionsFull.csv $(RESULTS_DIR)/snapshots.csv $(RESULTS_DIR)/domain.csv
 	rm -f $@; \
-	if ! $(STAT_SUBJECT_PROG) -p $(PROJECT) 2>&1 > $@|tee $(SUBJECT_STATS_LOG) >&2; \
+	if ! $(STAT_SUBJECT_PROG) -p $(PROJECT) -f csv 2>&1 > $@|tee $(SUBJECT_STATS_LOG) >&2; \
 	then \
 		rm -f $@; \
 		false; \

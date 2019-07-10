@@ -50,7 +50,7 @@ edie()
 usage()
 {
     echo "Usage:"
-    echo " $me [-vq] -p PROJECT [-n PRETTY_NAME]"
+    echo " $me [-vq] -p PROJECT [-n PRETTY_NAME] [-f OUTPUT_FORMAT]"
     echo "Get help by executing:"
     echo " $me -h"
 }
@@ -75,6 +75,7 @@ help()
     echo "            located in folders named snapshots/<PROJECT>/<YYYY-MM-DD> below the"
     echo "            current working directory."
     echo " -n         Pretty project name for the output."
+    echo " -f         Format of output, must be one of {tex,csv}. [default: $o_format]"
     echo " -v         Print more log messages."
     echo " -q         Print less log messages."
     echo " -h         Print this help screen and exit."
@@ -114,8 +115,10 @@ thousep() {
 
 unset o_project
 unset o_name
+unset o_format
+o_format=tex
 
-while getopts "hvqp:n:" o
+while getopts "hvqp:n:f:" o
 do
     case "$o" in
 	h) help
@@ -131,6 +134,21 @@ do
 	       usage_and_die
 	   fi
 	   o_project="$OPTARG"
+	   ;;
+	f) if [ -z "$OPTARG" ]
+	   then
+	       log_error "Output format must not be empty." >&2
+	       usage_and_die
+	   fi
+	   o_format="$OPTARG"
+	   case "$o_format" in
+	       csv|tex)
+		   true
+		   ;;
+	       *)
+		   log_error "Invalid output format.  Expected one of {tex,csv}, got \`$o_format'." >&2
+		   usage_and_die
+	   esac
 	   ;;
 	n) if [ -z "$OPTARG" ]
 	   then
@@ -153,7 +171,7 @@ fi
 
 if [ -z ${o_name+x} ]
 then
-    o_name=$(printf '\\subject%s\n' "$o_project"|tr -d '[0-9]')
+    o_name="$o_project"
     log_info "No pretty project name given, assuming, \`$o_name'"
 fi
 
@@ -257,7 +275,7 @@ log_debug "$perc_abfuncs_perc_loac_loc"
 
 num_files=$(get_csv_field "$files_allfuncs_loc_loac_abfuncs" num_files)
 num_funcs=$(get_csv_field "$files_allfuncs_loc_loac_abfuncs" total_functions)
-floc=$(get_csv_field     "$perc_abfuncs_perc_loac_loc" loc)
+sloc=$(get_csv_field     "$perc_abfuncs_perc_loac_loc" loc)
 flocratio=$(get_csv_field "$perc_abfuncs_perc_loac_loc" perc_loac)
 feature_funcs_ratio=$(get_csv_field "$perc_abfuncs_perc_loac_loc" perc_abfuncs)
 
@@ -271,20 +289,32 @@ domain=$(get_csv_field "$domain" domain)
 
 log_debug "num_files: $num_files"
 log_debug "num_funcs: $num_funcs"
-log_debug "floc: $floc"
+log_debug "sloc: $sloc"
 log_debug "flocratio: $flocratio"
 log_debug "feature_funcs_ratio: $feature_funcs_ratio"
-
-out_num_all_commits=$(thousep "$num_all_commits")
-out_num_files=$(thousep "$num_files")
-out_num_funcs=$(thousep "$num_funcs")
-out_floc=$(thousep "$floc")
-out_feature_funcs_ratio=$(printf '\\subjectPercentAnnotatedFunctions{%d}\n' $feature_funcs_ratio)
-out_flocratio=$(printf           '\\subjectPercentFunctionLoac{%d}\n'       $flocratio)
 
 ### Final output
 export LC_NUMERIC=C
 log_info "Statistics for project $o_project"
-log_info "Format: <name> & start-date & end-date & commits & files & funcs & (%annotated funcs) & floc & floac & domain%"
-printf             '%18s & %17s & %17s & %17s & %17s & %17s & %37s & %16s & %31s & %37s \\\\\n' \
-       "${o_name}" "$out_start_date" "$out_end_date" "$out_num_all_commits" "$out_num_files" "$out_num_funcs" "$out_feature_funcs_ratio" "$out_floc" "$out_flocratio" "$domain"
+case "$o_format" in
+    tex)
+	out_num_all_commits=$(thousep "$num_all_commits")
+	out_num_files=$(thousep "$num_files")
+	out_num_funcs=$(thousep "$num_funcs")
+	out_sloc=$(thousep "$sloc")
+	out_feature_funcs_ratio=$(printf '\\subjectPercentAnnotatedFunctions{%d}\n' $feature_funcs_ratio)
+	out_flocratio=$(printf           '\\subjectPercentFunctionLoac{%d}\n'       $flocratio)
+	out_project_name=$(printf '\\subject%s\n' "$o_project"|tr -d '[0-9]')
+	log_info "Format: <name> & start-date & end-date & commits & files & funcs & (%annotated funcs) & sloc & floac & domain%"
+	printf             '%18s & %17s & %17s & %17s & %17s & %17s & %37s & %16s & %31s & %37s \\\\\n' \
+			   "${out_project_name}" "$out_start_date" "$out_end_date" "$out_num_all_commits" "$out_num_files" "$out_num_funcs" "$out_feature_funcs_ratio" "$out_sloc" "$out_flocratio" "$domain"
+	;;
+    csv)
+	printf             'system,start_date,end_date,num_commits,num_files,num_funcs,annotated_funcs_percent,sloc,floc_percent,domain\n'
+	printf             '%s,%s,%s,%d,%d,%d,%d,%d,%d,%s\n' \
+			   "${o_project}" "$out_start_date" "$out_end_date" "$num_all_commits" "$num_files" "$num_funcs" "$feature_funcs_ratio" "$sloc" "$flocratio" "$domain"
+	;;
+    *) log_error "Internal error: Invalid output format: \`$o_format'"
+       exit 1
+       ;;
+esac
