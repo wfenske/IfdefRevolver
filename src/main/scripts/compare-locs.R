@@ -109,7 +109,7 @@ if (is.null(opts$output)) {
 ### Begin plot creation
 
 ##pdf(file=outputFn,width=7.5,height=3.6)
-cairo_pdf(file=outputFn,width=8,height=3.6)
+cairo_pdf(file=outputFn,width=7.5,height=3.6)
 
 ##x <- allData$FLgrouped
 ##y <- allData$LOC
@@ -149,30 +149,42 @@ if (opts$noXLabels) {
     xAxt <- NULL # default value
 }
 
-colors <- topo.colors(opts$divisions)
+##colors <- topo.colors(opts$divisions)
 
-txtScale <- 1.2
+## color-blind-friendly palette (palettes source: http://jfly.iam.u-tokyo.ac.jp/color/)
+##
+## Roughly: 1=gray, 2=orange, 3=light blue, 4=green, 5=yellow, 6=darkblue, 7=red, 8=magenta
+##
+## See https://www.datanovia.com/en/blog/ggplot-colors-best-tricks-you-will-love/ for a picture
+COLOR_PALETTE <- c("#999999", "#E69F00", "#56B4E9", "#009E73",
+                   "#F0E442", "#0072B2", "#D55E00", "#CC79A7")
+colorOffset <- 4
+colors <- COLOR_PALETTE[colorOffset:(colorOffset + opts$divisions - 1)]
+
+txtScale <- 1.3
 
 ## Format of margins is c(bottom, left, top, right)
 margins <- par()$mar
-margins[2] <- margins[2] + 4.5 ## increase left margin
+margins[2] <- margins[2] + 6.2 ## increase left margin
 margins[3] <- margins[3] - 4 ## decrease top margin
 ##if (opts$noXLabels) {
 ##    margins[1] <- margins[1] - 5 ## decrease bottom margin
 ##} else {
-    margins[1] <- margins[1] - 1 ## decrease bottom margin
+    margins[1] <- margins[1] - 1.3 ## decrease bottom margin
 ##}
-margins[4] <- margins[4] - 2 ## decrease right margin
+margins[4] <- margins[4] - 1.8 ## decrease right margin
 
 par(mar = margins)
 
-cex.lab <- 1.2*txtScale
+cex.lab <- 1.4*txtScale
+
+value.lab.scale <- 1.3 * txtScale
 
 bp <- invisible(boxplot(LOC ~ grouped
             , data=allData
             , cex=txtScale
             , cex.lab=cex.lab
-            , cex.axis=txtScale # size of value labels on x & y axis
+            , cex.axis=value.lab.scale # size of value labels on x & y axis
             #, cex.main=1
             #, cex.sub=1
             , xaxt=xAxt
@@ -197,7 +209,7 @@ if (is.null(xAxt)) {
 }
 
 if (isLoacRatio) {
-    mtext(yLab, side=2, line=5.7, cex=ycex, las=1
+    mtext(yLab, side=2, line=7, cex=ycex, las=1
         , font = 3 # 3=italics
         , family = "serif")
 } else {
