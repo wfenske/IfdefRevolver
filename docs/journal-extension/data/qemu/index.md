@@ -6,9 +6,7 @@ title: Data for qemu
 
 ## Raw Data
 
-The compressed raw data of this project exceeds 100MB, which could not
-be uploaded due to size restrictions.  The data will be made available
-shortly, at the lates by the end of August 2019.
+The raw data is [available here.](https://github.com/wfenske/IfdefRevolver/releases/download/v1.9/qemu-data.tar.gz)
 
 - The file `joint_data.csv` contains all the data collected by IfdefRevolver.
 - The files `YYYY-MM-DD/all_functions.csv` contains static metrics of all the functions in the respective snapshot.
