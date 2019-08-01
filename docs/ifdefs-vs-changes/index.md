@@ -1,8 +1,8 @@
 ---
 layout: default
-title: Online Appendix for "How Preprocessor Annotations (Do Not) Affect Maintainability"
+title: Online Appendix for "How Preprocessor Annotations (Do Not) Affect Maintainability" (GPCE 2017)
 ---
-# Online Appendix for "How Preprocessor Annotations (Do Not) Affect Maintainability: A Case Study on Change-Proneness"
+# Online Appendix for "How Preprocessor Annotations (Do Not) Affect Maintainability: A Case Study on Change-Proneness" (GPCE 2017)
   
 ## Tool Support
 
