@@ -219,7 +219,8 @@ Other Unix-like systems will probably work. Windows has not been tested.
    and without suspicious output.  `analysis.log` should conclude with
    a line saying something like
    
-   ``INFO 10:42:42 Successfully output aggregated change data for all 42 windows.
+   ``
+   INFO 10:42:42 Successfully output aggregated change data for all 42 windows.
    make[1]: Leaving directory '/home/user/projects'
    ``
 
