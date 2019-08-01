@@ -21,9 +21,9 @@ The raw data is [available here.](data.tar.gz)
 
 The first picture visuzalizes the distributions of the variables without log transformations, the second one after log transformation of the x- and/or y-axis.
 
-![Distribution of the data without log transformations](pic-distributions-no-log-scaling.png)
+![Distribution of the data without log transformations](distributions-no-log-scaling.png)
 
-![Distribution of the data after log transformation of x- and/or y-axes.](pic-distributions.png)
+![Distribution of the data after log transformation of x- and/or y-axes.](distributions.png)
 
 ## Relationship between Preprocessor Use and Function Size
 

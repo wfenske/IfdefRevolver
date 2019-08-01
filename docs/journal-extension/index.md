@@ -41,5 +41,26 @@ Vim  | `git@github.com:vim/vim.git`
 
 ## Data
   
-The data for all twenty subject systems used in the extended study is
-[available here.](data/).
+The data an visualizations for all twenty subject systems in the extended study are
+available here:
+
+1. [Apache](data/apache/)
+1. [Blender](data/blender/)
+1. [BusyBox](data/busybox/)
+1. [Cherokee](data/cherokee/)
+1. [Gimp](data/gimp/)
+1. [glibc](data/glibc/)
+1. [Gnumeric](data/gnumeric/)
+1. [gnuplot](data/gnuplot/)
+1. [libxml2](data/libxml2/)
+1. [mpv](data/mpv/)
+1. [MySQL](data/mysql/)
+1. [OpenLDAP](data/openldap/)
+1. [OpenVPN](data/openvpn/)
+1. [php](data/php/)
+1. [Pidgin](data/pidgin/)
+1. [PostgreSQL](data/postgresql/)
+1. [qemu](data/qemu/)
+1. [SQLite](data/sqlite/)
+1. [Subversion](data/subversion/)
+1. [Vim](data/vim/)
