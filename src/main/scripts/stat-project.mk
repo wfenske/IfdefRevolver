@@ -82,7 +82,7 @@ LOGITREG_STD_LOG               = $(LOG_DIR)/logit-reg-std.log
 REGRESSIONMODELS = $(LOGITREG_REGULAR_CSV) $(NBREG_REGULAR_CSV) $(LOGITREG_BALANCED_CSV) $(LOGITREG_STD_CSV)
 ##REGRESSIONMODELS = $(LOGITREG_REGULAR_CSV)
 
-all: group_diffs locplots spearman regressionmodels subject_stats descriptive_stats #ratiosplots
+all: group_diffs locplots spearman regressionmodels subject_stats descriptive_stats
 
 group_diffs: $(GROUP_DIFFS_CSV)
 

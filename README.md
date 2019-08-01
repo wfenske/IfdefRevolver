@@ -186,20 +186,23 @@ Other Unix-like systems will probably work. Windows has not been tested.
 
    `ifdefrevolve-project.sh -p myproject`
 
-   This will start the analysis.
+   This will start the analysis. It will create a directory with the
+   same name as the project, and this directory contains
+   subdirectories `snapshots` (for project checkouts), `logs` (for log
+   data), and `results` (for analysis results such as changes, CPP use, etc.).
 
    In case anything goes wrong:
 
    - You'll see some output such as
 
-     ```make: *** [results/openvpn/.analysis_successful] Error 2```
+     ``make: *** [myproject/results/.analysis_successful] Error 2``
 
-   - Inspect the log messages are in the `logs` subdirectory.  A
-	 subdirectory with the name of the analyzed project is
-	 automatically created below the `logs` directory.  Different log
+   - Inspect the log messages are in the `logs` subdirectory of the
+	 project directory. Different log
 	 files are created for different phases of the analysis process:
 
      1. lscommits.log
+     1. lsparentcommits.log
      1. checkout.log
 	 1. analyze.log
 
@@ -214,12 +217,12 @@ Other Unix-like systems will probably work. Windows has not been tested.
 	 
 1. Analysis is done when the command finished without an error code
    and without suspicious output.  `analysis.log` should conclude with
-   a line saying something like `Successfully processed 1 directories.`
+   a line saying something like
+   
+   ``INFO 10:42:42 Successfully output aggregated change data for all 42 windows.
+   make[1]: Leaving directory '/home/user/projects'
+   ``
 
-1. Excluding snapshots
+1. Start the statistical analyses
 
-   (will be described later)
-
-1. Grouping snapshots to windows
-
-   (will be described later)
+   ``make -f <IfdefRevolver>/src/main/scripts/stat-project.mk PROJECT=myproject``
