@@ -6,7 +6,7 @@ title: Data for BusyBox
 
 ## Raw Data
 
-The raw data is [available here.](data.tar.gz)
+The raw data is [available here.](https://github.com/wfenske/IfdefRevolver/releases/download/v1.9/busybox-data.tar.gz)
 
 - The file `joint_data.csv` contains all the data collected by IfdefRevolver.
 - The files `YYYY-MM-DD/all_functions.csv` contains static metrics of all the functions in the respective snapshot.
