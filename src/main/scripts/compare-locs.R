@@ -109,7 +109,8 @@ if (is.null(opts$output)) {
 ### Begin plot creation
 
 ##pdf(file=outputFn,width=7.5,height=3.6)
-cairo_pdf(file=outputFn,width=7.5,height=3.6)
+##cairo_pdf(file=outputFn,width=7.5,height=3.6)
+cairo_pdf(file=outputFn,width=8.5,height=4.5)
 
 ##x <- allData$FLgrouped
 ##y <- allData$LOC
@@ -172,7 +173,8 @@ margins[3] <- margins[3] - 4 ## decrease top margin
 ##} else {
     margins[1] <- margins[1] - 1.3 ## decrease bottom margin
 ##}
-margins[4] <- margins[4] - 1.8 ## decrease right margin
+##margins[4] <- margins[4] - 1.8 ## decrease right margin
+margins[4] <- margins[4] - 1.3 ## decrease right margin
 
 par(mar = margins)
 

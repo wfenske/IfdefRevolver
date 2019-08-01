@@ -47,7 +47,7 @@ RDS_FROM_CSV_PROG      = $(IFDEFREVOLVER_HOME)/rds-from-csv.R
 STAT_SUBJECT_PROG      = $(IFDEFREVOLVER_HOME)/stat-subject.sh
 DESCRIPTIVE_STATS_PROG = $(IFDEFREVOLVER_HOME)/descriptive-statistics.R
 
-COMPARE_LOC_OPTS ?= --no-title --ymax=400
+COMPARE_LOC_OPTS ?= --no-title ##--ymax=400
 RDS_FROM_CSV_OPTS ?=
 
 INPUT_CSV = $(RESULTS_DIR)/joint_data.csv

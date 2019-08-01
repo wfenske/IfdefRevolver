@@ -91,20 +91,25 @@ MRC_VAR <- "log2MRC"
 PC_VAR  <- "log2PC"
 ##TNF_VAR <- "log2TNF" # total number of functions
 
-VARS_CONTROLS            <- c("log2LOC", MRC_VAR, PC_VAR)
-VARS_CONTROLS_AGE        <- c(VARS_CONTROLS, AGE_VAR)
+VARS_CONTROLS            <- c("log2LOC", MRC_VAR, PC_VAR, AGE_VAR)
 
-VARS_CPP_NT              <- c(    "CND",     "FC",     "FL",     "NEG", "LOACratio")
-VARS_CPP_LOG             <- c("log2CND", "log2FC", "log2FL", "log2NEG", "LOACratio")
+VARS_CPP_NT_NOFL         <- c(    "CND",     "FC",               "NEG", "LOACratio")
+VARS_CPP_NT_NOFC         <- c(    "CND",               "FL",     "NEG", "LOACratio")
+VARS_CPP_NT_FCFL         <- c(    "CND",     "FC",     "FL",     "NEG", "LOACratio")
+
+VARS_CPP_LOG_NOFL        <- c("log2CND", "log2FC",           "log2NEG", "LOACratio")
+VARS_CPP_LOG_NOFC        <- c("log2CND",           "log2FL", "log2NEG", "LOACratio")
+VARS_CPP_LOG_FCFL        <- c("log2CND", "log2FC", "log2FL", "log2NEG", "LOACratio")
 
 FORMULA_CONTROLS         <- VARS_CONTROLS
-FORMULA_CONTROLS_AGE     <- VARS_CONTROLS_AGE
 
-FORMULA_FULL_NT          <- c(VARS_CPP_NT, VARS_CONTROLS)
-FORMULA_FULL_NT_AGE      <- c(VARS_CPP_NT, VARS_CONTROLS_AGE)
+FORMULA_FULL_NT_NOFL     <- c(VARS_CPP_NT_NOFL,  VARS_CONTROLS)
+FORMULA_FULL_NT_NOFC     <- c(VARS_CPP_NT_NOFC,  VARS_CONTROLS)
+FORMULA_FULL_NT_FCFL     <- c(VARS_CPP_NT_FCFL,  VARS_CONTROLS)
 
-FORMULA_FULL_LOG         <- c(VARS_CPP_LOG, VARS_CONTROLS)
-FORMULA_FULL_LOG_AGE     <- c(VARS_CPP_LOG, VARS_CONTROLS_AGE)
+FORMULA_FULL_LOG_NOFL    <- c(VARS_CPP_LOG_NOFL, VARS_CONTROLS)
+FORMULA_FULL_LOG_NOFC    <- c(VARS_CPP_LOG_NOFC, VARS_CONTROLS)
+FORMULA_FULL_LOG_FCFL    <- c(VARS_CPP_LOG_FCFL, VARS_CONTROLS)
 
 ### > aggregate(df.mcfaddens$MCFADDEN, by=list(Formula=df.mcfaddens$FORMULA), FUN=mean)
 ###                                                                          Formula          x
@@ -138,21 +143,23 @@ FORMULA_FULL_LOG_AGE     <- c(VARS_CPP_LOG, VARS_CONTROLS_AGE)
 getRegressionIndepsByNumber <- function(formulaCode) {
     if (formulaCode == 0)
         return(FORMULA_CONTROLS)
-    if (formulaCode == 1)
-        return(FORMULA_CONTROLS_AGE)
     
+    if (formulaCode == 1)
+        return(FORMULA_FULL_NT_NOFL)
     if (formulaCode == 2)
-        return(FORMULA_FULL_NT)
+        return(FORMULA_FULL_NT_NOFC)
     if (formulaCode == 3)
-        return(FORMULA_FULL_NT_AGE)
+        return(FORMULA_FULL_NT_FCFL)
     
     if (formulaCode == 4)
-        return(FORMULA_FULL_LOG)
+        return(FORMULA_FULL_LOG_NOFL)
     if (formulaCode == 5)
-        return(FORMULA_FULL_LOG_AGE)
+        return(FORMULA_FULL_LOG_NOFC)
+    if (formulaCode == 6)
+        return(FORMULA_FULL_LOG_FCFL)
 }
 
-MAX_FORMULA_CODE <- 5
+MAX_FORMULA_CODE <- 6
 
 standardizeVariables <- function(df) {
     sdf <- data.frame(df) ## copy original data frame
