@@ -221,6 +221,7 @@ Other Unix-like systems will probably work. Windows has not been tested.
    
    ``
    INFO 10:42:42 Successfully output aggregated change data for all 42 windows.
+   
    make[1]: Leaving directory '/home/user/projects'
    ``
 
