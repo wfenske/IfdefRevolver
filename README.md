@@ -1,7 +1,7 @@
 # IfdefRevolver
 
 Examines correlations between CPP annotations (a.k.a. `#ifdef`s) and
-negative effects, such as an increased proneness to faults or changes.
+negative effects, especially increased change proneness.
 
 ## Dependencies
 
@@ -42,8 +42,8 @@ some third-party tools, used as is.
 
 * CSVKit: https://github.com/wireservice/csvkit
 
-  Set of command-line tools to work with CSV files.  Used extensively
-  to aggregate and transform intermediate results.
+  Set of command-line tools to work with CSV files.  Used to aggregate
+  and transform intermediate results.
 
   Version used: 1.0.2 (2016)
   
@@ -57,15 +57,15 @@ some third-party tools, used as is.
   Used for statistical computations and figure creation.  The R
   scripts in `src/main/script` (extension `.R`) require it.
 
-  Version used: 3.3.2 (2016-10-31) 
+  Version used: 3.3.3 (2017-03-06)
 
 ## Compatibility
 
 `Ifdevrevolver` was successfully used under the following systems:
 
-* Linux (Ubuntu, kernel 4.10.0-26-generic, x86\_64)
+* Linux (Ubuntu, kernel 4.15.0-55-generic, x86\_64)
 
-* macOS (kernel 16.6.0, x86_64)
+* macOS (kernel 17.7.0, x86\_64)
 
 Other Unix-like systems will probably work. Windows has not been tested. 
 
