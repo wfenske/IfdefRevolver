@@ -13,9 +13,9 @@ The raw data is [available here.](https://github.com/wfenske/IfdefRevolver/relea
 - The files `YYYY-MM-DD/ABRes.csv` contains static metrics about preprocessor use of all functions in the respective snapshot.
 - The files `YYYY-MM-DD/function_change_hunks.csv` contains change metrics of all functions in the respective snapshot.
 - The files `YYYY-MM-DD/snapshot_commits.csv` contains hashes of the commits that the respective snapshot encompasses.
-- The results of the statistical tests for RQ1 is in `group_differences.csv`
-- The results of the statistical tests for RQ2 is in `spearman.csv`
-- The results of the statistical tests for RQ3 is in `logit-reg.csv` (logistic regression results), `logit-reg-std.csv` (logistic regression results after standardization), and `nb-reg.csv` (negative binomial regression with the outcomes "number of commits" and "lines changes").
+- The results of the statistical tests for RQ1 are in `group_differences.csv`
+- The results of the statistical tests for RQ2 are in `spearman.csv`
+- The results of the statistical tests for RQ3 are in `logit-reg.csv` (logistic regression results), `logit-reg-std.csv` (logistic regression results after standardization), and `nb-reg.csv` (negative binomial regression with the outcomes "number of commits" and "lines changes").
 
 ## Distributions of Independent and Dependent Variables
 
