@@ -223,7 +223,7 @@ fi
 log_info "Archiving additional results files ..."
 for ext in age bak csv mk nofc pdf rds
 do
-    for f in "$o_project/results"/*.${ext}
+    for f in "$o_project/results"/*.${ext} "$o_project/results/ABRes"
     do
 	if [ -e "$f" ]
 	then
